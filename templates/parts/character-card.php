@@ -3,7 +3,7 @@
 <script>
 window.twAdventureData = window.twAdventureData || {};
 window.twAdventureData.supabase_url         = '<?= esc_js( tw_supabase_url() ); ?>';
-window.twAdventureData.supabase_anon_key    = '<?= esc_js( tw_supabase_anon_key() ); ?>';
+// supabase_anon_key intentionally omitted — use window.twSupabase client instead
 window.twAdventureData.active_character_id  = <?= (int) $char_id; ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <?php echo do_shortcode('[tw_essences]'); ?>
         </div>
         <div class="paperdoll-wrapper">
-											<div class="corner-stat stat-left">
+									<div class="corner-stat stat-left">
                             <span class="stat-label">LOAD (KG)</span>
                             <span class="stat-value">
                                 <?= $total_mass; ?> / <?= $mass_limit; ?>
@@ -414,17 +414,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             <!-- NOTES -->
             <div class="tw-tab-content" id="player_notes">
-				<div class="tw-notes-tab-container">
+			<div class="tw-notes-tab-container">
                 <textarea class="tw-notes-area" id="twNotesField" placeholder="Enter notes..."><?= esc_textarea( $char_data['notes'] ?? '' ); ?></textarea>
                 <button class="tw-save-notes-btn" id="twSaveNotes" data-char-id="<?= (int) $char_id; ?>">SYNC DATA</button>
-				</div></div>
+			</div></div>
 
             <!-- ECHO -->
             <div class="tw-tab-content" id="echo">
                 <?php echo do_shortcode( '[character_echo]' ); ?>
             </div>
-			
-			            <!-- weavers -->
+		
+		            <!-- weavers -->
             <div class="tw-tab-content" id="weavers">
                 <?php echo do_shortcode( '[tw_weaver_list]' ); ?>
             </div>
