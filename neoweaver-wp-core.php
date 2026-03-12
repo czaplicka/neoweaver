@@ -42,6 +42,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
