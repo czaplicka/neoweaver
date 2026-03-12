@@ -357,6 +357,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.twGameState.currentWorldId     = d.active_world_id     ?? null;
     window.twGameState.currentLocationId  = d.active_location_id  ?? null;
     console.log('✓ twGameState hydrated from twAdventureData', window.twGameState);
+    document.dispatchEvent(new Event('twGameStateHydrated'));
   })();
 });
 (function () {
