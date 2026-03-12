@@ -94,7 +94,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         ? ( $c['cyber_campaign_characters'][0]['cyber_characters'] ?? null )
                         : null;
 
-                    $is_active = !isset($c['is_active']) || $c['is_active'] !== false;
+                    $is_active = ! empty( $c['is_active'] );
 
                     $game_mode = isset( $c['game_mode'] ) ? (int) $c['game_mode'] : 1;
                     $mode_str  = ( $game_mode === 2 ) ? 'TEAM' : 'SOLO';
@@ -258,7 +258,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 }
             });
 
-            // 2. ENTER MATRIX – SOLO vs TEAM
+            // 2. ENTER MATRIX - SOLO vs TEAM
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
                 const btn    = $(this);
