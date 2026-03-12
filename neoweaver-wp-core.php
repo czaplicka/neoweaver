@@ -38,16 +38,6 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php';
 // 6) Lexicon + shortcode + body_class
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
-wp_enqueue_script(
-    'nw-panel-tactical-left',
-    plugin_dir_url( __FILE__ ) . 'assets/js/panel-tactical-left.js',
-    [],
-    '1.0.0',
-    true
-);
-
-
-
 // ─── Class autoload ────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/chat-realtime.php';
@@ -97,9 +87,13 @@ add_action( 'wp_enqueue_scripts', function () {
 		NEOWEAVER_VERSION,
 		true
 	);
-	// BUG-FIX 3b: removed the second wp_enqueue_scripts callback that tried to
-	// load assets/style.css and assets/app.js — those files do not exist and
-	// caused 404s on every page load.
+	    if ( is_page( 2857 ) ) {
+        wp_enqueue_script(
+            'nw-panel-tactical-left',
+            plugin_dir_url( __FILE__ ) . 'assets/js/panel-tactical-left.js',
+            [], '1.0.0', true
+        );
+    }
 } );
 
 // ─── Register plugin page templates ───────────────────────────────────────────
