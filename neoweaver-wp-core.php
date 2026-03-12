@@ -50,6 +50,7 @@ wp_enqueue_script(
 
 // ─── Class autoload ────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/chat-realtime.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
