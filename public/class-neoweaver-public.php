@@ -54,6 +54,7 @@ class Neoweaver_Public {
 		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
 add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
+		add_action( 'wp_footer', [ $this, 'render_tag_update_popup' ] );
 
 	}
 
@@ -1466,4 +1467,45 @@ public function enqueue_quick_actions_bridge(): void {
     </script>
     <?php
 }
+	// =========================================================================
+// FOOTER SCRIPT: Tag Update Popup (game page only)
+// =========================================================================
+
+/**
+ * Outputs showTagUpdate() JS helper in wp_footer,
+ * only on the main game page (ID 2857).
+ * Call: showTagUpdate('TagName') or showTagUpdate('TagName', false) for failure.
+ */
+public function render_tag_update_popup(): void {
+    if ( ! is_page( 2857 ) ) {
+        return;
+    }
+    ?>
+    <script>
+    function showTagUpdate(tagName, isSuccess = true) {
+        const popup = document.createElement('div');
+        popup.className = `tag-update-popup ${isSuccess ? '' : 'failure'}`;
+        popup.innerHTML = `
+            <span class="tag-label">// DATA SYNC: NEW ECHO TAG ACQUIRED</span>
+            <span class="tag-name">${tagName}</span>
+        `;
+        document.body.appendChild(popup);
+
+        if (window.jQuery) {
+            jQuery(popup).fadeIn(300).delay(3000).fadeOut(500, function() {
+                this.remove();
+            });
+        } else {
+            popup.style.opacity = '1';
+            setTimeout(() => {
+                popup.style.transition = 'opacity 0.5s';
+                popup.style.opacity = '0';
+                setTimeout(() => popup.remove(), 500);
+            }, 3000);
+        }
+    }
+    </script>
+    <?php
+}
+
 }
