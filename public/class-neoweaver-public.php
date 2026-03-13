@@ -1433,3 +1433,9 @@ document.addEventListener('DOMContentLoaded', function () {
 		return $this->screen( $html );
 	}
 }
+add_shortcode( 'tw_active_node', [ $this, 'shortcode_active_node' ] );
+
+public function shortcode_active_node(): string {
+$world_id = isset( $_GET['world_id'] ) ? sanitize_text_field( $_GET['world_id'] ) : '';
+return '<span id="node-name-display" data-world-id="' . esc_attr( $world_id ) . '">LOADING_NODE...</span>';
+}
