@@ -16,61 +16,48 @@ define( 'NEOWEAVER_VERSION',    '0.7.0' );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-/**
- * Safe require helper — loads a file only if it exists.
- * Avoids fatal errors when a file is missing or renamed.
- */
-function neoweaver_require( string $file ): void {
-	if ( file_exists( $file ) ) {
-		require_once $file;
-	} else {
-		error_log( '[NeoWeaver] Missing file: ' . $file );
-	}
-}
-
 // ─── Helpers & core includes ──────────────────────────────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/supabase-config.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/supabase-helpers.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/game-data.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/ajax-public-profile.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php' );
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-config.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-helpers.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/game-data.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-public-profile.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
 // ─── AJAX handlers ──────────────────────────────────────────────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php' );
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 
 // ─── Game page scripts (wp_footer, page 2857 only) ────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/skills-loader.php' );
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/skills-loader.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/inventory-system.php';
 
 // ─── Class autoload ──────────────────────────────────────────────────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-deployments-creator.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-creator.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php' );
-
-// ─── Shortcodes ──────────────────────────────────────────────────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-character-campaign.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-campaign-world.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-campaigns.php' );  // fix: was shortcode-tw-list-campaign.php (singular)
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-worlds.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-essence.php' );          // fix: was shortcode-tw-esence.php (typo)
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-lobby.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-join-terminal.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-time-wheel.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-map.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-compas.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-weaver-list.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-fate-of-loom.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.php' );
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php' );
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-deployments-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-character-campaign.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-campaign-world.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-campaign.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-worlds.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-esence.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-lobby.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-join-terminal.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-time-wheel.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-map.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-compas.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-weaver-list.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-fate-of-loom.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php';
 
 // ─── REST API endpoints ────────────────────────────────────────────────────────────────────────
-neoweaver_require( NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php' );
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
 
 // ─── Enqueue shared public assets ──────────────────────────────────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
@@ -105,23 +92,12 @@ add_action( 'plugins_loaded', function () {
 
 // ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
-	if (
-		class_exists( 'Neoweaver_Agents_Repository' ) &&
-		class_exists( 'Neoweaver_Agents_List' ) &&
-		class_exists( 'Neoweaver_Agents_Creator' ) &&
-		class_exists( 'Neoweaver_Deployments_Creator' ) &&
-		class_exists( 'Neoweaver_Nodes_Creator' ) &&
-		class_exists( 'Neoweaver_Public' )
-	) {
-		$repo                = new Neoweaver_Agents_Repository();
-		$list                = new Neoweaver_Agents_List( $repo );
-		$creator             = new Neoweaver_Agents_Creator();
-		$deployments_creator = new Neoweaver_Deployments_Creator();
-		$nodes_creator       = new Neoweaver_Nodes_Creator();
-		new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
-	} else {
-		error_log( '[NeoWeaver] Bootstrap skipped — one or more core classes failed to load.' );
-	}
+	$repo                = new Neoweaver_Agents_Repository();
+	$list                = new Neoweaver_Agents_List( $repo );
+	$creator             = new Neoweaver_Agents_Creator();
+	$deployments_creator = new Neoweaver_Deployments_Creator();
+	$nodes_creator       = new Neoweaver_Nodes_Creator();
+	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
 // ─── Enqueue game page CSS ─────────────────────────────────────────────────────────────────────
