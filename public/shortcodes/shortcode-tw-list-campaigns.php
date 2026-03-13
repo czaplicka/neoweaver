@@ -90,6 +90,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $world_rel = ! empty( $c['cyber_campaign_worlds'] )
                         ? ( $c['cyber_campaign_worlds'][0]['cyber_worlds'] ?? null )
                         : null;
+                    // world_id needed client-side for the team character lookup
+                    $world_id  = ! empty( $c['cyber_campaign_worlds'] )
+                        ? ( $c['cyber_campaign_worlds'][0]['world_id'] ?? null )
+                        : null;
                     $char_rel  = ! empty( $c['cyber_campaign_characters'] )
                         ? ( $c['cyber_campaign_characters'][0]['cyber_characters'] ?? null )
                         : null;
@@ -117,7 +121,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         $main_btn = '<button class="tw-action-btn enter-matrix" 
                             data-id="' . $c_id . '" 
                             data-mode="' . esc_attr( $mode_str ) . '" 
-                            data-join="' . esc_attr( strtoupper( $join_code ) ) . '">
+                            data-join="' . esc_attr( strtoupper( $join_code ) ) . '"
+                            data-world="' . esc_attr( $world_id ) . '">
                             ENTER MATRIX
                         </button>';
                     }
@@ -305,6 +310,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     });
 
                 } else {
+                    // ── TEAM MODE ──────────────────────────────────────────────────
+                    // FIX #10: resolve the CURRENT user's own character for this
+                    // campaign's world — do NOT read from cyber_campaign_characters
+                    // (that table holds the campaign-creator's character only).
                     btn.text('LINKING...').css('opacity', '0.7');
 
                     if (!window.twSupabase) {
@@ -313,41 +322,51 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         return;
                     }
 
-                    const client = window.twSupabase;
+                    const client        = window.twSupabase;
+                    const worldId       = btn.data('world') || null;
+                    const currentWpUserId = (window.twAdventureData && (window.twAdventureData.wp_user_id || window.twAdventureData.userid)) || null;
+
+                    if (!currentWpUserId) {
+                        alert('SIGNUP FAILED: cannot detect current operator ID.');
+                        btn.text('ENTER MATRIX').css('opacity', '1');
+                        return;
+                    }
 
                     (async () => {
                         try {
-                            const { data: linkRows, error: linkError } = await client
-                                .from('cyber_campaign_characters')
-                                .select('character_id')
-                                .eq('campaign_id', campId)
-                                .limit(1);
+                            // ── Step 1: resolve this operator's character in the campaign world ──
+                            let characterId = null;
 
-                            if (linkError) {
-                                console.error('TEAM LINK ERROR', linkError);
-                                alert('DEPLOYMENT ERROR: cannot read campaign character link.');
-                                btn.text('ENTER MATRIX').css('opacity', '1');
-                                return;
+                            if (worldId) {
+                                const { data: charRows, error: charError } = await client
+                                    .from('cyber_characters')
+                                    .select('id')
+                                    .eq('wp_user_id', currentWpUserId)
+                                    .eq('world_id', worldId)
+                                    .limit(1);
+
+                                if (charError) {
+                                    console.error('CHARACTER LOOKUP ERROR', charError);
+                                    alert('SIGNUP FAILED: cannot resolve your Field Agent for this Node.');
+                                    btn.text('ENTER MATRIX').css('opacity', '1');
+                                    return;
+                                }
+
+                                if (charRows && charRows.length) {
+                                    characterId = charRows[0].id;
+                                }
                             }
 
-                            if (!linkRows || !linkRows.length || !linkRows[0].character_id) {
+                            // ── Step 2: no character found → redirect to agent creation ──
+                            if (!characterId) {
                                 window.location.href = '/agents/?campaign_id=' + campId;
                                 return;
                             }
 
-                            const characterId = linkRows[0].character_id;
-
-                            const currentWpUserId = (window.twAdventureData && (window.twAdventureData.wp_user_id || window.twAdventureData.userid)) || null;
-
-                            if (!currentWpUserId) {
-                                alert('SIGNUP FAILED: cannot detect current operator ID.');
-                                btn.text('ENTER MATRIX').css('opacity', '1');
-                                return;
-                            }
-
+                            // ── Step 3: check for existing signup (idempotent) ──
                             const { data: existingSignups, error: existingError } = await client
                                 .from('cyber_campaign_signups')
-                                .select('id, campaign_id, wp_user_id, character_id')
+                                .select('id')
                                 .eq('campaign_id', campId)
                                 .eq('wp_user_id', currentWpUserId)
                                 .limit(1);
@@ -359,13 +378,14 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 return;
                             }
 
+                            // ── Step 4: insert signup with operator's OWN character ──
                             if (!existingSignups || !existingSignups.length) {
                                 const { error: signupError } = await client
                                     .from('cyber_campaign_signups')
                                     .insert({
-                                        campaign_id: campId,
-                                        character_id: characterId,
-                                        wp_user_id: currentWpUserId
+                                        campaign_id:   campId,
+                                        character_id:  characterId,   // ← current user's character
+                                        wp_user_id:    currentWpUserId
                                     });
 
                                 if (signupError) {
