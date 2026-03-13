@@ -119,6 +119,12 @@ function neoweaver_enqueue_frontend_styles() {
 			'1.0.0',
 			true
 		);
+		wp_enqueue_style(
+    'neoweaver-terminal',
+    plugin_dir_url( __FILE__ ) . '../public/assets/css/neoweaver-terminal.css',
+    [],
+    NEOWEAVER_VERSION
+);
 		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
 			'supabaseUrl' => tw_supabase_url(),
 			'supabaseKey' => tw_supabase_anon_key(),
