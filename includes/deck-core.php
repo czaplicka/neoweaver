@@ -156,7 +156,7 @@ add_action( 'wp_footer', function () {
 
             validatedCards.forEach(cardData => {
                 const cardEl = document.createElement('div');
-                cardEl.className   = `deck-card type-${cardData.typeClass} ${cardData.validation.canPlay ? '' : 'card-locked'}`;
+                cardEl.className        = `deck-card type-${cardData.typeClass} ${cardData.validation.canPlay ? '' : 'card-locked'}`;
                 cardEl.dataset.cardId   = cardData.id;
                 cardEl.dataset.cardType = cardData.typeClass;
 
@@ -292,6 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Scenario Cards — kliknięcie uruchamia generowanie przez AJAX
+    // Używamy twAdventureData.ajax_url (dostępny na froncie),
+    // z fallbackiem na ajaxurl (dostępny tylko w adminie).
+    const twAjaxUrl = window.twAdventureData?.ajax_url || (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
+
     jQuery(document).on('click', '.scenario-card', function () {
         const $card      = jQuery(this);
         const scenarioId = $card.data('scenario-id');
@@ -299,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         $card.addClass('is-loading').text('\u23F3 Generating...');
 
-        jQuery.post(ajaxurl, {
+        jQuery.post(twAjaxUrl, {
             action:      'tw_start_scenario_generation',
             scenario_id: scenarioId,
             campaign_id: campaignId
