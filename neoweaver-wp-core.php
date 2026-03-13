@@ -34,6 +34,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/skills-loader.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/inventory-system.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quick-actions.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-deck-scenarios.php';
 
 // ─── Class autoload ──────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
