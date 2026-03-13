@@ -1,17 +1,5 @@
 <?php
 /**
- * Neoweaver_Public
- *
- * Registers and renders all public-facing shortcodes for the NeoWeaver plugin.
- * This class owns NO data logic — all Supabase reads go through repository /
- * creator classes injected via the constructor.
- *
- * Shortcodes registered here:
- *   [tw_list_characters]            → shortcode_list_characters()
- *   [tale_weaver_character_creator] → shortcode_character_creator()
- *   [tw_create_campaign]            → shortcode_campaign_creator()
- *   [tw_world_creator]              → shortcode_world_creator()
- *
  * LAYOUT CONTRACT (mandatory for all current and future shortcodes):
  *   Every shortcode return value MUST be wrapped in:
  *     <div class="neoweaver-screen">…</div>
@@ -1433,9 +1421,9 @@ document.addEventListener('DOMContentLoaded', function () {
 		return $this->screen( $html );
 	}
 }
-add_shortcode( 'tw_active_node', [ $this, 'shortcode_active_node' ] );
-
 public function shortcode_active_node(): string {
-$world_id = isset( $_GET['world_id'] ) ? sanitize_text_field( $_GET['world_id'] ) : '';
-return '<span id="node-name-display" data-world-id="' . esc_attr( $world_id ) . '">LOADING_NODE...</span>';
+    $user_id = get_current_user_id();
+    if ( ! $user_id ) return '<span id="node-name-display">NO_UPLINK</span>';
+
+    return '<span id="node-name-display" data-wp-user-id="' . esc_attr( $user_id ) . '">LOADING_NODE...</span>';
 }
