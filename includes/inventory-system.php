@@ -240,3 +240,136 @@ add_action( 'wp_footer', function () {
 	</script>
 	<?php
 }, 40 );
+
+/**
+ * TALE WEAVER – LOOT & INVENTORY TAGS
+ * Parser tagów [ITEM:ID] w czacie gry + handleLootAction + refreshInventory.
+ * Hook: wp_footer, priorytet 41 (po głównym bloku inwentarza powyżej).
+ */
+add_action( 'wp_footer', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+	?>
+<script>
+/**
+ * TALE WEAVER - SYSTEM OBSŁUGI EKWIPUNKU I LOOTU
+ */
+
+// 1. PARSER TAGÓW [ITEM:ID]
+function parseInventoryTags(text) {
+    if (typeof text !== 'string') return text;
+
+    const itemRegex = /\[ITEM:(\d+)\]/g;
+    return text.replace(itemRegex, function (match, itemId) {
+        const safeId = Number.parseInt(itemId, 10);
+        if (Number.isNaN(safeId)) return match;
+
+        return `
+            <button class="tw-loot-button"
+                    data-item-id="${safeId}"
+                    onclick="window.handleLootAction(${safeId}, this)">
+                <span class="tw-btn-text">TAKE ITEM</span>
+                <span class="tw-btn-id">#${safeId}</span>
+            </button>
+        `;
+    });
+}
+
+// 2. OBSŁUGA KLIKNIĘCIA "TAKE ITEM" (Make.com)
+window.handleLootAction = function (itemId, buttonElement) {
+    const webhookUrl = 'https://hook.eu2.make.com/7e7vk81sk2pgut86mk06waclqmoxxqgn';
+    if (!buttonElement) return;
+
+    const characterId = window.currentPlayerId || 1;
+
+    buttonElement.disabled = true;
+    buttonElement.classList.add('syncing');
+    const originalContent = buttonElement.innerHTML;
+    buttonElement.innerText = 'SYNCING...';
+
+    const payload = {
+        action: 'loot_item',
+        character_id: characterId,
+        item_id: itemId,
+    };
+
+    fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+        .then((response) => {
+            if (!response.ok) throw new Error('Network error');
+            return response.json().catch(() => ({}));
+        })
+        .then((data) => {
+            if (data.success) {
+                buttonElement.innerHTML = '&#10003; ADDED';
+                buttonElement.style.borderColor = '#adff00';
+                buttonElement.style.color = '#adff00';
+
+                if (typeof window.refreshInventory === 'function') {
+                    window.refreshInventory();
+                }
+            } else {
+                const message = data.message || 'Action rejected';
+
+                if (typeof window.twHandleActionError === 'function') {
+                    window.twHandleActionError(message);
+                } else {
+                    alert(message);
+                }
+
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = originalContent;
+                buttonElement.classList.remove('syncing');
+            }
+        })
+        .catch((error) => {
+            console.error('Loot Error:', error);
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = 'RETRY';
+            buttonElement.classList.remove('syncing');
+        });
+};
+
+// 3. ODŚWIEŻANIE FRAGMENTU INWENTARZA
+window.refreshInventory = function () {
+    console.log('Neural link syncing... refreshing gear data.');
+
+    const inventoryContainer = document.getElementById('tw-inventory-app');
+    if (!inventoryContainer) {
+        console.warn('Inventory container not found on current page.');
+        return;
+    }
+
+    inventoryContainer.style.opacity = '0.5';
+
+    fetch(window.location.href)
+        .then((response) => {
+            if (!response.ok) throw new Error('Sync failed');
+            return response.text();
+        })
+        .then((html) => {
+            const parser       = new DOMParser();
+            const doc          = parser.parseFromString(html, 'text/html');
+            const newInventory = doc.getElementById('tw-inventory-app');
+
+            if (newInventory) {
+                inventoryContainer.innerHTML = newInventory.innerHTML;
+                console.log('Inventory synced with database.');
+            } else {
+                console.warn('Fresh inventory container not found in fetched HTML.');
+            }
+
+            inventoryContainer.style.opacity = '1';
+        })
+        .catch((error) => {
+            console.error('Refresh Inventory Error:', error);
+            inventoryContainer.style.opacity = '1';
+        });
+};
+</script>
+	<?php
+}, 41 );
