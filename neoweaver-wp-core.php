@@ -11,12 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────────────────────────────
 define( 'NEOWEAVER_VERSION',    '0.0.7' );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// ─── Helpers & core includes ──────────────────────────────────────────────────────────
+// ─── Helpers & core includes ──────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-config.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-helpers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/game-data.php';
@@ -24,19 +24,20 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-public-profile.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
-// ─── AJAX handlers ──────────────────────────────────────────────────────────────────────────
+// ─── AJAX handlers ──────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 
-// ─── Game page scripts (wp_footer, page 2857 only) ────────────────────────────────
+// ─── Game page scripts (wp_footer, page 2857 only) ────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/deck-core.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/skills-loader.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/inventory-system.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quick-actions.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-deck-scenarios.php';
 
-// ─── Class autoload ──────────────────────────────────────────────────────────────────────────────
+// ─── Class autoload ──────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
@@ -59,10 +60,10 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.ph
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quick-actions-cmd-center.php';
 
-// ─── REST API endpoints ────────────────────────────────────────────────────────────────────────
+// ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
 
-// ─── Enqueue shared public assets ──────────────────────────────────────────────────────
+// ─── Enqueue shared public assets ──────────────────────────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_style( 'neoweaver', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css', [], NEOWEAVER_VERSION );
@@ -73,7 +74,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	}
 } );
 
-// ─── Register plugin page templates ───────────────────────────────────────────────────
+// ─── Register plugin page templates ───────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	add_filter( 'theme_page_templates', function ( $templates ) {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
@@ -93,7 +94,7 @@ add_action( 'plugins_loaded', function () {
 	} );
 } );
 
-// ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────
+// ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	$repo                = new Neoweaver_Agents_Repository();
 	$list                = new Neoweaver_Agents_List( $repo );
@@ -103,7 +104,7 @@ add_action( 'plugins_loaded', function () {
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
-// ─── Enqueue game page CSS ─────────────────────────────────────────────────────────────────────
+// ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────
 function neoweaver_enqueue_frontend_styles() {
 	if ( is_page_template( 'adventure.php' ) || is_page( 'terminal' ) ) {
 		$base = plugin_dir_url( __FILE__ ) . 'assets/css/';
@@ -111,17 +112,16 @@ function neoweaver_enqueue_frontend_styles() {
 		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-deck', $base . 'tw-deck.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_script(
-    'neoweaver-header-node',
-    plugin_dir_url( __FILE__ ) . 'assets/js/neoweaver-header-node.js',
-    [],
-    '1.0.0',
-    true // ładuj w footer
-);
-
-wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
-    'supabaseUrl' => tw_supabase_url(),
-    'supabaseKey' => tw_supabase_anon_key(),
-] );
+			'neoweaver-header-node',
+			plugin_dir_url( __FILE__ ) . 'assets/js/neoweaver-header-node.js',
+			[],
+			'1.0.0',
+			true
+		);
+		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
+			'supabaseUrl' => tw_supabase_url(),
+			'supabaseKey' => tw_supabase_anon_key(),
+		] );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_frontend_styles' );
