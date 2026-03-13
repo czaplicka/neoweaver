@@ -109,6 +109,18 @@ function neoweaver_enqueue_frontend_styles() {
 		wp_enqueue_style( 'neoweaver-tw-core', $base . 'tw-core.css', [], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-deck', $base . 'tw-deck.css', [ 'neoweaver-tw-core' ], '1.0.0' );
+		wp_enqueue_script(
+    'neoweaver-header-node',
+    plugin_dir_url( __FILE__ ) . 'assets/js/neoweaver-header-node.js',
+    [],
+    '1.0.0',
+    true // ładuj w footer
+);
+
+wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
+    'supabaseUrl' => tw_supabase_url(),
+    'supabaseKey' => tw_supabase_anon_key(),
+] );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_frontend_styles' );
