@@ -53,7 +53,6 @@ if ( ! function_exists( 'get_public_character_inventory' ) ) {
     function get_public_character_inventory( $char_id ) {
         $base = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_character_inventory';
 
-        // Join do cyber_items, wybieramy tylko to, co chcemy pokazać
         $url = add_query_arg(
             [
                 'character_id' => 'eq.' . intval( $char_id ),
@@ -88,24 +87,56 @@ if ( ! $char ) {
     return;
 }
 
-// 5) Inkrementacja licznika wyświetleń
-$current_views = isset( $char['view_count'] ) ? intval( $char['view_count'] ) : 0;
-$new_views     = $current_views + 1;
+// 5) Atomowa inkrementacja licznika wyświetleń przez RPC (fix Bug #7).
+//
+//    Poprzednia wersja: read-then-write — race condition + brak filtra botów.
+//    Obecna wersja:
+//      a) pomijamy boty/crawlery na podstawie User-Agent,
+//      b) wywołujemy fn_increment_view_count(char_id) — PostgreSQL RPC
+//         wykonujące UPDATE … SET view_count = view_count + 1 atomowo,
+//         bez odczytu obecnej wartości po stronie PHP.
+//
+//    Wymagane SQL (wykonaj raz w Supabase SQL Editor):
+//      CREATE OR REPLACE FUNCTION fn_increment_view_count(char_id BIGINT)
+//      RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
+//        UPDATE cyber_characters
+//           SET view_count = view_count + 1
+//         WHERE id = char_id;
+//      $$;
 
-$update_url = trailingslashit( $supabase_url ) . 'rest/v1/cyber_characters?id=eq.' . intval( $char_id );
+$is_bot = false;
+$ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
+$bot_patterns = [
+    'bot', 'crawl', 'spider', 'slurp', 'mediapartners', 'facebookexternalhit',
+    'twitterbot', 'linkedinbot', 'whatsapp', 'telegrambot', 'applebot',
+    'bingpreview', 'pinterest', 'semrush', 'ahrefsbot', 'mj12bot',
+];
+foreach ( $bot_patterns as $pattern ) {
+    if ( str_contains( $ua, $pattern ) ) {
+        $is_bot = true;
+        break;
+    }
+}
 
-wp_remote_request(
-    $update_url,
-    [
-        'method'  => 'PATCH',
-        'headers' => [
-            'apikey'        => $anon_key,
-            'Authorization' => 'Bearer ' . $anon_key,
-            'Content-Type'  => 'application/json',
-        ],
-        'body'    => wp_json_encode( [ 'view_count' => $new_views ] ),
-    ]
-);
+if ( ! $is_bot ) {
+    $rpc_url = trailingslashit( $supabase_url ) . 'rest/v1/rpc/fn_increment_view_count';
+
+    wp_remote_post(
+        $rpc_url,
+        [
+            'headers' => [
+                'apikey'        => $anon_key,
+                'Authorization' => 'Bearer ' . $anon_key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode( [ 'char_id' => intval( $char_id ) ] ),
+        ]
+    );
+}
+
+// Wyświetlamy view_count z załadowanych danych + ewentualny +1 (tylko dla ludzi),
+// żeby nie wykonywać dodatkowego GET tylko dla licznika w UI.
+$display_views = ( isset( $char['view_count'] ) ? intval( $char['view_count'] ) : 0 ) + ( $is_bot ? 0 : 1 );
 
 // 6) Publiczny ekwipunek
 $inventory    = get_public_character_inventory( $char_id );
@@ -290,7 +321,7 @@ body.character-profile {
             <span>Created: <?php echo esc_html( date_i18n( 'Y-m-d', strtotime( $char['created_at'] ) ) ); ?></span>
         </div>
         <div class="profile-meta-right">
-            <span>Views: <?php echo esc_html( $new_views ); ?></span>
+            <span>Views: <?php echo esc_html( $display_views ); ?></span>
             <button class="share-btn" data-share-url="<?php echo esc_url( $profile_url ); ?>">Share</button>
         </div>
     </div>
@@ -379,35 +410,30 @@ body.character-profile {
 
 <script>
 (function() {
+    // fix(Bug #7): anon_key removed from inline JS — Loom uses window.twSupabase
+    // (injected server-side via wp_add_inline_script, never echoed here).
     async function initLoom() {
-        const charId      = "<?php echo $char_id; ?>";
-        const supabaseUrl = "<?php echo esc_js( $supabase_url ); ?>";
-        const supabaseKey = "<?php echo esc_js( $anon_key ); ?>";
+        const charId = "<?php echo intval( $char_id ); ?>";
+
+        if ( ! window.twSupabase ) {
+            await new Promise( resolve =>
+                document.addEventListener( 'twSupabaseReady', resolve, { once: true } )
+            );
+        }
+        const sb = window.twSupabase;
 
         const categories = {
             brutality: ["Attack", "Fire", "Melee", "Physical", "Lethal", "Grit"],
-            cunning: ["Stealth", "Reflex", "Glitch", "Escape", "Thievery"],
+            cunning:   ["Stealth", "Reflex", "Glitch", "Escape", "Thievery"],
             intellect: ["Technology", "Hacking", "EMP", "Logic", "Analysis"],
-            spirit: ["Magic", "Chaos", "Willpower", "Madness", "Void"],
-            presence: ["Persuasion", "Diplomacy", "Intimidation", "Social"]
+            spirit:    ["Magic", "Chaos", "Willpower", "Madness", "Void"],
+            presence:  ["Persuasion", "Diplomacy", "Intimidation", "Social"]
         };
 
-        const res = await fetch(
-            `${supabaseUrl}/rest/v1/cyber_character_deck?character_id=eq.${charId}&select=cyber_deck(tags)`,
-            {
-                headers: {
-                    'apikey': supabaseKey,
-                    'Authorization': `Bearer ${supabaseKey}`
-                }
-            }
-        );
-
-        let deckData = [];
-        try {
-            deckData = await res.json();
-        } catch (e) {
-            deckData = [];
-        }
+        const { data: deckData } = await sb
+            .from('cyber_character_deck')
+            .select('cyber_deck(tags)')
+            .eq('character_id', charId);
 
         let stats = { brutality: 0, cunning: 0, intellect: 0, spirit: 0, presence: 0 };
 
