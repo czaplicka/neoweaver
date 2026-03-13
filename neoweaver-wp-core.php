@@ -56,6 +56,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-weaver-list.php
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-fate-of-loom.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quick-actions-cmd-center.php';
 
 // ─── REST API endpoints ────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
