@@ -53,6 +53,8 @@ class Neoweaver_Public {
 		add_shortcode( 'tale_weaver_character_creator', [ $this, 'shortcode_character_creator' ] );
 		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
+add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
+
 	}
 
 	// =========================================================================
@@ -1420,10 +1422,48 @@ document.addEventListener('DOMContentLoaded', function () {
 		$html = ob_get_clean();
 		return $this->screen( $html );
 	}
-}
+
 public function shortcode_active_node(): string {
     $user_id = get_current_user_id();
     if ( ! $user_id ) return '<span id="node-name-display">NO_UPLINK</span>';
 
     return '<span id="node-name-display" data-wp-user-id="' . esc_attr( $user_id ) . '">LOADING_NODE...</span>';
+}
+	// =========================================================================
+// FOOTER SCRIPT: Quick Actions Bridge (game page only)
+// =========================================================================
+
+/**
+ * Outputs the twQuickActionsBridge script in wp_footer,
+ * only on the main game page (ID 2857).
+ * deck-core calls window.twQuickActionsBridge.updateFromCards(cards)
+ * instead of calling twUpdatePlayerTags directly.
+ */
+public function enqueue_quick_actions_bridge(): void {
+    if ( ! is_page( 2857 ) ) {
+        return;
+    }
+    ?>
+    <script>
+    (function () {
+        function updateQuickActionsFromHand(cards) {
+            const tags = (cards || []).flatMap((c) =>
+                (c.tags || '')
+                    .split(',')
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+            );
+            if (window.twUpdatePlayerTags) {
+                window.twUpdatePlayerTags(tags);
+            } else {
+                console.warn('twUpdatePlayerTags is not defined – quick actions bridge has nothing to call.');
+            }
+        }
+        window.twQuickActionsBridge = {
+            updateFromCards: updateQuickActionsFromHand,
+        };
+    })();
+    </script>
+    <?php
+}
 }
