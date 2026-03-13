@@ -69,7 +69,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
-	if ( is_page( 2857 ) ) {
+	if ( is_page_template( 'templates/adventure.php' ) || is_page( 2857 ) ) {
 		wp_enqueue_script( 'nw-panel-tactical-left', plugin_dir_url( __FILE__ ) . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
 	}
 } );
@@ -106,7 +106,7 @@ add_action( 'plugins_loaded', function () {
 
 // ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────
 function neoweaver_enqueue_frontend_styles() {
-	if ( is_page_template( 'adventure.php' ) || is_page( 'terminal' ) ) {
+	if ( is_page_template( 'templates/adventure.php' ) || is_page( 2857 ) ) {
 		$base = plugin_dir_url( __FILE__ ) . 'assets/css/';
 		wp_enqueue_style( 'neoweaver-tw-core', $base . 'tw-core.css', [], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
