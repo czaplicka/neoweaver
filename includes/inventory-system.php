@@ -243,8 +243,11 @@ add_action( 'wp_footer', function () {
 
 /**
  * TALE WEAVER – LOOT & INVENTORY TAGS
- * Parser tagów [ITEM:ID] w czacie gry + handleLootAction + refreshInventory.
+ * Parser tagów [ITEM:ID] w czacie gry + handleLootAction.
  * Hook: wp_footer, priorytet 41 (po głównym bloku inwentarza powyżej).
+ *
+ * window.refreshInventory = alias do refreshInventoryUI() z bloku 40,
+ * dzięki czemu paperdoll odświeża się bezpośrednio po loocie.
  */
 add_action( 'wp_footer', function () {
 	if ( ! is_page( 2857 ) ) {
@@ -281,7 +284,9 @@ window.handleLootAction = function (itemId, buttonElement) {
     const webhookUrl = 'https://hook.eu2.make.com/7e7vk81sk2pgut86mk06waclqmoxxqgn';
     if (!buttonElement) return;
 
-    const characterId = window.currentPlayerId || 1;
+    const characterId = window.twAdventureData?.active_character_id
+        || window.currentPlayerId
+        || 1;
 
     buttonElement.disabled = true;
     buttonElement.classList.add('syncing');
@@ -309,8 +314,9 @@ window.handleLootAction = function (itemId, buttonElement) {
                 buttonElement.style.borderColor = '#adff00';
                 buttonElement.style.color = '#adff00';
 
-                if (typeof window.refreshInventory === 'function') {
-                    window.refreshInventory();
+                // Wywolaj refreshInventoryUI() (paperdoll + lista) zdefiniowany w bloku 40.
+                if (typeof refreshInventoryUI === 'function') {
+                    refreshInventoryUI();
                 }
             } else {
                 const message = data.message || 'Action rejected';
@@ -334,41 +340,14 @@ window.handleLootAction = function (itemId, buttonElement) {
         });
 };
 
-// 3. ODŚWIEŻANIE FRAGMENTU INWENTARZA
+// 3. window.refreshInventory — publiczny alias do refreshInventoryUI()
+// Pozwala zewnętrznym skryptom (np. czat) wolać obie nazwy.
 window.refreshInventory = function () {
-    console.log('Neural link syncing... refreshing gear data.');
-
-    const inventoryContainer = document.getElementById('tw-inventory-app');
-    if (!inventoryContainer) {
-        console.warn('Inventory container not found on current page.');
-        return;
+    if (typeof refreshInventoryUI === 'function') {
+        refreshInventoryUI();
+    } else {
+        console.warn('refreshInventoryUI not available yet.');
     }
-
-    inventoryContainer.style.opacity = '0.5';
-
-    fetch(window.location.href)
-        .then((response) => {
-            if (!response.ok) throw new Error('Sync failed');
-            return response.text();
-        })
-        .then((html) => {
-            const parser       = new DOMParser();
-            const doc          = parser.parseFromString(html, 'text/html');
-            const newInventory = doc.getElementById('tw-inventory-app');
-
-            if (newInventory) {
-                inventoryContainer.innerHTML = newInventory.innerHTML;
-                console.log('Inventory synced with database.');
-            } else {
-                console.warn('Fresh inventory container not found in fetched HTML.');
-            }
-
-            inventoryContainer.style.opacity = '1';
-        })
-        .catch((error) => {
-            console.error('Refresh Inventory Error:', error);
-            inventoryContainer.style.opacity = '1';
-        });
 };
 </script>
 	<?php
