@@ -352,3 +352,72 @@ window.refreshInventory = function () {
 </script>
 	<?php
 }, 41 );
+
+/**
+ * TALE WEAVER – LOOT ERROR OVERLAY
+ * Narracyjny overlay błędu przy nieudanej próbie podniesienia przedmiotu.
+ * Hook: wp_footer, priorytet 42 (po blokach inwentarza i loot tagów).
+ */
+add_action( 'wp_footer', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+	?>
+<script>
+/**
+ * Tale Weaver - Text-to-Inventory Feedback
+ * Wyświetla błąd narracyjny, gdy próba podniesienia przedmiotu zawiedzie.
+ */
+window.twHandleActionError = function (rawMessage) {
+    if (!rawMessage) rawMessage = 'Unknown error';
+    const msg   = String(rawMessage);
+    const lower = msg.toLowerCase();
+
+    let narrativeError = 'SYSTEM REFUSAL: ';
+
+    if (lower.includes('too weak')) {
+        narrativeError += 'The item is too heavy for your current physical state.';
+    } else if (lower.includes('too large')) {
+        narrativeError += "You have no room for this. It's too bulky for your gear.";
+    } else if (lower.includes('full')) {
+        narrativeError += 'Your containers are at maximum capacity.';
+    } else if (lower.includes('not equipped')) {
+        narrativeError += 'You are trying to stow this in a bag you are not wearing.';
+    } else {
+        narrativeError += msg;
+    }
+
+    const existing = document.querySelector('.tw-terminal-error');
+    if (existing) existing.remove();
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'tw-terminal-error';
+    errorDiv.innerHTML = `
+        <div style="
+            background: rgba(20, 0, 0, 0.9);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+            padding: 15px;
+            font-family: 'Chakra Petch', sans-serif;
+            position: fixed;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
+            text-align: center;
+        ">
+            <span style="color: #adff00;">[LOG_ERROR]</span><br>${narrativeError}
+        </div>
+    `;
+    document.body.appendChild(errorDiv);
+
+    setTimeout(() => {
+        if (errorDiv && errorDiv.parentNode) {
+            errorDiv.remove();
+        }
+    }, 4000);
+};
+</script>
+	<?php
+}, 42 );
