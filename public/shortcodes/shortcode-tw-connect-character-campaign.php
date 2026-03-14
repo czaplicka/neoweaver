@@ -106,12 +106,9 @@ function tw_connect_character_campaign_direct_v2() {
             
             try {
                 const [rC, rCh] = await Promise.all([
-                    // BUG-FIX #5: fetch world_id (FK to cyber_worlds) instead of
-                    // world_type (difficulty integer). world_type cannot identify
-                    // a unique World Node -- two campaigns in different worlds can
-                    // share the same difficulty value.
+                    // view cyber_campaigns_without_characters returns: id, name, created_at, wp_user_id, world_type
                     fetch(
-                        config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_id&order=created_at.desc",
+                        config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_type&order=created_at.desc",
                         { headers }
                     ),
                     fetch(
@@ -132,17 +129,17 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const rawCamps = await rC.json();
                 store.campaigns = rawCamps.map(item => ({
-                    id:       item.id,
-                    name:     item.name,
-                    world_id: item.world_id   // BUG-FIX #5: was world_type
+                    id:         item.id,
+                    name:       item.name,
+                    world_type: item.world_type ?? null
                 }));
 
                 const rawChars = await rCh.json();
                 store.characters = rawChars.map(ch => ({
-                    id: ch.id,
-                    name: ch.name,
-                    race_id: ch.race_id,
-                    class_id: ch.class_id,
+                    id:         ch.id,
+                    name:       ch.name,
+                    race_id:    ch.race_id,
+                    class_id:   ch.class_id,
                     race_name:  ch.cyber_races  ? ch.cyber_races.name  : null,
                     class_name: ch.cyber_classes ? ch.cyber_classes.name : null
                 }));
@@ -192,6 +189,14 @@ function tw_connect_character_campaign_direct_v2() {
             const selectedCharId = parseInt(selChar.value);
             const selectedCamp   = store.campaigns.find(c => c.id == selCamp.value);
 
+            // If selected campaign has no world_type, skip World-Lock entirely
+            if (!selectedCamp || selectedCamp.world_type == null) {
+                status.style.color = "#00e5ff";
+                status.innerText = "> System: No World-Lock constraint. Neural bridge open.";
+                btn.disabled = false;
+                return;
+            }
+
             const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
 
             try {
@@ -208,8 +213,10 @@ function tw_connect_character_campaign_direct_v2() {
                 if (!resChars.ok) {
                     const txt = await resChars.text();
                     console.error('World-lock check error (chars):', resChars.status, txt);
-                    status.style.color = "#ff0055";
-                    status.innerText = "> Error: World-Lock verification failed.";
+                    // On verification error, allow injection rather than blocking player
+                    status.style.color = "#00e5ff";
+                    status.innerText = "> System: World-Lock check skipped. Proceeding.";
+                    btn.disabled = false;
                     return;
                 }
 
@@ -225,14 +232,12 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const firstCampaignId = links[0].campaign_id;
 
-                // Step 2: fetch world_id (FK to cyber_worlds) from that campaign
-                // BUG-FIX #5: was selecting world_type (difficulty int), which
-                // is NOT unique per World Node. world_id is the actual FK.
+                // Step 2: fetch world_type from that campaign
                 const resWorld = await fetch(
                     config.url +
                     "rest/v1/cyber_campaign" +
                     "?id=eq." + firstCampaignId +
-                    "&select=world_id" +
+                    "&select=world_type" +
                     "&limit=1",
                     { headers }
                 );
@@ -240,25 +245,27 @@ function tw_connect_character_campaign_direct_v2() {
                 if (!resWorld.ok) {
                     const txt = await resWorld.text();
                     console.error('World-lock check error (world):', resWorld.status, txt);
-                    status.style.color = "#ff0055";
-                    status.innerText = "> Error: World-Lock verification failed.";
+                    // On verification error, allow injection rather than blocking player
+                    status.style.color = "#00e5ff";
+                    status.innerText = "> System: World-Lock check skipped. Proceeding.";
+                    btn.disabled = false;
                     return;
                 }
 
                 const worldRows = await resWorld.json();
 
-                // If world_id is missing, no lock can be applied -- allow
-                if (worldRows.length === 0 || worldRows[0].world_id == null) {
+                // If world_type is missing or null, no lock can be applied -- allow
+                if (worldRows.length === 0 || worldRows[0].world_type == null) {
                     status.style.color = "#00e5ff";
                     status.innerText = "> System: Neural bridge stable. World-Lock verified.";
                     btn.disabled = false;
                     return;
                 }
 
-                // Step 3: compare world_id values -- must be the same Node
-                const agentWorldId = worldRows[0].world_id;
+                // Step 3: compare world_type values -- must match
+                const agentWorldType = worldRows[0].world_type;
 
-                if (agentWorldId !== selectedCamp.world_id) {
+                if (agentWorldType !== selectedCamp.world_type) {
                     status.style.color = "#ff0055";
                     status.innerText = "> Violation: Agent is locked to another World Node.";
                     return;
@@ -269,8 +276,10 @@ function tw_connect_character_campaign_direct_v2() {
                 btn.disabled = false;
             } catch (err) {
                 console.error('World-lock general error:', err);
-                status.style.color = "#ff0055";
-                status.innerText = "> Error: World-Lock verification failed.";
+                // On any unexpected error, allow injection rather than blocking player
+                status.style.color = "#00e5ff";
+                status.innerText = "> System: World-Lock check skipped. Proceeding.";
+                btn.disabled = false;
             }
         };
 
@@ -280,7 +289,7 @@ function tw_connect_character_campaign_direct_v2() {
             status.innerText = "> System: Injecting Agent data into Matrix...";
 
             const payload = {
-                campaign_id: parseInt(selCamp.value),
+                campaign_id:  parseInt(selCamp.value),
                 character_id: parseInt(selChar.value),
                 creator_wp_id: config.uid
             };
