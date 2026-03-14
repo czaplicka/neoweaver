@@ -47,9 +47,9 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-crea
 require_once NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-character-campaign.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-campaign-world.php';
-require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-campaign.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-campaigns.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-worlds.php';
-require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-esence.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-essence.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-lobby.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-join-terminal.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-time-wheel.php';
