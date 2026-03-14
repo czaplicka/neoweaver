@@ -12,7 +12,6 @@ function neoweave_join_terminal_shortcode() {
         return '<div class="neoweave-terminal">ERROR: SUPABASE CONFIG MISSING.</div>';
     }
 
-    // https://XXXX.supabase.co/rest/v1/
     $supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
     $supabase_key  = tw_supabase_anon_key();
 
@@ -248,3 +247,4 @@ function neoweave_join_terminal_shortcode() {
     <?php
     return ob_get_clean();
 }
+?>
