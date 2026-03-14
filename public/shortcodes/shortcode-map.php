@@ -1,3 +1,4 @@
+<?php
 function tw_render_active_game_map() {
     $wp_user_id = get_current_user_id();
     if (!$wp_user_id) return '<div style="padding:20px; color:red;">[ACCESS DENIED]: Link not established.</div>';
