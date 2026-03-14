@@ -1,3 +1,4 @@
+<?php
 /**
  * SHORTCODE: [tw_connect_character_campaign]
  * NEOWEAVE AGENT INJECTION (World-Lock Protocol)
@@ -62,12 +63,12 @@ function tw_connect_character_campaign_direct_v2() {
                         EXECUTE INJECTION [ENTER]
                     </button>
 
-                    <!-- WORLD‑LOCK POD PRZYCISKIEM -->
+                    <!-- WORLD-LOCK POD PRZYCISKIEM -->
                     <div class="tw-world-lock-note">
-                        <h4>WORLD‑LOCK PROTOCOL</h4>
+                        <h4>WORLD-LOCK PROTOCOL</h4>
                         <p>
                             An Agent can join multiple Deployments only within its origin World Node.
-                            Cross‑world injection will be rejected by Neoweave safety protocols.
+                            Cross-world injection will be rejected by Neoweave safety protocols.
                         </p>
                     </div>
                 </form>
@@ -105,12 +106,10 @@ function tw_connect_character_campaign_direct_v2() {
             
             try {
                 const [rC, rCh] = await Promise.all([
-                    // Kampanie bez przypisanych postaci – widok
                     fetch(
                         config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_type&order=created_at.desc",
                         { headers }
                     ),
-                    // Postacie użytkownika z nazwami rasy i klasy
                     fetch(
                         config.url + "rest/v1/cyber_characters?select=id,name,race_id,class_id,cyber_races(name),cyber_classes(name)&wp_user_id=eq." + config.uid,
                         { headers }
@@ -166,8 +165,8 @@ function tw_connect_character_campaign_direct_v2() {
                 filtered.forEach(i => {
                     let label = i.name.toUpperCase();
                     if(type === 'char') {
-                        const raceLabel  = i.race_name  || (i.race_id  ?? '–');
-                        const classLabel = i.class_name || (i.class_id ?? '–');
+                        const raceLabel  = i.race_name  || (i.race_id  ?? '-');
+                        const classLabel = i.class_name || (i.class_id ?? '-');
                         label += ` [${raceLabel} | ${classLabel}]`;
                     }
                     const opt = new Option(label, i.id);
@@ -179,7 +178,6 @@ function tw_connect_character_campaign_direct_v2() {
         document.getElementById('search-camp-char').oninput = (e) => render('camp', store.campaigns, e.target.value);
         document.getElementById('search-char').oninput     = (e) => render('char', store.characters, e.target.value);
         
-        // WORLD-LOCK: dwustopniowa weryfikacja, teraz po world_type
         form.onchange = async () => {
             btn.disabled = true;
             if (!selCamp.value || !selChar.value) return;
@@ -193,7 +191,6 @@ function tw_connect_character_campaign_direct_v2() {
             const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
 
             try {
-                // 1) znajdź kampanie, w których agent już jest
                 const resChars = await fetch(
                     config.url +
                     "rest/v1/cyber_campaign_characters" +
@@ -213,7 +210,6 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const links = await resChars.json();
 
-                // Agent jeszcze nigdzie nie był – brak world-locka, puszczamy
                 if (links.length === 0) {
                     status.style.color = "#00e5ff";
                     status.innerText = "> System: Neural bridge stable. World-Lock verified.";
@@ -223,7 +219,6 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const firstCampaignId = links[0].campaign_id;
 
-                // 2) pobierz world_type tej pierwszej kampanii agenta
                 const resWorld = await fetch(
                     config.url +
                     "rest/v1/cyber_campaign" +
@@ -243,7 +238,6 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const worldRows = await resWorld.json();
 
-                // jeśli z jakiegoś powodu kampania nie ma world_type – traktujemy jak brak locka
                 if (worldRows.length === 0 || typeof worldRows[0].world_type === "undefined" || worldRows[0].world_type === null) {
                     status.style.color = "#00e5ff";
                     status.innerText = "> System: Neural bridge stable. World-Lock verified.";
@@ -253,7 +247,6 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const agentWorldType = worldRows[0].world_type;
 
-                // 3) porównanie światów po world_type
                 if (agentWorldType !== selectedCamp.world_type) {
                     status.style.color = "#ff0055";
                     status.innerText = "> Violation: Agent is locked to another World Node.";
@@ -327,10 +320,7 @@ function tw_connect_character_campaign_direct_v2() {
         .tw-hero-stat-item { background: rgba(255,255,255,0.05); padding: 10px 20px; border-left: 2px solid #adff00; display: flex; flex-direction: column; min-width: 100px; }
         .tw-hero-stat-item .n { color: #fff; font-weight: bold; font-size: 1.2rem; }
         .tw-hero-stat-item .l { color: #555; font-size: 0.6rem; text-transform: uppercase; }
-
-        /* Grid bez prawej kolumny */
         .tw-deploy-grid { display: block; padding: 40px; }
-
         .tw-console-box { background: #050505; border-left: 3px solid #00e5ff; padding: 15px; font-family: monospace; font-size: 0.8rem; color: #00e5ff; margin-bottom: 30px; min-height: 50px; }
         .tw-selection-group { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .tw-field-box label { display: block; color: #adff00; font-size: 0.75rem; margin-bottom: 10px; font-weight: bold; }
@@ -340,7 +330,6 @@ function tw_connect_character_campaign_direct_v2() {
         .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: 0.3s; text-transform: uppercase; }
         .tw-btn-deploy:disabled { background: #1a1a1a; color: #333; cursor: not-allowed; }
         .tw-btn-deploy:hover:not(:disabled) { background: #fff; }
-
         .tw-pulse-stat { animation: tw-pulse 2s infinite; }
         @keyframes tw-pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         .tw-glitch-shake { animation: tw-shake 0.3s cubic-bezier(.36,.07,.19,.97) both; border-color: #ff0055 !important; box-shadow: 0 0 40px rgba(255, 0, 85, 0.4); }
@@ -350,22 +339,8 @@ function tw_connect_character_campaign_direct_v2() {
             30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
             40%, 60% { transform: translate3d(4px, 0, 0); }
         }
-
-        .tw-world-lock-note {
-            margin-top: 16px;
-            padding: 14px 18px;
-            border: 1px solid #333;
-            background: #050505;
-            font-size: 0.8rem;
-            color: #777;
-        }
-
-        .tw-world-lock-note h4 {
-            margin: 0 0 6px;
-            font-size: 0.8rem;
-            color: #adff00;
-            letter-spacing: 1px;
-        }
+        .tw-world-lock-note { margin-top: 16px; padding: 14px 18px; border: 1px solid #333; background: #050505; font-size: 0.8rem; color: #777; }
+        .tw-world-lock-note h4 { margin: 0 0 6px; font-size: 0.8rem; color: #adff00; letter-spacing: 1px; }
     </style>
     <?php
     return ob_get_clean();
