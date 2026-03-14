@@ -1,3 +1,4 @@
+<?php
 function tw_time_ago($timestamp) {
 	if ( ! is_page( 2857 ) ) { return ''; }
     $created = strtotime($timestamp);
