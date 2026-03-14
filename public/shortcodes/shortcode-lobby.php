@@ -9,6 +9,13 @@
  *                                  names to unauthenticated users)
  *   Both nonces are injected into the lobby element as data-* attributes by the
  *   shortcode so the JS never needs a hard-coded value.
+ *
+ * BUG #5 FIX — online dot now uses last_seen_at heartbeat:
+ *   - JS sends POST neoweave_lobby_heartbeat every 20 s (see ajax-lobby-heartbeat.php)
+ *   - enrichSignups() reads s.last_seen_at instead of s.created_at
+ *   - Online threshold: last_seen_at within the last 90 s (3 missed heartbeats)
+ *   - fetchSignups() selects last_seen_at from cyber_campaign_signups
+ *   - Nonce neoweave_heartbeat injected as data-nonce-heartbeat
  */
 
 add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
@@ -51,10 +58,10 @@ function neoweave_lobby_terminal() {
 
 	$ajax_url = admin_url( 'admin-ajax.php' );
 
-	// Per-request nonces — one per action so a stolen launch nonce
-	// cannot be replayed against user_labels and vice-versa.
-	$nonce_launch = wp_create_nonce( 'neoweave_launch' );
-	$nonce_labels = wp_create_nonce( 'neoweave_labels' );
+	// Per-request nonces.
+	$nonce_launch    = wp_create_nonce( 'neoweave_launch' );
+	$nonce_labels    = wp_create_nonce( 'neoweave_labels' );
+	$nonce_heartbeat = wp_create_nonce( 'neoweave_heartbeat' ); // Bug #5
 
 	$user_map      = [];
 	$current_user  = wp_get_current_user();
@@ -140,7 +147,8 @@ function neoweave_lobby_terminal() {
 		 data-current-user="<?php echo esc_attr( get_current_user_id() ); ?>"
 		 data-host-id="<?php echo esc_attr( $campaign_host_id ); ?>"
 		 data-nonce-launch="<?php echo esc_attr( $nonce_launch ); ?>"
-		 data-nonce-labels="<?php echo esc_attr( $nonce_labels ); ?>">
+		 data-nonce-labels="<?php echo esc_attr( $nonce_labels ); ?>"
+		 data-nonce-heartbeat="<?php echo esc_attr( $nonce_heartbeat ); ?>">
 		<div class="terminal-header">
 			<div class="terminal-title">SQUAD DEPLOYMENT: ID_<?php echo esc_html( $campaign_id ); ?></div>
 			<div class="terminal-status">
@@ -165,16 +173,25 @@ function neoweave_lobby_terminal() {
 
 	<script>
 	(function() {
+
+		/**
+		 * Online threshold: player is considered online if last_seen_at
+		 * is within the last 90 seconds (= 3 missed 20-second heartbeats).
+		 */
+		const ONLINE_THRESHOLD_MS  = 90 * 1000;
+		const HEARTBEAT_INTERVAL_MS = 20 * 1000;
+
 		function initLobbyWithClient(client) {
 			const lobbyEl = document.getElementById('neoweave-lobby');
 			if (!lobbyEl) return;
 
-			const campaignId    = lobbyEl.getAttribute('data-campaign-id');
-			const ajaxUrl       = lobbyEl.getAttribute('data-ajax-url');
-			const currentUserId = lobbyEl.getAttribute('data-current-user');
-			const hostId        = lobbyEl.getAttribute('data-host-id');
-			const nonceLaunch   = lobbyEl.getAttribute('data-nonce-launch');
-			const nonceLabels   = lobbyEl.getAttribute('data-nonce-labels');
+			const campaignId      = lobbyEl.getAttribute('data-campaign-id');
+			const ajaxUrl         = lobbyEl.getAttribute('data-ajax-url');
+			const currentUserId   = lobbyEl.getAttribute('data-current-user');
+			const hostId          = lobbyEl.getAttribute('data-host-id');
+			const nonceLaunch     = lobbyEl.getAttribute('data-nonce-launch');
+			const nonceLabels     = lobbyEl.getAttribute('data-nonce-labels');
+			const nonceHeartbeat  = lobbyEl.getAttribute('data-nonce-heartbeat');
 
 			const userMapAttr = lobbyEl.getAttribute('data-user-map');
 			let userMap = {};
@@ -189,6 +206,30 @@ function neoweave_lobby_terminal() {
 				document.getElementById('squad-slot-3'),
 				document.getElementById('squad-slot-4'),
 			];
+
+			// ─────────────────────────────────────────────
+			// HEARTBEAT  (Bug #5)
+			// Fires immediately on load, then every 20 s.
+			// Updates last_seen_at on cyber_campaign_signups
+			// so other players see a green dot.
+			// ─────────────────────────────────────────────
+			function sendHeartbeat() {
+				if (!ajaxUrl || !campaignId) return;
+				const fd = new FormData();
+				fd.append('action',      'neoweave_lobby_heartbeat');
+				fd.append('nonce',       nonceHeartbeat);
+				fd.append('campaign_id', campaignId);
+				fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+					.catch(e => console.warn('LOBBY: heartbeat failed', e));
+			}
+			sendHeartbeat();
+			const heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+			// Stop heartbeat when tab is hidden / closed
+			document.addEventListener('visibilitychange', () => {
+				if (document.hidden) clearInterval(heartbeatTimer);
+				else { sendHeartbeat(); setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS); }
+			});
 
 			function renderSlots(signups) {
 				signups.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -205,8 +246,8 @@ function neoweave_lobby_terminal() {
 						body.classList.remove('slot-empty');
 						body.innerHTML = '';
 
-						const charName  = signup.character_name || ('#' + signup.character_id);
-						const userName  = signup.user_name      || ('USER_' + signup.wp_user_id);
+						const charName   = signup.character_name || ('#' + signup.character_id);
+						const userName   = signup.user_name      || ('USER_' + signup.wp_user_id);
 						const readyLabel = signup.is_ready ? ' [READY]' : ' [IDLE]';
 
 						const avatarUrl = signup.character_avatar || '';
@@ -278,7 +319,7 @@ function neoweave_lobby_terminal() {
 					if (userIds.length && ajaxUrl) {
 						const formData = new FormData();
 						formData.append('action', 'neoweave_user_labels');
-						formData.append('nonce', nonceLabels); // <-- nonce
+						formData.append('nonce', nonceLabels);
 						userIds.forEach(id => formData.append('ids[]', id));
 
 						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
@@ -294,9 +335,12 @@ function neoweave_lobby_terminal() {
 				}
 
 				const now = Date.now();
+
 				return rawSignups.map(s => {
-					const t       = s.created_at ? new Date(s.created_at).getTime() : 0;
-					const isOnline = !isNaN(t) && t > 0 && (now - t) < 60000;
+					// Bug #5 fix: use last_seen_at heartbeat, NOT created_at.
+					// Treat NULL last_seen_at (no heartbeat yet) as offline.
+					const seenAt   = s.last_seen_at ? new Date(s.last_seen_at).getTime() : 0;
+					const isOnline = seenAt > 0 && (now - seenAt) < ONLINE_THRESHOLD_MS;
 					return {
 						...s,
 						character_name:   charsById[s.character_id]?.name   || null,
@@ -311,7 +355,8 @@ function neoweave_lobby_terminal() {
 				try {
 					const { data, error } = await client
 						.from('cyber_campaign_signups')
-						.select('campaign_id, wp_user_id, character_id, created_at, is_ready')
+						// Bug #5: added last_seen_at to the select
+						.select('campaign_id, wp_user_id, character_id, created_at, is_ready, last_seen_at')
 						.eq('campaign_id', campaignId);
 					if (error) { console.error('NEOWEAVE LOBBY: signups fetch error', error); return; }
 					renderSlots(await enrichSignups(data || []));
@@ -345,7 +390,7 @@ function neoweave_lobby_terminal() {
 				const formData = new FormData();
 				formData.append('action',      'neoweave_launch_campaign');
 				formData.append('campaign_id', campaignId);
-				formData.append('nonce',       nonceLaunch); // <-- nonce
+				formData.append('nonce',       nonceLaunch);
 
 				try {
 					const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
