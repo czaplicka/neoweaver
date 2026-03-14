@@ -1,3 +1,4 @@
+<?php
 // ==========================================
 // WORLD STATE: AUTO-INIT FOR CAMPAIGN
 // ==========================================
@@ -12,6 +13,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
         $campaign_id = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
         if ( ! $campaign_id ) {
             wp_send_json_error( 'Missing campaign_id' );
+            return;
         }
 
         $supabase_url = tw_supabase_url();
@@ -19,11 +21,12 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
         if ( empty( $supabase_url ) || empty( $anon_key ) ) {
             wp_send_json_error( 'Supabase config missing' );
+            return;
         }
 
         $base = trailingslashit( $supabase_url ) . 'rest/v1/cyber_world_state';
 
-        // 2. Sprawdź, czy wiersz już istnieje
+        // 2. Sprawdzamy, czy wiersz już istnieje
         $check_url = add_query_arg( [
             'campaign_id' => 'eq.' . $campaign_id,
             'select'      => 'campaign_id',
@@ -41,6 +44,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
         if ( is_wp_error( $check_resp ) ) {
             wp_send_json_error( 'Check error' );
+            return;
         }
 
         $code = wp_remote_retrieve_response_code( $check_resp );
@@ -50,6 +54,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
         if ( $code === 200 && is_array( $rows ) && ! empty( $rows ) ) {
             // Już istnieje – nic nie rób
             wp_send_json_success( [ 'status' => 'exists' ] );
+            return;
         }
 
         // 3. Utwórz domyślny wpis
@@ -75,6 +80,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
         if ( is_wp_error( $insert_resp ) ) {
             wp_send_json_error( 'Insert error' );
+            return;
         }
 
         $insert_code = wp_remote_retrieve_response_code( $insert_resp );
@@ -83,6 +89,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
         if ( $insert_code < 200 || $insert_code >= 300 ) {
             wp_send_json_error( 'Insert failed' );
+            return;
         }
 
         wp_send_json_success( [
