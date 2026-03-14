@@ -106,8 +106,12 @@ function tw_connect_character_campaign_direct_v2() {
             
             try {
                 const [rC, rCh] = await Promise.all([
+                    // BUG-FIX #5: fetch world_id (FK to cyber_worlds) instead of
+                    // world_type (difficulty integer). world_type cannot identify
+                    // a unique World Node -- two campaigns in different worlds can
+                    // share the same difficulty value.
                     fetch(
-                        config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_type&order=created_at.desc",
+                        config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_id&order=created_at.desc",
                         { headers }
                     ),
                     fetch(
@@ -128,9 +132,9 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const rawCamps = await rC.json();
                 store.campaigns = rawCamps.map(item => ({
-                    id: item.id,
-                    name: item.name,
-                    world_type: item.world_type
+                    id:       item.id,
+                    name:     item.name,
+                    world_id: item.world_id   // BUG-FIX #5: was world_type
                 }));
 
                 const rawChars = await rCh.json();
@@ -191,6 +195,7 @@ function tw_connect_character_campaign_direct_v2() {
             const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
 
             try {
+                // Step 1: find the first campaign this agent has already joined
                 const resChars = await fetch(
                     config.url +
                     "rest/v1/cyber_campaign_characters" +
@@ -210,6 +215,7 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const links = await resChars.json();
 
+                // Agent has never been deployed -- no World-Lock yet, allow
                 if (links.length === 0) {
                     status.style.color = "#00e5ff";
                     status.innerText = "> System: Neural bridge stable. World-Lock verified.";
@@ -219,11 +225,14 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const firstCampaignId = links[0].campaign_id;
 
+                // Step 2: fetch world_id (FK to cyber_worlds) from that campaign
+                // BUG-FIX #5: was selecting world_type (difficulty int), which
+                // is NOT unique per World Node. world_id is the actual FK.
                 const resWorld = await fetch(
                     config.url +
                     "rest/v1/cyber_campaign" +
                     "?id=eq." + firstCampaignId +
-                    "&select=world_type" +
+                    "&select=world_id" +
                     "&limit=1",
                     { headers }
                 );
@@ -238,16 +247,18 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const worldRows = await resWorld.json();
 
-                if (worldRows.length === 0 || typeof worldRows[0].world_type === "undefined" || worldRows[0].world_type === null) {
+                // If world_id is missing, no lock can be applied -- allow
+                if (worldRows.length === 0 || worldRows[0].world_id == null) {
                     status.style.color = "#00e5ff";
                     status.innerText = "> System: Neural bridge stable. World-Lock verified.";
                     btn.disabled = false;
                     return;
                 }
 
-                const agentWorldType = worldRows[0].world_type;
+                // Step 3: compare world_id values -- must be the same Node
+                const agentWorldId = worldRows[0].world_id;
 
-                if (agentWorldType !== selectedCamp.world_type) {
+                if (agentWorldId !== selectedCamp.world_id) {
                     status.style.color = "#ff0055";
                     status.innerText = "> Violation: Agent is locked to another World Node.";
                     return;
