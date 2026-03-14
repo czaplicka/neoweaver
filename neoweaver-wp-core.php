@@ -26,6 +26,8 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
 // ─── AJAX handlers ──────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-handlers.php';
+
 
 // ─── Game page scripts (wp_footer, page 2857 only) ────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
