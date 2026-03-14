@@ -1,3 +1,4 @@
+<?php
 add_shortcode('tw_weaver_list', 'tw_display_weaver_list');
 
 function tw_display_weaver_list() {
