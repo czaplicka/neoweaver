@@ -1,3 +1,4 @@
+<?php
 if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
     function tw_loom_of_fate_shortcode() {
         // Pobieramy ID po stronie PHP jako fallback (na wszelki wypadek)
