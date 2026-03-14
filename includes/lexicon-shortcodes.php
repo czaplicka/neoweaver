@@ -86,7 +86,10 @@ add_shortcode(
 
 if ( ! function_exists( 'tw_public_profile_body_class' ) ) {
     function tw_public_profile_body_class( $classes ) {
-        if ( is_page() && get_page_template_slug( get_queried_object_id() ) === 'public_profile.php' ) {
+        // BUG-FIX #2: slug was 'public_profile.php' — wrong name, missing
+        // 'templates/' prefix. Template is registered under
+        // 'templates/public-character-profile.php' in neoweaver-wp-core.php.
+        if ( is_page() && get_page_template_slug( get_queried_object_id() ) === 'templates/public-character-profile.php' ) {
             $classes[] = 'character-profile';
         }
         return $classes;
