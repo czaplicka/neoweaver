@@ -1,3 +1,4 @@
+<?php
 /**
  * Shortcode: [tw_compass]
  * Renderuje interaktywny kompas pobierający dane z cyber_world_map.
