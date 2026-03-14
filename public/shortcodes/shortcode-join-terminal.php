@@ -1,3 +1,4 @@
+<?php
 add_shortcode('neoweave_join_terminal', 'neoweave_join_terminal_shortcode');
 
 function neoweave_join_terminal_shortcode() {
