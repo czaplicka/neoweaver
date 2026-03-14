@@ -1,3 +1,4 @@
+<?php
 /**
  * SHORTCODE: [tw_list_worlds]
  * Wersja v12: Multi-Campaign + World Modal + INITIALIZING + Agent/Status + DELETE
