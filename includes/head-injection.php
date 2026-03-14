@@ -200,13 +200,11 @@ add_action( 'wp_head', function () {
 	 * Wymaga CSS klasy .failed-animation (zdefiniowanej w arkuszu gry).
 	 */
 	function triggerQuestFailureEffect(questId) {
-		// 1. Znajdź kartę questa i dodaj jej efekt wizualny
 		const card = document.getElementById('quest-' + questId);
 		if (card) {
 			card.classList.add('failed-animation');
 		}
 
-		// 2. Stwórz pełnoekranową nakładkę
 		const overlay = document.createElement('div');
 		overlay.className = 'quest-failed-overlay';
 		overlay.innerHTML = `
@@ -215,10 +213,6 @@ add_action( 'wp_head', function () {
 		`;
 		document.body.appendChild(overlay);
 
-		// 3. Efekt dźwiękowy (opcjonalnie)
-		// playSound('glitch_error.mp3');
-
-		// 4. Usuń nakładkę po 3 sekundach
 		setTimeout(() => {
 			overlay.style.transition = 'opacity 1s ease';
 			overlay.style.opacity = '0';
@@ -228,6 +222,136 @@ add_action( 'wp_head', function () {
 	</script>
 	<?php
 }, 10 );
+
+// ==========================================
+// DECK PANEL – UI tabs (Mission / Augments / Skills)
+// Tylko na stronie gry (ID 2857)
+// ==========================================
+
+add_action( 'wp_head', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+	?>
+	<script>
+	/**
+	 * DECK PANEL: tab switching, collapse/expand, keyboard escape.
+	 *
+	 * Eksposes window.twInitDeckPanel() for manual re-init (e.g. after
+	 * dynamic DOM replacement). Tab "tab-skills" calls
+	 * window.twLoadSkillsAndAbilities() if that function exists.
+	 *
+	 * Audio relies on files at:
+	 *   /wp-content/uploads/sounds/ui-click.mp3
+	 *   /wp-content/uploads/sounds/glitch-static.mp3
+	 */
+	(function () {
+		const SOUND_BASE = '/wp-content/uploads/sounds/';
+		const sounds = {
+			tab:   new Audio(SOUND_BASE + 'ui-click.mp3'),
+			glitch: new Audio(SOUND_BASE + 'glitch-static.mp3'),
+		};
+
+		function playSound(name) {
+			const sound = sounds[name];
+			if (!sound) return;
+			sound.currentTime = 0;
+			sound.volume = 0.2;
+			sound.play().catch(() => {});
+		}
+
+		function initDeckPanel() {
+			console.log('initDeckPanel CALLED');
+			const deckPanel = document.getElementById('deck-panel');
+			if (!deckPanel) return;
+
+			// Prevent clicks inside the panel from bubbling to body/overlay
+			deckPanel.addEventListener('click', (e) => e.stopPropagation());
+
+			const panelTabs      = document.querySelectorAll('.panel-tab');
+			const toggleBtn      = document.getElementById('toggle-deck');
+			const deckTabsWrapper = document.querySelector('.deck-tabs-wrapper');
+
+			function switchTab(targetId) {
+				const tabContents = document.querySelectorAll('.deck-tab-content');
+				const tabs        = document.querySelectorAll('.panel-tab');
+
+				playSound('tab');
+				playSound('glitch');
+
+				// Auto-expand if collapsed
+				if (deckPanel.classList.contains('is-collapsed')) {
+					deckPanel.classList.remove('is-collapsed');
+					deckPanel.classList.add('is-open');
+				}
+
+				tabContents.forEach((content) => {
+					content.classList.toggle('is-active', content.id === targetId);
+				});
+
+				tabs.forEach((btn) => {
+					btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId);
+				});
+
+				// Lazy-load skills tab
+				if (targetId === 'tab-skills' && typeof window.twLoadSkillsAndAbilities === 'function') {
+					window.twLoadSkillsAndAbilities();
+				}
+			}
+
+			panelTabs.forEach((btn) => {
+				btn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const targetId = btn.getAttribute('data-tab');
+					// Exclude the toggle button itself
+					if (targetId && btn.id !== 'toggle-deck') {
+						switchTab(targetId);
+					}
+				});
+			});
+
+			if (toggleBtn) {
+				toggleBtn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const isOpen = deckPanel.classList.contains('is-open');
+					deckPanel.classList.toggle('is-open',      !isOpen);
+					deckPanel.classList.toggle('is-collapsed',  isOpen);
+				});
+			}
+
+			if (deckTabsWrapper) {
+				deckTabsWrapper.addEventListener('click', (e) => {
+					// Only react to clicks directly on the wrapper background
+					if (e.target === deckTabsWrapper) {
+						const isOpen = deckPanel.classList.contains('is-open');
+						deckPanel.classList.toggle('is-open',      !isOpen);
+						deckPanel.classList.toggle('is-collapsed',  isOpen);
+					}
+				});
+			}
+
+			// Keyboard: Escape collapses the panel
+			document.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
+					deckPanel.classList.add('is-collapsed');
+					deckPanel.classList.remove('is-open');
+				}
+			});
+		}
+
+		// Run immediately if DOM is ready, otherwise wait
+		if (document.readyState === 'complete' || document.readyState === 'interactive') {
+			initDeckPanel();
+		} else {
+			document.addEventListener('DOMContentLoaded', initDeckPanel);
+		}
+
+		// Expose for external re-init calls
+		window.twInitDeckPanel = initDeckPanel;
+	})();
+	</script>
+	<?php
+}, 15 );
 
 // ==========================================
 // TALE WEAVER FULL ENGINE v5
@@ -275,7 +399,6 @@ add_action( 'wp_head', function () {
 			if (cards.length > 0 && !window.scenarioListenerBound) {
 				console.log('🎯 FULL BINDING ACTIVE!');
 
-				// Event delegation on body (catches dynamically added cards too)
 				document.body.addEventListener('click', (e) => {
 					const card = e.target.closest('.deck-card.scenario-card');
 					if (!card || !card.dataset.scenarioId) return;
@@ -284,7 +407,6 @@ add_action( 'wp_head', function () {
 					e.preventDefault();
 					e.stopPropagation();
 
-					// --- CARD CLONE SETUP ---
 					const rect  = card.getBoundingClientRect();
 					const clone = card.cloneNode(true);
 					clone.className = '';
@@ -299,11 +421,9 @@ add_action( 'wp_head', function () {
 					clone.style.margin   = '0';
 					document.body.appendChild(clone);
 
-					// Hide original
 					card.style.opacity       = '0';
 					card.style.pointerEvents = 'none';
 
-					// --- UI CLEANUP ---
 					const deckPanelEl = document.getElementById('deck-panel');
 					if (deckPanelEl) deckPanelEl.classList.add('fade-out-scenery');
 
@@ -313,8 +433,7 @@ add_action( 'wp_head', function () {
 						missionTab.classList.add('ui-element-hidden');
 					}
 
-					// --- FLIGHT → BURN (synchronised with CSS timings) ---
-					void clone.offsetWidth; // Force reflow before adding class
+					void clone.offsetWidth;
 
 					requestAnimationFrame(() => {
 						clone.classList.add('centering');
@@ -338,9 +457,6 @@ add_action( 'wp_head', function () {
 			}
 		}, 1000);
 
-		// -------------------------------------------------------
-		// 2. Lore Tips loader
-		// -------------------------------------------------------
 		async function loadLoreTips() {
 			try {
 				const response = await fetch(
@@ -355,9 +471,6 @@ add_action( 'wp_head', function () {
 			}
 		}
 
-		// -------------------------------------------------------
-		// 3. Weaving Overlay + AI scenario polling
-		// -------------------------------------------------------
 		async function showWeavingOverlay(scenarioId) {
 			if (!loreTips.length) await loadLoreTips();
 			triggerScenarioGeneration(scenarioId);
@@ -371,7 +484,6 @@ add_action( 'wp_head', function () {
 			createMatrixEffect(overlay);
 			rotateTips(overlay);
 
-			// Poll for AI-generated message (max 40 attempts × 2 s = 80 s)
 			let attempts = 0;
 			const ajaxUrl = (window.twAdventureData && window.twAdventureData.ajax_url)
 				|| '/wp-admin/admin-ajax.php';
@@ -444,12 +556,12 @@ add_action( 'wp_head', function () {
 		}
 
 		function rotateTips(overlay) {
-			const tipEl   = overlay.querySelector('#weaving-tip');
+			const tipEl    = overlay.querySelector('#weaving-tip');
 			let   tipIndex = 0;
 			tipInterval = setInterval(() => {
 				tipEl.textContent     = loreTips[tipIndex % loreTips.length];
 				tipEl.style.animation = 'none';
-				tipEl.offsetHeight;   // Force reflow
+				tipEl.offsetHeight;
 				tipEl.style.animation = 'tip-fade 0.8s ease-out forwards';
 				tipIndex++;
 			}, 4500);
@@ -483,7 +595,6 @@ add_action( 'wp_head', function () {
 				setTimeout(() => overlay.remove(), 800);
 			}
 
-			// Restore mission tab button
 			const missionTab = document.querySelector('button.panel-tab[data-tab="tab-scenarios"]');
 			if (missionTab) missionTab.classList.remove('ui-element-hidden');
 		}
