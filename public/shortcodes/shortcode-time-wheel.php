@@ -1,3 +1,4 @@
+<?php
 add_shortcode('tw_time_wheel', 'tw_display_time_wheel');
 
 function tw_display_time_wheel() {
