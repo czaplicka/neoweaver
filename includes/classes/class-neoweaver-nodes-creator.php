@@ -7,13 +7,19 @@
  * Responsibilities:
  *   - validate()            — gate-check required fields and auth state
  *   - build_payload()       — assemble the FormData-equivalent array
- *   - create_via_endpoint() — wp_remote_post() to the theme endpoint
+ *   - create_via_rest_api() — calls neoweaver_create_world() directly (no loopback HTTP)
  *   - create()              — orchestrator; fires neoweaver_node_created on success
  *
- * The front-end JS continues to submit directly to tw-endpoint-world.php;
+ * The front-end JS continues to submit directly to the REST endpoint;
  * this class provides a PHP-side API for server-driven creation and future tests.
  *
  * No namespaces. No Supabase direct calls — the endpoint owns that contract.
+ *
+ * BUG-FIX 4: create_via_rest_api() previously used wp_remote_post() to call
+ * its own REST endpoint, which arrived unauthenticated (no session cookies on
+ * loopback) and always triggered a 401 from neoweaver_user_can_play().
+ * Fixed by calling neoweaver_create_world() directly via a synthetic
+ * WP_REST_Request — no HTTP round-trip, no auth problem.
  *
  * @package Neoweaver
  */
@@ -77,7 +83,7 @@ class Neoweaver_Nodes_Creator {
 	}
 
 	/**
-	 * Build the payload array expected by tw-endpoint-world.php.
+	 * Build the payload array expected by neoweaver_create_world().
 	 *
 	 * Field names are kept exactly as the current form posts them.
 	 * wp_user_id is injected from the current session.
@@ -104,43 +110,50 @@ class Neoweaver_Nodes_Creator {
 	}
 
 	/**
-	 * POST the payload to the theme's tw-endpoint-world.php.
+	 * Call neoweaver_create_world() directly via a synthetic WP_REST_Request.
 	 *
-	 * Uses wp_remote_post() so it respects WordPress proxy / SSL settings.
-	 * The endpoint URL matches what the front-end JS uses — no contract change.
+	 * BUG-FIX 4: The previous implementation used wp_remote_post() to hit the
+	 * plugin's own REST endpoint. Loopback requests carry no session cookies, so
+	 * is_user_logged_in() returned false and every call got a 401.
+	 *
+	 * The fix bypasses HTTP entirely: we build a WP_REST_Request from the
+	 * payload and invoke neoweaver_create_world() in-process. The current user
+	 * session is already available, nonce verification passes because
+	 * build_payload() mints a fresh nonce, and no network round-trip occurs.
 	 *
 	 * @param  array $payload  Output of build_payload().
 	 * @return array  ['success' => bool, 'data' => mixed]
 	 */
+	public function create_via_rest_api( array $payload ): array {
+		if ( ! function_exists( 'neoweaver_create_world' ) ) {
+			error_log( 'TW Nodes Creator – neoweaver_create_world() not found; api-endpoints.php not loaded.' );
+			return [
+				'success' => false,
+				'data'    => [ 'message' => 'World creation handler not available.' ],
+			];
+		}
 
-public function create_via_rest_api( array $payload ): array {
-    $endpoint_url = rest_url('neoweaver/v1/world/create');
-    
-    $response = wp_remote_post($endpoint_url, [
-        'body' => $payload,
-        'timeout' => 60,
-    ]);
+		// Build a synthetic REST request so neoweaver_create_world() can use
+		// its normal get_param() interface without any HTTP involvement.
+		$request = new WP_REST_Request( 'POST', '/neoweaver/v1/world/create' );
+		$request->set_body_params( $payload );
 
+		$response = neoweaver_create_world( $request );
+
+		// WP_Error from the handler.
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW Nodes Creator – wp_remote_post error: ' . $response->get_error_message() );
+			error_log( 'TW Nodes Creator – neoweaver_create_world() error: ' . $response->get_error_message() );
 			return [
 				'success' => false,
 				'data'    => [ 'message' => $response->get_error_message() ],
 			];
 		}
 
-		$body    = wp_remote_retrieve_body( $response );
-		$decoded = json_decode( $body, true );
+		// WP_REST_Response — extract the data array.
+		$decoded = $response instanceof WP_REST_Response
+			? $response->get_data()
+			: (array) $response;
 
-		if ( $decoded === null ) {
-			error_log( 'TW Nodes Creator – JSON decode failed. Raw body: ' . $body );
-			return [
-				'success' => false,
-				'data'    => [ 'message' => 'Endpoint returned non-JSON response.' ],
-			];
-		}
-
-		// Endpoint contract: { success: true|false, data: { ... } }
 		return [
 			'success' => ! empty( $decoded['success'] ),
 			'data'    => $decoded['data'] ?? $decoded,
