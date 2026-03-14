@@ -8,20 +8,66 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ==========================================
 
 /**
+ * Game-page detection helper.
+ *
+ * Returns true only for pages that actually need window.twAdventureData:
+ *   - Pages using a NeoWeaver PHP template (templates/*.php)
+ *   - The hard-coded game page (ID 2857)
+ *   - Any page whose slug starts with one of the game prefixes
+ *
+ * All other WordPress pages (blog, shop, etc.) are excluded so we never
+ * fire 3 Supabase HTTP requests on irrelevant page loads.
+ */
+if ( ! function_exists( 'tw_is_game_page' ) ) {
+	function tw_is_game_page(): bool {
+		if ( ! is_singular() && ! is_page() ) {
+			return false;
+		}
+
+		// Hard-coded game page ID
+		if ( is_page( 2857 ) ) {
+			return true;
+		}
+
+		// Any page using a NeoWeaver PHP template
+		$template = get_page_template_slug( get_queried_object_id() );
+		if ( $template && str_starts_with( $template, 'templates/' ) ) {
+			return true;
+		}
+
+		// Slug-based guard for game section pages
+		$game_slugs = [ 'game', 'play', 'legend', 'deployments', 'field-agents', 'nodes', 'inventory' ];
+		$slug = get_post_field( 'post_name', get_queried_object_id() );
+		foreach ( $game_slugs as $prefix ) {
+			if ( str_starts_with( $slug, $prefix ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
+/**
  * Wstrzykujemy:
  * - Supabase JS
  * - window.twAdventureData (dane gry + konfiguracja)
  *
- * BUG-FIX 1: The entire function + add_action block was duplicated in the
- * file (a second bare `<?php` tag began a copy-paste of the same code).
- * PHP would fatal with "Cannot redeclare tw_inject_global_data()" on the
- * second declaration. The duplicate block is removed.
- * The add_action call is also moved inside the function_exists guard so it
- * is only registered once even if something causes the file to be parsed
- * more than once.
+ * BUG-FIX (original): duplicate function declaration removed.
+ * BUG-FIX #4: added two-layer guard:
+ *   1. tw_is_game_page() — skips all non-game pages entirely.
+ *   2. 60-second per-user transient — eliminates repeated Supabase calls
+ *      on the same game page across multiple requests within one minute.
+ *      The transient is invalidated on session/character change by calling
+ *      tw_invalidate_game_data_cache( $user_id ) from any write handler.
  */
 if ( ! function_exists( 'tw_inject_global_data' ) ) {
 	function tw_inject_global_data() {
+		// Gate 1: only fire on game-related pages
+		if ( ! tw_is_game_page() ) {
+			return;
+		}
+
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			return;
@@ -29,20 +75,30 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 
 		$gm_avatar_url = get_option( 'gm_avatar_url', '' );
 
-		if ( function_exists( 'get_user_game_data_from_supabase' ) ) {
-			$game_data = get_user_game_data_from_supabase( $user_id );
-		} else {
-			$game_data = [
-				'active_session_id'   => null,
-				'active_campaign_id'  => null,
-				'active_character_id' => null,
-				'active_scenario_id'  => null,
-				'char_name'           => 'Unknown',
-				'char_class'          => 'None',
-				'char_tags'           => [],
-				'campaign_world_type' => 1,
-				'wp_user_id'          => $user_id,
-			];
+		// Gate 2: transient cache (60 s) — avoids 3 Supabase calls per page hit
+		$cache_key = 'tw_game_data_' . $user_id;
+		$game_data = get_transient( $cache_key );
+
+		if ( false === $game_data ) {
+			if ( function_exists( 'get_user_game_data_from_supabase' ) ) {
+				$game_data = get_user_game_data_from_supabase( $user_id );
+			} else {
+				$game_data = [
+					'active_session_id'   => null,
+					'active_campaign_id'  => null,
+					'active_character_id' => null,
+					'active_scenario_id'  => null,
+					'char_name'           => 'Unknown',
+					'char_class'          => 'None',
+					'char_tags'           => [],
+					'campaign_world_type' => 1,
+					'wp_user_id'          => $user_id,
+				];
+			}
+
+			// Cache for 60 seconds. Short enough that game state feels live;
+			// long enough to collapse burst requests (e.g. multi-tab reload).
+			set_transient( $cache_key, $game_data, 60 );
 		}
 
 		$supabase_url = tw_supabase_url();
@@ -65,12 +121,24 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 			nonce: '<?php echo esc_js( wp_create_nonce( 'tw_nonce' ) ); ?>',
 			gm_avatar: '<?php echo esc_url( $gm_avatar_url ); ?>'
 		};
-		console.log('🔗 twAdventureData injected:', window.twAdventureData);
+		console.log('🔗 twAdventureData injected (cached):', window.twAdventureData);
 		</script>
 		<?php
 	}
 
 	add_action( 'wp_head', 'tw_inject_global_data', 1 );
+}
+
+/**
+ * Cache invalidation helper — call this whenever a user's session,
+ * character, or campaign changes so the next page load fetches fresh data.
+ *
+ * Usage: tw_invalidate_game_data_cache( get_current_user_id() );
+ */
+if ( ! function_exists( 'tw_invalidate_game_data_cache' ) ) {
+	function tw_invalidate_game_data_cache( int $user_id ): void {
+		delete_transient( 'tw_game_data_' . $user_id );
+	}
 }
 
 /**
