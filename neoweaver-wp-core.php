@@ -63,6 +63,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.ph
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quick-actions-cmd-center.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-character-echo.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/shortcodes-tags.php';
 
 
 // ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────
