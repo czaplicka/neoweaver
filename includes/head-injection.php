@@ -605,3 +605,68 @@ add_action( 'wp_head', function () {
 	</script>
 	<?php
 }, 20 );
+
+// ==========================================
+// ECHO STREAM – Refresh utility
+// Tylko na stronie gry (ID 2857)
+// ==========================================
+
+add_action( 'wp_head', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+	?>
+	<script>
+	/**
+	 * refreshEchoStream()
+	 *
+	 * Fetches fresh Echo Stream HTML via admin-ajax (action: tw_echo_refresh)
+	 * and replaces the current .echo-stream-container in place.
+	 * After replacement, re-runs initEchoTooltips() if available.
+	 *
+	 * Uses the ajax_url from window.twAdventureData when available so the
+	 * URL is never hard-coded.
+	 *
+	 * Usage:
+	 *   refreshEchoStream();                        // fire and forget
+	 *   setInterval(refreshEchoStream, 30_000);     // auto-poll every 30 s
+	 */
+	window.refreshEchoStream = async function refreshEchoStream() {
+		const container = document.querySelector('.echo-stream-container');
+		if (!container) return;
+
+		const ajaxUrl = (window.twAdventureData && window.twAdventureData.ajax_url)
+			|| '/wp-admin/admin-ajax.php';
+
+		try {
+			const res = await fetch(
+				ajaxUrl + '?action=tw_echo_refresh',
+				{
+					method:      'GET',
+					credentials: 'same-origin',
+					headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+				}
+			);
+
+			if (!res.ok) {
+				console.error('[Echo Stream] refresh error, status:', res.status);
+				return;
+			}
+
+			const html = await res.text();
+
+			// Replace the container node with the freshly-rendered HTML.
+			container.outerHTML = html;
+
+			// Re-bind tooltips on the new node if the function exists.
+			const newContainer = document.querySelector('.echo-stream-container');
+			if (typeof window.initEchoTooltips === 'function' && newContainer) {
+				window.initEchoTooltips();
+			}
+		} catch (err) {
+			console.error('[Echo Stream] refresh failed:', err);
+		}
+	};
+	</script>
+	<?php
+}, 25 );
