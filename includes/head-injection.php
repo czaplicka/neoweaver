@@ -670,3 +670,117 @@ add_action( 'wp_head', function () {
 	</script>
 	<?php
 }, 25 );
+
+// ==========================================
+// BACKGROUND LOADER (priority 30)
+// Pobiera tło z v_cyber_game_state dla aktualnego gracza.
+// Fallback: get_option('tw_default_bg') wstrzyknięty z PHP.
+// Tylko na stronie gry (ID 2857)
+// ==========================================
+
+add_action( 'wp_head', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+
+	// PHP fallback URL — set once in WP Options, never hard-code a path here.
+	$default_bg = esc_url( get_option( 'tw_default_bg', '' ) );
+	?>
+	<script>
+	/**
+	 * NeoWeaver Background Loader
+	 *
+	 * Priority 30 — runs after:
+	 *   pri  1  tw_inject_global_data  (window.twAdventureData)
+	 *   pri  5  Supabase client init   (window.twSupabase via twSupabaseReady)
+	 *   pri 20  Full Engine v5         (dispatches twGameStateHydrated)
+	 *
+	 * Listens for 'twGameStateHydrated'. Falls back to a PHP-injected default
+	 * image URL so the page never shows a blank background.
+	 *
+	 * XSS: URL is validated — only http/https schemes allowed, single/double
+	 * quotes and backslashes stripped before writing to CSS.
+	 */
+	(function () {
+		const DEFAULT_BG = '<?php echo esc_js( $default_bg ); ?>';
+
+		function sanitizeCssUrl(raw) {
+			if (!raw || typeof raw !== 'string') return '';
+			// Allow only http / https
+			if (!/^https?:\/\//i.test(raw)) return '';
+			// Strip characters that could break CSS url("...") context
+			return raw.replace(/["'\\]/g, '');
+		}
+
+		function applyBackground(imgUrl, locationId, locationName) {
+			const safe = sanitizeCssUrl(imgUrl);
+			if (!safe) {
+				console.warn('🎨 Background: invalid or empty URL, skipping.');
+				return;
+			}
+
+			document.body.style.backgroundImage      = 'url("' + safe + '")';
+			document.body.style.backgroundSize       = 'cover';
+			document.body.style.backgroundPosition   = 'center';
+			document.body.style.backgroundRepeat     = 'no-repeat';
+			document.body.style.backgroundAttachment = 'fixed';
+
+			if (window.twGameState) {
+				window.twGameState.currentLocationId   = locationId   ?? null;
+				window.twGameState.currentLocationName = locationName ?? null;
+			}
+
+			console.log('🎨 Background set:', locationName, '(' + safe.substring(0, 40) + '...)');
+		}
+
+		async function loadBackground() {
+			const client   = window.twSupabase;
+			const wpUserId = window.twAdventureData?.wp_user_id;
+
+			if (!client || !wpUserId) {
+				console.warn('🎨 Background: Supabase client or wp_user_id missing.');
+				if (DEFAULT_BG) applyBackground(DEFAULT_BG, null, 'default');
+				return;
+			}
+
+			try {
+				// Primary: active game state for this player
+				const { data, error } = await client
+					.from('v_cyber_game_state')
+					.select('location_img_url, location_name, location_id')
+					.eq('wp_user_id', wpUserId)
+					.maybeSingle();
+
+				if (!error && data?.location_img_url) {
+					applyBackground(data.location_img_url, data.location_id, data.location_name);
+					return;
+				}
+
+				// Fallback: PHP-supplied default image (set via WP Options)
+				console.log('🎨 Background: no active location, using PHP default.');
+				if (DEFAULT_BG) {
+					applyBackground(DEFAULT_BG, null, 'default');
+				} else {
+					console.warn('🎨 Background: tw_default_bg option not set.');
+				}
+
+			} catch (err) {
+				console.error('🎨 Background critical error:', err);
+				if (DEFAULT_BG) applyBackground(DEFAULT_BG, null, 'default');
+			}
+		}
+
+		// twGameStateHydrated = fired by Full Engine v5 when game state is ready.
+		// If already fired (race condition), run immediately.
+		if (window.twGameReady) {
+			loadBackground();
+		} else {
+			document.addEventListener('twGameStateHydrated', loadBackground, { once: true });
+		}
+
+		// Expose for manual refresh (e.g. after location change)
+		window.twReloadBackground = loadBackground;
+	})();
+	</script>
+	<?php
+}, 30 );
