@@ -110,7 +110,7 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 			supabase_anon_key: '<?php echo esc_js( tw_supabase_anon_key() ); ?>',
 			active_session_id: <?php echo isset( $game_data['active_session_id'] ) ? (int) $game_data['active_session_id'] : 'null'; ?>,
 			active_campaign_id: <?php echo isset( $game_data['active_campaign_id'] ) ? (int) $game_data['active_campaign_id'] : 'null'; ?>,
-			active_character_id: <?php echo isset( $game_data['active_character_id'] ) ? (int) $game_data['active_campaign_id'] : 'null'; ?>,
+			active_character_id: <?php echo isset( $game_data['active_character_id'] ) ? (int) $game_data['active_character_id'] : 'null'; ?>,
 			active_scenario_id: <?php echo isset( $game_data['active_scenario_id'] ) ? (int) $game_data['active_scenario_id'] : 'null'; ?>,
 			char_name: '<?php echo isset( $game_data['char_name'] ) ? esc_js( $game_data['char_name'] ) : 'Unknown'; ?>',
 			char_class: '<?php echo isset( $game_data['char_class'] ) ? esc_js( $game_data['char_class'] ) : 'None'; ?>',
@@ -228,3 +228,269 @@ add_action( 'wp_head', function () {
 	</script>
 	<?php
 }, 10 );
+
+// ==========================================
+// TALE WEAVER FULL ENGINE v5
+// Slow Motion card animation + Weaving Overlay
+// + AI scenario polling
+// Tylko na stronie gry (ID 2857)
+// ==========================================
+
+add_action( 'wp_head', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+
+	// Seed campaign_id from server so JS never needs a hard-coded fallback.
+	$user_id     = get_current_user_id();
+	$cache_key   = 'tw_game_data_' . $user_id;
+	$game_data   = get_transient( $cache_key );
+	$campaign_id = ( $game_data && ! empty( $game_data['active_campaign_id'] ) )
+		? (int) $game_data['active_campaign_id']
+		: 0;
+	$nonce       = wp_create_nonce( 'tw_nonce' );
+	?>
+	<script>
+	/**
+	 * TALE WEAVER: FULL ENGINE v5 (Slow Motion + UI Fixes)
+	 *
+	 * Reads campaign_id from window.twAdventureData (injected by tw_inject_global_data
+	 * at priority 1) so there is no hard-coded fallback value in the JS.
+	 * PHP also seeds window.twGameConfig directly below as a belt-and-suspenders guard.
+	 */
+	window.twGameConfig = window.twGameConfig || {};
+	window.twGameConfig.campaign_id = <?php echo $campaign_id ?: 'window.twAdventureData && window.twAdventureData.active_campaign_id || 0'; ?>;
+	window.twGameConfig.nonce       = '<?php echo esc_js( $nonce ); ?>';
+
+	(function () {
+		console.log('🎮 TALE WEAVER v5 SLOW MOTION ENGINE START');
+
+		let loreTips = [], tipInterval, matrixInterval;
+
+		// -------------------------------------------------------
+		// 1. POLL + BIND — wait for scenario cards to appear in DOM
+		// -------------------------------------------------------
+		const init = setInterval(() => {
+			const cards = document.querySelectorAll('.deck-card.scenario-card');
+			if (cards.length > 0 && !window.scenarioListenerBound) {
+				console.log('🎯 FULL BINDING ACTIVE!');
+
+				// Event delegation on body (catches dynamically added cards too)
+				document.body.addEventListener('click', (e) => {
+					const card = e.target.closest('.deck-card.scenario-card');
+					if (!card || !card.dataset.scenarioId) return;
+
+					console.log('✅ SCENARIO CLICKED:', card.dataset.scenarioId);
+					e.preventDefault();
+					e.stopPropagation();
+
+					// --- CARD CLONE SETUP ---
+					const rect  = card.getBoundingClientRect();
+					const clone = card.cloneNode(true);
+					clone.className = '';
+					clone.classList.add('tw-card-clone');
+					clone.style.cssText  = card.style.cssText;
+					clone.style.position = 'fixed';
+					clone.style.top      = rect.top  + 'px';
+					clone.style.left     = rect.left + 'px';
+					clone.style.width    = rect.width  + 'px';
+					clone.style.height   = rect.height + 'px';
+					clone.style.zIndex   = '100000';
+					clone.style.margin   = '0';
+					document.body.appendChild(clone);
+
+					// Hide original
+					card.style.opacity       = '0';
+					card.style.pointerEvents = 'none';
+
+					// --- UI CLEANUP ---
+					const deckPanelEl = document.getElementById('deck-panel');
+					if (deckPanelEl) deckPanelEl.classList.add('fade-out-scenery');
+
+					const missionTab = document.querySelector('button.panel-tab[data-tab="tab-scenarios"]');
+					if (missionTab) {
+						missionTab.classList.remove('is-active');
+						missionTab.classList.add('ui-element-hidden');
+					}
+
+					// --- FLIGHT → BURN (synchronised with CSS timings) ---
+					void clone.offsetWidth; // Force reflow before adding class
+
+					requestAnimationFrame(() => {
+						clone.classList.add('centering');
+
+						setTimeout(() => {
+							clone.classList.add('burning');
+
+							setTimeout(() => {
+								clone.remove();
+								showWeavingOverlay(card.dataset.scenarioId);
+								if (deckPanelEl) deckPanelEl.style.display = 'none';
+							}, 2400);
+
+						}, 1500);
+					});
+
+				}, true);
+
+				window.scenarioListenerBound = true;
+				clearInterval(init);
+			}
+		}, 1000);
+
+		// -------------------------------------------------------
+		// 2. Lore Tips loader
+		// -------------------------------------------------------
+		async function loadLoreTips() {
+			try {
+				const response = await fetch(
+					(window.twAdventureData && window.twAdventureData.ajax_url) ||
+					'/wp-admin/admin-ajax.php',
+					{ method: 'POST', body: new URLSearchParams({ action: 'tw_get_lore_tips' }) }
+				);
+				const result = await response.json();
+				loreTips = result.success ? result.data : ['Compiling...', 'Linking...'];
+			} catch (e) {
+				loreTips = ['System loading...'];
+			}
+		}
+
+		// -------------------------------------------------------
+		// 3. Weaving Overlay + AI scenario polling
+		// -------------------------------------------------------
+		async function showWeavingOverlay(scenarioId) {
+			if (!loreTips.length) await loadLoreTips();
+			triggerScenarioGeneration(scenarioId);
+
+			let overlay = document.getElementById('tw-weaving-overlay');
+			if (!overlay) {
+				overlay = createWeavingOverlay();
+				document.body.appendChild(overlay);
+			}
+			overlay.classList.add('active');
+			createMatrixEffect(overlay);
+			rotateTips(overlay);
+
+			// Poll for AI-generated message (max 40 attempts × 2 s = 80 s)
+			let attempts = 0;
+			const ajaxUrl = (window.twAdventureData && window.twAdventureData.ajax_url)
+				|| '/wp-admin/admin-ajax.php';
+			const campaignId = window.twGameConfig.campaign_id
+				|| (window.twAdventureData && window.twAdventureData.active_campaign_id)
+				|| 0;
+
+			const checkMessage = async () => {
+				attempts++;
+				console.log(`Waiting for AI #${attempts} (Camp: ${campaignId})`);
+
+				try {
+					const res    = await fetch(`${ajaxUrl}?action=tw_get_ai_message&campaign_id=${campaignId}`);
+					const result = await res.json();
+
+					if (result.success && result.data.message) {
+						console.log('✅ AI Message READY!');
+						hideWeavingOverlay();
+
+						const chatWindow = document.querySelector('#player-chat, .chat-window.is-active');
+						if (chatWindow) {
+							const msgDiv = document.createElement('div');
+							msgDiv.innerHTML = `
+								<div class="tw-ai-narrative">
+									<div class="tw-ai-header">
+										<span class="tw-gm-label">GM</span>
+										<span class="tw-timestamp">${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+									</div>
+									<div class="tw-ai-text">${result.data.message.replace(/\n/g, '<br>')}</div>
+								</div>
+							`;
+							chatWindow.appendChild(msgDiv);
+							chatWindow.scrollTop = chatWindow.scrollHeight;
+						}
+						return;
+					}
+				} catch (e) {
+					console.warn('AI poll error:', e);
+				}
+
+				if (attempts < 40) setTimeout(checkMessage, 2000);
+				else hideWeavingOverlay();
+			};
+			checkMessage();
+		}
+
+		function createWeavingOverlay() {
+			const overlay = document.createElement('div');
+			overlay.id        = 'tw-weaving-overlay';
+			overlay.innerHTML = `
+				<div class="weaving-matrix"></div>
+				<div class="weaving-title">WEAVING SCENARIO</div>
+				<div class="weaving-tip" id="weaving-tip">Loading...</div>
+			`;
+			return overlay;
+		}
+
+		function createMatrixEffect(overlay) {
+			const matrix = overlay.querySelector('.weaving-matrix');
+			matrixInterval = setInterval(() => {
+				const char = document.createElement('div');
+				char.className   = 'matrix-char';
+				char.textContent = String.fromCharCode(0x30A0 + Math.random() * 96);
+				char.style.left              = Math.random() * 100 + '%';
+				char.style.animationDuration = (Math.random() * 3 + 4) + 's';
+				char.style.opacity           = Math.random() * 0.5 + 0.2;
+				matrix.appendChild(char);
+				setTimeout(() => char.remove(), 8000);
+			}, 300);
+		}
+
+		function rotateTips(overlay) {
+			const tipEl   = overlay.querySelector('#weaving-tip');
+			let   tipIndex = 0;
+			tipInterval = setInterval(() => {
+				tipEl.textContent     = loreTips[tipIndex % loreTips.length];
+				tipEl.style.animation = 'none';
+				tipEl.offsetHeight;   // Force reflow
+				tipEl.style.animation = 'tip-fade 0.8s ease-out forwards';
+				tipIndex++;
+			}, 4500);
+		}
+
+		async function triggerScenarioGeneration(scenarioId) {
+			const ajaxUrl    = (window.twAdventureData && window.twAdventureData.ajax_url)
+				|| '/wp-admin/admin-ajax.php';
+			const campaignId = window.twGameConfig.campaign_id
+				|| (window.twAdventureData && window.twAdventureData.active_campaign_id)
+				|| 0;
+			const nonce      = window.twGameConfig.nonce
+				|| (window.twAdventureData && window.twAdventureData.nonce)
+				|| '';
+
+			const formData = new URLSearchParams({
+				action:      'tw_start_scenario_generation',
+				scenario_id: scenarioId,
+				campaign_id: campaignId,
+				nonce:       nonce,
+			});
+			fetch(ajaxUrl, { method: 'POST', body: formData }).catch(e => console.error(e));
+		}
+
+		function hideWeavingOverlay() {
+			const overlay = document.getElementById('tw-weaving-overlay');
+			if (overlay) {
+				overlay.classList.remove('active');
+				clearInterval(matrixInterval);
+				clearInterval(tipInterval);
+				setTimeout(() => overlay.remove(), 800);
+			}
+
+			// Restore mission tab button
+			const missionTab = document.querySelector('button.panel-tab[data-tab="tab-scenarios"]');
+			if (missionTab) missionTab.classList.remove('ui-element-hidden');
+		}
+
+		window.addEventListener('beforeunload', hideWeavingOverlay);
+		loadLoreTips();
+	})();
+	</script>
+	<?php
+}, 20 );
