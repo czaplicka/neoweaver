@@ -110,7 +110,7 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 			supabase_anon_key: '<?php echo esc_js( tw_supabase_anon_key() ); ?>',
 			active_session_id: <?php echo isset( $game_data['active_session_id'] ) ? (int) $game_data['active_session_id'] : 'null'; ?>,
 			active_campaign_id: <?php echo isset( $game_data['active_campaign_id'] ) ? (int) $game_data['active_campaign_id'] : 'null'; ?>,
-			active_character_id: <?php echo isset( $game_data['active_character_id'] ) ? (int) $game_data['active_character_id'] : 'null'; ?>,
+			active_character_id: <?php echo isset( $game_data['active_character_id'] ) ? (int) $game_data['active_campaign_id'] : 'null'; ?>,
 			active_scenario_id: <?php echo isset( $game_data['active_scenario_id'] ) ? (int) $game_data['active_scenario_id'] : 'null'; ?>,
 			char_name: '<?php echo isset( $game_data['char_name'] ) ? esc_js( $game_data['char_name'] ) : 'Unknown'; ?>',
 			char_class: '<?php echo isset( $game_data['char_class'] ) ? esc_js( $game_data['char_class'] ) : 'None'; ?>',
@@ -178,3 +178,53 @@ add_action( 'wp_head', function () {
 	</script>
 	<?php
 }, 5 );
+
+// ==========================================
+// TALE WEAVER – Quest Failure Effect
+// Tylko na stronie gry (ID 2857)
+// ==========================================
+
+add_action( 'wp_head', function () {
+	if ( ! is_page( 2857 ) ) {
+		return;
+	}
+	?>
+	<script>
+	/**
+	 * triggerQuestFailureEffect( questId )
+	 *
+	 * Wywołaj, gdy quest zakończy się porażką:
+	 *   triggerQuestFailureEffect('q-42');
+	 *
+	 * Wymaga na karcie questa: id="quest-{questId}"
+	 * Wymaga CSS klasy .failed-animation (zdefiniowanej w arkuszu gry).
+	 */
+	function triggerQuestFailureEffect(questId) {
+		// 1. Znajdź kartę questa i dodaj jej efekt wizualny
+		const card = document.getElementById('quest-' + questId);
+		if (card) {
+			card.classList.add('failed-animation');
+		}
+
+		// 2. Stwórz pełnoekranową nakładkę
+		const overlay = document.createElement('div');
+		overlay.className = 'quest-failed-overlay';
+		overlay.innerHTML = `
+			<div class='failed-title'>CRITICAL FAILURE</div>
+			<div class='failed-subtitle'>OBJECTIVE LOST // CONNECTION SEVERED</div>
+		`;
+		document.body.appendChild(overlay);
+
+		// 3. Efekt dźwiękowy (opcjonalnie)
+		// playSound('glitch_error.mp3');
+
+		// 4. Usuń nakładkę po 3 sekundach
+		setTimeout(() => {
+			overlay.style.transition = 'opacity 1s ease';
+			overlay.style.opacity = '0';
+			setTimeout(() => overlay.remove(), 1000);
+		}, 2500);
+	}
+	</script>
+	<?php
+}, 10 );
