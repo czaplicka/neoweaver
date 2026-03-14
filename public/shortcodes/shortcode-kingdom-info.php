@@ -1,3 +1,4 @@
+<?php
 add_shortcode('kingdom_info', function() {
     global $wpdb;
 
