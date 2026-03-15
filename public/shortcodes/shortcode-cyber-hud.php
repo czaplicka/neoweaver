@@ -5,10 +5,10 @@
  * Renders the status HUD only on the game page (ID 2857).
  *
  * Supabase views / tables used:
- *   cyber_game_sessions          – active session (world_id, location_id, character_id)
- *   world_status_summary_v2      – global world stats
- *   location_status_summary      – per-location stats
- *   cyber_reputation             – per-character faction reputation
+ *   cyber_game_sessions       – active session (world_id, location_id, character_id)
+ *   cyber_world_hud_stats     – global world stats  (was: world_status_summary_v2)
+ *   cyber_location_hud_stats  – per-location stats  (was: location_status_summary)
+ *   cyber_reputation          – per-character faction reputation
  *
  * Requires tw_supabase_url() and tw_supabase_anon_key() helpers to be defined.
  */
@@ -122,12 +122,14 @@ async function updateHUD() {
 
         let activeAlertColor = null;
 
-        // Bug 4 fix: queries 2–4 are independent of each other — fire them in parallel.
-        // characterId may be null for sessions without a character; fall back to [] so the
-        // destructuring assignment below always receives an array in every position.
+        // Bug 4 fix: queries 2–4 are independent — fire in parallel.
+        // Bug 5 fix: updated view names (world_status_summary_v2 → cyber_world_hud_stats,
+        //            location_status_summary → cyber_location_hud_stats) and the views
+        //            themselves now join cyber_action_tags / cyber_action_tag_categories
+        //            instead of the old cyber_tags / cyber_tags_category.
         const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
-            supaFetch(`/world_status_summary_v2?world_id=eq.${worldId}`),
-            supaFetch(`/location_status_summary?world_id=eq.${worldId}&location_id=eq.${locationId}`),
+            supaFetch(`/cyber_world_hud_stats?world_id=eq.${worldId}`),
+            supaFetch(`/cyber_location_hud_stats?world_id=eq.${worldId}&location_id=eq.${locationId}`),
             characterId
                 ? supaFetch(`/cyber_reputation?character_id=eq.${characterId}&order=updated_at.desc&limit=1`)
                 : Promise.resolve([]),
