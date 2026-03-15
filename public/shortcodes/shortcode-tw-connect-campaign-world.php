@@ -1,7 +1,7 @@
 <?php
 /**
  * SHORTCODE: [tw_connect_campaign_world]
- * Wersja: v13+ - AUDIO & VISUAL SYNC (Glitch & Live Stats Edition)
+ * Wersja: v14 - direct table query, no dropped view
  */
 function tw_connect_campaign_world_final() {
     if ( ! is_user_logged_in() ) {
@@ -14,7 +14,7 @@ function tw_connect_campaign_world_final() {
 
     ob_start(); ?>
     <div id="tw-deployment-root" class="tw-deployment-main-container">
-        
+
         <audio id="tw-glitch-sound" src="https://cyber.nieodparady.pl/wp-content/uploads/2026/02/soundreality-glitch-177348.mp3" preload="auto"></audio>
 
         <section class="tw-briefing-hero">
@@ -105,10 +105,13 @@ function tw_connect_campaign_world_final() {
             const h = { "apikey": cfg.key, "Authorization": `Bearer ${cfg.key}` };
 
             try {
+                // Pobieramy kampanie BEZ świata bezpośrednio z tabeli
+                // cyber_campaign_without_world view został usunięty
+                // Filtrujemy po stronie JS po otrzymaniu listy kampanii użytkownika
                 const [rC, rW] = await Promise.all([
                     fetch(
                         cfg.url +
-                        "rest/v1/cyber_campaign_without_world" +
+                        "rest/v1/cyber_campaign" +
                         "?select=id,name,world_type,wp_user_id" +
                         "&wp_user_id=eq." + cfg.uid +
                         "&order=created_at.desc",
@@ -134,10 +137,26 @@ function tw_connect_campaign_world_final() {
                     return;
                 }
 
-                dataStore.camps  = await rC.json();
+                const allCamps = await rC.json();
+
+                // Pobierz ID kampanii które JUŻ mają świat
+                const rLinked = await fetch(
+                    cfg.url + "rest/v1/cyber_campaign_worlds" +
+                    "?select=campaign_id",
+                    { headers: h }
+                );
+
+                let linkedIds = new Set();
+                if (rLinked.ok) {
+                    const linkedRows = await rLinked.json();
+                    linkedRows.forEach(r => linkedIds.add(String(r.campaign_id)));
+                }
+
+                // Pokaż tylko kampanie BEZ przypisanego świata
+                dataStore.camps  = allCamps.filter(c => !linkedIds.has(String(c.id)));
                 dataStore.worlds = await rW.json();
 
-                renderList('camp', dataStore.camps);
+                renderList('camp',  dataStore.camps);
                 renderList('world', dataStore.worlds);
 
                 log.innerText = "> System: Field Agent authorized. Scan complete.";
@@ -164,7 +183,7 @@ function tw_connect_campaign_world_final() {
 
             filtered.forEach(i => {
                 let label = (i.name || "").toUpperCase();
-                if (type === 'camp' && typeof i.world_type !== "undefined" && i.world_type !== null) {
+                if (type === 'camp' && i.world_type != null) {
                     label += " [TYPE " + i.world_type + "]";
                 }
                 el.appendChild(new Option(label, i.id));
@@ -175,8 +194,7 @@ function tw_connect_campaign_world_final() {
             const latencyEl = document.getElementById('stat-latency');
             setInterval(() => {
                 if (!latencyEl) return;
-                const newVal = (0.020 + Math.random() * 0.01).toFixed(3);
-                latencyEl.innerText = newVal;
+                latencyEl.innerText = (0.020 + Math.random() * 0.01).toFixed(3);
                 if (Math.random() > 0.8) {
                     latencyEl.classList.add('n-glitch');
                     setTimeout(() => latencyEl.classList.remove('n-glitch'), 150);
@@ -202,8 +220,8 @@ function tw_connect_campaign_world_final() {
             log.innerText = "> System: Weaving Splot threads...";
 
             const payload = {
-                campaign_id: parseInt(selC.value),
-                world_id:    parseInt(selW.value),
+                campaign_id:   parseInt(selC.value),
+                world_id:      parseInt(selW.value),
                 creator_wp_id: cfg.uid
             };
 
@@ -213,7 +231,8 @@ function tw_connect_campaign_world_final() {
                     headers: {
                         "apikey": cfg.key,
                         "Authorization": `Bearer ${cfg.key}`,
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "Prefer": "resolution=merge-duplicates"
                     },
                     body: JSON.stringify(payload)
                 });
