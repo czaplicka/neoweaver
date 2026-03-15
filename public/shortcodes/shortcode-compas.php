@@ -2,7 +2,8 @@
 /**
  * Shortcode: [tw_compass]
  * Renderuje interaktywny kompas pobierajacy dane z cyber_world_map.
- * Skrypt JS jest enqueue'owany tylko na stronie adventure.php.
+ * Style sa enqueue'owane z neoweaver-compass.css (Opt 2).
+ * Skrypt JS odpala sie tylko na stronie adventure.php (Bug 3).
  */
 add_shortcode('tw_compass', 'tw_compass_render');
 
@@ -10,8 +11,18 @@ function tw_compass_render() {
     $wp_user_id = get_current_user_id();
     if (!$wp_user_id) return '';
 
-    // Bug 3 fix: only enqueue the compass script on the adventure page
+    // Bug 3: only render on the adventure page template
     if (!is_page_template('template/adventure.php')) return '';
+
+    // Opt 2: enqueue styles once via WordPress, not inline on every render
+    if (!wp_style_is('neoweaver-compass', 'enqueued')) {
+        wp_enqueue_style(
+            'neoweaver-compass',
+            plugin_dir_url(__FILE__) . '../assets/css/neoweaver-compass.css',
+            [],
+            '1.0.0'
+        );
+    }
 
     ob_start();
     ?>
@@ -44,83 +55,14 @@ function tw_compass_render() {
         </div>
     </div>
 
-    <style>
-        .tw-compass-wrapper {
-            background: rgba(10, 15, 10, 0.85);
-            border: 1px solid #adff00;
-            padding: 15px;
-            border-radius: 50%;
-            width: 260px;
-            height: 260px;
-            margin: 20px auto;
-            font-family: 'Chakra Petch', sans-serif;
-            color: #fff;
-            position: relative;
-            box-shadow: 0 0 20px rgba(173, 255, 0, 0.15), inset 0 0 15px rgba(173, 255, 0, 0.05);
-            border-style: double;
-        }
-        .tw-compass-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            grid-template-rows: 1fr 1fr 1fr;
-            height: 100%;
-            width: 100%;
-            text-align: center;
-        }
-        /* Default: no exit in this direction */
-        .tw-compass-cell {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            opacity: 0.3;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        /* Discovered neighbour: full green glow */
-        .tw-compass-cell.active {
-            opacity: 1;
-            color: #adff00;
-            text-shadow: 0 0 8px rgba(173, 255, 0, 0.6);
-        }
-        /* Undiscovered neighbour: passable but unknown — dimmed, no glow */
-        .tw-compass-cell.undiscovered {
-            opacity: 0.6;
-            color: #888;
-            font-style: italic;
-            text-shadow: none;
-        }
-        .tw-compass-cell .dir-label { font-weight: 700; font-size: 1.1rem; margin-bottom: 2px; }
-        .tw-compass-cell .loc-name { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-        .tw-n { grid-column: 2; grid-row: 1; }
-        .tw-w { grid-column: 1; grid-row: 2; }
-        .tw-e { grid-column: 3; grid-row: 2; }
-        .tw-s { grid-column: 2; grid-row: 3; }
-
-        .tw-compass-center {
-            grid-column: 2; grid-row: 2;
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            border: 1px solid rgba(173, 255, 0, 0.5);
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(173, 255, 0, 0.1) 0%, transparent 70%);
-            z-index: 2;
-        }
-        .tw-compass-icon { font-size: 1.8rem; color: #adff00; animation: pulse 3s infinite; }
-        #tw-current-loc-name { font-size: 0.75rem; font-weight: bold; color: #adff00; padding: 0 5px; }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); opacity: 0.8; }
-        }
-    </style>
 <script>
 /**
  * Compass Logic - NeoWeaver
  * Wrapped in IIFE (Bug 4). Uses compassLoaded flag (Bug 5).
  * Split active/undiscovered states (Bug 6).
- * Reads location_id from twGameState instead of querying the session (Opt 1).
+ * Reads location_id from twGameState (Opt 1).
+ * Styles moved to neoweaver-compass.css (Opt 2).
+ * Shows 'Awaiting sync...' when game state not ready (Opt 3).
  */
 (function () {
 
@@ -134,13 +76,13 @@ function tw_compass_render() {
 
     async function refreshCompass() {
         const client = window.twSupabase;
-
-        // Opt 1: location_id is already available in twGameState — no session query needed
         const location_id = window.twGameState?.currentLocationId;
 
         if (!client || !location_id) {
+            // Opt 3: surface state to player instead of silent 'Scanning...'
+            const label = document.getElementById('tw-current-loc-name');
+            if (label) label.innerText = 'Awaiting sync...';
             console.warn('Compass: Missing Supabase client or location ID');
-            document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
             return;
         }
 
@@ -173,7 +115,7 @@ function tw_compass_render() {
                     console.error('Compass: Failed to fetch neighbour names', namesError);
                 } else if (Array.isArray(names)) {
                     names.forEach(n => {
-                        neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
+                        neighborMap[n.id] = n.is_discovered ? n.location_name : '???';
                     });
                 }
             }
@@ -192,8 +134,8 @@ function tw_compass_render() {
                 const label = cell.querySelector('.loc-name');
                 const name = dir.id ? neighborMap[dir.id] : null;
 
-                cell.classList.toggle('active',        !!name && name !== '???');
-                cell.classList.toggle('undiscovered',  !!name && name === '???');
+                cell.classList.toggle('active',       !!name && name !== '???');
+                cell.classList.toggle('undiscovered', !!name && name === '???');
                 label.innerText = name ?? 'Block';
             });
 

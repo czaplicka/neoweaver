@@ -1,0 +1,112 @@
+/**
+ * NeoWeaver Compass Styles
+ * Extracted from shortcode-compas.php (Optimisation 2).
+ * Enqueued via wp_add_inline_style() or a dedicated wp_enqueue_style() call
+ * on the adventure page only.
+ */
+
+/* Wrapper */
+.tw-compass-wrapper {
+    background: rgba(10, 15, 10, 0.85);
+    border: 1px solid #adff00;
+    padding: 15px;
+    border-radius: 50%;
+    width: 260px;
+    height: 260px;
+    margin: 20px auto;
+    font-family: 'Chakra Petch', sans-serif;
+    color: #fff;
+    position: relative;
+    box-shadow: 0 0 20px rgba(173, 255, 0, 0.15), inset 0 0 15px rgba(173, 255, 0, 0.05);
+    border-style: double;
+}
+
+/* Grid */
+.tw-compass-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    height: 100%;
+    width: 100%;
+    text-align: center;
+}
+
+/* Default: no exit in this direction */
+.tw-compass-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.3;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Discovered neighbour: full green glow */
+.tw-compass-cell.active {
+    opacity: 1;
+    color: #adff00;
+    text-shadow: 0 0 8px rgba(173, 255, 0, 0.6);
+}
+
+/* Undiscovered neighbour: passable but unknown — dimmed, no glow */
+.tw-compass-cell.undiscovered {
+    opacity: 0.6;
+    color: #888;
+    font-style: italic;
+    text-shadow: none;
+}
+
+.tw-compass-cell .dir-label {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+}
+
+.tw-compass-cell .loc-name {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Grid positions */
+.tw-n { grid-column: 2; grid-row: 1; }
+.tw-w { grid-column: 1; grid-row: 2; }
+.tw-e { grid-column: 3; grid-row: 2; }
+.tw-s { grid-column: 2; grid-row: 3; }
+
+/* Centre node */
+.tw-compass-center {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid rgba(173, 255, 0, 0.5);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(173, 255, 0, 0.1) 0%, transparent 70%);
+    z-index: 2;
+}
+
+.tw-compass-icon {
+    font-size: 1.8rem;
+    color: #adff00;
+    animation: tw-compass-pulse 3s infinite;
+}
+
+#tw-current-loc-name {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #adff00;
+    padding: 0 5px;
+}
+
+@keyframes tw-compass-pulse {
+    0%   { transform: scale(1);   opacity: 0.8; }
+    50%  { transform: scale(1.1); opacity: 1;   }
+    100% { transform: scale(1);   opacity: 0.8; }
+}
