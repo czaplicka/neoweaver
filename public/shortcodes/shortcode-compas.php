@@ -150,15 +150,18 @@ async function refreshCompass() {
         
         let neighborMap = {};
         if (neighborIds.length > 0) {
-            const { data: names } = await client
-                .from('cyber_world_map')
-                .select('id, location_name, is_discovered')
-                .in('id', neighborIds);
-            
-            names.forEach(n => {
-                neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
-            });
-        }
+            const { data: names, error: namesError } = await client
+    .from('cyber_world_map')
+    .select('id, location_name, is_discovered')
+    .in('id', neighborIds);
+
+if (namesError) {
+    console.error('Compass: Failed to fetch neighbor names', namesError);
+} else if (Array.isArray(names)) {
+    names.forEach(n => {
+        neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
+    });
+}
 
         // 3. Mapowanie i aktualizacja komórek kompasu
         const directions = [
