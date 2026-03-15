@@ -83,9 +83,7 @@ function toggleHud() {
     t.innerText = w.classList.contains('is-open') ? '\u00d7 DISCONNECT_STREAMS' : '\u203a SYSTEM_ACTIVE';
 }
 
-// Bug 7 fix: rep_chaos_order was #00f2ff — same as stealth. Changed to #cc00ff (magic/purple)
-// so all 8 dots are visually distinct. Both the colorMap entry and the PHP dot's --base-color
-// attribute must match; both updated here.
+// Bug 7 fix: rep_chaos_order #00f2ff → #cc00ff (distinct from stealth)
 const colorMap = {
     rep_local:       '#0055ff',
     rep_world:       '#6699ff',
@@ -102,8 +100,7 @@ const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 're
 const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
 const SUPA_HEAD = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
-// Bug 3 fix: check res.ok before parsing JSON — fetch() only rejects on network failure,
-// not on HTTP 4xx/5xx. Returning [] keeps all callers safe (they all use arr[0] || null).
+// Bug 3 fix: check res.ok before parsing JSON — fetch() only rejects on network failure.
 async function supaFetch(path) {
     const res = await fetch(SUPA_URL + path, { headers: SUPA_HEAD });
     if (!res.ok) {
@@ -113,7 +110,7 @@ async function supaFetch(path) {
     return res.json();
 }
 
-// Bug 6 fix: escape HTML special characters in strings before inserting into innerHTML.
+// Bug 6 fix: escape HTML special characters before inserting into innerHTML.
 function escapeHtml(str) {
     return str
         .replace(/&/g, '&amp;')
@@ -125,8 +122,6 @@ function escapeHtml(str) {
 
 async function updateHUD() {
     try {
-        // 1. Active session — must resolve first; worldId / locationId / characterId are
-        //    needed to build the URLs for the three parallel requests below.
         const sessArr = await supaFetch(
             `/cyber_game_sessions?wp_user_id=eq.<?php echo (int) $current_user_id; ?>&order=created_at.desc&limit=1`
         );
@@ -135,8 +130,7 @@ async function updateHUD() {
 
         let activeAlertColor = null;
 
-        // Bug 4 fix: queries 2–4 are independent — fire in parallel.
-        // Bug 5 fix: updated view names.
+        // Bug 4 fix: parallel fetches. Bug 5 fix: updated view names.
         const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
             supaFetch(`/cyber_world_hud_stats?world_id=eq.${worldId}`),
             supaFetch(`/cyber_location_hud_stats?world_id=eq.${worldId}&location_id=eq.${locationId}`),
@@ -149,7 +143,6 @@ async function updateHUD() {
         const locStats   = locStatsArr[0]   || null;
         const rep        = repArr[0]         || null;
 
-        // Helper – update a single HUD row
         const updateRow = (id, val, tagsStr, isBipolar = false) => {
             const bar    = document.getElementById(`b-${id}`);
             const num    = document.getElementById(`v-${id}`);
@@ -164,12 +157,18 @@ async function updateHUD() {
                     bar.style.left  = value >= 0 ? '50%' : (50 - width) + '%';
 
                     if (id === 'stealth') {
+                        // Bug 8 fix: semantics were inverted.
+                        // Axis: positive = STEALTH (hidden, safe), negative = DETECT (exposed, danger).
+                        // High detection (value <= -80) is the dangerous state — alert in orange.
+                        // High stealth (value >= 80) is the calm state — show cyan, no global alert.
                         if (value < 0) {
-                            bar.style.backgroundColor = '#00f2ff';
-                            if (value <= -80) activeAlertColor = '#00f2ff';
+                            // Detect-heavy: bar fills to the right in orange/danger palette
+                            bar.style.backgroundColor = value <= -80 ? '#ff8800' : '#ff3300';
+                            if (value <= -80) activeAlertColor = '#ff8800';
                         } else {
-                            bar.style.backgroundColor = value > 80 ? '#ff8800' : '#1a2a2a';
-                            if (value >= 80) activeAlertColor = '#ff8800';
+                            // Stealth-heavy: bar fills to the left in calm cyan
+                            bar.style.backgroundColor = '#00f2ff';
+                            // No global alert — being well-hidden is not a warning
                         }
                     } else {
                         bar.style.backgroundColor = value >= 0 ? colorMap[id] : '#ff3300';
@@ -206,7 +205,6 @@ async function updateHUD() {
             }
         };
 
-        // 5. Populate panels
         if (locStats?.political_val !== undefined)
             updateRow('rep_local', locStats.political_val, locStats.political_tags, false);
 
@@ -230,7 +228,6 @@ async function updateHUD() {
             updateRow('rep_gold_thief',  rep.gold_vs_thief,  null, true);
         }
 
-        // 6. Global alert overlay
         const globalAlert = document.getElementById('hud-global-alert');
         if (globalAlert) {
             if (activeAlertColor) {
