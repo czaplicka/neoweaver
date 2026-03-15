@@ -110,6 +110,20 @@ async function supaFetch(path) {
     return res.json();
 }
 
+// Bug 6 fix: escape HTML special characters in strings before inserting into innerHTML.
+// Tag strings come from operator-editable DB content — an unescaped tag like
+// </span><img onerror=alert(1)> would execute as stored XSS.
+// We keep innerHTML (needed to apply the inline style per span) but sanitise each tag
+// text node individually before interpolation.
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 async function updateHUD() {
     try {
         // 1. Active session — must resolve first; worldId / locationId / characterId are
@@ -188,9 +202,11 @@ async function updateHUD() {
                     .split(',')
                     .map(t => t.trim())
                     .filter(t => t && !['neutral', 'balance', 'balanced'].includes(t.toLowerCase()));
-                tagBox.innerHTML = tags.slice(-3).map(t =>
-                    `<span class="tag-item" style="border-left-color:${colorMap[id] || '#fff'}">#${t}</span>`
-                ).join('');
+                // Bug 6 fix: escape each tag string before interpolating into innerHTML.
+                tagBox.innerHTML = tags.slice(-3).map(t => {
+                    const safe = escapeHtml(t);
+                    return `<span class="tag-item" style="border-left-color:${colorMap[id] || '#fff'}">#${safe}</span>`;
+                }).join('');
             }
         };
 
