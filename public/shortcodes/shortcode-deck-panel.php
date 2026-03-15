@@ -1,6 +1,6 @@
 <?php
 /**
- * [TW] Deck Panel – UI tabs (Mission / Augments / Skills)
+ * [TW] Deck Panel - UI tabs (Mission / Augments / Skills)
  *
  * Shortcode: [tw_deck_panel]
  *
@@ -30,7 +30,7 @@ function tw_deck_panel_render(): string {
 	<div class="deck-tabs-wrapper">
 
 		<!-- Toggle button -->
-		<button id="toggle-deck" class="panel-tab" aria-label="Toggle deck panel">☰</button>
+		<button id="toggle-deck" class="panel-tab" aria-label="Toggle deck panel">&#9776;</button>
 
 		<!-- Tab buttons -->
 		<button class="panel-tab" data-tab="tab-mission">MISSION</button>
@@ -42,17 +42,17 @@ function tw_deck_panel_render(): string {
 	<!-- Tab content areas -->
 	<div id="tab-mission"  class="deck-tab-content is-active">
 		<h3 class="deck-tab-title">// MISSION_DATA</h3>
-		<div id="tw-mission-content">Loading mission data…</div>
+		<div id="tw-mission-content">Loading mission data...</div>
 	</div>
 
 	<div id="tab-augments" class="deck-tab-content">
 		<h3 class="deck-tab-title">// AUGMENTS</h3>
-		<div id="tw-augments-content">Loading augments…</div>
+		<div id="tw-augments-content">Loading augments...</div>
 	</div>
 
 	<div id="tab-skills" class="deck-tab-content">
 		<h3 class="deck-tab-title">// SKILLS &amp; ABILITIES</h3>
-		<div id="tw-skills-content">Loading skills…</div>
+		<div id="tw-skills-content">Loading skills...</div>
 	</div>
 </div>
 
@@ -78,14 +78,15 @@ function tw_deck_panel_render(): string {
 
         deckPanel.addEventListener('click', (e) => e.stopPropagation());
 
-        // Bug 1 fix: scope both selectors to deckPanel to avoid colliding with any other
-        // component on the page that happens to use .panel-tab or .deck-tab-content.
+        // Bug 1 fix: scope all selectors to deckPanel to avoid colliding with other components.
+        // Bug 3 fix: use deckPanel.querySelector('#toggle-deck') instead of getElementById --
+        // getElementById is global; if this shortcode were ever rendered twice, the second
+        // instance would silently grab the first instance's button.
         const panelTabs       = deckPanel.querySelectorAll('.panel-tab');
-        const toggleBtn       = document.getElementById('toggle-deck');
+        const toggleBtn       = deckPanel.querySelector('#toggle-deck');
         const deckTabsWrapper = deckPanel.querySelector('.deck-tabs-wrapper');
 
         function switchTab(targetId) {
-            // Bug 1 fix: scoped inside switchTab as well so repeated calls stay local.
             const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
             const tabs        = deckPanel.querySelectorAll('.panel-tab');
 
