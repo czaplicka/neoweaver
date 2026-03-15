@@ -27,7 +27,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 function tw_deck_panel_render(): string {
 	// Bug 8 fix: without this guard the shortcode outputs HTML, registers a document
 	// keydown listener, and queues audio network requests on every page of the site.
-	// Restrict output to the adventure template, consistent with all other game shortcodes.
 	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return '';
 	}
@@ -107,6 +106,10 @@ function tw_deck_panel_render(): string {
         const toggleBtn       = deckPanel.querySelector('#toggle-deck');
         const deckTabsWrapper = deckPanel.querySelector('.deck-tabs-wrapper');
 
+        // Bug 9 fix: twLoadSkillsAndAbilities() was called on every SKILLS tab click,
+        // causing repeated Supabase fetches and re-renders. One-time flag prevents that.
+        let skillsLoaded = false;
+
         function switchTab(targetId) {
             const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
             const tabs        = deckPanel.querySelectorAll('.panel-tab');
@@ -128,8 +131,9 @@ function tw_deck_panel_render(): string {
                 btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId);
             });
 
-            if (targetId === 'tab-skills' && typeof window.twLoadSkillsAndAbilities === 'function') {
+            if (targetId === 'tab-skills' && !skillsLoaded && typeof window.twLoadSkillsAndAbilities === 'function') {
                 window.twLoadSkillsAndAbilities();
+                skillsLoaded = true;
             }
         }
 
