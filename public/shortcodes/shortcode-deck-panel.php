@@ -84,14 +84,6 @@ function tw_deck_panel_render(): string {
         sounds[name].play().catch(() => {});
     }
 
-    // Bug 5 fix: glitch sound only on panel open/close, not on tab switch.
-    function togglePanel(deckPanel) {
-        const isOpen = deckPanel.classList.contains('is-open');
-        deckPanel.classList.toggle('is-open',      !isOpen);
-        deckPanel.classList.toggle('is-collapsed',  isOpen);
-        playSound('glitch');
-    }
-
     function initDeckPanel() {
         console.log('initDeckPanel CALLED');
         const deckPanel = document.getElementById('deck-panel');
@@ -101,8 +93,7 @@ function tw_deck_panel_render(): string {
 
         // Bug 1 fix: scope all selectors to deckPanel.
         // Bug 3 fix: deckPanel.querySelector instead of getElementById.
-        // Opt 1 fix: cache NodeLists once here; switchTab closes over them
-        // instead of re-running querySelectorAll on every tab click.
+        // Opt 1 fix: cache NodeLists once; switchTab closes over them.
         const panelTabs       = deckPanel.querySelectorAll('.panel-tab');
         const tabContents     = deckPanel.querySelectorAll('.deck-tab-content');
         const toggleBtn       = deckPanel.querySelector('#toggle-deck');
@@ -111,14 +102,30 @@ function tw_deck_panel_render(): string {
         // Bug 9 fix: load skills data only once per session.
         let skillsLoaded = false;
 
+        // Opt 2 fix: single source of truth for panel state transitions.
+        // Previously the same classList.add/remove pattern was copy-pasted in
+        // switchTab, toggleBtn handler, deckTabsWrapper handler, and handleEscape.
+        function openPanel()  {
+            deckPanel.classList.add('is-open');
+            deckPanel.classList.remove('is-collapsed');
+            playSound('glitch');
+        }
+        function closePanel() {
+            deckPanel.classList.add('is-collapsed');
+            deckPanel.classList.remove('is-open');
+            playSound('glitch');
+        }
+        // Bug 5 fix: glitch sound on open/close only (called exclusively via openPanel/closePanel).
+        function togglePanel() {
+            deckPanel.classList.contains('is-open') ? closePanel() : openPanel();
+        }
+
         function switchTab(targetId) {
             // Bug 5 fix: tab click plays only the click sound.
             playSound('tab');
 
             if (deckPanel.classList.contains('is-collapsed')) {
-                deckPanel.classList.remove('is-collapsed');
-                deckPanel.classList.add('is-open');
-                playSound('glitch');
+                openPanel();
             }
 
             tabContents.forEach((content) => {
@@ -148,14 +155,14 @@ function tw_deck_panel_render(): string {
         if (toggleBtn) {
             toggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                togglePanel(deckPanel);
+                togglePanel();
             });
         }
 
         if (deckTabsWrapper) {
             deckTabsWrapper.addEventListener('click', (e) => {
                 if (e.target === deckTabsWrapper) {
-                    togglePanel(deckPanel);
+                    togglePanel();
                 }
             });
         }
@@ -164,9 +171,7 @@ function tw_deck_panel_render(): string {
         if (!deckPanel._escBound) {
             function handleEscape(e) {
                 if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
-                    deckPanel.classList.add('is-collapsed');
-                    deckPanel.classList.remove('is-open');
-                    playSound('glitch');
+                    closePanel();
                 }
             }
             document.addEventListener('keydown', handleEscape);
