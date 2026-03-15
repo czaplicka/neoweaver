@@ -10,6 +10,9 @@
  *
  * Supabase view: cyber_character_complete_tags
  * Required columns: character_id, label, color, source_type
+ *
+ * DB invariant: cyber_tags.label is stored WITHOUT '#' prefix.
+ * Enforced via CHECK constraint: CHECK (label NOT LIKE '#%')
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -90,8 +93,9 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			$target = isset( $groups[ $st ] ) ? $st : 'narrative';
 			$color  = sanitize_hex_color( $tag['color'] ?? '' ) ?? '#00ffff';
 
+			// Opt 3: labels stored without '#' in DB — no ltrim round-trip needed
 			$groups[ $target ]['items'][] = [
-				'label' => '#' . ltrim( $tag['label'] ?? '', '#' ),
+				'label' => '#' . ( $tag['label'] ?? '' ),
 				'color' => $color,
 			];
 		}
