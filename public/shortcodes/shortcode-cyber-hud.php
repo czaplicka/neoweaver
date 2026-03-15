@@ -10,14 +10,19 @@
  *   location_status_summary      – per-location stats
  *   cyber_reputation             – per-character faction reputation
  *
- * Requires TW_SUPABASE_PROJECT_ID and TW_SUPABASE_ANON_KEY constants (set in wp-config.php).
+ * Requires tw_supabase_url() and tw_supabase_anon_key() helpers to be defined.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 function display_cyber_hud() {
     if ( ! is_page( 2857 ) ) return '';
-    if ( ! defined( 'TW_SUPABASE_PROJECT_ID' ) || ! defined( 'TW_SUPABASE_ANON_KEY' ) ) return '';
+
+    // Bug 2 fix: guard uses the same source as the JS credential injection — the helper functions.
+    // Checking raw constants while the code uses helpers created a gap where the guard could
+    // pass (constants defined) but helpers return empty strings (different config source).
+    if ( ! function_exists( 'tw_supabase_url' ) || ! tw_supabase_url() ) return '';
+    if ( ! function_exists( 'tw_supabase_anon_key' ) || ! tw_supabase_anon_key() ) return '';
 
     $current_user_id = get_current_user_id();
 
