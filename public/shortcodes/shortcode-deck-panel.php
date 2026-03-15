@@ -75,8 +75,7 @@ function tw_deck_panel_render(): string {
         sounds[name].play().catch(() => {});
     }
 
-    // Bug 5 fix: extract toggle logic so glitch sound can be played
-    // exclusively on panel open/close, not on every tab switch.
+    // Bug 5 fix: glitch sound only on panel open/close, not on tab switch.
     function togglePanel(deckPanel) {
         const isOpen = deckPanel.classList.contains('is-open');
         deckPanel.classList.toggle('is-open',      !isOpen);
@@ -101,8 +100,7 @@ function tw_deck_panel_render(): string {
             const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
             const tabs        = deckPanel.querySelectorAll('.panel-tab');
 
-            // Bug 5 fix: tab navigation plays only the click sound.
-            // glitch sound is reserved for panel open/close (togglePanel).
+            // Bug 5 fix: tab click plays only the click sound.
             playSound('tab');
 
             if (deckPanel.classList.contains('is-collapsed')) {
@@ -149,13 +147,22 @@ function tw_deck_panel_render(): string {
             });
         }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
-                deckPanel.classList.add('is-collapsed');
-                deckPanel.classList.remove('is-open');
-                playSound('glitch');
+        // Bug 6 fix: initDeckPanel() is exposed as window.twInitDeckPanel and may be
+        // called multiple times (e.g. after a partial re-render). Without a guard each
+        // call stacks another keydown listener on document; pressing Escape fires all
+        // of them simultaneously. Named function + _escBound flag ensures the listener
+        // is added exactly once per deckPanel element.
+        if (!deckPanel._escBound) {
+            function handleEscape(e) {
+                if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
+                    deckPanel.classList.add('is-collapsed');
+                    deckPanel.classList.remove('is-open');
+                    playSound('glitch');
+                }
             }
-        });
+            document.addEventListener('keydown', handleEscape);
+            deckPanel._escBound = true;
+        }
     }
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
