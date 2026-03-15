@@ -25,8 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return string
  */
 function tw_deck_panel_render(): string {
-	// Bug 8 fix: without this guard the shortcode outputs HTML, registers a document
-	// keydown listener, and queues audio network requests on every page of the site.
+	// Bug 8 fix: restrict output to the adventure template.
 	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return '';
 	}
@@ -102,18 +101,17 @@ function tw_deck_panel_render(): string {
 
         // Bug 1 fix: scope all selectors to deckPanel.
         // Bug 3 fix: deckPanel.querySelector instead of getElementById.
+        // Opt 1 fix: cache NodeLists once here; switchTab closes over them
+        // instead of re-running querySelectorAll on every tab click.
         const panelTabs       = deckPanel.querySelectorAll('.panel-tab');
+        const tabContents     = deckPanel.querySelectorAll('.deck-tab-content');
         const toggleBtn       = deckPanel.querySelector('#toggle-deck');
         const deckTabsWrapper = deckPanel.querySelector('.deck-tabs-wrapper');
 
-        // Bug 9 fix: twLoadSkillsAndAbilities() was called on every SKILLS tab click,
-        // causing repeated Supabase fetches and re-renders. One-time flag prevents that.
+        // Bug 9 fix: load skills data only once per session.
         let skillsLoaded = false;
 
         function switchTab(targetId) {
-            const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
-            const tabs        = deckPanel.querySelectorAll('.panel-tab');
-
             // Bug 5 fix: tab click plays only the click sound.
             playSound('tab');
 
@@ -127,7 +125,7 @@ function tw_deck_panel_render(): string {
                 content.classList.toggle('is-active', content.id === targetId);
             });
 
-            tabs.forEach((btn) => {
+            panelTabs.forEach((btn) => {
                 btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId);
             });
 
