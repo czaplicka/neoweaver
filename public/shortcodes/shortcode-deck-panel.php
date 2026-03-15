@@ -6,6 +6,7 @@
  *
  * Renders the sliding side-panel with three tabs and wires up all
  * toggle / keyboard / sound interactions via inline JS.
+ * Only renders on pages using templates/adventure.php.
  *
  * CSS scope  : .neoweaver-screen #deck-panel
  * JS globals : window.twInitDeckPanel
@@ -24,6 +25,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return string
  */
 function tw_deck_panel_render(): string {
+	// Bug 8 fix: without this guard the shortcode outputs HTML, registers a document
+	// keydown listener, and queues audio network requests on every page of the site.
+	// Restrict output to the adventure template, consistent with all other game shortcodes.
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
+		return '';
+	}
+
 	ob_start();
 	?>
 <div id="deck-panel" class="is-collapsed">
@@ -58,8 +66,7 @@ function tw_deck_panel_render(): string {
 
 <script>
 (function () {
-    // Bug 7 fix: hardcoded absolute URLs break on staging / local / domain migration.
-    // content_url() resolves the correct wp-content URL for the current environment.
+    // Bug 7 fix: PHP content_url() instead of hardcoded production domain.
     const twSoundBase = '<?php echo esc_js( trailingslashit( content_url( 'uploads/sounds' ) ) ); ?>';
 
     // Bug 4 fix: defer Audio construction to first user gesture.
