@@ -2,6 +2,7 @@
 /**
  * SHORTCODE: [tw_connect_character_campaign]
  * NEOWEAVE AGENT INJECTION (World-Lock Protocol)
+ * World-Lock: agent locked to world via cyber_campaign_worlds junction table
  */
 function tw_connect_character_campaign_direct_v2() {
     if ( ! is_user_logged_in() ) {
@@ -14,7 +15,7 @@ function tw_connect_character_campaign_direct_v2() {
 
     ob_start(); ?>
     <div id="tw-deployment-root" class="tw-deployment-main-container">
-        
+
         <audio id="tw-glitch-sound" src="https://cyber.nieodparady.pl/wp-content/uploads/2026/02/soundreality-glitch-177348.mp3" preload="auto"></audio>
 
         <section class="tw-briefing-hero">
@@ -23,7 +24,7 @@ function tw_connect_character_campaign_direct_v2() {
                 <div class="tw-hero-text">
                     <span class="tw-label-alt">AGENT INJECTION PROTOCOL</span>
                     <h1>DEPLOYING THE AGENT</h1>
-                    <p>Operator, select a verified Agent entity to inhabit the targeted Deployment matrix. 
+                    <p>Operator, select a verified Agent entity to inhabit the targeted Deployment matrix.
                        Note: Agents are locked to the World Node of their first deployment.</p>
                 </div>
                 <div class="tw-hero-stats">
@@ -63,7 +64,6 @@ function tw_connect_character_campaign_direct_v2() {
                         EXECUTE INJECTION [ENTER]
                     </button>
 
-                    <!-- WORLD-LOCK POD PRZYCISKIEM -->
                     <div class="tw-world-lock-note">
                         <h4>WORLD-LOCK PROTOCOL</h4>
                         <p>
@@ -94,21 +94,21 @@ function tw_connect_character_campaign_direct_v2() {
 
         let store = { campaigns: [], characters: [] };
 
-        // Dynamic latency
         setInterval(() => {
             const l = document.getElementById('stat-latency');
-            if(l) l.innerText = (0.020 + Math.random() * 0.010).toFixed(3);
+            if (l) l.innerText = (0.020 + Math.random() * 0.010).toFixed(3);
         }, 3000);
 
         async function init() {
             status.innerText = "> System: Calibrating Uplink with The Weave...";
             const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
-            
+
             try {
+                // cyber_campaigns_ready_for_agent = kampanie ze światem, bez agenta
+                // zwraca: id, name, created_at, wp_user_id, world_type, world_id
                 const [rC, rCh] = await Promise.all([
-                    // view cyber_campaigns_without_characters returns: id, name, created_at, wp_user_id, world_type
                     fetch(
-                        config.url + "rest/v1/cyber_campaigns_without_characters?select=id,name,world_type&order=created_at.desc",
+                        config.url + "rest/v1/cyber_campaigns_ready_for_agent?select=id,name,world_id&order=created_at.desc",
                         { headers }
                     ),
                     fetch(
@@ -129,9 +129,9 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const rawCamps = await rC.json();
                 store.campaigns = rawCamps.map(item => ({
-                    id:         item.id,
-                    name:       item.name,
-                    world_type: item.world_type ?? null
+                    id:       item.id,
+                    name:     item.name,
+                    world_id: item.world_id ?? null
                 }));
 
                 const rawChars = await rCh.json();
@@ -140,7 +140,7 @@ function tw_connect_character_campaign_direct_v2() {
                     name:       ch.name,
                     race_id:    ch.race_id,
                     class_id:   ch.class_id,
-                    race_name:  ch.cyber_races  ? ch.cyber_races.name  : null,
+                    race_name:  ch.cyber_races   ? ch.cyber_races.name  : null,
                     class_name: ch.cyber_classes ? ch.cyber_classes.name : null
                 }));
 
@@ -159,26 +159,25 @@ function tw_connect_character_campaign_direct_v2() {
             const el = (type === 'camp') ? selCamp : selChar;
             el.innerHTML = "";
             const filtered = list.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()));
-            
-            if(filtered.length === 0) {
+
+            if (filtered.length === 0) {
                 el.appendChild(new Option("-- NO DATA --", ""));
             } else {
                 filtered.forEach(i => {
                     let label = i.name.toUpperCase();
-                    if(type === 'char') {
+                    if (type === 'char') {
                         const raceLabel  = i.race_name  || (i.race_id  ?? '-');
                         const classLabel = i.class_name || (i.class_id ?? '-');
                         label += ` [${raceLabel} | ${classLabel}]`;
                     }
-                    const opt = new Option(label, i.id);
-                    el.appendChild(opt);
+                    el.appendChild(new Option(label, i.id));
                 });
             }
         }
 
         document.getElementById('search-camp-char').oninput = (e) => render('camp', store.campaigns, e.target.value);
         document.getElementById('search-char').oninput     = (e) => render('char', store.characters, e.target.value);
-        
+
         form.onchange = async () => {
             btn.disabled = true;
             if (!selCamp.value || !selChar.value) return;
@@ -188,95 +187,86 @@ function tw_connect_character_campaign_direct_v2() {
 
             const selectedCharId = parseInt(selChar.value);
             const selectedCamp   = store.campaigns.find(c => c.id == selCamp.value);
+            const headers        = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
 
-            // If selected campaign has no world_type, skip World-Lock entirely
-            if (!selectedCamp || selectedCamp.world_type == null) {
+            // Kampania bez world_id = brak World-Lock, przepuść
+            if (!selectedCamp || selectedCamp.world_id == null) {
                 status.style.color = "#00e5ff";
                 status.innerText = "> System: No World-Lock constraint. Neural bridge open.";
                 btn.disabled = false;
                 return;
             }
 
-            const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
-
             try {
-                // Step 1: find the first campaign this agent has already joined
-                const resChars = await fetch(
-                    config.url +
-                    "rest/v1/cyber_campaign_characters" +
+                // Krok 1: czy agent ma już jakąś kampanię?
+                const resLinks = await fetch(
+                    config.url + "rest/v1/cyber_campaign_characters" +
                     "?character_id=eq." + selectedCharId +
-                    "&select=campaign_id" +
-                    "&limit=1",
+                    "&select=campaign_id&limit=1",
                     { headers }
                 );
 
-                if (!resChars.ok) {
-                    const txt = await resChars.text();
-                    console.error('World-lock check error (chars):', resChars.status, txt);
-                    // On verification error, allow injection rather than blocking player
-                    status.style.color = "#00e5ff";
-                    status.innerText = "> System: World-Lock check skipped. Proceeding.";
-                    btn.disabled = false;
+                if (!resLinks.ok) {
+                    console.error('World-lock step 1 error:', resLinks.status, await resLinks.text());
+                    allowWithSkip();
                     return;
                 }
 
-                const links = await resChars.json();
+                const links = await resLinks.json();
 
-                // Agent has never been deployed -- no World-Lock yet, allow
+                // Agent nigdy nie był deployowany = brak locka, przepuść
                 if (links.length === 0) {
-                    status.style.color = "#00e5ff";
-                    status.innerText = "> System: Neural bridge stable. World-Lock verified.";
-                    btn.disabled = false;
+                    allow("> System: Neural bridge stable. World-Lock verified.");
                     return;
                 }
 
                 const firstCampaignId = links[0].campaign_id;
 
-                // Step 2: fetch world_type from that campaign
+                // Krok 2: pobierz world_id tej kampanii z cyber_campaign_worlds
                 const resWorld = await fetch(
-                    config.url +
-                    "rest/v1/cyber_campaign" +
-                    "?id=eq." + firstCampaignId +
-                    "&select=world_type" +
-                    "&limit=1",
+                    config.url + "rest/v1/cyber_campaign_worlds" +
+                    "?campaign_id=eq." + firstCampaignId +
+                    "&select=world_id&limit=1",
                     { headers }
                 );
 
                 if (!resWorld.ok) {
-                    const txt = await resWorld.text();
-                    console.error('World-lock check error (world):', resWorld.status, txt);
-                    // On verification error, allow injection rather than blocking player
-                    status.style.color = "#00e5ff";
-                    status.innerText = "> System: World-Lock check skipped. Proceeding.";
-                    btn.disabled = false;
+                    console.error('World-lock step 2 error:', resWorld.status, await resWorld.text());
+                    allowWithSkip();
                     return;
                 }
 
                 const worldRows = await resWorld.json();
 
-                // If world_type is missing or null, no lock can be applied -- allow
-                if (worldRows.length === 0 || worldRows[0].world_type == null) {
-                    status.style.color = "#00e5ff";
-                    status.innerText = "> System: Neural bridge stable. World-Lock verified.";
-                    btn.disabled = false;
+                // Kampania bez świata = brak locka, przepuść
+                if (worldRows.length === 0 || worldRows[0].world_id == null) {
+                    allow("> System: Neural bridge stable. World-Lock verified.");
                     return;
                 }
 
-                // Step 3: compare world_type values -- must match
-                const agentWorldType = worldRows[0].world_type;
+                // Krok 3: porównaj world_id
+                const agentWorldId = worldRows[0].world_id;
 
-                if (agentWorldType !== selectedCamp.world_type) {
+                if (String(agentWorldId) !== String(selectedCamp.world_id)) {
                     status.style.color = "#ff0055";
                     status.innerText = "> Violation: Agent is locked to another World Node.";
                     return;
                 }
 
-                status.style.color = "#00e5ff";
-                status.innerText = "> System: Neural bridge stable. World-Lock verified.";
-                btn.disabled = false;
+                allow("> System: Neural bridge stable. World-Lock verified.");
+
             } catch (err) {
                 console.error('World-lock general error:', err);
-                // On any unexpected error, allow injection rather than blocking player
+                allowWithSkip();
+            }
+
+            function allow(msg) {
+                status.style.color = "#00e5ff";
+                status.innerText = msg;
+                btn.disabled = false;
+            }
+
+            function allowWithSkip() {
                 status.style.color = "#00e5ff";
                 status.innerText = "> System: World-Lock check skipped. Proceeding.";
                 btn.disabled = false;
@@ -289,25 +279,25 @@ function tw_connect_character_campaign_direct_v2() {
             status.innerText = "> System: Injecting Agent data into Matrix...";
 
             const payload = {
-                campaign_id:  parseInt(selCamp.value),
-                character_id: parseInt(selChar.value),
+                campaign_id:   parseInt(selCamp.value),
+                character_id:  parseInt(selChar.value),
                 creator_wp_id: config.uid
             };
 
             try {
                 const res = await fetch(config.url + "rest/v1/cyber_campaign_characters", {
                     method: "POST",
-                    headers: { 
-                        "apikey": config.key, 
+                    headers: {
+                        "apikey": config.key,
                         "Authorization": `Bearer ${config.key}`,
                         "Content-Type": "application/json",
-                        "Prefer": "resolution=merge-duplicates" 
+                        "Prefer": "resolution=merge-duplicates"
                     },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    if(audio) audio.play();
+                    if (audio) audio.play();
                     root.classList.add('tw-glitch-shake');
                     status.style.color = "#adff00";
                     status.innerText = "> System: INJECTION SUCCESSFUL. AGENT LINKED.";
