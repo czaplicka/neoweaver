@@ -2,12 +2,16 @@
 /**
  * Shortcode: [tw_compass]
  * Renderuje interaktywny kompas pobierajacy dane z cyber_world_map.
+ * Skrypt JS jest enqueue'owany tylko na stronie adventure.php.
  */
 add_shortcode('tw_compass', 'tw_compass_render');
 
 function tw_compass_render() {
     $wp_user_id = get_current_user_id();
-    if (!$wp_user_id) return ''; // Nie pokazuj nic niezalogowanym
+    if (!$wp_user_id) return '';
+
+    // Bug 3 fix: only enqueue the compass script on the adventure page
+    if (!is_page('adventure')) return '';
 
     ob_start();
     ?>
@@ -17,7 +21,7 @@ function tw_compass_render() {
                 <span class="dir-label">N</span>
                 <div class="loc-name">-</div>
             </div>
-            
+
             <div class="tw-compass-cell tw-w" data-dir="w">
                 <span class="dir-label">W</span>
                 <div class="loc-name">-</div>
@@ -78,12 +82,12 @@ function tw_compass_render() {
         }
         .tw-compass-cell .dir-label { font-weight: 700; font-size: 1.1rem; margin-bottom: 2px; }
         .tw-compass-cell .loc-name { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        
+
         .tw-n { grid-column: 2; grid-row: 1; }
         .tw-w { grid-column: 1; grid-row: 2; }
         .tw-e { grid-column: 3; grid-row: 2; }
         .tw-s { grid-column: 2; grid-row: 3; }
-        
+
         .tw-compass-center {
             grid-column: 2; grid-row: 2;
             display: flex; flex-direction: column;
@@ -104,7 +108,8 @@ function tw_compass_render() {
     </style>
 <script>
 /**
- * Logika Kompasu - Tale Weaver
+ * Compass Logic - NeoWeaver
+ * Runs only on the adventure page (server-side guard above ensures this).
  */
 document.addEventListener('twGameStateHydrated', function() {
     console.log('Compass: Game State ready, refreshing...');
@@ -173,7 +178,7 @@ async function refreshCompass() {
 
         directions.forEach(dir => {
             const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
-            if (!cell) return; // Bug 2 fix: cell may be null if DOM is missing or shortcode rendered out of context
+            if (!cell) return;
             const label = cell.querySelector('.loc-name');
 
             if (dir.id && neighborMap[dir.id]) {
