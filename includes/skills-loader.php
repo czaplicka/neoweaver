@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Hook: wp_footer, priorytet 35 (po scenarios-loader.php który ma 30).
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>
@@ -31,7 +31,6 @@ add_action( 'wp_footer', function () {
 
 	        const supa = window.twSupabase;
 
-	        // Jeśli brak charId - szukamy w bazie
 	        if (!charId) {
 	            const wpUserId = window.twAdventureData?.wp_user_id;
 	            if (!wpUserId) {
@@ -120,7 +119,6 @@ add_action( 'wp_footer', function () {
 	        }
 	    };
 
-	    // Uruchomienie po załadowaniu strony
 	    if (document.readyState === 'complete') {
 	        setTimeout(() => window.twLoadSkillsAndAbilities(), 1000);
 	    } else {
