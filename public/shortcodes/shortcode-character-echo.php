@@ -75,12 +75,15 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 		];
 
 		foreach ( $rows as $tag ) {
-			$st = $tag['source_type'] ?? 'narrative';
+			$st     = $tag['source_type'] ?? 'narrative';
 			$target = isset( $groups[ $st ] ) ? $st : 'narrative';
+
+			// Bug 3 fix: sanitize_hex_color prevents CSS injection via stored color values
+			$color = sanitize_hex_color( $tag['color'] ?? '' ) ?? '#00ffff';
 
 			$groups[ $target ]['items'][] = [
 				'label' => '#' . ltrim( $tag['label'] ?? '', '#' ),
-				'color' => ! empty( $tag['color'] ) ? $tag['color'] : '#00ffff',
+				'color' => $color,
 			];
 		}
 
