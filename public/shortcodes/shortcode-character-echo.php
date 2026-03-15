@@ -5,8 +5,8 @@
  * Renders the ECHO STREAM panel: all tags attached to the active character,
  * grouped by source type (status / skill / ability / item / narrative).
  *
- * Only rendered on page ID 2857. Uses tw_supabase_url() / tw_supabase_anon_key()
- * instead of bare constants so credentials are never hard-coded.
+ * Rendered only on pages using templates/adventure.php.
+ * Uses tw_supabase_url() / tw_supabase_anon_key() from wp-config.
  *
  * Supabase view: cyber_character_complete_tags
  * Required columns: character_id, label, color, source_type
@@ -18,8 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 	function tw_character_echo_shortcode() {
-		// 1. Render only on the main game page
-		if ( ! is_page( 2857 ) ) {
+		// 1. Render only on the adventure/game page (Bug 5: template check, not hardcoded ID)
+		if ( ! is_page_template( 'templates/adventure.php' ) ) {
 			return '';
 		}
 
@@ -32,8 +32,7 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			return '<div class="echo-stream-container">// ERROR: NO ACTIVE CHARACTER IN NEURAL LINK</div>';
 		}
 
-		// 3. Fetch from Supabase — with 30s transient cache per character
-		// Tags change only when a Make.com webhook fires, so short TTL is safe.
+		// 3. Fetch from Supabase with 30s transient cache per character
 		$safe_id   = (int) $character_id;
 		$cache_key = 'tw_echo_tags_' . $safe_id;
 		$rows      = get_transient( $cache_key );
@@ -41,7 +40,8 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 		if ( $rows === false ) {
 			$endpoint = trailingslashit( tw_supabase_url() )
 				. 'rest/v1/cyber_character_complete_tags'
-				. '?character_id=eq.' . $safe_id;
+				. '?character_id=eq.' . $safe_id
+				. '&select=label,color,source_type'; // Opt 1: fetch only used columns
 
 			$anon_key = tw_supabase_anon_key();
 
@@ -57,7 +57,6 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 				return '<div class="echo-stream-container">// ERROR: CONNECTION TIMEOUT</div>';
 			}
 
-			// Bug 2 fix: check HTTP status before parsing body
 			$code = wp_remote_retrieve_response_code( $response );
 			if ( $code !== 200 ) {
 				error_log( 'TW Echo: Supabase HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $response ) );
@@ -70,8 +69,6 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 				$rows = [];
 			}
 
-			// Cache for 30 seconds — invalidated naturally by TTL or by Make.com
-			// webhook calling delete_transient( 'tw_echo_tags_' . $character_id )
 			set_transient( $cache_key, $rows, 30 );
 		}
 
@@ -91,9 +88,7 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 		foreach ( $rows as $tag ) {
 			$st     = $tag['source_type'] ?? 'narrative';
 			$target = isset( $groups[ $st ] ) ? $st : 'narrative';
-
-			// Bug 3 fix: sanitize_hex_color prevents CSS injection via stored color values
-			$color = sanitize_hex_color( $tag['color'] ?? '' ) ?? '#00ffff';
+			$color  = sanitize_hex_color( $tag['color'] ?? '' ) ?? '#00ffff';
 
 			$groups[ $target ]['items'][] = [
 				'label' => '#' . ltrim( $tag['label'] ?? '', '#' ),
