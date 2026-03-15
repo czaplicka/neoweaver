@@ -109,9 +109,17 @@ function tw_compass_render() {
 <script>
 /**
  * Compass Logic - NeoWeaver
- * Wrapped in an IIFE to prevent global scope pollution (Bug 4 fix).
+ * Wrapped in IIFE (Bug 4). Uses compassLoaded flag to prevent double fetch (Bug 5).
  */
 (function () {
+
+    let compassLoaded = false;
+
+    function onCompassReady() {
+        if (compassLoaded) return;
+        compassLoaded = true;
+        refreshCompass();
+    }
 
     async function refreshCompass() {
         const client = window.twSupabase;
@@ -192,10 +200,12 @@ function tw_compass_render() {
         }
     }
 
-    document.addEventListener('twGameStateHydrated', refreshCompass);
+    // Primary trigger: fires when game state is fully hydrated
+    document.addEventListener('twGameStateHydrated', onCompassReady);
 
+    // Fallback: in case twGameStateHydrated never fires (e.g. auth delay, slow init)
     document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(refreshCompass, 1000);
+        setTimeout(onCompassReady, 1500);
     });
 
 })();
