@@ -67,6 +67,7 @@ function tw_compass_render() {
             width: 100%;
             text-align: center;
         }
+        /* Default: no exit in this direction */
         .tw-compass-cell {
             display: flex;
             flex-direction: column;
@@ -75,10 +76,18 @@ function tw_compass_render() {
             opacity: 0.3;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        /* Discovered neighbour: full green glow */
         .tw-compass-cell.active {
             opacity: 1;
             color: #adff00;
             text-shadow: 0 0 8px rgba(173, 255, 0, 0.6);
+        }
+        /* Undiscovered neighbour: passable but unknown — dimmed amber, no glow */
+        .tw-compass-cell.undiscovered {
+            opacity: 0.6;
+            color: #888;
+            font-style: italic;
+            text-shadow: none;
         }
         .tw-compass-cell .dir-label { font-weight: 700; font-size: 1.1rem; margin-bottom: 2px; }
         .tw-compass-cell .loc-name { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -110,6 +119,7 @@ function tw_compass_render() {
 /**
  * Compass Logic - NeoWeaver
  * Wrapped in IIFE (Bug 4). Uses compassLoaded flag to prevent double fetch (Bug 5).
+ * Uses separate active/undiscovered CSS classes (Bug 6).
  */
 (function () {
 
@@ -185,14 +195,12 @@ function tw_compass_render() {
                 const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
                 if (!cell) return;
                 const label = cell.querySelector('.loc-name');
+                const name = dir.id ? neighborMap[dir.id] : null;
 
-                if (dir.id && neighborMap[dir.id]) {
-                    cell.classList.add('active');
-                    label.innerText = neighborMap[dir.id];
-                } else {
-                    cell.classList.remove('active');
-                    label.innerText = "Block";
-                }
+                // Bug 6 fix: split discovered vs undiscovered visual states
+                cell.classList.toggle('active', !!name && name !== '???');
+                cell.classList.toggle('undiscovered', !!name && name === '???');
+                label.innerText = name ?? 'Block';
             });
 
         } catch (err) {
