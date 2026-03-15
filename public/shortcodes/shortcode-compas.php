@@ -1,7 +1,7 @@
 <?php
 /**
  * Shortcode: [tw_compass]
- * Renderuje interaktywny kompas pobierający dane z cyber_world_map.
+ * Renderuje interaktywny kompas pobierajacy dane z cyber_world_map.
  */
 add_shortcode('tw_compass', 'tw_compass_render');
 
@@ -24,7 +24,7 @@ function tw_compass_render() {
             </div>
 
             <div class="tw-compass-center">
-                <div class="tw-compass-icon">⟡</div>
+                <div class="tw-compass-icon">&#x27E1;</div>
                 <div id="tw-current-loc-name">Scanning...</div>
             </div>
 
@@ -107,7 +107,7 @@ function tw_compass_render() {
  * Logika Kompasu - Tale Weaver
  */
 document.addEventListener('twGameStateHydrated', function() {
-    console.log('🧭 Game State ready, refreshing compass...');
+    console.log('Compass: Game State ready, refreshing...');
     refreshCompass();
 });
 
@@ -121,7 +121,7 @@ async function refreshCompass() {
     }
 
     try {
-        // 1. Pobierz location_id z aktywnej sesji
+        // 1. Fetch location_id from active session
         const { data: sessionData, error: sError } = await client
             .from('cyber_game_sessions')
             .select('location_id')
@@ -133,7 +133,7 @@ async function refreshCompass() {
             return;
         }
 
-        // 2. Pobierz detale lokacji i sąsiadów z widoku v_cyber_world_nodes
+        // 2. Fetch node details and neighbours from v_cyber_world_nodes view
         const { data: node, error: nError } = await client
             .from('v_cyber_world_nodes')
             .select('location_name, n_id, e_id, s_id, w_id')
@@ -142,28 +142,28 @@ async function refreshCompass() {
 
         if (nError || !node) return;
 
-        // Ustaw nazwę aktualnej lokalizacji
         document.getElementById('tw-current-loc-name').innerText = node.location_name;
 
-        // Przygotuj listę ID sąsiadów do pobrania ich nazw jednym zapytaniem (optymalizacja)
+        // Build neighbour ID list for a single batched query
         const neighborIds = [node.n_id, node.e_id, node.s_id, node.w_id].filter(id => id !== null);
-        
+
         let neighborMap = {};
         if (neighborIds.length > 0) {
             const { data: names, error: namesError } = await client
-    .from('cyber_world_map')
-    .select('id, location_name, is_discovered')
-    .in('id', neighborIds);
+                .from('cyber_world_map')
+                .select('id, location_name, is_discovered')
+                .in('id', neighborIds);
 
-if (namesError) {
-    console.error('Compass: Failed to fetch neighbor names', namesError);
-} else if (Array.isArray(names)) {
-    names.forEach(n => {
-        neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
-    });
-}
+            if (namesError) {
+                console.error('Compass: Failed to fetch neighbour names', namesError);
+            } else if (Array.isArray(names)) {
+                names.forEach(n => {
+                    neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
+                });
+            }
+        }
 
-        // 3. Mapowanie i aktualizacja komórek kompasu
+        // 3. Map and update compass cells
         const directions = [
             { key: 'n', id: node.n_id },
             { key: 'e', id: node.e_id },
@@ -173,6 +173,7 @@ if (namesError) {
 
         directions.forEach(dir => {
             const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
+            if (!cell) return; // Bug 2 fix: cell may be null if DOM is missing or shortcode rendered out of context
             const label = cell.querySelector('.loc-name');
 
             if (dir.id && neighborMap[dir.id]) {
@@ -180,7 +181,7 @@ if (namesError) {
                 label.innerText = neighborMap[dir.id];
             } else {
                 cell.classList.remove('active');
-                label.innerText = "Block"; // Lub "Void" / "Wall"
+                label.innerText = "Block";
             }
         });
 
@@ -188,8 +189,9 @@ if (namesError) {
         console.error('Compass Error:', err);
     }
 }
+
 document.addEventListener('DOMContentLoaded', function () {
-  setTimeout(refreshCompass, 1000);
+    setTimeout(refreshCompass, 1000);
 });
 </script>
     <?php
