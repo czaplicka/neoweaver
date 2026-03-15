@@ -58,17 +58,25 @@ function tw_deck_panel_render(): string {
 
 <script>
 (function () {
-    const sounds = {
-        tab:    new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3'),
-        glitch: new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3'),
+    // Bug 4 fix: do not construct Audio objects at parse time.
+    // new Audio() at IIFE scope triggers background network requests on every page load
+    // and violates browser autoplay policy (Chrome/Firefox/Safari block play() without
+    // a prior user gesture). Defer construction to the first actual playSound() call
+    // so audio files are only fetched after a real interaction.
+    const SOUND_URLS = {
+        tab:    'https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3',
+        glitch: 'https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3',
     };
+    let sounds = {};
 
     function playSound(name) {
-        const sound = sounds[name];
-        if (!sound) return;
-        sound.currentTime = 0;
-        sound.volume = 0.2;
-        sound.play().catch(() => {});
+        if (!SOUND_URLS[name]) return;
+        if (!sounds[name]) {
+            sounds[name] = new Audio(SOUND_URLS[name]);
+            sounds[name].volume = 0.2;
+        }
+        sounds[name].currentTime = 0;
+        sounds[name].play().catch(() => {});
     }
 
     function initDeckPanel() {
@@ -78,10 +86,8 @@ function tw_deck_panel_render(): string {
 
         deckPanel.addEventListener('click', (e) => e.stopPropagation());
 
-        // Bug 1 fix: scope all selectors to deckPanel to avoid colliding with other components.
-        // Bug 3 fix: use deckPanel.querySelector('#toggle-deck') instead of getElementById --
-        // getElementById is global; if this shortcode were ever rendered twice, the second
-        // instance would silently grab the first instance's button.
+        // Bug 1 fix: scope all selectors to deckPanel.
+        // Bug 3 fix: deckPanel.querySelector instead of getElementById.
         const panelTabs       = deckPanel.querySelectorAll('.panel-tab');
         const toggleBtn       = deckPanel.querySelector('#toggle-deck');
         const deckTabsWrapper = deckPanel.querySelector('.deck-tabs-wrapper');
