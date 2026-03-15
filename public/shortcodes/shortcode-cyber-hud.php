@@ -25,7 +25,7 @@ function display_cyber_hud() {
 
     <div id="hud-wrapper" class="cyber-hud-wrapper">
         <div class="status-dots-row" onclick="toggleHud()">
-            <div class="hud-status-label" id="hud-trigger-text">› SYSTEM_ACTIVE</div>
+            <div class="hud-status-label" id="hud-trigger-text">&rsaquo; SYSTEM_ACTIVE</div>
             <div class="dots-group">
                 <div class="dot" id="dot-rep_local"       style="--base-color: #0055ff"></div>
                 <div class="dot" id="dot-rep_world"       style="--base-color: #6699ff"></div>
@@ -77,7 +77,7 @@ function toggleHud() {
     const w = document.getElementById('hud-wrapper');
     const t = document.getElementById('hud-trigger-text');
     w.classList.toggle('is-open');
-    t.innerText = w.classList.contains('is-open') ? '× DISCONNECT_STREAMS' : '› SYSTEM_ACTIVE';
+    t.innerText = w.classList.contains('is-open') ? '\u00d7 DISCONNECT_STREAMS' : '\u203a SYSTEM_ACTIVE';
 }
 
 const colorMap = {
@@ -91,8 +91,9 @@ const colorMap = {
     rep_gold_thief:  '#ff8800'
 };
 
-const SUPA_URL  = 'https://<?php echo TW_SUPABASE_PROJECT_ID; ?>.supabase.co/rest/v1';
-const SUPA_KEY  = '<?php echo TW_SUPABASE_ANON_KEY; ?>';
+// Bug 1 fix: use esc_js() and centralised helper functions instead of raw constant output
+const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 'rest/v1' ); ?>';
+const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
 const SUPA_HEAD = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
 async function supaFetch(path) {
