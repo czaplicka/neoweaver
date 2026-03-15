@@ -11,7 +11,7 @@ function tw_compass_render() {
     if (!$wp_user_id) return '';
 
     // Bug 3 fix: only enqueue the compass script on the adventure page
-    if (!is_page('adventure')) return '';
+    if (!is_page('template/adventure.php')) return '';
 
     ob_start();
     ?>
