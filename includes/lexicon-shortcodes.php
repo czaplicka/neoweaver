@@ -41,11 +41,11 @@ if ( ! function_exists( 'tw_get_supabase_lexicon' ) ) {
     }
 }
 
-// Wstrzyknięcie słownika do window.cyberLexicon na stronie gry (ID 2857)
+// Wstrzyknięcie słownika do window.cyberLexicon na stronie gry (adventure template)
 add_action(
     'wp_head',
     function () {
-        if ( ! is_page( 2857 ) ) {
+        if ( ! is_page_template( 'templates/adventure.php' ) ) {
             return;
         }
         $lexicon_data = tw_get_supabase_lexicon();
