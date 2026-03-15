@@ -82,7 +82,7 @@ function tw_compass_render() {
             color: #adff00;
             text-shadow: 0 0 8px rgba(173, 255, 0, 0.6);
         }
-        /* Undiscovered neighbour: passable but unknown — dimmed amber, no glow */
+        /* Undiscovered neighbour: passable but unknown — dimmed, no glow */
         .tw-compass-cell.undiscovered {
             opacity: 0.6;
             color: #888;
@@ -118,8 +118,9 @@ function tw_compass_render() {
 <script>
 /**
  * Compass Logic - NeoWeaver
- * Wrapped in IIFE (Bug 4). Uses compassLoaded flag to prevent double fetch (Bug 5).
- * Uses separate active/undiscovered CSS classes (Bug 6).
+ * Wrapped in IIFE (Bug 4). Uses compassLoaded flag (Bug 5).
+ * Split active/undiscovered states (Bug 6).
+ * Reads location_id from twGameState instead of querying the session (Opt 1).
  */
 (function () {
 
@@ -133,34 +134,28 @@ function tw_compass_render() {
 
     async function refreshCompass() {
         const client = window.twSupabase;
-        const session_id = window.twGameState?.currentSessionId;
 
-        if (!client || !session_id) {
-            console.warn('Compass: Missing client or session ID');
+        // Opt 1: location_id is already available in twGameState — no session query needed
+        const location_id = window.twGameState?.currentLocationId;
+
+        if (!client || !location_id) {
+            console.warn('Compass: Missing Supabase client or location ID');
+            document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
             return;
         }
 
         try {
-            // 1. Fetch location_id from active session
-            const { data: sessionData, error: sError } = await client
-                .from('cyber_game_sessions')
-                .select('location_id')
-                .eq('id', session_id)
-                .single();
-
-            if (sError || !sessionData?.location_id) {
-                document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
-                return;
-            }
-
-            // 2. Fetch node details and neighbours from v_cyber_world_nodes view
+            // 1. Fetch node details and neighbours from v_cyber_world_nodes view
             const { data: node, error: nError } = await client
                 .from('v_cyber_world_nodes')
                 .select('location_name, n_id, e_id, s_id, w_id')
-                .eq('id', sessionData.location_id)
+                .eq('id', location_id)
                 .single();
 
-            if (nError || !node) return;
+            if (nError || !node) {
+                console.error('Compass: Failed to fetch node', nError);
+                return;
+            }
 
             document.getElementById('tw-current-loc-name').innerText = node.location_name;
 
@@ -183,7 +178,7 @@ function tw_compass_render() {
                 }
             }
 
-            // 3. Map and update compass cells
+            // 2. Map and update compass cells
             const directions = [
                 { key: 'n', id: node.n_id },
                 { key: 'e', id: node.e_id },
@@ -197,9 +192,8 @@ function tw_compass_render() {
                 const label = cell.querySelector('.loc-name');
                 const name = dir.id ? neighborMap[dir.id] : null;
 
-                // Bug 6 fix: split discovered vs undiscovered visual states
-                cell.classList.toggle('active', !!name && name !== '???');
-                cell.classList.toggle('undiscovered', !!name && name === '???');
+                cell.classList.toggle('active',        !!name && name !== '???');
+                cell.classList.toggle('undiscovered',  !!name && name === '???');
                 label.innerText = name ?? 'Block';
             });
 
