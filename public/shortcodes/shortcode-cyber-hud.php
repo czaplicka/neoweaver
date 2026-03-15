@@ -19,8 +19,6 @@ function display_cyber_hud() {
     if ( ! is_page( 2857 ) ) return '';
 
     // Bug 2 fix: guard uses the same source as the JS credential injection — the helper functions.
-    // Checking raw constants while the code uses helpers created a gap where the guard could
-    // pass (constants defined) but helpers return empty strings (different config source).
     if ( ! function_exists( 'tw_supabase_url' ) || ! tw_supabase_url() ) return '';
     if ( ! function_exists( 'tw_supabase_anon_key' ) || ! tw_supabase_anon_key() ) return '';
 
@@ -101,8 +99,17 @@ const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 're
 const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
 const SUPA_HEAD = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
+// Bug 3 fix: check res.ok before parsing JSON.
+// fetch() only rejects on network failure — HTTP 4xx/5xx return a resolved promise with an
+// error body. Without this check, Supabase error objects (e.g. 401, 404, 500) were silently
+// passed to callers as regular values, causing sessArr[0] to be undefined and downstream
+// property access errors that the outer try/catch would swallow.
 async function supaFetch(path) {
     const res = await fetch(SUPA_URL + path, { headers: SUPA_HEAD });
+    if (!res.ok) {
+        console.error('HUD supaFetch HTTP', res.status, path);
+        return [];
+    }
     return res.json();
 }
 
