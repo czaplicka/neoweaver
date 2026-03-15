@@ -78,13 +78,16 @@ function tw_deck_panel_render(): string {
 
         deckPanel.addEventListener('click', (e) => e.stopPropagation());
 
-        const panelTabs       = document.querySelectorAll('.panel-tab');
+        // Bug 1 fix: scope both selectors to deckPanel to avoid colliding with any other
+        // component on the page that happens to use .panel-tab or .deck-tab-content.
+        const panelTabs       = deckPanel.querySelectorAll('.panel-tab');
         const toggleBtn       = document.getElementById('toggle-deck');
-        const deckTabsWrapper = document.querySelector('.deck-tabs-wrapper');
+        const deckTabsWrapper = deckPanel.querySelector('.deck-tabs-wrapper');
 
         function switchTab(targetId) {
-            const tabContents = document.querySelectorAll('.deck-tab-content');
-            const tabs        = document.querySelectorAll('.panel-tab');
+            // Bug 1 fix: scoped inside switchTab as well so repeated calls stay local.
+            const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
+            const tabs        = deckPanel.querySelectorAll('.panel-tab');
 
             playSound('tab');
             playSound('glitch');
