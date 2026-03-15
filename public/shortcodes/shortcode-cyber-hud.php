@@ -99,11 +99,8 @@ const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 're
 const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
 const SUPA_HEAD = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
-// Bug 3 fix: check res.ok before parsing JSON.
-// fetch() only rejects on network failure — HTTP 4xx/5xx return a resolved promise with an
-// error body. Without this check, Supabase error objects (e.g. 401, 404, 500) were silently
-// passed to callers as regular values, causing sessArr[0] to be undefined and downstream
-// property access errors that the outer try/catch would swallow.
+// Bug 3 fix: check res.ok before parsing JSON — fetch() only rejects on network failure,
+// not on HTTP 4xx/5xx. Returning [] keeps all callers safe (they all use arr[0] || null).
 async function supaFetch(path) {
     const res = await fetch(SUPA_URL + path, { headers: SUPA_HEAD });
     if (!res.ok) {
@@ -115,7 +112,8 @@ async function supaFetch(path) {
 
 async function updateHUD() {
     try {
-        // 1. Active session
+        // 1. Active session — must resolve first; worldId / locationId / characterId are
+        //    needed to build the URLs for the three parallel requests below.
         const sessArr = await supaFetch(
             `/cyber_game_sessions?wp_user_id=eq.<?php echo (int) $current_user_id; ?>&order=created_at.desc&limit=1`
         );
@@ -124,24 +122,20 @@ async function updateHUD() {
 
         let activeAlertColor = null;
 
-        // 2. World stats
-        const worldStatsArr = await supaFetch(`/world_status_summary_v2?world_id=eq.${worldId}`);
-        const worldStats    = worldStatsArr[0] || null;
+        // Bug 4 fix: queries 2–4 are independent of each other — fire them in parallel.
+        // characterId may be null for sessions without a character; fall back to [] so the
+        // destructuring assignment below always receives an array in every position.
+        const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
+            supaFetch(`/world_status_summary_v2?world_id=eq.${worldId}`),
+            supaFetch(`/location_status_summary?world_id=eq.${worldId}&location_id=eq.${locationId}`),
+            characterId
+                ? supaFetch(`/cyber_reputation?character_id=eq.${characterId}&order=updated_at.desc&limit=1`)
+                : Promise.resolve([]),
+        ]);
 
-        // 3. Location stats
-        const locStatsArr = await supaFetch(
-            `/location_status_summary?world_id=eq.${worldId}&location_id=eq.${locationId}`
-        );
-        const locStats = locStatsArr[0] || null;
-
-        // 4. Character faction reputation
-        let rep = null;
-        if (characterId) {
-            const repArr = await supaFetch(
-                `/cyber_reputation?character_id=eq.${characterId}&order=updated_at.desc&limit=1`
-            );
-            rep = repArr[0] || null;
-        }
+        const worldStats = worldStatsArr[0] || null;
+        const locStats   = locStatsArr[0]   || null;
+        const rep        = repArr[0]         || null;
 
         // Helper – update a single HUD row
         const updateRow = (id, val, tagsStr, isBipolar = false) => {
