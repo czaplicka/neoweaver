@@ -33,7 +33,6 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 		}
 
 		// 3. Fetch from the Supabase view
-		// tw_supabase_url() already returns the full base URL (no project-id constant needed).
 		$endpoint = trailingslashit( tw_supabase_url() )
 			. 'rest/v1/cyber_character_complete_tags'
 			. '?character_id=eq.' . (int) $character_id;
@@ -50,6 +49,13 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 
 		if ( is_wp_error( $response ) ) {
 			return '<div class="echo-stream-container">// ERROR: CONNECTION TIMEOUT</div>';
+		}
+
+		// Bug 2 fix: check HTTP status before parsing body
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code !== 200 ) {
+			error_log( 'TW Echo: Supabase HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $response ) );
+			return '<div class="echo-stream-container">// ERROR: DATA FEED UNAVAILABLE</div>';
 		}
 
 		$body = wp_remote_retrieve_body( $response );
@@ -70,8 +76,6 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 
 		foreach ( $rows as $tag ) {
 			$st = $tag['source_type'] ?? 'narrative';
-
-			// Map source_type to group key; race/class fall into IDENTITY
 			$target = isset( $groups[ $st ] ) ? $st : 'narrative';
 
 			$groups[ $target ]['items'][] = [
