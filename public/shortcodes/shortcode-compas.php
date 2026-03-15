@@ -109,95 +109,96 @@ function tw_compass_render() {
 <script>
 /**
  * Compass Logic - NeoWeaver
- * Runs only on the adventure page (server-side guard above ensures this).
+ * Wrapped in an IIFE to prevent global scope pollution (Bug 4 fix).
  */
-document.addEventListener('twGameStateHydrated', function() {
-    console.log('Compass: Game State ready, refreshing...');
-    refreshCompass();
-});
+(function () {
 
-async function refreshCompass() {
-    const client = window.twSupabase;
-    const session_id = window.twGameState?.currentSessionId;
+    async function refreshCompass() {
+        const client = window.twSupabase;
+        const session_id = window.twGameState?.currentSessionId;
 
-    if (!client || !session_id) {
-        console.warn('Compass: Missing client or session ID');
-        return;
-    }
-
-    try {
-        // 1. Fetch location_id from active session
-        const { data: sessionData, error: sError } = await client
-            .from('cyber_game_sessions')
-            .select('location_id')
-            .eq('id', session_id)
-            .single();
-
-        if (sError || !sessionData?.location_id) {
-            document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
+        if (!client || !session_id) {
+            console.warn('Compass: Missing client or session ID');
             return;
         }
 
-        // 2. Fetch node details and neighbours from v_cyber_world_nodes view
-        const { data: node, error: nError } = await client
-            .from('v_cyber_world_nodes')
-            .select('location_name, n_id, e_id, s_id, w_id')
-            .eq('id', sessionData.location_id)
-            .single();
+        try {
+            // 1. Fetch location_id from active session
+            const { data: sessionData, error: sError } = await client
+                .from('cyber_game_sessions')
+                .select('location_id')
+                .eq('id', session_id)
+                .single();
 
-        if (nError || !node) return;
-
-        document.getElementById('tw-current-loc-name').innerText = node.location_name;
-
-        // Build neighbour ID list for a single batched query
-        const neighborIds = [node.n_id, node.e_id, node.s_id, node.w_id].filter(id => id !== null);
-
-        let neighborMap = {};
-        if (neighborIds.length > 0) {
-            const { data: names, error: namesError } = await client
-                .from('cyber_world_map')
-                .select('id, location_name, is_discovered')
-                .in('id', neighborIds);
-
-            if (namesError) {
-                console.error('Compass: Failed to fetch neighbour names', namesError);
-            } else if (Array.isArray(names)) {
-                names.forEach(n => {
-                    neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
-                });
+            if (sError || !sessionData?.location_id) {
+                document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
+                return;
             }
+
+            // 2. Fetch node details and neighbours from v_cyber_world_nodes view
+            const { data: node, error: nError } = await client
+                .from('v_cyber_world_nodes')
+                .select('location_name, n_id, e_id, s_id, w_id')
+                .eq('id', sessionData.location_id)
+                .single();
+
+            if (nError || !node) return;
+
+            document.getElementById('tw-current-loc-name').innerText = node.location_name;
+
+            // Build neighbour ID list for a single batched query
+            const neighborIds = [node.n_id, node.e_id, node.s_id, node.w_id].filter(id => id !== null);
+
+            let neighborMap = {};
+            if (neighborIds.length > 0) {
+                const { data: names, error: namesError } = await client
+                    .from('cyber_world_map')
+                    .select('id, location_name, is_discovered')
+                    .in('id', neighborIds);
+
+                if (namesError) {
+                    console.error('Compass: Failed to fetch neighbour names', namesError);
+                } else if (Array.isArray(names)) {
+                    names.forEach(n => {
+                        neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
+                    });
+                }
+            }
+
+            // 3. Map and update compass cells
+            const directions = [
+                { key: 'n', id: node.n_id },
+                { key: 'e', id: node.e_id },
+                { key: 's', id: node.s_id },
+                { key: 'w', id: node.w_id }
+            ];
+
+            directions.forEach(dir => {
+                const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
+                if (!cell) return;
+                const label = cell.querySelector('.loc-name');
+
+                if (dir.id && neighborMap[dir.id]) {
+                    cell.classList.add('active');
+                    label.innerText = neighborMap[dir.id];
+                } else {
+                    cell.classList.remove('active');
+                    label.innerText = "Block";
+                }
+            });
+
+        } catch (err) {
+            console.error('Compass Error:', err);
         }
-
-        // 3. Map and update compass cells
-        const directions = [
-            { key: 'n', id: node.n_id },
-            { key: 'e', id: node.e_id },
-            { key: 's', id: node.s_id },
-            { key: 'w', id: node.w_id }
-        ];
-
-        directions.forEach(dir => {
-            const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
-            if (!cell) return;
-            const label = cell.querySelector('.loc-name');
-
-            if (dir.id && neighborMap[dir.id]) {
-                cell.classList.add('active');
-                label.innerText = neighborMap[dir.id];
-            } else {
-                cell.classList.remove('active');
-                label.innerText = "Block";
-            }
-        });
-
-    } catch (err) {
-        console.error('Compass Error:', err);
     }
-}
 
-document.addEventListener('DOMContentLoaded', function () {
-    setTimeout(refreshCompass, 1000);
-});
+    document.addEventListener('twGameStateHydrated', refreshCompass);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(refreshCompass, 1000);
+    });
+
+})();
 </script>
     <?php
     return ob_get_clean();
