@@ -97,34 +97,33 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 		}
 
 		// 5. Build HTML
+		// Opt 2: data-driven empty-state — no $has_any flag needed
+		$all_items = array_merge( ...array_column( $groups, 'items' ) );
+
 		ob_start();
 		?>
 		<div class="echo-stream-container">
 			<div class="echo-title">ECHO STREAM</div>
 			<div class="echo-list">
-				<?php
-				$has_any = false;
-				foreach ( $groups as $group ) :
-					if ( empty( $group['items'] ) ) continue;
-					$has_any = true;
-					?>
-					<div class="echo-group">
-						<div class="echo-group-title"><?php echo esc_html( $group['title'] ); ?></div>
-						<div class="echo-group-items">
-							<?php foreach ( $group['items'] as $item ) : ?>
-								<div class="echo-item"
-								     style="--echo-tag-color: <?php echo esc_attr( $item['color'] ); ?>;">
-									<span class="echo-label">
-										<?php echo esc_html( $item['label'] ); ?>
-									</span>
-								</div>
-							<?php endforeach; ?>
-						</div>
-					</div>
-				<?php endforeach; ?>
-
-				<?php if ( ! $has_any ) : ?>
+				<?php if ( empty( $all_items ) ) : ?>
 					<div class="echo-item" style="opacity: 0.5;">// NO ECHOES RECORDED</div>
+				<?php else : ?>
+					<?php foreach ( $groups as $group ) : ?>
+						<?php if ( empty( $group['items'] ) ) continue; ?>
+						<div class="echo-group">
+							<div class="echo-group-title"><?php echo esc_html( $group['title'] ); ?></div>
+							<div class="echo-group-items">
+								<?php foreach ( $group['items'] as $item ) : ?>
+									<div class="echo-item"
+									     style="--echo-tag-color: <?php echo esc_attr( $item['color'] ); ?>;">
+										<span class="echo-label">
+											<?php echo esc_html( $item['label'] ); ?>
+										</span>
+									</div>
+								<?php endforeach; ?>
+							</div>
+						</div>
+					<?php endforeach; ?>
 				<?php endif; ?>
 			</div>
 		</div>
