@@ -58,10 +58,14 @@ function tw_deck_panel_render(): string {
 
 <script>
 (function () {
+    // Bug 7 fix: hardcoded absolute URLs break on staging / local / domain migration.
+    // content_url() resolves the correct wp-content URL for the current environment.
+    const twSoundBase = '<?php echo esc_js( trailingslashit( content_url( 'uploads/sounds' ) ) ); ?>';
+
     // Bug 4 fix: defer Audio construction to first user gesture.
     const SOUND_URLS = {
-        tab:    'https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3',
-        glitch: 'https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3',
+        tab:    twSoundBase + 'ui-click.mp3',
+        glitch: twSoundBase + 'glitch-static.mp3',
     };
     let sounds = {};
 
@@ -147,11 +151,7 @@ function tw_deck_panel_render(): string {
             });
         }
 
-        // Bug 6 fix: initDeckPanel() is exposed as window.twInitDeckPanel and may be
-        // called multiple times (e.g. after a partial re-render). Without a guard each
-        // call stacks another keydown listener on document; pressing Escape fires all
-        // of them simultaneously. Named function + _escBound flag ensures the listener
-        // is added exactly once per deckPanel element.
+        // Bug 6 fix: guard against stacking multiple keydown listeners on re-init.
         if (!deckPanel._escBound) {
             function handleEscape(e) {
                 if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
