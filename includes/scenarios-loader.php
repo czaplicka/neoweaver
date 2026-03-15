@@ -5,11 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * TALE WEAVER - SCENARIOS LOADER
- * Wstrzykuje JS loadera scenariuszy tylko na stronie gry (ID 2857).
+ * Wstrzykuje JS loadera scenariuszy tylko na stronie gry (templates/adventure.php).
  * Hook: wp_footer, priorytet 30 (po char-panel.php który ma 25).
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>

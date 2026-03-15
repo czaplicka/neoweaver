@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   przed skills-loader.php  (35) — kolejność nie jest krytyczna
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>
@@ -23,7 +23,6 @@ add_action( 'wp_footer', function () {
 
     // =========================================================================
     // 1. SYNCHRONIZACJA CZASU (REALTIME)
-    // Słucha zmian w Supabase i kręci kołem czasu bez przeładowania strony
     // =========================================================================
     function initTimeRealtimeSync() {
         const supabase        = window.twSupabase;
@@ -64,7 +63,6 @@ add_action( 'wp_footer', function () {
             };
         }
 
-        // --- Walidacja kart (Tagi i Statusy) ---
         function validateCardPlay(card, activeTags = []) {
             let result = {
                 canPlay:     true,
@@ -91,7 +89,6 @@ add_action( 'wp_footer', function () {
             return result;
         }
 
-        // --- Ładowanie talii (Postać + Lokacja) ---
         async function loadPlayerDeck() {
             const { gameState, supabaseClient, TABLES } = getState();
             const allContainer = document.getElementById('hand-cards-all');
@@ -131,7 +128,6 @@ add_action( 'wp_footer', function () {
             }
         }
 
-        // --- Renderowanie kart na ekranie ---
         function renderPlayerHand(cards, activeTags = []) {
             const allContainer = document.getElementById('hand-cards-all');
             if (!allContainer) return;
@@ -217,7 +213,6 @@ add_action( 'wp_footer', function () {
             initCardZoom();
         }
 
-        // --- Zoom karty (Double Click) ---
         function initCardZoom() {
             const overlay = document.getElementById('card-zoom-overlay');
             if (!overlay) return;
@@ -243,7 +238,6 @@ add_action( 'wp_footer', function () {
             };
         }
 
-        // START
         function startDeck() {
             if (window.twDeckCoreStarted) return;
             window.twDeckCoreStarted = true;
@@ -261,11 +255,10 @@ add_action( 'wp_footer', function () {
 })();
 
 // =========================================================================
-// 3. UI TABS & SCENARIO (Zarządzanie widokami)
+// 3. UI TABS & SCENARIO
 // =========================================================================
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Filtrowanie kart (Attack, Tech, Social...)
     const typeTabs = document.querySelectorAll('.hand-type-tab');
     typeTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -278,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Przełączanie czatów (Gracz / GM)
     const chatTabs = document.querySelectorAll('.chat-tab');
     chatTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -291,9 +283,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Scenario Cards — kliknięcie uruchamia generowanie przez AJAX
-    // Używamy twAdventureData.ajax_url (dostępny na froncie),
-    // z fallbackiem na ajaxurl (dostępny tylko w adminie).
     const twAjaxUrl = window.twAdventureData?.ajax_url || (typeof ajaxurl !== 'undefined' ? ajaxurl : '/wp-admin/admin-ajax.php');
 
     jQuery(document).on('click', '.scenario-card', function () {

@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Hook: wp_footer, priorytet 40 (po skills-loader.php który ma 35).
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>
@@ -243,23 +243,14 @@ add_action( 'wp_footer', function () {
 
 /**
  * TALE WEAVER – LOOT & INVENTORY TAGS
- * Parser tagów [ITEM:ID] w czacie gry + handleLootAction.
- * Hook: wp_footer, priorytet 41 (po głównym bloku inwentarza powyżej).
- *
- * window.refreshInventory = alias do refreshInventoryUI() z bloku 40,
- * dzięki czemu paperdoll odświeża się bezpośrednio po loocie.
+ * Hook: wp_footer, priorytet 41.
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 	?>
 <script>
-/**
- * TALE WEAVER - SYSTEM OBSŁUGI EKWIPUNKU I LOOTU
- */
-
-// 1. PARSER TAGÓW [ITEM:ID]
 function parseInventoryTags(text) {
     if (typeof text !== 'string') return text;
 
@@ -279,7 +270,6 @@ function parseInventoryTags(text) {
     });
 }
 
-// 2. OBSŁUGA KLIKNIĘCIA "TAKE ITEM" (Make.com)
 window.handleLootAction = function (itemId, buttonElement) {
     const webhookUrl = 'https://hook.eu2.make.com/7e7vk81sk2pgut86mk06waclqmoxxqgn';
     if (!buttonElement) return;
@@ -314,7 +304,6 @@ window.handleLootAction = function (itemId, buttonElement) {
                 buttonElement.style.borderColor = '#adff00';
                 buttonElement.style.color = '#adff00';
 
-                // Wywolaj refreshInventoryUI() (paperdoll + lista) zdefiniowany w bloku 40.
                 if (typeof refreshInventoryUI === 'function') {
                     refreshInventoryUI();
                 }
@@ -340,8 +329,6 @@ window.handleLootAction = function (itemId, buttonElement) {
         });
 };
 
-// 3. window.refreshInventory — publiczny alias do refreshInventoryUI()
-// Pozwala zewnętrznym skryptom (np. czat) wolać obie nazwy.
 window.refreshInventory = function () {
     if (typeof refreshInventoryUI === 'function') {
         refreshInventoryUI();
@@ -355,19 +342,14 @@ window.refreshInventory = function () {
 
 /**
  * TALE WEAVER – LOOT ERROR OVERLAY
- * Narracyjny overlay błędu przy nieudanej próbie podniesienia przedmiotu.
- * Hook: wp_footer, priorytet 42 (po blokach inwentarza i loot tagów).
+ * Hook: wp_footer, priorytet 42.
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 	?>
 <script>
-/**
- * Tale Weaver - Text-to-Inventory Feedback
- * Wyświetla błąd narracyjny, gdy próba podniesienia przedmiotu zawiedzie.
- */
 window.twHandleActionError = function (rawMessage) {
     if (!rawMessage) rawMessage = 'Unknown error';
     const msg   = String(rawMessage);
