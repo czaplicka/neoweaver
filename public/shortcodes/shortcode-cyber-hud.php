@@ -2,7 +2,7 @@
 /**
  * TALE WEAVER – Cyber HUD Overlay
  * Shortcode: [cyber_hud]
- * Renders the status HUD only on the game page (ID 2857).
+ * Renders the status HUD only on pages using templates/adventure.php.
  *
  * Supabase views / tables used:
  *   cyber_game_sessions       – active session (world_id, location_id, character_id)
@@ -16,7 +16,9 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 function display_cyber_hud() {
-    if ( ! is_page( 2857 ) ) return '';
+    // Opt 2 fix: is_page( 2857 ) breaks on staging / fresh installs / page duplication.
+    // is_page_template() matches by template file path and is environment-independent.
+    if ( ! is_page_template( 'templates/adventure.php' ) ) return '';
 
     // Bug 2 fix: guard uses the same source as the JS credential injection — the helper functions.
     if ( ! function_exists( 'tw_supabase_url' ) || ! tw_supabase_url() ) return '';
@@ -237,11 +239,7 @@ async function updateHUD() {
     }
 }
 
-// Opt 1 fix: replace DOMContentLoaded with twGameStateHydrated as the initial trigger.
-// DOMContentLoaded + setInterval caused a double-fire burst when the page loaded slowly
-// (DOMContentLoaded at ~t4.9s, then interval tick at t=5.0s). twGameStateHydrated fires
-// only once window.twGameState is fully populated, ensuring session data is available
-// before the first fetch. setInterval continues to handle periodic polling.
+// Opt 1 fix: twGameStateHydrated as initial trigger; setInterval for polling.
 document.addEventListener('twGameStateHydrated', updateHUD);
 setInterval(updateHUD, 5000);
 </script>
