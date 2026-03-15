@@ -58,11 +58,7 @@ function tw_deck_panel_render(): string {
 
 <script>
 (function () {
-    // Bug 4 fix: do not construct Audio objects at parse time.
-    // new Audio() at IIFE scope triggers background network requests on every page load
-    // and violates browser autoplay policy (Chrome/Firefox/Safari block play() without
-    // a prior user gesture). Defer construction to the first actual playSound() call
-    // so audio files are only fetched after a real interaction.
+    // Bug 4 fix: defer Audio construction to first user gesture.
     const SOUND_URLS = {
         tab:    'https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3',
         glitch: 'https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3',
@@ -77,6 +73,15 @@ function tw_deck_panel_render(): string {
         }
         sounds[name].currentTime = 0;
         sounds[name].play().catch(() => {});
+    }
+
+    // Bug 5 fix: extract toggle logic so glitch sound can be played
+    // exclusively on panel open/close, not on every tab switch.
+    function togglePanel(deckPanel) {
+        const isOpen = deckPanel.classList.contains('is-open');
+        deckPanel.classList.toggle('is-open',      !isOpen);
+        deckPanel.classList.toggle('is-collapsed',  isOpen);
+        playSound('glitch');
     }
 
     function initDeckPanel() {
@@ -96,12 +101,14 @@ function tw_deck_panel_render(): string {
             const tabContents = deckPanel.querySelectorAll('.deck-tab-content');
             const tabs        = deckPanel.querySelectorAll('.panel-tab');
 
+            // Bug 5 fix: tab navigation plays only the click sound.
+            // glitch sound is reserved for panel open/close (togglePanel).
             playSound('tab');
-            playSound('glitch');
 
             if (deckPanel.classList.contains('is-collapsed')) {
                 deckPanel.classList.remove('is-collapsed');
                 deckPanel.classList.add('is-open');
+                playSound('glitch');
             }
 
             tabContents.forEach((content) => {
@@ -130,18 +137,14 @@ function tw_deck_panel_render(): string {
         if (toggleBtn) {
             toggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isOpen = deckPanel.classList.contains('is-open');
-                deckPanel.classList.toggle('is-open',      !isOpen);
-                deckPanel.classList.toggle('is-collapsed',  isOpen);
+                togglePanel(deckPanel);
             });
         }
 
         if (deckTabsWrapper) {
             deckTabsWrapper.addEventListener('click', (e) => {
                 if (e.target === deckTabsWrapper) {
-                    const isOpen = deckPanel.classList.contains('is-open');
-                    deckPanel.classList.toggle('is-open',      !isOpen);
-                    deckPanel.classList.toggle('is-collapsed',  isOpen);
+                    togglePanel(deckPanel);
                 }
             });
         }
@@ -150,6 +153,7 @@ function tw_deck_panel_render(): string {
             if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
                 deckPanel.classList.add('is-collapsed');
                 deckPanel.classList.remove('is-open');
+                playSound('glitch');
             }
         });
     }
