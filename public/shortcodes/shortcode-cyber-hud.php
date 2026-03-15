@@ -36,7 +36,7 @@ function display_cyber_hud() {
                 <div class="dot" id="dot-stealth"         style="--base-color: #00f2ff"></div>
                 <div class="dot" id="dot-order"           style="--base-color: #ffd700"></div>
                 <div class="dot" id="dot-rep_tech_nature" style="--base-color: #adff00"></div>
-                <div class="dot" id="dot-rep_chaos_order" style="--base-color: #00f2ff"></div>
+                <div class="dot" id="dot-rep_chaos_order" style="--base-color: #cc00ff"></div>
                 <div class="dot" id="dot-rep_gold_thief"  style="--base-color: #ff8800"></div>
             </div>
         </div>
@@ -83,6 +83,9 @@ function toggleHud() {
     t.innerText = w.classList.contains('is-open') ? '\u00d7 DISCONNECT_STREAMS' : '\u203a SYSTEM_ACTIVE';
 }
 
+// Bug 7 fix: rep_chaos_order was #00f2ff — same as stealth. Changed to #cc00ff (magic/purple)
+// so all 8 dots are visually distinct. Both the colorMap entry and the PHP dot's --base-color
+// attribute must match; both updated here.
 const colorMap = {
     rep_local:       '#0055ff',
     rep_world:       '#6699ff',
@@ -90,7 +93,7 @@ const colorMap = {
     stealth:         '#00f2ff',
     order:           '#ffd700',
     rep_tech_nature: '#adff00',
-    rep_chaos_order: '#00f2ff',
+    rep_chaos_order: '#cc00ff',
     rep_gold_thief:  '#ff8800'
 };
 
@@ -111,10 +114,6 @@ async function supaFetch(path) {
 }
 
 // Bug 6 fix: escape HTML special characters in strings before inserting into innerHTML.
-// Tag strings come from operator-editable DB content — an unescaped tag like
-// </span><img onerror=alert(1)> would execute as stored XSS.
-// We keep innerHTML (needed to apply the inline style per span) but sanitise each tag
-// text node individually before interpolation.
 function escapeHtml(str) {
     return str
         .replace(/&/g, '&amp;')
@@ -137,10 +136,7 @@ async function updateHUD() {
         let activeAlertColor = null;
 
         // Bug 4 fix: queries 2–4 are independent — fire in parallel.
-        // Bug 5 fix: updated view names (world_status_summary_v2 → cyber_world_hud_stats,
-        //            location_status_summary → cyber_location_hud_stats) and the views
-        //            themselves now join cyber_action_tags / cyber_action_tag_categories
-        //            instead of the old cyber_tags / cyber_tags_category.
+        // Bug 5 fix: updated view names.
         const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
             supaFetch(`/cyber_world_hud_stats?world_id=eq.${worldId}`),
             supaFetch(`/cyber_location_hud_stats?world_id=eq.${worldId}&location_id=eq.${locationId}`),
