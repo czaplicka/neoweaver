@@ -1,7 +1,7 @@
 <?php
 /**
  * TALE WEAVER – Quick Actions CMD_CENTER v2.0
- * Renders the Glass Terminal quick-actions bar only on the game page (ID 2857).
+ * Renders the Glass Terminal quick-actions bar only on the adventure page template.
  * Loaded via WPCode snippet or included in class-neoweaver-public.php.
  *
  * Tables used:
@@ -12,7 +12,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( is_page( 2857 ) ) :
+if ( is_page_template( 'templates/adventure.php' ) ) :
 ?>
 <script>
 // TW Quick Actions CMD_CENTER v2.0 - Glass Terminal + Combos
