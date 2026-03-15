@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Hook: wp_footer, priorytet 45 (po inventory-system.php który ma 40).
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>
@@ -188,7 +188,6 @@ add_action( 'wp_footer', function () {
 	        if (window.twGameReady) window.twLoadQuickActions();
 	    };
 
-	    // Odświeżanie przycisku z cooldownem co sekundę
 	    setInterval(() => {
 	        if (document.querySelector('button[disabled]')) window.twLoadQuickActions();
 	    }, 1000);

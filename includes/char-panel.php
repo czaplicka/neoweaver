@@ -6,11 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * TALE WEAVER - CHARACTER PANEL LOGIC
  * Logika otwierania/zamykania panelu postaci, nawigacji i notatek.
- * Ładuje się TYLKO na stronie gry (ID 2857).
+ * Ładuje się TYLKO na stronie gry (templates/adventure.php).
  * Hook: wp_footer, priorytet 25 (po chat-realtime.php który ma 20).
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page( 2857 ) || ! get_current_user_id() ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
 		return;
 	}
 	?>

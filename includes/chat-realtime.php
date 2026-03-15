@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 add_action( 'wp_footer', function () {
-    if ( ! is_page( 2857 ) ) return;
+    if ( ! is_page_template( 'templates/adventure.php' ) ) return;
     $user_id = get_current_user_id();
     if ( ! $user_id ) return;
     ?>
@@ -338,7 +338,7 @@ function sendChatMessage() {
                 
                 // 👇 PO WYSŁANIU WIADOMOŚCI ODŚWIEŻAMY ZEGAR
                 // Dajemy mały delay (500ms), żeby Make.com / Baza zdążyły przetworzyć zmiany czasu
-                setTimeout(refreshTwClock, 500);
+                setTimeout(() => { if (typeof refreshTwClock === 'function') refreshTwClock(); }, 500);
             }
         });
 }

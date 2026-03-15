@@ -12,7 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Returns true only for pages that actually need window.twAdventureData:
  *   - Pages using a NeoWeaver PHP template (templates/*.php)
- *   - The hard-coded game page (ID 2857)
  *   - Any page whose slug starts with one of the game prefixes
  *
  * All other WordPress pages (blog, shop, etc.) are excluded so we never
@@ -22,11 +21,6 @@ if ( ! function_exists( 'tw_is_game_page' ) ) {
 	function tw_is_game_page(): bool {
 		if ( ! is_singular() && ! is_page() ) {
 			return false;
-		}
-
-		// Hard-coded game page ID
-		if ( is_page( 2857 ) ) {
-			return true;
 		}
 
 		// Any page using a NeoWeaver PHP template
@@ -52,14 +46,6 @@ if ( ! function_exists( 'tw_is_game_page' ) ) {
  * Wstrzykujemy:
  * - Supabase JS
  * - window.twAdventureData (dane gry + konfiguracja)
- *
- * BUG-FIX (original): duplicate function declaration removed.
- * BUG-FIX #4: added two-layer guard:
- *   1. tw_is_game_page() — skips all non-game pages entirely.
- *   2. 60-second per-user transient — eliminates repeated Supabase calls
- *      on the same game page across multiple requests within one minute.
- *      The transient is invalidated on session/character change by calling
- *      tw_invalidate_game_data_cache( $user_id ) from any write handler.
  */
 if ( ! function_exists( 'tw_inject_global_data' ) ) {
 	function tw_inject_global_data() {
@@ -96,8 +82,6 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 				];
 			}
 
-			// Cache for 60 seconds. Short enough that game state feels live;
-			// long enough to collapse burst requests (e.g. multi-tab reload).
 			set_transient( $cache_key, $game_data, 60 );
 		}
 
@@ -130,10 +114,7 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 }
 
 /**
- * Cache invalidation helper — call this whenever a user's session,
- * character, or campaign changes so the next page load fetches fresh data.
- *
- * Usage: tw_invalidate_game_data_cache( get_current_user_id() );
+ * Cache invalidation helper.
  */
 if ( ! function_exists( 'tw_invalidate_game_data_cache' ) ) {
 	function tw_invalidate_game_data_cache( int $user_id ): void {
@@ -181,24 +162,15 @@ add_action( 'wp_head', function () {
 
 // ==========================================
 // TALE WEAVER – Quest Failure Effect
-// Tylko na stronie gry (ID 2857)
+// Tylko na stronie gry (templates/adventure.php)
 // ==========================================
 
 add_action( 'wp_head', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 	?>
 	<script>
-	/**
-	 * triggerQuestFailureEffect( questId )
-	 *
-	 * Wywołaj, gdy quest zakończy się porażką:
-	 *   triggerQuestFailureEffect('q-42');
-	 *
-	 * Wymaga na karcie questa: id="quest-{questId}"
-	 * Wymaga CSS klasy .failed-animation (zdefiniowanej w arkuszu gry).
-	 */
 	function triggerQuestFailureEffect(questId) {
 		const card = document.getElementById('quest-' + questId);
 		if (card) {
@@ -225,26 +197,15 @@ add_action( 'wp_head', function () {
 
 // ==========================================
 // DECK PANEL – UI tabs (Mission / Augments / Skills)
-// Tylko na stronie gry (ID 2857)
+// Tylko na stronie gry (templates/adventure.php)
 // ==========================================
 
 add_action( 'wp_head', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 	?>
 	<script>
-	/**
-	 * DECK PANEL: tab switching, collapse/expand, keyboard escape.
-	 *
-	 * Eksposes window.twInitDeckPanel() for manual re-init (e.g. after
-	 * dynamic DOM replacement). Tab "tab-skills" calls
-	 * window.twLoadSkillsAndAbilities() if that function exists.
-	 *
-	 * Audio relies on files at:
-	 *   /wp-content/uploads/sounds/ui-click.mp3
-	 *   /wp-content/uploads/sounds/glitch-static.mp3
-	 */
 	(function () {
 		const SOUND_BASE = '/wp-content/uploads/sounds/';
 		const sounds = {
@@ -265,7 +226,6 @@ add_action( 'wp_head', function () {
 			const deckPanel = document.getElementById('deck-panel');
 			if (!deckPanel) return;
 
-			// Prevent clicks inside the panel from bubbling to body/overlay
 			deckPanel.addEventListener('click', (e) => e.stopPropagation());
 
 			const panelTabs      = document.querySelectorAll('.panel-tab');
@@ -279,7 +239,6 @@ add_action( 'wp_head', function () {
 				playSound('tab');
 				playSound('glitch');
 
-				// Auto-expand if collapsed
 				if (deckPanel.classList.contains('is-collapsed')) {
 					deckPanel.classList.remove('is-collapsed');
 					deckPanel.classList.add('is-open');
@@ -293,7 +252,6 @@ add_action( 'wp_head', function () {
 					btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId);
 				});
 
-				// Lazy-load skills tab
 				if (targetId === 'tab-skills' && typeof window.twLoadSkillsAndAbilities === 'function') {
 					window.twLoadSkillsAndAbilities();
 				}
@@ -303,7 +261,6 @@ add_action( 'wp_head', function () {
 				btn.addEventListener('click', (e) => {
 					e.stopPropagation();
 					const targetId = btn.getAttribute('data-tab');
-					// Exclude the toggle button itself
 					if (targetId && btn.id !== 'toggle-deck') {
 						switchTab(targetId);
 					}
@@ -321,7 +278,6 @@ add_action( 'wp_head', function () {
 
 			if (deckTabsWrapper) {
 				deckTabsWrapper.addEventListener('click', (e) => {
-					// Only react to clicks directly on the wrapper background
 					if (e.target === deckTabsWrapper) {
 						const isOpen = deckPanel.classList.contains('is-open');
 						deckPanel.classList.toggle('is-open',      !isOpen);
@@ -330,7 +286,6 @@ add_action( 'wp_head', function () {
 				});
 			}
 
-			// Keyboard: Escape collapses the panel
 			document.addEventListener('keydown', (e) => {
 				if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
 					deckPanel.classList.add('is-collapsed');
@@ -339,14 +294,12 @@ add_action( 'wp_head', function () {
 			});
 		}
 
-		// Run immediately if DOM is ready, otherwise wait
 		if (document.readyState === 'complete' || document.readyState === 'interactive') {
 			initDeckPanel();
 		} else {
 			document.addEventListener('DOMContentLoaded', initDeckPanel);
 		}
 
-		// Expose for external re-init calls
 		window.twInitDeckPanel = initDeckPanel;
 	})();
 	</script>
@@ -355,17 +308,14 @@ add_action( 'wp_head', function () {
 
 // ==========================================
 // TALE WEAVER FULL ENGINE v5
-// Slow Motion card animation + Weaving Overlay
-// + AI scenario polling
-// Tylko na stronie gry (ID 2857)
+// Tylko na stronie gry (templates/adventure.php)
 // ==========================================
 
 add_action( 'wp_head', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 
-	// Seed campaign_id from server so JS never needs a hard-coded fallback.
 	$user_id     = get_current_user_id();
 	$cache_key   = 'tw_game_data_' . $user_id;
 	$game_data   = get_transient( $cache_key );
@@ -375,13 +325,6 @@ add_action( 'wp_head', function () {
 	$nonce       = wp_create_nonce( 'tw_nonce' );
 	?>
 	<script>
-	/**
-	 * TALE WEAVER: FULL ENGINE v5 (Slow Motion + UI Fixes)
-	 *
-	 * Reads campaign_id from window.twAdventureData (injected by tw_inject_global_data
-	 * at priority 1) so there is no hard-coded fallback value in the JS.
-	 * PHP also seeds window.twGameConfig directly below as a belt-and-suspenders guard.
-	 */
 	window.twGameConfig = window.twGameConfig || {};
 	window.twGameConfig.campaign_id = <?php echo $campaign_id ?: 'window.twAdventureData && window.twAdventureData.active_campaign_id || 0'; ?>;
 	window.twGameConfig.nonce       = '<?php echo esc_js( $nonce ); ?>';
@@ -391,9 +334,6 @@ add_action( 'wp_head', function () {
 
 		let loreTips = [], tipInterval, matrixInterval;
 
-		// -------------------------------------------------------
-		// 1. POLL + BIND — wait for scenario cards to appear in DOM
-		// -------------------------------------------------------
 		const init = setInterval(() => {
 			const cards = document.querySelectorAll('.deck-card.scenario-card');
 			if (cards.length > 0 && !window.scenarioListenerBound) {
@@ -608,29 +548,15 @@ add_action( 'wp_head', function () {
 
 // ==========================================
 // ECHO STREAM – Refresh utility
-// Tylko na stronie gry (ID 2857)
+// Tylko na stronie gry (templates/adventure.php)
 // ==========================================
 
 add_action( 'wp_head', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 	?>
 	<script>
-	/**
-	 * refreshEchoStream()
-	 *
-	 * Fetches fresh Echo Stream HTML via admin-ajax (action: tw_echo_refresh)
-	 * and replaces the current .echo-stream-container in place.
-	 * After replacement, re-runs initEchoTooltips() if available.
-	 *
-	 * Uses the ajax_url from window.twAdventureData when available so the
-	 * URL is never hard-coded.
-	 *
-	 * Usage:
-	 *   refreshEchoStream();                        // fire and forget
-	 *   setInterval(refreshEchoStream, 30_000);     // auto-poll every 30 s
-	 */
 	window.refreshEchoStream = async function refreshEchoStream() {
 		const container = document.querySelector('.echo-stream-container');
 		if (!container) return;
@@ -654,11 +580,8 @@ add_action( 'wp_head', function () {
 			}
 
 			const html = await res.text();
-
-			// Replace the container node with the freshly-rendered HTML.
 			container.outerHTML = html;
 
-			// Re-bind tooltips on the new node if the function exists.
 			const newContainer = document.querySelector('.echo-stream-container');
 			if (typeof window.initEchoTooltips === 'function' && newContainer) {
 				window.initEchoTooltips();
@@ -673,42 +596,23 @@ add_action( 'wp_head', function () {
 
 // ==========================================
 // BACKGROUND LOADER (priority 30)
-// Pobiera tło z v_cyber_game_state dla aktualnego gracza.
-// Fallback: get_option('tw_default_bg') wstrzyknięty z PHP.
-// Tylko na stronie gry (ID 2857)
+// Tylko na stronie gry (templates/adventure.php)
 // ==========================================
 
 add_action( 'wp_head', function () {
-	if ( ! is_page( 2857 ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 
-	// PHP fallback URL — set once in WP Options, never hard-code a path here.
 	$default_bg = esc_url( get_option( 'tw_default_bg', '' ) );
 	?>
 	<script>
-	/**
-	 * NeoWeaver Background Loader
-	 *
-	 * Priority 30 — runs after:
-	 *   pri  1  tw_inject_global_data  (window.twAdventureData)
-	 *   pri  5  Supabase client init   (window.twSupabase via twSupabaseReady)
-	 *   pri 20  Full Engine v5         (dispatches twGameStateHydrated)
-	 *
-	 * Listens for 'twGameStateHydrated'. Falls back to a PHP-injected default
-	 * image URL so the page never shows a blank background.
-	 *
-	 * XSS: URL is validated — only http/https schemes allowed, single/double
-	 * quotes and backslashes stripped before writing to CSS.
-	 */
 	(function () {
 		const DEFAULT_BG = '<?php echo esc_js( $default_bg ); ?>';
 
 		function sanitizeCssUrl(raw) {
 			if (!raw || typeof raw !== 'string') return '';
-			// Allow only http / https
 			if (!/^https?:\/\//i.test(raw)) return '';
-			// Strip characters that could break CSS url("...") context
 			return raw.replace(/["'\\]/g, '');
 		}
 
@@ -744,7 +648,6 @@ add_action( 'wp_head', function () {
 			}
 
 			try {
-				// Primary: active game state for this player
 				const { data, error } = await client
 					.from('v_cyber_game_state')
 					.select('location_img_url, location_name, location_id')
@@ -756,7 +659,6 @@ add_action( 'wp_head', function () {
 					return;
 				}
 
-				// Fallback: PHP-supplied default image (set via WP Options)
 				console.log('🎨 Background: no active location, using PHP default.');
 				if (DEFAULT_BG) {
 					applyBackground(DEFAULT_BG, null, 'default');
@@ -770,15 +672,12 @@ add_action( 'wp_head', function () {
 			}
 		}
 
-		// twGameStateHydrated = fired by Full Engine v5 when game state is ready.
-		// If already fired (race condition), run immediately.
 		if (window.twGameReady) {
 			loadBackground();
 		} else {
 			document.addEventListener('twGameStateHydrated', loadBackground, { once: true });
 		}
 
-		// Expose for manual refresh (e.g. after location change)
 		window.twReloadBackground = loadBackground;
 	})();
 	</script>
