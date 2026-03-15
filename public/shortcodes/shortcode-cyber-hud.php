@@ -17,7 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 function display_cyber_hud() {
     // Opt 2 fix: is_page( 2857 ) breaks on staging / fresh installs / page duplication.
-    // is_page_template() matches by template file path and is environment-independent.
     if ( ! is_page_template( 'templates/adventure.php' ) ) return '';
 
     // Bug 2 fix: guard uses the same source as the JS credential injection — the helper functions.
@@ -97,6 +96,11 @@ const colorMap = {
     rep_gold_thief:  '#ff8800'
 };
 
+// Opt 3 fix: priority order for alert colours — earlier in array = higher priority.
+// When multiple metrics are critical simultaneously the first match wins,
+// instead of the old last-write-wins behaviour that silently dropped earlier alerts.
+const ALERT_PRIORITY = ['#ff0033', '#ff8800', '#ffd700', '#cc00ff', '#adff00', '#0055ff', '#6699ff'];
+
 // Bug 1 fix: use esc_js() and centralised helper functions instead of raw constant output
 const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 'rest/v1' ); ?>';
 const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
@@ -130,7 +134,8 @@ async function updateHUD() {
         if (!sessArr?.length) return;
         const { world_id: worldId, location_id: locationId, character_id: characterId } = sessArr[0];
 
-        let activeAlertColor = null;
+        // Opt 3 fix: collect all triggered alert colours; resolve priority after all rows.
+        const activeAlerts = [];
 
         // Bug 4 fix: parallel fetches. Bug 5 fix: updated view names.
         const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
@@ -162,7 +167,7 @@ async function updateHUD() {
                         // Bug 8 fix: positive = STEALTH (safe, cyan), negative = DETECT (danger, orange).
                         if (value < 0) {
                             bar.style.backgroundColor = value <= -80 ? '#ff8800' : '#ff3300';
-                            if (value <= -80) activeAlertColor = '#ff8800';
+                            if (value <= -80) activeAlerts.push('#ff8800');
                         } else {
                             bar.style.backgroundColor = '#00f2ff';
                         }
@@ -175,9 +180,9 @@ async function updateHUD() {
                     bar.style.left            = '0';
                     bar.style.backgroundColor = colorMap[id] || '#ffffff';
                     if (id === 'danger' && clamped >= 80) {
-                        activeAlertColor = '#ff0033';
+                        activeAlerts.push('#ff0033');
                     } else if (clamped >= 80 && colorMap[id]) {
-                        activeAlertColor = colorMap[id];
+                        activeAlerts.push(colorMap[id]);
                     }
                 }
             }
@@ -223,11 +228,14 @@ async function updateHUD() {
             updateRow('rep_gold_thief',  rep.gold_vs_thief,  null, true);
         }
 
+        // Opt 3 fix: pick highest-priority alert colour from all that fired this tick.
+        const topAlert = ALERT_PRIORITY.find(c => activeAlerts.includes(c)) || null;
+
         const globalAlert = document.getElementById('hud-global-alert');
         if (globalAlert) {
-            if (activeAlertColor) {
+            if (topAlert) {
                 document.body.classList.add('global-glitch-active');
-                globalAlert.style.setProperty('--alert-c', activeAlertColor);
+                globalAlert.style.setProperty('--alert-c', topAlert);
                 globalAlert.classList.add('is-visible');
             } else {
                 document.body.classList.remove('global-glitch-active');
