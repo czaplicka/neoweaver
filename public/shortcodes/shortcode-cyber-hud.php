@@ -157,18 +157,12 @@ async function updateHUD() {
                     bar.style.left  = value >= 0 ? '50%' : (50 - width) + '%';
 
                     if (id === 'stealth') {
-                        // Bug 8 fix: semantics were inverted.
-                        // Axis: positive = STEALTH (hidden, safe), negative = DETECT (exposed, danger).
-                        // High detection (value <= -80) is the dangerous state — alert in orange.
-                        // High stealth (value >= 80) is the calm state — show cyan, no global alert.
+                        // Bug 8 fix: positive = STEALTH (safe, cyan), negative = DETECT (danger, orange).
                         if (value < 0) {
-                            // Detect-heavy: bar fills to the right in orange/danger palette
                             bar.style.backgroundColor = value <= -80 ? '#ff8800' : '#ff3300';
                             if (value <= -80) activeAlertColor = '#ff8800';
                         } else {
-                            // Stealth-heavy: bar fills to the left in calm cyan
                             bar.style.backgroundColor = '#00f2ff';
-                            // No global alert — being well-hidden is not a warning
                         }
                     } else {
                         bar.style.backgroundColor = value >= 0 ? colorMap[id] : '#ff3300';
@@ -197,7 +191,6 @@ async function updateHUD() {
                     .split(',')
                     .map(t => t.trim())
                     .filter(t => t && !['neutral', 'balance', 'balanced'].includes(t.toLowerCase()));
-                // Bug 6 fix: escape each tag string before interpolating into innerHTML.
                 tagBox.innerHTML = tags.slice(-3).map(t => {
                     const safe = escapeHtml(t);
                     return `<span class="tag-item" style="border-left-color:${colorMap[id] || '#fff'}">#${safe}</span>`;
@@ -244,8 +237,13 @@ async function updateHUD() {
     }
 }
 
+// Opt 1 fix: replace DOMContentLoaded with twGameStateHydrated as the initial trigger.
+// DOMContentLoaded + setInterval caused a double-fire burst when the page loaded slowly
+// (DOMContentLoaded at ~t4.9s, then interval tick at t=5.0s). twGameStateHydrated fires
+// only once window.twGameState is fully populated, ensuring session data is available
+// before the first fetch. setInterval continues to handle periodic polling.
+document.addEventListener('twGameStateHydrated', updateHUD);
 setInterval(updateHUD, 5000);
-document.addEventListener('DOMContentLoaded', updateHUD);
 </script>
 
     <?php return ob_get_clean();
