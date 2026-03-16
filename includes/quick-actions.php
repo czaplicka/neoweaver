@@ -183,9 +183,15 @@ add_action( 'wp_footer', function () {
 	        }
 	    };
 
+	    // Listens for the shared twTagsUpdated event (dispatched by twUpdatePlayerTags).
+	    // This keeps quick-actions in sync with any tags update, same as the Loom.
+	    document.addEventListener('twTagsUpdated', function() {
+	        if (window.twGameReady) window.twLoadQuickActions();
+	    });
+
 	    window.twUpdatePlayerTags = function(tags) {
 	        window.currentPlayerTags = Array.isArray(tags) ? tags : [];
-	        if (window.twGameReady) window.twLoadQuickActions();
+	        document.dispatchEvent(new CustomEvent('twTagsUpdated', { detail: window.currentPlayerTags }));
 	    };
 
 	    setInterval(() => {
