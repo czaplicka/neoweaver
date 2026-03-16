@@ -264,11 +264,13 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 }
             }
 
-            // --- SYNCHRONIZACJA STARTU ---
+            // Bug fix (9): { once: true } removes the listener after first fire so that
+            // repeated twGameStateHydrated dispatches (e.g. after a game state refresh)
+            // don't trigger multiple concurrent initLoom() calls.
             if (window.twGameReady) {
                 initLoom();
             } else {
-                document.addEventListener('twGameStateHydrated', initLoom);
+                document.addEventListener('twGameStateHydrated', initLoom, { once: true });
             }
         })();
         </script>
