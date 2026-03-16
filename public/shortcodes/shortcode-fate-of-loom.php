@@ -1,6 +1,12 @@
 <?php
 if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
     function tw_loom_of_fate_shortcode() {
+if ( ! is_page_template( array( 
+    'templates/adventure.php', 
+    'templates/character-public-profile.php' 
+) ) ) {
+    return '';
+}
         // Bug fix (1): cast 0 (integer) to '' so JS guard simplifies to !charId
         $char_id  = function_exists('tw_get_current_character_id') ? tw_get_current_character_id() : '';
         $char_id  = $char_id ?: '';
