@@ -7,6 +7,11 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
         // Bug fix (2): unique suffix per instance so multiple shortcodes on one page don't collide
         $uid = 'loom_' . uniqid();
 
+        // Bug fix (7): Chart.js is enqueued once via wp_enqueue_script('chartjs') in the plugin
+        // bootstrap (neoweaver-wp-core.php). Do NOT output a <script src> tag here — it would be
+        // duplicated on every shortcode render and re-execute Chart.js, destroying existing instances.
+        wp_enqueue_script( 'chartjs' );
+
         ob_start(); ?>
         
         <!-- LOOM CONTAINER UI -->
@@ -86,7 +91,6 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
             </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
         (function() {
             // Instance UID — scopes every DOM query to this specific Loom render
