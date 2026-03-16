@@ -197,7 +197,9 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                         scales: {
                             r: {
                                 min: 0,
-                                max: Math.max(...Object.values(stats), 3),
+                                // Bug fix (6): cap scale at 50 so that a dominant stat
+                                // (e.g. 200 Attack cards) doesn't squash all other bars.
+                                max: Math.min(Math.max(...Object.values(stats), 3), 50),
                                 ticks: { display: false },
                                 angleLines: { color: 'rgba(0, 210, 255, 0.25)', lineWidth: 1 },
                                 grid: { color: 'rgba(0, 210, 255, 0.15)', lineWidth: 1 },
