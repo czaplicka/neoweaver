@@ -11,12 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────────────────────────────────────────
 define( 'NEOWEAVER_VERSION',    '0.0.7' );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// ─── Helpers & core includes ──────────────────────────────────────────────
+// ─── Helpers & core includes ────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-config.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-helpers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/game-data.php';
@@ -24,12 +24,12 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-public-profile.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
-// ─── AJAX handlers ──────────────────────────────────────────────────────────────────────────────
+// ─── AJAX handlers ────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-handlers.php';
 
 
-// ─── Game page scripts (wp_footer, adventure template only) ────────────────────
+// ─── Game page scripts (wp_footer, adventure template only) ──────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/scenarios-loader.php';
@@ -40,7 +40,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/quick-actions.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-deck-scenarios.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quest-helpers.php';
 
-// ─── Class autoload ──────────────────────────────────────────────────────────────────────────────────────
+// ─── Class autoload ──────────────────────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
@@ -66,21 +66,27 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-character-echo.
 require_once plugin_dir_path( __FILE__ ) . 'includes/shortcodes-tags.php';
 
 
-// ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────
+// ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
 
-// ─── Enqueue shared public assets ──────────────────────────────────────────────
+// ─── Enqueue shared public assets ──────────────────────────────────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_style( 'neoweaver', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+
+	// Bug fix (7): enqueue Chart.js once here instead of inline inside the shortcode.
+	// The [tw_loom_of_fate] shortcode can appear multiple times on a page; a raw
+	// <script src="..."> tag would be duplicated on each render and re-execute Chart.js,
+	// redefining the Chart global and destroying existing chart instances.
+	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
 	if ( is_page_template( 'templates/adventure.php' ) ) {
 		wp_enqueue_script( 'nw-panel-tactical-left', plugin_dir_url( __FILE__ ) . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
 	}
 } );
 
-// ─── Register plugin page templates ───────────────────────────────────────────
+// ─── Register plugin page templates ─────────────────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	add_filter( 'theme_page_templates', function ( $templates ) {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
@@ -100,7 +106,7 @@ add_action( 'plugins_loaded', function () {
 	} );
 } );
 
-// ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────────────────────
+// ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	$repo                = new Neoweaver_Agents_Repository();
 	$list                = new Neoweaver_Agents_List( $repo );
@@ -110,7 +116,7 @@ add_action( 'plugins_loaded', function () {
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
-// ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────
+// ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────────
 function neoweaver_enqueue_frontend_styles() {
 	if ( is_page_template( 'templates/adventure.php' ) ) {
 		$base = plugin_dir_url( __FILE__ ) . 'assets/css/';
