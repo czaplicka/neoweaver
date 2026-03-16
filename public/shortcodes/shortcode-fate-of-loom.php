@@ -96,13 +96,13 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 
             let loomChart = null;
 
-            // 1. Odbiór tagów z zewnątrz (np. przy zagrywaniu karty)
-            const originalUpdate = window.twUpdatePlayerTags;
-            window.twUpdatePlayerTags = function(tags) {
-                if (typeof originalUpdate === 'function') originalUpdate(tags);
-                console.log("Loom: Tags updated, refreshing chart...");
+            // Bug fix (5): use CustomEvent instead of monkey-patching window.twUpdatePlayerTags.
+            // Other scripts should dispatch: document.dispatchEvent(new CustomEvent('twTagsUpdated', { detail: tags }))
+            // Every Loom instance independently listens — no global state clobbered.
+            document.addEventListener('twTagsUpdated', function(e) {
+                console.log('Loom [' + LOOM_UID + ']: twTagsUpdated received, refreshing chart...');
                 initLoom();
-            };
+            });
 
             async function initLoom() {
                 const client = window.twSupabase;
@@ -112,7 +112,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 const charId = window.twGameState?.currentCharacterId || "<?php echo esc_js( $char_id ); ?>";
 
                 if (!client || !charId) {
-                    console.log("Loom: Waiting for data/charId...");
+                    console.log('Loom [' + LOOM_UID + ']: Waiting for data/charId...');
                     return; 
                 }
 
@@ -130,7 +130,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     .eq("character_id", charId);
 
                 if (error) {
-                    console.error("Loom Error:", error);
+                    console.error('Loom [' + LOOM_UID + '] Error:', error);
                     triggerQARefresh();
                     return;
                 }
@@ -157,11 +157,12 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
             }
 
             function renderChart(stats, hasData) {
-                // Bug fix (2): all DOM lookups scoped to this instance's container
+                // Bug fix (2/3): all DOM lookups scoped to this instance's container
                 const canvas = container.querySelector('#fateChart-' + LOOM_UID);
                 if (!canvas) return;
                 
                 const ctx = canvas.getContext('2d');
+                // Bug fix (4): instance-local loomChart var, not window.twLoomChart
                 if (loomChart) loomChart.destroy();
 
                 const colors = {
@@ -237,7 +238,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 }
 
                 window.twGameState.currentArchetype = activeArchetype;
-                console.log("Loom [" + LOOM_UID + "]: Archetype set to", activeArchetype);
+                console.log('Loom [' + LOOM_UID + ']: Archetype set to', activeArchetype);
                 triggerQARefresh();
             }
 
