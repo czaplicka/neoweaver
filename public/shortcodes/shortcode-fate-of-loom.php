@@ -1,15 +1,16 @@
 <?php
 if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
     function tw_loom_of_fate_shortcode() {
-        // Pobieramy ID po stronie PHP jako fallback (na wszelki wypadek)
-        // Bug fix: cast 0 (integer) to '' so JS guard simplifies to !charId
-        $char_id = function_exists('tw_get_current_character_id') ? tw_get_current_character_id() : '';
-        $char_id = $char_id ?: '';
+        // Bug fix (1): cast 0 (integer) to '' so JS guard simplifies to !charId
+        $char_id  = function_exists('tw_get_current_character_id') ? tw_get_current_character_id() : '';
+        $char_id  = $char_id ?: '';
+        // Bug fix (2): unique suffix per instance so multiple shortcodes on one page don't collide
+        $uid = 'loom_' . uniqid();
 
         ob_start(); ?>
         
         <!-- LOOM CONTAINER UI -->
-        <div id="tw-loom-container" style="
+        <div id="tw-loom-container-<?php echo esc_attr( $uid ); ?>" class="tw-loom-container" style="
             background: var(--tw-bg-ghost, rgba(3,7,18,0.2));
             backdrop-filter: blur(var(--tw-blur, 12px));
             border: 1px solid rgba(0,210,255,0.4);
@@ -58,23 +59,23 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 z-index: 2;
                 left: 10px;
             ">
-                <canvas id="fateChart" style="width: 100%; height: 100%;"></canvas>
+                <canvas id="fateChart-<?php echo esc_attr( $uid ); ?>" style="width: 100%; height: 100%;"></canvas>
                 
-                <div id="label-brutality" style="position: absolute; top: 5px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; white-space: nowrap; color: #ff4444; text-shadow: 0 0 5px rgba(0,0,0,0.8);">BRUTALITY <span style="color: #fff; font-size: 12px;">0</span></div>
-                <div id="label-cunning" style="position: absolute; top: 75px; right: -5px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #d946ef; text-shadow: 0 0 5px rgba(0,0,0,0.8);">CUNNING <span style="color: #fff; font-size: 12px;">0</span></div>
-                <div id="label-intellect" style="position: absolute; bottom: 75px; right: -5px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #00d2ff; text-shadow: 0 0 5px rgba(0,0,0,0.8);">INTELLECT <span style="color: #fff; font-size: 12px;">0</span></div>
-                <div id="label-spirit" style="position: absolute; bottom: 75px; left: -15px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #8b5cf6; text-shadow: 0 0 5px rgba(0,0,0,0.8);">SPIRIT <span style="color: #fff; font-size: 12px;">0</span></div>
-                <div id="label-presence" style="position: absolute; top: 75px; left: -15px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #adff00; text-shadow: 0 0 5px rgba(0,0,0,0.8);">PRESENCE <span style="color: #fff; font-size: 12px;">0</span></div>
+                <div id="label-brutality-<?php echo esc_attr( $uid ); ?>" style="position: absolute; top: 5px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; white-space: nowrap; color: #ff4444; text-shadow: 0 0 5px rgba(0,0,0,0.8);">BRUTALITY <span style="color: #fff; font-size: 12px;">0</span></div>
+                <div id="label-cunning-<?php echo esc_attr( $uid ); ?>" style="position: absolute; top: 75px; right: -5px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #d946ef; text-shadow: 0 0 5px rgba(0,0,0,0.8);">CUNNING <span style="color: #fff; font-size: 12px;">0</span></div>
+                <div id="label-intellect-<?php echo esc_attr( $uid ); ?>" style="position: absolute; bottom: 75px; right: -5px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #00d2ff; text-shadow: 0 0 5px rgba(0,0,0,0.8);">INTELLECT <span style="color: #fff; font-size: 12px;">0</span></div>
+                <div id="label-spirit-<?php echo esc_attr( $uid ); ?>" style="position: absolute; bottom: 75px; left: -15px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #8b5cf6; text-shadow: 0 0 5px rgba(0,0,0,0.8);">SPIRIT <span style="color: #fff; font-size: 12px;">0</span></div>
+                <div id="label-presence-<?php echo esc_attr( $uid ); ?>" style="position: absolute; top: 75px; left: -15px; font-size: 9px; font-weight: 700; white-space: nowrap; color: #adff00; text-shadow: 0 0 5px rgba(0,0,0,0.8);">PRESENCE <span style="color: #fff; font-size: 12px;">0</span></div>
             </div>
 
-            <div id="archetype-container" style="
+            <div id="archetype-container-<?php echo esc_attr( $uid ); ?>" style="
                 text-align: center;
                 border-top: 1px solid rgba(0,210,255,0.3);
                 padding-top: 12px;
                 position: relative;
                 z-index: 2;
             ">
-                <div id="archetype-name" style="
+                <div id="archetype-name-<?php echo esc_attr( $uid ); ?>" style="
                     color: var(--tw-monitor, #00d2ff);
                     font-size: 1.3em;
                     font-weight: 800;
@@ -88,12 +89,18 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
         (function() {
+            // Instance UID — scopes every DOM query to this specific Loom render
+            const LOOM_UID = "<?php echo esc_js( $uid ); ?>";
+            const container = document.getElementById('tw-loom-container-' + LOOM_UID);
+            if (!container) return;
+
+            let loomChart = null;
+
             // 1. Odbiór tagów z zewnątrz (np. przy zagrywaniu karty)
             const originalUpdate = window.twUpdatePlayerTags;
             window.twUpdatePlayerTags = function(tags) {
                 if (typeof originalUpdate === 'function') originalUpdate(tags);
                 console.log("Loom: Tags updated, refreshing chart...");
-                // Skoro tagi się zmieniły, system już działa - odświeżamy
                 initLoom();
             };
 
@@ -101,10 +108,9 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 const client = window.twSupabase;
                 window.twGameState = window.twGameState || {};
                 
-                // Bug fix: esc_js() prevents JS injection; empty string when no char found
+                // Bug fix (1): esc_js() + empty-string fallback
                 const charId = window.twGameState?.currentCharacterId || "<?php echo esc_js( $char_id ); ?>";
 
-                // Jeśli nadal brak ID, przerywamy (czekamy na sygnał lub przeładowanie)
                 if (!client || !charId) {
                     console.log("Loom: Waiting for data/charId...");
                     return; 
@@ -118,7 +124,6 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     presence: ["Persuasion", "Diplomacy", "Intimidation", "Social", "Fame"]
                 };
 
-                // Pobieramy karty z bazy
                 const { data: deckData, error } = await client
                     .from("cyber_character_deck")
                     .select("card_id, cyber_deck(tags)")
@@ -126,12 +131,10 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 
                 if (error) {
                     console.error("Loom Error:", error);
-                    // Mimo błędu, spróbuj odświeżyć QA (np. z domyślnym archetypem)
                     triggerQARefresh();
                     return;
                 }
 
-                // Analiza tagów
                 let stats = { brutality: 0, cunning: 0, intellect: 0, spirit: 0, presence: 0 };
 
                 if (deckData?.length > 0) {
@@ -154,11 +157,12 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
             }
 
             function renderChart(stats, hasData) {
-                const canvas = document.getElementById('fateChart');
-                if(!canvas) return;
+                // Bug fix (2): all DOM lookups scoped to this instance's container
+                const canvas = container.querySelector('#fateChart-' + LOOM_UID);
+                if (!canvas) return;
                 
                 const ctx = canvas.getContext('2d');
-                if (window.twLoomChart) window.twLoomChart.destroy();
+                if (loomChart) loomChart.destroy();
 
                 const colors = {
                     brutality: '#ff4444',
@@ -168,7 +172,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     presence: '#adff00'
                 };
 
-                window.twLoomChart = new Chart(ctx, {
+                loomChart = new Chart(ctx, {
                     type: 'radar',
                     data: {
                         labels: ['', '', '', '', ''],
@@ -204,14 +208,13 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     }
                 });
 
-                // Aktualizacja etykiet liczbowych
-                document.querySelector('#label-brutality span').innerText = stats.brutality;
-                document.querySelector('#label-cunning span').innerText = stats.cunning;
-                document.querySelector('#label-intellect span').innerText = stats.intellect;
-                document.querySelector('#label-spirit span').innerText = stats.spirit;
-                document.querySelector('#label-presence span').innerText = stats.presence;
+                // Scoped label updates
+                container.querySelector('#label-brutality-' + LOOM_UID + ' span').innerText = stats.brutality;
+                container.querySelector('#label-cunning-' + LOOM_UID + ' span').innerText   = stats.cunning;
+                container.querySelector('#label-intellect-' + LOOM_UID + ' span').innerText  = stats.intellect;
+                container.querySelector('#label-spirit-' + LOOM_UID + ' span').innerText    = stats.spirit;
+                container.querySelector('#label-presence-' + LOOM_UID + ' span').innerText  = stats.presence;
 
-                // Obliczanie Archetypu
                 const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]);
                 const titles = {
                     brutality: "JUGGERNAUT", cunning: "GHOST", 
@@ -219,7 +222,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 };
                 
                 let activeArchetype = "DEFAULT";
-                const nameEl = document.getElementById('archetype-name');
+                const nameEl = container.querySelector('#archetype-name-' + LOOM_UID);
 
                 if (hasData && sorted[0][1] > 0) {
                     activeArchetype = titles[sorted[0][0]];
@@ -233,9 +236,8 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     nameEl.style.textShadow = "none";
                 }
 
-                // Zapisz Archetyp do stanu gry i powiadom Quick Actions
                 window.twGameState.currentArchetype = activeArchetype;
-                console.log("Loom: Archetype set to", activeArchetype);
+                console.log("Loom [" + LOOM_UID + "]: Archetype set to", activeArchetype);
                 triggerQARefresh();
             }
 
@@ -246,7 +248,6 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
             }
 
             // --- SYNCHRONIZACJA STARTU ---
-            // To sprawia, że Loom czeka na Master Bootstrappera
             if (window.twGameReady) {
                 initLoom();
             } else {
