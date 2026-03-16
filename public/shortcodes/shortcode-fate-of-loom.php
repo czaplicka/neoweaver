@@ -215,12 +215,18 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                     }
                 });
 
-                // Scoped label updates
-                container.querySelector('#label-brutality-' + LOOM_UID + ' span').innerText = stats.brutality;
-                container.querySelector('#label-cunning-' + LOOM_UID + ' span').innerText   = stats.cunning;
-                container.querySelector('#label-intellect-' + LOOM_UID + ' span').innerText  = stats.intellect;
-                container.querySelector('#label-spirit-' + LOOM_UID + ' span').innerText    = stats.spirit;
-                container.querySelector('#label-presence-' + LOOM_UID + ' span').innerText  = stats.presence;
+                // Bug fix (8): guard each label span against null before setting innerText.
+                // A missing <span> (e.g. due to HTML mutation, caching or minification) would
+                // otherwise throw TypeError: Cannot set properties of null.
+                const setLabel = (id, value) => {
+                    const el = container.querySelector('#' + id + '-' + LOOM_UID + ' span');
+                    if (el) el.innerText = value;
+                };
+                setLabel('label-brutality', stats.brutality);
+                setLabel('label-cunning',   stats.cunning);
+                setLabel('label-intellect', stats.intellect);
+                setLabel('label-spirit',    stats.spirit);
+                setLabel('label-presence',  stats.presence);
 
                 const sorted = Object.entries(stats).sort((a,b) => b[1] - a[1]);
                 const titles = {
@@ -233,14 +239,18 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 
                 if (hasData && sorted[0][1] > 0) {
                     activeArchetype = titles[sorted[0][0]];
-                    nameEl.innerText = activeArchetype;
-                    nameEl.style.color = colors[sorted[0][0]];
-                    nameEl.style.textShadow = `0 0 16px ${colors[sorted[0][0]]}`;
+                    if (nameEl) {
+                        nameEl.innerText = activeArchetype;
+                        nameEl.style.color = colors[sorted[0][0]];
+                        nameEl.style.textShadow = `0 0 16px ${colors[sorted[0][0]]}`;
+                    }
                 } else {
                     activeArchetype = "DEFAULT";
-                    nameEl.innerText = "VOID SOUL";
-                    nameEl.style.color = "#94a3b8";
-                    nameEl.style.textShadow = "none";
+                    if (nameEl) {
+                        nameEl.innerText = "VOID SOUL";
+                        nameEl.style.color = "#94a3b8";
+                        nameEl.style.textShadow = "none";
+                    }
                 }
 
                 window.twGameState.currentArchetype = activeArchetype;
