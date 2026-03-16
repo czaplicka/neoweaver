@@ -2,7 +2,9 @@
 if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
     function tw_loom_of_fate_shortcode() {
         // Pobieramy ID po stronie PHP jako fallback (na wszelki wypadek)
+        // Bug fix: cast 0 (integer) to '' so JS guard simplifies to !charId
         $char_id = function_exists('tw_get_current_character_id') ? tw_get_current_character_id() : '';
+        $char_id = $char_id ?: '';
 
         ob_start(); ?>
         
@@ -99,11 +101,11 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
                 const client = window.twSupabase;
                 window.twGameState = window.twGameState || {};
                 
-                // Pobieramy ID z GameState (priorytet) lub PHP (fallback)
-                const charId = window.twGameState?.currentCharacterId || "<?php echo $char_id; ?>";
+                // Bug fix: esc_js() prevents JS injection; empty string when no char found
+                const charId = window.twGameState?.currentCharacterId || "<?php echo esc_js( $char_id ); ?>";
 
                 // Jeśli nadal brak ID, przerywamy (czekamy na sygnał lub przeładowanie)
-                if (!client || !charId || charId === '0') {
+                if (!client || !charId) {
                     console.log("Loom: Waiting for data/charId...");
                     return; 
                 }
