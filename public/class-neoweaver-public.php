@@ -53,6 +53,7 @@ class Neoweaver_Public {
 		add_shortcode( 'tale_weaver_character_creator', [ $this, 'shortcode_character_creator' ] );
 		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
+		add_shortcode( 'tw_active_node', [ $this, 'shortcode_active_node' ] );
 		add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
 		add_action( 'wp_footer', [ $this, 'render_tag_update_popup' ] );
 
@@ -335,10 +336,12 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function showStep(step) {
-    document.querySelectorAll('.tw-step').forEach(s => s.classList.remove('active'));
-    const target = document.querySelector(`.tw-step[data-step="${step}"]`);
+    const form = document.getElementById('tw-char-creator');
+    form.querySelectorAll('.tw-step').forEach(s => s.classList.remove('active'));
+    const target = form.querySelector(`.tw-step[data-step="${step}"]`);
     if (target) target.classList.add('active');
-    const total = document.querySelectorAll('.tw-step').length;
+    const total = form.querySelectorAll('.tw-step').length;
+
     const counter = document.getElementById('tw-step-counter');
     const fill = document.getElementById('tw-progress-fill');
     if (counter) counter.textContent = String(step).padStart(2, '0');
@@ -989,7 +992,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		$tw_world_nonce = wp_create_nonce( 'tw_world_nonce' );
 		$tw_endpoint    = get_stylesheet_directory_uri() . '/endpoint/tw-endpoint-world.php';
-
+$tw_nodes_url   = home_url( '/nodes/' );
 		ob_start();
 		?>
 <div id="tw-world-creator-container" class="tw-monitor-outer">
@@ -1278,12 +1281,12 @@ document.addEventListener('DOMContentLoaded', function () {
         totalSteps:  11
     };
 
-    const ui = {
-        fill:    document.getElementById('tw-world-progress-fill'),
-        counter: document.getElementById('tw-world-step-counter'),
-        backBtn: document.getElementById('tw-back-btn'),
-        overlay: document.getElementById('tw-world-loading-overlay')
-    };
+const ui = {
+    fill:    container.querySelector('#tw-world-progress-fill'),
+    counter: container.querySelector('#tw-world-step-counter'),
+    backBtn: container.querySelector('#tw-back-btn'),
+    overlay: document.getElementById('tw-world-loading-overlay')
+};
 
     // ── Glitch helper ──
     function triggerGlitch() {
@@ -1414,7 +1417,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 const worldId = json.data && json.data.worldid ? json.data.worldid : '';
                 setTimeout(() => {
-                    window.location.href = 'https://cyber.nieodparady.pl/nodes/?status=initializing&world_id=' + worldId;
+                    window.location.href = '<?php echo esc_js( $tw_nodes_url ); ?>?status=initializing&world_id=' + worldId;
                 }, 2000);
             } else {
                 const msg = json.data && json.data.message ? json.data.message : 'Unknown error';
@@ -1442,10 +1445,10 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 
 public function shortcode_active_node(): string {
-    $user_id = get_current_user_id();
-    if ( ! $user_id ) return '<span id="node-name-display">NO_UPLINK</span>';
-
-    return '<span id="node-name-display" data-wp-user-id="' . esc_attr( $user_id ) . '">LOADING_NODE...</span>';
+    if ( ! get_current_user_id() ) {
+        return '<span id="node-name-display">NO_UPLINK</span>';
+    }
+    return '<span id="node-name-display">LOADING_NODE...</span>';
 }
 	// =========================================================================
 // FOOTER SCRIPT: Quick Actions Bridge (game page only)
@@ -1458,7 +1461,7 @@ public function shortcode_active_node(): string {
  * instead of calling twUpdatePlayerTags directly.
  */
 public function enqueue_quick_actions_bridge(): void {
-    if ( ! is_page( 2857 ) ) {
+    if ( ! is_page_template('templates/adventure.php') ) {
         return;
     }
     ?>
@@ -1502,10 +1505,11 @@ public function render_tag_update_popup(): void {
     function showTagUpdate(tagName, isSuccess = true) {
         const popup = document.createElement('div');
         popup.className = `tag-update-popup ${isSuccess ? '' : 'failure'}`;
-        popup.innerHTML = `
-            <span class="tag-label">// DATA SYNC: NEW ECHO TAG ACQUIRED</span>
-            <span class="tag-name">${tagName}</span>
-        `;
+popup.innerHTML = `
+    <span class="tag-label">// DATA SYNC: NEW ECHO TAG ACQUIRED</span>
+    <span class="tag-name"></span>
+`;
+popup.querySelector('.tag-name').textContent = tagName;
         document.body.appendChild(popup);
 
         if (window.jQuery) {
