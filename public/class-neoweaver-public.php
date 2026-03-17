@@ -53,7 +53,7 @@ class Neoweaver_Public {
 		add_shortcode( 'tale_weaver_character_creator', [ $this, 'shortcode_character_creator' ] );
 		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
-add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
+		add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
 		add_action( 'wp_footer', [ $this, 'render_tag_update_popup' ] );
 
 	}
@@ -310,6 +310,10 @@ add_action( 'wp_footer', [ $this, 'enqueue_quick_actions_bridge' ] );
 </div>
 
 <script>
+		(function() {
+			function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 let currentStep = 1;
 let currentClassLimit = 3;
 let sb = null;
@@ -378,15 +382,15 @@ async function loadRaces() {
     if (!races || !races.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ccc;">NO RACES FOUND</div>'; return; }
     const main = races.filter(r => !r.parent_race || String(r.parent_race).trim() === '');
     if (!main.length) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#ccc;">NO ROOT RACES</div>'; return; }
-    grid.innerHTML = main.map(r => `
-        <label class="tw-card-label">
-            <input type="radio" name="race" value="${r.id}" onclick="onRaceSelected('${r.id}','${(r.name||'').replace(/'/g,"\\'")}')">
-            <div class="tw-card-visual">
-                <img src="${r.img_url||'https://via.placeholder.com/200'}" alt="${r.name||''}">
-                <strong>${r.name||''}</strong>
-                <span>${formatTags(r.tags)}</span>
-            </div>
-        </label>`).join('');
+grid.innerHTML = main.map(r => `
+    <label class="tw-card-label">
+        <input type="radio" name="race" value="${escapeHtml(r.id)}" onclick="onRaceSelected('${escapeHtml(r.id)}','${escapeHtml(r.name)}')">
+        <div class="tw-card-visual">
+            <img src="${escapeHtml(r.img_url||'https://via.placeholder.com/200')}" alt="${escapeHtml(r.name)}">
+            <strong>${escapeHtml(r.name)}</strong>
+            <span>${escapeHtml(formatTags(r.tags))}</span>
+        </div>
+    </label>`).join('');
     grid.dataset.loaded = '1';
 }
 
@@ -406,14 +410,14 @@ async function toggleSubrace(parentName) {
     if (error) { if (container) container.style.display = 'none'; return; }
     if (subs && subs.length > 0) {
         container.style.display = 'block';
-        document.getElementById('tw-subrace-grid').innerHTML = subs.map(s => `
-            <label class="tw-card-label">
-                <input type="radio" name="subrace" value="${s.id}" onclick="document.getElementById('tw-race-final').value='${s.id}'">
-                <div class="tw-card-visual">
-                    <img src="${s.img_url||'https://via.placeholder.com/200'}" alt="${s.name||''}">
-                    <strong>${s.name||''}</strong><span>${formatTags(s.tags)}</span>
-                </div>
-            </label>`).join('');
+document.getElementById('tw-subrace-grid').innerHTML = subs.map(s => `
+    <label class="tw-card-label">
+        <input type="radio" name="subrace" value="${escapeHtml(s.id)}" onclick="document.getElementById('tw-race-final').value='${escapeHtml(s.id)}'">
+        <div class="tw-card-visual">
+            <img src="${escapeHtml(s.img_url||'https://via.placeholder.com/200')}" alt="${escapeHtml(s.name)}">
+            <strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(formatTags(s.tags))}</span>
+        </div>
+    </label>`).join('');
     } else {
         container.style.display = 'none';
         document.querySelectorAll('input[name="subrace"]').forEach(r => r.checked = false);
@@ -426,14 +430,14 @@ async function loadClasses() {
     if (grid.dataset.loaded === '1') return;
     const { data: classes, error } = await sb.from('cyber_classes').select('*').order('name');
     if (error) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#f66;">ERROR LOADING CLASSES</div>'; return; }
-    grid.innerHTML = classes.map(c => `
-        <label class="tw-card-label">
-            <input type="radio" name="class" value="${c.id}" onchange="selectClass(this)">
-            <div class="tw-card-visual">
-                <img src="${c.img_url||'https://via.placeholder.com/200'}" alt="${c.name||''}">
-                <strong>${c.name||''}</strong><span>${formatTags(c.tags)}</span>
-            </div>
-        </label>`).join('');
+grid.innerHTML = classes.map(c => `
+    <label class="tw-card-label">
+        <input type="radio" name="class" value="${escapeHtml(c.id)}" onchange="selectClass(this)">
+        <div class="tw-card-visual">
+            <img src="${escapeHtml(c.img_url||'https://via.placeholder.com/200')}" alt="${escapeHtml(c.name)}">
+            <strong>${escapeHtml(c.name)}</strong><span>${escapeHtml(formatTags(c.tags))}</span>
+        </div>
+    </label>`).join('');
     grid.dataset.loaded = '1';
 }
 
@@ -453,7 +457,7 @@ async function loadSkills() {
     grid.innerHTML = skills.map(s => {
         let catHTML = '';
         if (s.category !== lastCat) { catHTML = `<div class="tw-skill-category">>> ${s.category||'GENERAL'} MODULES</div>`; lastCat = s.category; }
-        return catHTML + `<label class="tw-skill-item"><input type="checkbox" name="skills[]" value="${s.id}" onchange="checkSkillLimit(this)"><div class="tw-skill-card"><img src="${s.img_url||'https://cyber.nieodparady.pl/wp-content/uploads/2026/01/1.svg'}"><div class="tw-skill-text"><h5>${s.name}</h5><span>${formatTags(s.tags)}</span></div></div></label>`;
+      return catHTML + `<label class="tw-skill-item"><input type="checkbox" name="skills[]" value="${escapeHtml(s.id)}" onchange="checkSkillLimit(this)"><div class="tw-skill-card"><img src="${escapeHtml(s.img_url||'https://cyber.nieodparady.pl/wp-content/uploads/2026/01/1.svg')}"><div class="tw-skill-text"><h5>${escapeHtml(s.name)}</h5><span>${escapeHtml(formatTags(s.tags))}</span></div></div></label>`;
     }).join('');
     skillsLoaded = true;
 }
@@ -513,6 +517,7 @@ function submitCharacter() {
         })
         .catch(e => { console.error(e); alert('System Failure'); btn.innerText=orig; btn.disabled=false; if(overlay)overlay.classList.remove('active'); });
 }
+			})();
 </script>
 
 <!-- =====================================================================
@@ -640,11 +645,23 @@ function submitCharacter() {
 		$anon_key = tw_supabase_anon_key();
 		$headers  = [ 'apikey' => $anon_key, 'Authorization' => 'Bearer ' . $anon_key ];
 
-		$worlds_res = wp_remote_get( add_query_arg( [ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ], $url_base . 'cyber_worlds' ), [ 'headers' => $headers ] );
-		$chars_res  = wp_remote_get( add_query_arg( [ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ], $url_base . 'cyber_characters' ), [ 'headers' => $headers ] );
+		// PO — z pełnym error handling
+$worlds_res = wp_remote_get( add_query_arg( [ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ], $url_base . 'cyber_worlds' ), [ 'headers' => $headers ] );
+$chars_res  = wp_remote_get( add_query_arg( [ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ], $url_base . 'cyber_characters' ), [ 'headers' => $headers ] );
 
-		$worlds     = json_decode( wp_remote_retrieve_body( $worlds_res ), true );
-		$characters = json_decode( wp_remote_retrieve_body( $chars_res ), true );
+if ( is_wp_error( $worlds_res ) || wp_remote_retrieve_response_code( $worlds_res ) !== 200 ) {
+    $worlds = [];
+    error_log( 'NeoWeaver Campaign Creator: worlds fetch failed – ' . ( is_wp_error( $worlds_res ) ? $worlds_res->get_error_message() : wp_remote_retrieve_response_code( $worlds_res ) ) );
+} else {
+    $worlds = json_decode( wp_remote_retrieve_body( $worlds_res ), true ) ?: [];
+}
+
+if ( is_wp_error( $chars_res ) || wp_remote_retrieve_response_code( $chars_res ) !== 200 ) {
+    $characters = [];
+    error_log( 'NeoWeaver Campaign Creator: characters fetch failed – ' . ( is_wp_error( $chars_res ) ? $chars_res->get_error_message() : wp_remote_retrieve_response_code( $chars_res ) ) );
+} else {
+    $characters = json_decode( wp_remote_retrieve_body( $chars_res ), true ) ?: [];
+}
 
 		$campaign_nonce = wp_create_nonce( 'tw_campaign_nonce' );
 
