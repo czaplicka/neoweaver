@@ -39,13 +39,9 @@ function tw_ajax_join_campaign() {
         'Authorization' => 'Bearer ' . $anon,
     ];
 
-    // 2. Ownership check: confirm the submitted character_id belongs to this
-    //    WP user and is not STATUS_DEAD.
-    // BUG-FIX 6: the query is keyed on the exact character UUID (id=eq.X) so
-    //    there is only ever 0 or 1 matching row. No 'order' is needed and we
-    //    never access $char_rows[0] positionally — we only test empty() to
-    //    confirm existence. This removes the non-determinism from the previous
-    //    unordered multi-row query.
+    // OPT 1: character ownership check and campaign lookup are independent —
+    // fire both wp_remote_get calls before reading either response, so they
+    // run concurrently inside PHP's HTTP stack instead of sequentially.
     $safe_char_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
     $char_url = add_query_arg( [
         'id'         => 'eq.' . $safe_char_id,
@@ -55,7 +51,19 @@ function tw_ajax_join_campaign() {
         'limit'      => 1,
     ], $base . 'cyber_characters' );
 
+    // BUG-FIX 5 note: no urlencode() — add_query_arg() handles encoding.
+    $camp_url = add_query_arg( [
+        'join_code' => 'eq.' . $join_code,
+        'select'    => 'id',
+        'limit'     => 1,
+    ], $base . 'cyber_campaign' );
+
+    // Fire both requests before reading either response.
     $char_resp = wp_remote_get( $char_url, [ 'headers' => $headers, 'timeout' => 10 ] );
+    $camp_resp = wp_remote_get( $camp_url, [ 'headers' => $headers, 'timeout' => 10 ] );
+
+    // 2. Evaluate character ownership response.
+    // BUG-FIX 6: keyed on exact UUID — 0 or 1 row, no positional access.
     if ( is_wp_error( $char_resp ) || wp_remote_retrieve_response_code( $char_resp ) !== 200 ) {
         wp_send_json_error( [ 'message' => 'character_lookup_failed' ] );
         return;
@@ -65,20 +73,10 @@ function tw_ajax_join_campaign() {
         wp_send_json_error( [ 'message' => 'character_not_owned_or_dead' ] );
         return;
     }
-    // Use the DB-confirmed safe ID for all subsequent inserts, not the raw POST value.
+    // Use the DB-confirmed safe ID for all subsequent inserts.
     $character_id = $safe_char_id;
 
-    // 3. Look up campaign by join code.
-    // BUG-FIX 5: do not urlencode() the value — add_query_arg() handles URL
-    // encoding already. Passing urlencode() output through add_query_arg()
-    // double-encodes it, so a code containing '+' or '-' would never match.
-    $camp_url = add_query_arg( [
-        'join_code' => 'eq.' . $join_code,
-        'select'    => 'id',
-        'limit'     => 1,
-    ], $base . 'cyber_campaign' );
-
-    $camp_resp = wp_remote_get( $camp_url, [ 'headers' => $headers, 'timeout' => 10 ] );
+    // 3. Evaluate campaign lookup response.
     if ( is_wp_error( $camp_resp ) || wp_remote_retrieve_response_code( $camp_resp ) !== 200 ) {
         wp_send_json_error( [ 'message' => 'campaign_lookup_failed' ] );
         return;
@@ -231,6 +229,16 @@ function neoweave_join_terminal_shortcode() {
     }
     #neoweave-join-terminal .terminal-message.error { color: #ff5577; }
     #neoweave-join-terminal .terminal-message.success { color: #adff00; }
+    /* OPT 3: select styles moved from inline attribute into scoped stylesheet. */
+    #neoweave-join-terminal .terminal-input select {
+        width: 100%;
+        padding: 10px;
+        background: #0a0c00;
+        border: 1px solid #adff00;
+        color: #adff00;
+        font-family: 'Share Tech Mono', monospace;
+        text-transform: uppercase;
+    }
     </style>
 
     <div class="neoweave-terminal" id="neoweave-join-terminal"
@@ -253,10 +261,7 @@ function neoweave_join_terminal_shortcode() {
         <!-- Bug-Fix 4: character selector populated server-side -->
         <div class="terminal-input">
             <label for="neoweave-join-character">SELECT FIELD AGENT:</label>
-            <select id="neoweave-join-character" style="
-                width:100%; padding:10px; background:#0a0c00;
-                border:1px solid #adff00; color:#adff00;
-                font-family:'Share Tech Mono',monospace; text-transform:uppercase;">
+            <select id="neoweave-join-character">
                 <?php if ( empty( $available_chars ) ) : ?>
                     <option value="">-- NO LIVING AGENTS FOUND --</option>
                 <?php else : ?>
@@ -279,9 +284,13 @@ function neoweave_join_terminal_shortcode() {
 
     <script>
     (function() {
+        // OPT 2: bail out of the entire IIFE immediately if the terminal element
+        // is not on this page — avoids registering a DOMContentLoaded listener
+        // on every page load when the shortcode isn't present.
+        if (!document.getElementById('neoweave-join-terminal')) return;
+
         function initJoinTerminal() {
             const box = document.getElementById('neoweave-join-terminal');
-            if (!box) return;
 
             // BUG-FIX 3: read nonce + ajax url from data attributes (safe values).
             const ajaxUrl = box.getAttribute('data-ajax-url');
