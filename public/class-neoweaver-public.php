@@ -297,7 +297,7 @@ class Neoweaver_Public {
 			</form>
 		</div>
 
-		<audio id="tw-glitch-sfx" src="https://cyber.nieodparady.pl/wp-content/uploads/2026/02/dragon-studio-glitch-sound-effect-443130.mp3" preload="auto"></audio>
+		<audio id="tw-glitch-sfx" src="/wp-content/uploads/glitch-static.mp3" preload="auto"></audio>
 	</div>
 </div>
 
@@ -671,7 +671,7 @@ if ( is_wp_error( $chars_res ) || wp_remote_retrieve_response_code( $chars_res )
 		ob_start();
 		?>
 <div id="tw-campaign-creator-container" class="tw-monitor-outer">
-	<audio id="tw-campaign-audio-click" src="https://cyber.nieodparady.pl/wp-content/uploads/2026/02/dragon-studio-glitch-sound-effect-450447.mp3" preload="auto"></audio>
+	<audio id="tw-campaign-audio-click" src="/wp-content/uploads/2026/02/dragon-studio-glitch-sound-effect-450447.mp3" preload="none"></audio>
 
 	<div class="tw-screen-bezel">
 		<div class="tw-glitch-overlay"></div>
