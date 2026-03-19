@@ -20,6 +20,28 @@
 
 add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
 
+/**
+ * Bug 7 fix: @import inside a <body>-level <style> is invalid per CSS spec and
+ * handled inconsistently across browsers. Fonts must be enqueued via WordPress
+ * so they land in <head> before any rendering begins.
+ *
+ * Guard with has_shortcode() so the extra HTTP request only fires on pages that
+ * actually render the lobby, not on every page of the site.
+ */
+add_action( 'wp_enqueue_scripts', 'neoweave_lobby_enqueue_fonts' );
+function neoweave_lobby_enqueue_fonts() {
+	global $post;
+	if ( ! is_a( $post, 'WP_Post' ) || ! has_shortcode( $post->post_content, 'neoweave_lobby' ) ) {
+		return;
+	}
+	wp_enqueue_style(
+		'neoweave-lobby-fonts',
+		'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Share+Tech+Mono&display=swap',
+		[],
+		null  // null version = no ?ver= query string, matching Google's canonical URL.
+	);
+}
+
 function neoweave_lobby_terminal() {
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
@@ -62,6 +84,7 @@ function neoweave_lobby_terminal() {
 	$nonce_launch    = wp_create_nonce( 'neoweave_launch' );
 	$nonce_labels    = wp_create_nonce( 'neoweave_labels' );
 	$nonce_heartbeat = wp_create_nonce( 'neoweave_heartbeat' ); // Bug #5
+	$nonce_leave     = wp_create_nonce( 'neoweave_leave' );     // Bug #3
 
 	$user_map      = [];
 	$current_user  = wp_get_current_user();
@@ -73,25 +96,28 @@ function neoweave_lobby_terminal() {
 	ob_start();
 	?>
 	<style>
-	@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Share+Tech+Mono&display=swap');
-	.neoweave-terminal {
+	/* Bug 8 fix: all rules scoped to #neoweave-lobby to prevent collision with
+	   other shortcodes and theme components on the same page. @keyframes are
+	   global by CSS spec and intentionally left without a scope prefix. */
+
+	#neoweave-lobby {
 		background-color: #0a0c00; color: #adff00; font-family: 'Share Tech Mono', monospace;
 		padding: 30px; border: 2px solid #adff00; position: relative; max-width: 700px; margin: 20px auto;
 		text-transform: uppercase; box-shadow: 0 0 20px rgba(173, 255, 0, 0.2);
 	}
-	.terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
-	.terminal-title { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
-	.terminal-status { margin-top: 5px; font-size: 0.9rem; }
-	.blink { animation: blinker 1s linear infinite; }
+	#neoweave-lobby .terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
+	#neoweave-lobby .terminal-title { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
+	#neoweave-lobby .terminal-status { margin-top: 5px; font-size: 0.9rem; }
+	#neoweave-lobby .blink { animation: blinker 1s linear infinite; }
 	@keyframes blinker { 50% { opacity: 0; } }
 
-	.squad-grid {
+	#neoweave-lobby .squad-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 15px;
 		margin-top: 20px;
 	}
-	.squad-slot {
+	#neoweave-lobby .squad-slot {
 		border: 1px solid #adff00;
 		padding: 12px;
 		min-height: 80px;
@@ -99,7 +125,7 @@ function neoweave_lobby_terminal() {
 		align-items: center;
 		position: relative;
 	}
-	.slot-body {
+	#neoweave-lobby .slot-body {
 		font-size: 0.8rem;
 		width: 100%;
 		text-align: left;
@@ -107,35 +133,35 @@ function neoweave_lobby_terminal() {
 		align-items: center;
 		gap: 10px;
 	}
-	.slot-empty { opacity: 0.6; }
-	.slot-avatar {
+	#neoweave-lobby .slot-empty { opacity: 0.6; }
+	#neoweave-lobby .slot-avatar {
 		width: 60px; height: 60px; border-radius: 50%; border: 0px solid #adff00;
 		object-fit: cover; background: #050600; flex-shrink: 0;
 	}
-	.slot-avatar.placeholder {
+	#neoweave-lobby .slot-avatar.placeholder {
 		display: flex; align-items: center; justify-content: center;
 		font-size: 0.5rem; color: #555;
 	}
-	.slot-text-block { display: flex; flex-direction: column; gap: 2px; }
-	.slot-text-line  { line-height: 1.2; }
-	.online-dot {
+	#neoweave-lobby .slot-text-block { display: flex; flex-direction: column; gap: 2px; }
+	#neoweave-lobby .slot-text-line  { line-height: 1.2; }
+	#neoweave-lobby .online-dot {
 		width: 8px; height: 8px; border-radius: 50%; background: #00ff55;
 		box-shadow: 0 0 6px #00ff55; margin-left: auto;
 		animation: onlinePulse 1.2s infinite; flex-shrink: 0;
 	}
-	.online-dot.offline { background: #444; box-shadow: none; animation: none; }
+	#neoweave-lobby .online-dot.offline { background: #444; box-shadow: none; animation: none; }
 	@keyframes onlinePulse {
 		0%   { transform: scale(1);   opacity: 1; }
 		50%  { transform: scale(1.4); opacity: 0.4; }
 		100% { transform: scale(1);   opacity: 1; }
 	}
-	.terminal-button {
+	#neoweave-lobby .terminal-button {
 		background: #adff00; color: #0a0c00; border: none; padding: 12px 20px;
 		margin-top: 20px; width: 100%; font-family: 'Chakra Petch', sans-serif; font-weight: bold;
 		cursor: pointer; text-align: center; text-decoration: none; display: inline-block;
 	}
-	.terminal-actions { display: flex; gap: 10px; margin-top: 25px; }
-	.terminal-button.secondary {
+	#neoweave-lobby .terminal-actions { display: flex; gap: 10px; margin-top: 25px; }
+	#neoweave-lobby .terminal-button.secondary {
 		background: #0a0c00; color: #adff00; border: 1px solid #adff00;
 	}
 	</style>
@@ -148,7 +174,8 @@ function neoweave_lobby_terminal() {
 		 data-host-id="<?php echo esc_attr( $campaign_host_id ); ?>"
 		 data-nonce-launch="<?php echo esc_attr( $nonce_launch ); ?>"
 		 data-nonce-labels="<?php echo esc_attr( $nonce_labels ); ?>"
-		 data-nonce-heartbeat="<?php echo esc_attr( $nonce_heartbeat ); ?>">
+		 data-nonce-heartbeat="<?php echo esc_attr( $nonce_heartbeat ); ?>"
+		 data-nonce-leave="<?php echo esc_attr( $nonce_leave ); ?>">
 		<div class="terminal-header">
 			<div class="terminal-title">SQUAD DEPLOYMENT: ID_<?php echo esc_html( $campaign_id ); ?></div>
 			<div class="terminal-status">
@@ -178,20 +205,21 @@ function neoweave_lobby_terminal() {
 		 * Online threshold: player is considered online if last_seen_at
 		 * is within the last 90 seconds (= 3 missed 20-second heartbeats).
 		 */
-		const ONLINE_THRESHOLD_MS  = 90 * 1000;
+		const ONLINE_THRESHOLD_MS   = 90 * 1000;
 		const HEARTBEAT_INTERVAL_MS = 20 * 1000;
 
 		function initLobbyWithClient(client) {
 			const lobbyEl = document.getElementById('neoweave-lobby');
 			if (!lobbyEl) return;
 
-			const campaignId      = lobbyEl.getAttribute('data-campaign-id');
-			const ajaxUrl         = lobbyEl.getAttribute('data-ajax-url');
-			const currentUserId   = lobbyEl.getAttribute('data-current-user');
-			const hostId          = lobbyEl.getAttribute('data-host-id');
-			const nonceLaunch     = lobbyEl.getAttribute('data-nonce-launch');
-			const nonceLabels     = lobbyEl.getAttribute('data-nonce-labels');
-			const nonceHeartbeat  = lobbyEl.getAttribute('data-nonce-heartbeat');
+			const campaignId     = lobbyEl.getAttribute('data-campaign-id');
+			const ajaxUrl        = lobbyEl.getAttribute('data-ajax-url');
+			const currentUserId  = lobbyEl.getAttribute('data-current-user');
+			const hostId         = lobbyEl.getAttribute('data-host-id');
+			const nonceLaunch    = lobbyEl.getAttribute('data-nonce-launch');
+			const nonceLabels    = lobbyEl.getAttribute('data-nonce-labels');
+			const nonceHeartbeat = lobbyEl.getAttribute('data-nonce-heartbeat');
+			const nonceLeave     = lobbyEl.getAttribute('data-nonce-leave');
 
 			const userMapAttr = lobbyEl.getAttribute('data-user-map');
 			let userMap = {};
@@ -207,12 +235,13 @@ function neoweave_lobby_terminal() {
 				document.getElementById('squad-slot-4'),
 			];
 
-			// ─────────────────────────────────────────────
-			// HEARTBEAT  (Bug #5)
+			// ─────────────────────────────────────────────────────────────────────
+			// HEARTBEAT
 			// Fires immediately on load, then every 20 s.
-			// Updates last_seen_at on cyber_campaign_signups
-			// so other players see a green dot.
-			// ─────────────────────────────────────────────
+			// Updates last_seen_at on cyber_campaign_signups so other players
+			// see a green online dot.
+			// Bug 5 fix: use let so heartbeatTimer can be reassigned on tab restore.
+			// ─────────────────────────────────────────────────────────────────────
 			function sendHeartbeat() {
 				if (!ajaxUrl || !campaignId) return;
 				const fd = new FormData();
@@ -223,80 +252,29 @@ function neoweave_lobby_terminal() {
 					.catch(e => console.warn('LOBBY: heartbeat failed', e));
 			}
 			sendHeartbeat();
-			const heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+			let heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
-			// Stop heartbeat when tab is hidden / closed
+			// Stop heartbeat when tab hidden; restart (saving new id) when visible.
 			document.addEventListener('visibilitychange', () => {
-				if (document.hidden) clearInterval(heartbeatTimer);
-				else { sendHeartbeat(); setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS); }
+				if (document.hidden) {
+					clearInterval(heartbeatTimer);
+				} else {
+					sendHeartbeat();
+					heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+				}
 			});
 
-			function renderSlots(signups) {
-				signups.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+			// ─────────────────────────────────────────────────────────────────────
+			// Opt 2: cache enrich results (character names, avatars, user labels).
+			// These never change during a lobby session. Only is_ready and
+			// last_seen_at change per poll, so we fetch them lightly after the
+			// first full enrich and merge in the stable cached data.
+			// ─────────────────────────────────────────────────────────────────────
+			let enrichCache = null; // { charsById, userMap } — populated once
 
-				for (let i = 0; i < 4; i++) {
-					const slot = slotEls[i];
-					if (!slot) continue;
-					const body = slot.querySelector('.slot-body');
-					if (!body) continue;
-
-					const signup = signups[i];
-					if (signup) {
-						slot.classList.remove('slot-empty');
-						body.classList.remove('slot-empty');
-						body.innerHTML = '';
-
-						const charName   = signup.character_name || ('#' + signup.character_id);
-						const userName   = signup.user_name      || ('USER_' + signup.wp_user_id);
-						const readyLabel = signup.is_ready ? ' [READY]' : ' [IDLE]';
-
-						const avatarUrl = signup.character_avatar || '';
-						let avatarEl = document.createElement('div');
-						avatarEl.className = 'slot-avatar placeholder';
-						if (avatarUrl) {
-							avatarEl = document.createElement('img');
-							avatarEl.className = 'slot-avatar';
-							avatarEl.src = avatarUrl;
-							avatarEl.alt = charName;
-						} else {
-							avatarEl.textContent = 'AV';
-						}
-
-						const textBlock = document.createElement('div');
-						textBlock.className = 'slot-text-block';
-
-						const line1 = document.createElement('div');
-						line1.className   = 'slot-text-line';
-						line1.textContent = 'AGENT ' + charName + readyLabel;
-
-						const line2 = document.createElement('div');
-						line2.className   = 'slot-text-line';
-						line2.textContent = 'OPERATOR ' + userName;
-
-						textBlock.appendChild(line1);
-						textBlock.appendChild(line2);
-
-						const dot = document.createElement('div');
-						dot.className = 'online-dot';
-						if (signup._isOnline === false) { dot.classList.add('offline'); }
-
-						body.appendChild(avatarEl);
-						body.appendChild(textBlock);
-						body.appendChild(dot);
-					} else {
-						slot.classList.add('slot-empty');
-						body.classList.add('slot-empty');
-						body.textContent = '// WAITING FOR SIGNAL //';
-					}
-				}
-			}
-
-			async function enrichSignups(rawSignups) {
-				if (!Array.isArray(rawSignups) || !rawSignups.length) return [];
-
+			async function doFullEnrich(rawSignups) {
 				const charIds = [...new Set(rawSignups.map(s => s.character_id).filter(Boolean))];
 				const userIds = [...new Set(rawSignups.map(s => s.wp_user_id).filter(Boolean))];
-
 				let charsById = {};
 
 				try {
@@ -311,18 +289,15 @@ function neoweave_lobby_terminal() {
 							console.error('LOBBY: char lookup error', charErr);
 						}
 					}
-				} catch (e) {
-					console.error('LOBBY: enrichSignups char exception', e);
-				}
+				} catch (e) { console.error('LOBBY: enrichSignups char exception', e); }
 
 				try {
 					if (userIds.length && ajaxUrl) {
-						const formData = new FormData();
-						formData.append('action', 'neoweave_user_labels');
-						formData.append('nonce', nonceLabels);
-						userIds.forEach(id => formData.append('ids[]', id));
-
-						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
+						const fd = new FormData();
+						fd.append('action', 'neoweave_user_labels');
+						fd.append('nonce', nonceLabels);
+						userIds.forEach(id => fd.append('ids[]', id));
+						const res  = await fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' });
 						const json = await res.json();
 						if (json && json.success && json.data && json.data.map) {
 							Object.assign(userMap, json.data.map);
@@ -330,32 +305,139 @@ function neoweave_lobby_terminal() {
 							console.error('LOBBY: user labels response error', json);
 						}
 					}
-				} catch (e) {
-					console.error('LOBBY: enrichSignups user exception', e);
-				}
+				} catch (e) { console.error('LOBBY: enrichSignups user exception', e); }
 
+				// Cache stable data so subsequent polls skip these two requests.
+				enrichCache = { charsById, userMap: Object.assign({}, userMap) };
+				return enrichCache;
+			}
+
+			function applyEnrich(rawSignups, cache) {
 				const now = Date.now();
-
 				return rawSignups.map(s => {
-					// Bug #5 fix: use last_seen_at heartbeat, NOT created_at.
-					// Treat NULL last_seen_at (no heartbeat yet) as offline.
 					const seenAt   = s.last_seen_at ? new Date(s.last_seen_at).getTime() : 0;
 					const isOnline = seenAt > 0 && (now - seenAt) < ONLINE_THRESHOLD_MS;
+					const charInfo = cache.charsById[s.character_id];
 					return {
 						...s,
-						character_name:   charsById[s.character_id]?.name   || null,
-						character_avatar: charsById[s.character_id]?.avatar || '',
-						user_name:        userMap[String(s.wp_user_id)]    || null,
+						character_name:   charInfo?.name   || null,
+						character_avatar: charInfo?.avatar || '',
+						user_name:        cache.userMap[String(s.wp_user_id)] || null,
 						_isOnline:        isOnline,
 					};
 				});
 			}
 
+			async function enrichSignups(rawSignups) {
+				if (!Array.isArray(rawSignups) || !rawSignups.length) return [];
+				const cache = enrichCache ? enrichCache : await doFullEnrich(rawSignups);
+				return applyEnrich(rawSignups, cache);
+			}
+
+			// ─────────────────────────────────────────────────────────────────────
+			// Opt 4: diffing renderSlots — only update slots where data changed.
+			// Previously body.innerHTML = '' wiped and rebuilt all four slots every
+			// 3 s, causing layout thrash and flickering avatars. We now store a
+			// snapshot of the last rendered state per slot and skip the update when
+			// the visible content is identical.
+			// ─────────────────────────────────────────────────────────────────────
+			const lastRender = [null, null, null, null]; // one snapshot per slot
+
+			function slotSignature(signup) {
+				if (!signup) return '__empty__';
+				// Include every field that affects what the slot displays.
+				return [
+					signup.character_id,
+					signup.character_name,
+					signup.character_avatar,
+					signup.wp_user_id,
+					signup.user_name,
+					signup.is_ready ? '1' : '0',
+					signup._isOnline ? '1' : '0',
+				].join('|');
+			}
+
+			function renderOneSlot(slot, body, signup) {
+				if (signup) {
+					slot.classList.remove('slot-empty');
+					body.classList.remove('slot-empty');
+					body.innerHTML = '';
+
+					const charName   = signup.character_name || ('#' + signup.character_id);
+					const userName   = signup.user_name      || ('USER_' + signup.wp_user_id);
+					const readyLabel = signup.is_ready ? ' [READY]' : ' [IDLE]';
+
+					const avatarUrl = signup.character_avatar || '';
+					let avatarEl = document.createElement('div');
+					avatarEl.className = 'slot-avatar placeholder';
+					if (avatarUrl) {
+						avatarEl = document.createElement('img');
+						avatarEl.className = 'slot-avatar';
+						avatarEl.src = avatarUrl;
+						avatarEl.alt = charName;
+					} else {
+						avatarEl.textContent = 'AV';
+					}
+
+					const textBlock = document.createElement('div');
+					textBlock.className = 'slot-text-block';
+
+					const line1 = document.createElement('div');
+					line1.className   = 'slot-text-line';
+					line1.textContent = 'AGENT ' + charName + readyLabel;
+
+					const line2 = document.createElement('div');
+					line2.className   = 'slot-text-line';
+					line2.textContent = 'OPERATOR ' + userName;
+
+					textBlock.appendChild(line1);
+					textBlock.appendChild(line2);
+
+					const dot = document.createElement('div');
+					dot.className = 'online-dot';
+					if (signup._isOnline === false) { dot.classList.add('offline'); }
+
+					body.appendChild(avatarEl);
+					body.appendChild(textBlock);
+					body.appendChild(dot);
+				} else {
+					slot.classList.add('slot-empty');
+					body.classList.add('slot-empty');
+					body.textContent = '// WAITING FOR SIGNAL //';
+				}
+			}
+
+			function renderSlots(signups) {
+				signups.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+				for (let i = 0; i < 4; i++) {
+					const slot = slotEls[i];
+					if (!slot) continue;
+					const body = slot.querySelector('.slot-body');
+					if (!body) continue;
+
+					const signup = signups[i] || null;
+					const sig    = slotSignature(signup);
+
+					// Opt 4: skip DOM update if nothing visible has changed.
+					if (lastRender[i] === sig) continue;
+					lastRender[i] = sig;
+
+					renderOneSlot(slot, body, signup);
+				}
+			}
+
+			// ─────────────────────────────────────────────────────────────────────
+			// Opt 3: merge watchForSessionAndRedirect into the fetchSignups loop.
+			// Previously two independent polling intervals (3 s + 4 s) fired
+			// separate Supabase queries. The session-started check is now a second
+			// query inside the same async tick as fetchSignups, sharing the same
+			// polling cadence and avoiding a redundant interval.
+			// ─────────────────────────────────────────────────────────────────────
 			async function fetchSignups() {
 				try {
 					const { data, error } = await client
 						.from('cyber_campaign_signups')
-						// Bug #5: added last_seen_at to the select
 						.select('campaign_id, wp_user_id, character_id, created_at, is_ready, last_seen_at')
 						.eq('campaign_id', campaignId);
 					if (error) { console.error('NEOWEAVE LOBBY: signups fetch error', error); return; }
@@ -363,27 +445,32 @@ function neoweave_lobby_terminal() {
 				} catch (e) {
 					console.error('NEOWEAVE LOBBY: exception while fetching signups', e);
 				}
+
+				// Opt 3: check for an active session in the same polling tick.
+				// Non-host players need this to detect when the host has launched.
+				// The host is redirected immediately by handleLaunchAsHost() on success.
+				if (String(currentUserId) !== String(hostId)) {
+					try {
+						const { data: sessions, error: sessErr } = await client
+							.from('cyber_game_sessions')
+							.select('id')
+							.eq('campaign_id', campaignId)
+							.eq('wp_user_id', currentUserId)
+							.eq('status', 'active')
+							.limit(1);
+						if (!sessErr && sessions && sessions.length) {
+							window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
+						}
+					} catch (e) { console.error('LOBBY: session watch error', e); }
+				}
 			}
 
 			fetchSignups();
 			setInterval(fetchSignups, 3000);
 
-			async function watchForSessionAndRedirect() {
-				try {
-					const { data, error } = await client
-						.from('cyber_game_sessions')
-						.select('id, status')
-						.eq('campaign_id', campaignId)
-						.eq('wp_user_id', currentUserId)
-						.eq('status', 'active')
-						.limit(1);
-					if (!error && data && data.length) {
-						window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
-					}
-				} catch (e) { console.error('SESSION WATCH ERROR', e); }
-			}
-			setInterval(watchForSessionAndRedirect, 4000);
-
+			// ─────────────────────────────────────────────────────────────────────
+			// Launch / Ready button
+			// ─────────────────────────────────────────────────────────────────────
 			async function handleLaunchAsHost() {
 				if (!ajaxUrl) { alert('LAUNCH FAILED: missing AJAX URL.'); return; }
 
@@ -432,6 +519,9 @@ function neoweave_lobby_terminal() {
 				}
 			}
 
+			// ─────────────────────────────────────────────────────────────────────
+			// Leave lobby button
+			// ─────────────────────────────────────────────────────────────────────
 			const leaveBtn = document.getElementById('neoweave-leave-button');
 			if (leaveBtn && ajaxUrl) {
 				leaveBtn.addEventListener('click', async function() {
@@ -450,6 +540,7 @@ function neoweave_lobby_terminal() {
 						const formData = new FormData();
 						formData.append('action',      'neoweave_leave_lobby');
 						formData.append('campaign_id', campaignId);
+						formData.append('nonce',       nonceLeave);
 
 						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
 						const json = await res.json();
@@ -460,12 +551,19 @@ function neoweave_lobby_terminal() {
 			}
 		}
 
+		// Bug 4 fix: cap retries so we don't poll forever if window.twSupabase never
+		// initialises (CDN blocked, head-injection failed, JS error, etc.).
+		// After 20 attempts (~10 s) show a visible error instead of leaking timers.
+		let twSupabaseRetries = 0;
 		function waitForTwSupabase() {
 			if (window.twSupabase) {
 				console.log('NEOWEAVE LOBBY: binding to global Supabase client');
 				initLobbyWithClient(window.twSupabase);
-			} else {
+			} else if (twSupabaseRetries++ < 20) {
 				setTimeout(waitForTwSupabase, 500);
+			} else {
+				const el = document.getElementById('neoweave-lobby');
+				if (el) el.innerHTML = '<p style="color:#ff5577;font-family:\'Share Tech Mono\',monospace;padding:20px;">UPLINK FAILED: SUPABASE CLIENT OFFLINE. RELOAD TO RETRY.</p>';
 			}
 		}
 
@@ -473,7 +571,62 @@ function neoweave_lobby_terminal() {
 	})();
 	</script>
 	<?php
+	<?php
 	return ob_get_clean();
+}
+
+/**
+ * AJAX: player leaves lobby — removes their signup row.
+ *
+ * SECURITY: requires a valid nonce (neoweave_leave).
+ * nopriv not registered — login required.
+ */
+add_action( 'wp_ajax_neoweave_leave_lobby', 'neoweave_leave_lobby' );
+
+function neoweave_leave_lobby() {
+	check_ajax_referer( 'neoweave_leave', 'nonce' );
+
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( [ 'message' => 'not_logged_in' ] );
+		return;
+	}
+
+	$campaign_id     = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
+	$current_user_id = get_current_user_id();
+
+	if ( $campaign_id <= 0 || ! $current_user_id ) {
+		wp_send_json_error( [ 'message' => 'invalid_params' ] );
+		return;
+	}
+
+	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		wp_send_json_error( [ 'message' => 'supabase_config_missing' ] );
+		return;
+	}
+
+	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+	$supabase_key  = tw_supabase_anon_key();
+
+	// Delete the signup row for this player.
+	$delete_url = $supabase_rest . 'cyber_campaign_signups'
+		. '?campaign_id=eq.' . $campaign_id
+		. '&wp_user_id=eq.'  . $current_user_id;
+
+	$delete_res = wp_remote_request( $delete_url, [
+		'method'  => 'DELETE',
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+
+	if ( is_wp_error( $delete_res ) || wp_remote_retrieve_response_code( $delete_res ) >= 300 ) {
+		error_log( 'TW Supabase error: neoweave_leave_lobby DELETE failed for campaign ' . $campaign_id . ', user ' . $current_user_id );
+		wp_send_json_error( [ 'message' => 'leave_failed' ] );
+		return;
+	}
+
+	wp_send_json_success( [ 'message' => 'left' ] );
 }
 
 /**
@@ -488,14 +641,17 @@ add_action( 'wp_ajax_neoweave_user_labels', 'neoweave_user_labels' );
 function neoweave_user_labels() {
 	check_ajax_referer( 'neoweave_labels', 'nonce' );
 
+	// BUG-FIX 1: added return after every early wp_send_json_error/success.
 	if ( empty( $_POST['ids'] ) || ! is_array( $_POST['ids'] ) ) {
 		wp_send_json_error( [ 'message' => 'NO_IDS' ] );
+		return;
 	}
 
 	$ids = array_unique( array_filter( array_map( 'intval', $_POST['ids'] ) ) );
 
 	if ( empty( $ids ) ) {
 		wp_send_json_success( [ 'map' => [] ] );
+		return;
 	}
 
 	$users = get_users( [
@@ -524,94 +680,125 @@ function neoweave_launch_campaign() {
 
 	if ( ! is_user_logged_in() ) {
 		wp_send_json_error( [ 'message' => 'not_logged_in' ] );
+		return;
 	}
 
 	$campaign_id = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
 	if ( $campaign_id <= 0 ) {
 		wp_send_json_error( [ 'message' => 'invalid_campaign' ] );
+		return;
 	}
 
 	$current_user_id = get_current_user_id();
 
 	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 		wp_send_json_error( [ 'message' => 'supabase_config_missing' ] );
+		return;
 	}
 
 	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	$supabase_key  = tw_supabase_anon_key();
+	$headers       = [
+		'apikey'        => $supabase_key,
+		'Authorization' => 'Bearer ' . $supabase_key,
+	];
 
-	// 1) host check
-	$camp_url = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=wp_user_id';
-	$camp_res = wp_remote_get( $camp_url, [
-		'headers' => [
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
-		],
-	] );
-	if ( is_wp_error( $camp_res ) ) {
+	// Opt 1: parallelise HTTP calls with curl_multi to reduce wall-clock time.
+	// Chain: (1) campaign host-check alone → must pass before we proceed.
+	//        (2+4) world_id + signups in parallel (both depend only on campaign_id).
+	//        (3) start location — needs world_id from step 2, so fires after.
+	// Each request carries an explicit 10 s timeout (matching tw_ajax_join_campaign).
+
+	/**
+	 * Helper: fire an array of URLs in parallel via curl_multi and return
+	 * an array of decoded JSON bodies in the same order as $urls.
+	 * Returns null for any request that fails or times out.
+	 */
+	$curl_multi_get = static function ( array $urls ) use ( $headers ): array {
+		$multi   = curl_multi_init();
+		$handles = [];
+		foreach ( $urls as $i => $url ) {
+			$ch = curl_init( $url );
+			curl_setopt_array( $ch, [
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 10,
+				CURLOPT_HTTPHEADER     => [
+					'apikey: '        . $headers['apikey'],
+					'Authorization: ' . $headers['Authorization'],
+				],
+				CURLOPT_SSL_VERIFYPEER => true,
+			] );
+			curl_multi_add_handle( $multi, $ch );
+			$handles[ $i ] = $ch;
+		}
+		do {
+			$status = curl_multi_exec( $multi, $running );
+			if ( $running ) { curl_multi_select( $multi ); }
+		} while ( $running && $status === CURLM_OK );
+		$results = [];
+		foreach ( $handles as $i => $ch ) {
+			$body        = curl_multi_getcontent( $ch );
+			$results[$i] = ( curl_errno( $ch ) === 0 && $body )
+				? json_decode( $body, true )
+				: null;
+			curl_multi_remove_handle( $multi, $ch );
+			curl_close( $ch );
+		}
+		curl_multi_close( $multi );
+		return $results;
+	};
+
+	// ── Step 1: campaign host check (serial; must validate before proceeding) ──
+	$camp_url  = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=wp_user_id';
+	$step1     = $curl_multi_get( [ $camp_url ] );
+	$camp_data = $step1[0];
+	if ( ! is_array( $camp_data ) ) {
 		wp_send_json_error( [ 'message' => 'campaign_fetch_error' ] );
+		return;
 	}
-	$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
-	$host_id   = isset( $camp_data[0]['wp_user_id'] ) ? intval( $camp_data[0]['wp_user_id'] ) : 0;
+	$host_id = isset( $camp_data[0]['wp_user_id'] ) ? intval( $camp_data[0]['wp_user_id'] ) : 0;
 	if ( $host_id !== $current_user_id ) {
 		wp_send_json_error( [ 'message' => 'not_host' ] );
+		return;
 	}
 
-	// 1b) world_id
-	$world_id  = null;
-	$world_url = $supabase_rest . 'cyber_campaign_worlds?campaign_id=eq.' . $campaign_id . '&select=world_id';
-	$world_res = wp_remote_get( $world_url, [
-		'headers' => [
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
-		],
-	] );
-	if ( ! is_wp_error( $world_res ) ) {
-		$world_data = json_decode( wp_remote_retrieve_body( $world_res ), true );
-		if ( is_array( $world_data ) && ! empty( $world_data[0]['world_id'] ) ) {
-			$world_id = intval( $world_data[0]['world_id'] );
-		}
+	// ── Step 2+4: world_id and signups in parallel ────────────────────────────
+	$world_url  = $supabase_rest . 'cyber_campaign_worlds?campaign_id=eq.' . $campaign_id . '&select=world_id';
+	$signup_url = $supabase_rest . 'cyber_campaign_signups?campaign_id=eq.' . $campaign_id . '&select=wp_user_id,character_id';
+	$step2      = $curl_multi_get( [ $world_url, $signup_url ] );
+
+	// Process world_id (step 2a) — UUID; do NOT intval().
+	$world_data = $step2[0];
+	$world_id   = null;
+	if ( is_array( $world_data ) && ! empty( $world_data[0]['world_id'] ) ) {
+		// Sanitize: allow only UUID-safe characters (hex digits and hyphens).
+		$world_id = preg_replace( '/[^a-f0-9\-]/i', '', (string) $world_data[0]['world_id'] );
+		if ( ! $world_id ) { $world_id = null; }
 	}
 	if ( ! $world_id ) {
 		wp_send_json_error( [ 'message' => 'no_world_linked' ] );
+		return;
 	}
 
-	// 1c) start location (0,0)
-	$location_id = null;
-	$loc_url = $supabase_rest
-		. 'cyber_world_map?world_id=eq.' . $world_id
-		. '&coord_x=eq.0&coord_y=eq.0&select=id&limit=1';
-	$loc_res = wp_remote_get( $loc_url, [
-		'headers' => [
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
-		],
-	] );
-	if ( ! is_wp_error( $loc_res ) ) {
-		$loc_data = json_decode( wp_remote_retrieve_body( $loc_res ), true );
-		if ( is_array( $loc_data ) && ! empty( $loc_data[0]['id'] ) ) {
-			$location_id = intval( $loc_data[0]['id'] );
-		}
-	}
-	if ( ! $location_id ) {
-		wp_send_json_error( [ 'message' => 'no_start_location' ] );
-	}
-
-	// 2) signups
-	$signup_url = $supabase_rest . 'cyber_campaign_signups?campaign_id=eq.' . $campaign_id
-		. '&select=wp_user_id,character_id';
-	$signup_res = wp_remote_get( $signup_url, [
-		'headers' => [
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
-		],
-	] );
-	if ( is_wp_error( $signup_res ) ) {
-		wp_send_json_error( [ 'message' => 'signup_fetch_error' ] );
-	}
-	$signups = json_decode( wp_remote_retrieve_body( $signup_res ), true );
+	// Process signups (step 4).
+	$signups = $step2[1];
 	if ( ! is_array( $signups ) || ! count( $signups ) ) {
 		wp_send_json_error( [ 'message' => 'no_signups' ] );
+		return;
+	}
+
+	// ── Step 3: start location — needs world_id, so fires after step 2 ────────
+	$loc_url  = $supabase_rest
+		. 'cyber_world_map?world_id=eq.' . $world_id
+		. '&coord_x=eq.0&coord_y=eq.0&select=id&limit=1';
+	$step3    = $curl_multi_get( [ $loc_url ] );
+	$loc_data = $step3[0];
+	$location_id = ( is_array( $loc_data ) && ! empty( $loc_data[0]['id'] ) )
+		? intval( $loc_data[0]['id'] )
+		: null;
+	if ( ! $location_id ) {
+		wp_send_json_error( [ 'message' => 'no_start_location' ] );
+		return;
 	}
 
 	// 2b) pause existing active sessions for these users
@@ -638,10 +825,11 @@ function neoweave_launch_campaign() {
 	// 3) insert new active sessions
 	$sessions_payload = [];
 	foreach ( $signups as $s ) {
+		// wp_user_id is a genuine integer; character_id is a UUID — do NOT intval() it.
 		$sessions_payload[] = [
 			'campaign_id'  => $campaign_id,
 			'wp_user_id'   => intval( $s['wp_user_id'] ),
-			'character_id' => intval( $s['character_id'] ),
+			'character_id' => preg_replace( '/[^a-f0-9\-]/i', '', (string) ( $s['character_id'] ?? '' ) ),
 			'world_id'     => $world_id,
 			'location_id'  => $location_id,
 			'status'       => 'active',
@@ -660,6 +848,7 @@ function neoweave_launch_campaign() {
 
 	if ( is_wp_error( $session_res ) || wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
 		wp_send_json_error( [ 'message' => 'session_insert_error' ] );
+		return;
 	}
 
 	wp_send_json_success( [ 'message' => 'launched' ] );
