@@ -6,97 +6,120 @@
  * - $grid_map  (array<int, array>)  slots 1–9 => unit rows
  * - $has_enemy (bool)
  */
+
+// FIX: Pre-sanitize and resolve values once, not inline repeatedly.
+$combat_active    = ! empty( $has_enemy );
+$header_css_class = $combat_active ? 'hp-red' : 'tactical-mode';
+$header_label     = $combat_active ? 'THREAT DETECTED' : 'SYSTEM: ACTIVE';
+$kingdom_name     = esc_html( $map_data['kingdom_name'] ?? 'Wilderness' );
+$location_name    = esc_html( $map_data['location_name'] ?? 'Unknown' );
 ?>
 
-<!-- Mostek statusu dla JS -->
+<!-- Status bridge for JS — aria-hidden keeps it out of the a11y tree -->
 <div id="tactical-status-bridge"
-     data-combat-active="<?= !empty($has_enemy) ? 'true' : 'false'; ?>"
+     data-combat-active="<?= $combat_active ? 'true' : 'false'; ?>"
+     aria-hidden="true"
      style="display:none;"></div>
 
-<!-- Nawigacja boczna -->
+<!-- Side navigation -->
 <div class="tw-side-nav left-nav" id="twLeftNavTactical">
-    <button class="tw-nav-btn-tactical" data-tab="left-map-tab" title="World Map">
-        <span class="icon">🧭</span>
+    <button class="tw-nav-btn-tactical" data-tab="left-map-tab" title="World Map" type="button">
+        <span class="icon" aria-hidden="true">🧭</span>
     </button>
-    <button class="tw-nav-btn-tactical" data-tab="left-battle-tab" title="Combat Grid">
-        <span class="icon">⚔️</span>
+    <button class="tw-nav-btn-tactical" data-tab="left-battle-tab" title="Combat Grid" type="button">
+        <span class="icon" aria-hidden="true">⚔️</span>
     </button>
-    <button class="tw-nav-btn-tactical" data-tab="left-scanning-tab" title="Scan Area">
-        <span class="icon">📡</span>
+    <button class="tw-nav-btn-tactical" data-tab="left-scanning-tab" title="Scan Area" type="button">
+        <span class="icon" aria-hidden="true">📡</span>
     </button>
 </div>
 
-<!-- Panel Główny -->
+<!-- Main panel -->
 <div class="tw-character-panel-container left-panel" id="tacticalPanelLeft">
-    <div class="tw-character-card tactical-card" style="height: 100%; display: flex; flex-direction: column;">
+    <div class="tw-character-card tactical-card tw-tactical-card--full">
 
-        <!-- Nagłówek -->
-        <div class="tw-char-header tactical-header" style="flex-shrink: 0;">
+        <!-- Header -->
+        <div class="tw-char-header tactical-header tw-tactical-header--fixed">
             <div class="tw-char-info">
-                <div class="tw-lvl-frame <?= !empty($has_enemy) ? 'hp-red' : 'tactical-mode'; ?>">
-                    <?= !empty($has_enemy) ? 'THREAT DETECTED' : 'SYSTEM: ACTIVE'; ?>
+                <div class="tw-lvl-frame <?= $header_css_class; ?>">
+                    <?= $header_label; ?>
                 </div>
                 <h3 class="tw-char-name">TACTICAL HUD</h3>
                 <div class="tw-char-class-line">
-                    KINGDOM: <span class="highlight"><?= esc_html($map_data['kingdom_name'] ?? 'Wilderness'); ?></span>
-                    <span style="opacity: 0.6; margin: 0 5px;">//</span>
-                    LOC: <span class="highlight"><?= esc_html($map_data['location_name'] ?? 'Unknown'); ?></span>
+                    KINGDOM: <span class="highlight"><?= $kingdom_name; ?></span>
+                    <span class="tw-divider" aria-hidden="true">//</span>
+                    LOC: <span class="highlight"><?= $location_name; ?></span>
                 </div>
             </div>
         </div>
 
-        <!-- Obszar treści -->
-        <div class="tw-panel-scroll-area" style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding: 0;">
+        <!-- Scrollable content area -->
+        <div class="tw-panel-scroll-area tw-panel-scroll-area--flex">
 
-            <!-- TAB: MAPA -->
-            <div class="tw-tab-content-tactical active"
+            <!-- TAB: MAP (active by default) -->
+            <div class="tw-tab-content-tactical tw-tab-content-tactical--active"
                  id="left-map-tab"
-                 style="width: 100%; height: 100%; display: flex; flex-direction: column;">
-                <div class="tw-map-wrapper" style="flex-grow: 1; width: 100%; height: 100%; position: relative;">
-                    <?php echo do_shortcode('[cyber_active_map]'); ?>
-                    <?php echo do_shortcode('[kingdom_info]'); ?>
+                 role="tabpanel"
+                 aria-label="World Map">
+                <div class="tw-map-wrapper">
+                    <?php echo do_shortcode( '[cyber_active_map]' ); ?>
+                    <?php echo do_shortcode( '[kingdom_info]' ); ?>
                 </div>
             </div>
 
-            <!-- TAB: BITWA -->
-            <div class="tw-tab-content-tactical"
+            <!-- TAB: BATTLE -->
+            <div class="tw-tab-content-tactical tw-tab-content-tactical--padded tw-tab-content-tactical--hidden"
                  id="left-battle-tab"
-                 style="padding: 15px; overflow-y: auto; display: none;">
+                 role="tabpanel"
+                 aria-label="Combat Grid">
                 <div class="tw-grid-header">
                     <span class="stat-label">ENGAGEMENT GRID (3x3)</span>
                 </div>
 
                 <div class="tw-tactical-grid">
-                    <?php for ( $i = 1; $i <= 9; $i++ ) :
-                        $unit = $grid_map[ $i ] ?? null;
+                    <?php for ( $slot = 1; $slot <= 9; $slot++ ) :
+                        // FIX: use strict int key; avoid accidental loose comparisons.
+                        $unit = $grid_map[ $slot ] ?? null;
+
+                        // FIX: sanitize CSS class and unit_type before output.
+                        $health_class = $unit ? esc_attr( $unit['current_health_visual'] ?? 'green' ) : '';
+                        $unit_type    = $unit ? sanitize_key( $unit['unit_type'] ?? 'npc' ) : '';
+                        $is_player    = ( $unit_type === 'player' );
+
+                        // FIX: active_effects may be a string or array — normalise first.
+                        $raw_effects    = $unit['active_effects'] ?? [];
+                        $effects_list   = is_array( $raw_effects ) ? $raw_effects : [ $raw_effects ];
+                        $effects_string = implode( ', ', array_map( 'esc_attr', $effects_list ) );
                     ?>
-                        <div class="tw-grid-slot <?= $unit ? 'occupied' : ''; ?>" data-slot="<?= $i; ?>">
+                        <div class="tw-grid-slot <?= $unit ? 'occupied' : ''; ?>"
+                             data-slot="<?= intval( $slot ); ?>">
                             <?php if ( $unit ) : ?>
-                                <div class="tw-unit <?= esc_attr($unit['current_health_visual'] ?? 'green'); ?>"
-                                     title="<?= esc_attr(implode(', ', (array)($unit['active_effects'] ?? []))); ?>">
-                                    <span class="unit-icon">
-                                        <?= ($unit['unit_type'] ?? '') === 'player' ? '👤' : '🤖'; ?>
+                                <div class="tw-unit <?= $health_class; ?>"
+                                     title="<?= $effects_string; ?>">
+                                    <span class="unit-icon" aria-hidden="true">
+                                        <?= $is_player ? '👤' : '🤖'; ?>
                                     </span>
-                                    <?php if ( !empty($unit['active_effects']) ) : ?>
-                                        <div class="unit-effects-dots"></div>
+                                    <?php if ( ! empty( $effects_list ) ) : ?>
+                                        <div class="unit-effects-dots" aria-hidden="true"></div>
                                     <?php endif; ?>
                                 </div>
                             <?php else : ?>
-                                <span class="slot-coord"><?= $i; ?></span>
+                                <span class="slot-coord" aria-hidden="true"><?= intval( $slot ); ?></span>
                             <?php endif; ?>
                         </div>
                     <?php endfor; ?>
                 </div>
             </div>
 
-            <!-- TAB: SKANER -->
-            <div class="tw-tab-content-tactical"
+            <!-- TAB: SCANNER -->
+            <div class="tw-tab-content-tactical tw-tab-content-tactical--padded tw-tab-content-tactical--hidden"
                  id="left-scanning-tab"
-                 style="padding: 15px; overflow-y: auto; display: none;">
+                 role="tabpanel"
+                 aria-label="Area Scanner">
                 <div class="tw-gold-hud">
                     <div class="tw-gold-label">LOCAL ENTITIES</div>
                 </div>
-                <?php echo do_shortcode('[tw_local_scanner]'); ?>
+                <?php echo do_shortcode( '[tw_local_scanner]' ); ?>
             </div>
 
         </div>
