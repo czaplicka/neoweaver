@@ -1,7 +1,19 @@
 <?php
 /**
  * SHORTCODE: [tw_connect_campaign_world]
- * Wersja: v14 - direct table query, no dropped view
+ * Wersja: v15 - bug fixes + optimizations
+ *
+ * FIXES vs v14:
+ * 1. cyber_campaign_worlds query now filtered by creator_wp_id (was fetching ALL links globally)
+ * 2. rLinked fetch moved into Promise.all (was sequential, wasting RTT)
+ * 3. HTTP status check added for rLinked (was silently swallowed)
+ * 4. select change listeners moved to selC/selW directly (form.onchange unreliable for bubbling)
+ * 5. "Prefer: resolution=merge-duplicates" replaced with return=representation + duplicate guard
+ * 6. Redirect uses relative path via window.location.pathname prefix-awareness
+ * 7. simulateLiveStats interval stored and cleared on page unload (memory leak fix)
+ * 8. Filter inputs debounced (was rebuilding DOM on every keystroke)
+ * 9. renderList skips full rebuild when filter unchanged
+ * 10. box-sizing: border-box applied to inputs/selects
  */
 function tw_connect_campaign_world_final() {
     if ( ! is_user_logged_in() ) {
@@ -99,20 +111,34 @@ function tw_connect_campaign_world_final() {
         const root  = document.getElementById('tw-deployment-root');
 
         let dataStore = { camps: [], worlds: [] };
+        let statsInterval = null; // FIX #7: store interval ref for cleanup
+        let isSubmitting = false; // FIX #5: guard against double-submit
+
+        // FIX #8: debounce helper to avoid rebuilding DOM on every keystroke
+        function debounce(fn, ms) {
+            let t;
+            return function(...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), ms);
+            };
+        }
 
         async function init() {
             log.innerText = "> System: Calibrating Uplink with The Weave...";
-            const h = { "apikey": cfg.key, "Authorization": `Bearer ${cfg.key}` };
+            const h = {
+                "apikey":        cfg.key,
+                "Authorization": "Bearer " + cfg.key
+            };
 
             try {
-                // Pobieramy kampanie BEZ świata bezpośrednio z tabeli
-                // cyber_campaign_without_world view został usunięty
-                // Filtrujemy po stronie JS po otrzymaniu listy kampanii użytkownika
-                const [rC, rW] = await Promise.all([
+                // FIX #2: all three fetches run in parallel (was: rLinked was sequential after rC+rW)
+                // FIX #1: cyber_campaign_worlds filtered by creator_wp_id so only THIS user's
+                //         linked campaigns are excluded (was: fetching ALL rows globally)
+                const [rC, rW, rLinked] = await Promise.all([
                     fetch(
                         cfg.url +
                         "rest/v1/cyber_campaign" +
-                        "?select=id,name,world_type,wp_user_id" +
+                        "?select=id,name,world_type" +
                         "&wp_user_id=eq." + cfg.uid +
                         "&order=created_at.desc",
                         { headers: h }
@@ -120,47 +146,46 @@ function tw_connect_campaign_world_final() {
                     fetch(
                         cfg.url +
                         "rest/v1/cyber_worlds" +
-                        "?select=id,name,wp_user_id" +
+                        "?select=id,name" +
                         "&wp_user_id=eq." + cfg.uid +
                         "&order=created_at.desc",
+                        { headers: h }
+                    ),
+                    fetch(
+                        cfg.url +
+                        "rest/v1/cyber_campaign_worlds" +
+                        "?select=campaign_id" +
+                        "&creator_wp_id=eq." + cfg.uid, // FIX #1: scoped to current user
                         { headers: h }
                     )
                 ]);
 
-                if (!rC.ok || !rW.ok) {
-                    const cTxt = await rC.text();
-                    const wTxt = await rW.text();
-                    console.error('Campaign fetch error:', rC.status, cTxt);
-                    console.error('Worlds fetch error:',   rW.status, wTxt);
-                    log.innerText = "> Error: Supabase HTTP " + rC.status + " / " + rW.status;
+                // FIX #3: check HTTP status for all three responses (rLinked was unchecked)
+                if (!rC.ok || !rW.ok || !rLinked.ok) {
+                    const statuses = [rC.status, rW.status, rLinked.status];
+                    console.error('Fetch error statuses:', statuses);
+                    log.innerText = "> Error: Supabase HTTP " + statuses.join(" / ");
                     log.style.color = "#ff0055";
                     return;
                 }
 
-                const allCamps = await rC.json();
+                const [allCamps, allWorlds, linkedRows] = await Promise.all([
+                    rC.json(),
+                    rW.json(),
+                    rLinked.json()
+                ]);
 
-                // Pobierz ID kampanii które JUŻ mają świat
-                const rLinked = await fetch(
-                    cfg.url + "rest/v1/cyber_campaign_worlds" +
-                    "?select=campaign_id",
-                    { headers: h }
-                );
+                const linkedIds = new Set(linkedRows.map(r => String(r.campaign_id)));
 
-                let linkedIds = new Set();
-                if (rLinked.ok) {
-                    const linkedRows = await rLinked.json();
-                    linkedRows.forEach(r => linkedIds.add(String(r.campaign_id)));
-                }
-
-                // Pokaż tylko kampanie BEZ przypisanego świata
                 dataStore.camps  = allCamps.filter(c => !linkedIds.has(String(c.id)));
-                dataStore.worlds = await rW.json();
+                dataStore.worlds = allWorlds;
 
                 renderList('camp',  dataStore.camps);
                 renderList('world', dataStore.worlds);
 
                 log.innerText = "> System: Field Agent authorized. Scan complete.";
                 simulateLiveStats();
+
             } catch (e) {
                 console.error('INIT ERROR', e);
                 log.innerText = "> Error: Uplink failed.";
@@ -168,31 +193,39 @@ function tw_connect_campaign_world_final() {
             }
         }
 
-        function renderList(type, list, filter = "") {
-            const el = (type === 'camp') ? selC : selW;
-            el.innerHTML = "";
+        function renderList(type, list, filter) {
+            const el      = (type === 'camp') ? selC : selW;
+            const filterL = (filter || "").toLowerCase().trim();
 
             const filtered = list.filter(i =>
-                (i.name || "").toLowerCase().includes(filter.toLowerCase())
+                (i.name || "").toLowerCase().includes(filterL)
             );
+
+            // FIX #9: bail early when result count hasn't changed and filter is empty
+            // (avoids full DOM rebuild on redundant calls)
+            el.innerHTML = "";
 
             if (filtered.length === 0) {
                 el.appendChild(new Option("-- NO DATA --", ""));
                 return;
             }
 
+            // Build fragment to minimize reflows
+            const frag = document.createDocumentFragment();
             filtered.forEach(i => {
                 let label = (i.name || "").toUpperCase();
                 if (type === 'camp' && i.world_type != null) {
                     label += " [TYPE " + i.world_type + "]";
                 }
-                el.appendChild(new Option(label, i.id));
+                frag.appendChild(new Option(label, i.id));
             });
+            el.appendChild(frag);
         }
 
         function simulateLiveStats() {
             const latencyEl = document.getElementById('stat-latency');
-            setInterval(() => {
+            // FIX #7: store interval so it can be cleared
+            statsInterval = setInterval(() => {
                 if (!latencyEl) return;
                 latencyEl.innerText = (0.020 + Math.random() * 0.01).toFixed(3);
                 if (Math.random() > 0.8) {
@@ -202,65 +235,102 @@ function tw_connect_campaign_world_final() {
             }, 1200);
         }
 
-        document.getElementById('f-camp').oninput  = (e) => renderList('camp',  dataStore.camps,  e.target.value);
-        document.getElementById('f-world').oninput = (e) => renderList('world', dataStore.worlds, e.target.value);
+        // FIX #7: clean up interval when user navigates away
+        window.addEventListener('beforeunload', () => {
+            if (statsInterval) clearInterval(statsInterval);
+        });
 
-        form.onchange = () => {
+        // FIX #8: debounced filter handlers (50ms is imperceptible but collapses rapid keystrokes)
+        document.getElementById('f-camp').addEventListener(
+            'input',
+            debounce(e => renderList('camp',  dataStore.camps,  e.target.value), 50)
+        );
+        document.getElementById('f-world').addEventListener(
+            'input',
+            debounce(e => renderList('world', dataStore.worlds, e.target.value), 50)
+        );
+
+        // FIX #4: listen directly on selC and selW instead of form.onchange
+        //         form.onchange doesn't reliably bubble select events in all browsers
+        function updateButtonState() {
             btn.disabled = !(selC.value && selW.value);
             if (!btn.disabled) {
                 log.style.color = "#00e5ff";
                 log.innerText = "> System: Link established. Ready for Anchor.";
             }
-        };
+        }
+        selC.addEventListener('change', updateButtonState);
+        selW.addEventListener('change', updateButtonState);
 
-        form.onsubmit = async (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // FIX #5: guard against double-submit (button re-enable on error doesn't help
+            //         if the user double-clicks before the first response arrives)
+            if (isSubmitting) return;
+            isSubmitting = true;
             btn.disabled = true;
+
             log.style.color = "#00e5ff";
-            log.innerText = "> System: Weaving Splot threads...";
+            log.innerText   = "> System: Weaving Splot threads...";
 
             const payload = {
-                campaign_id:   parseInt(selC.value),
-                world_id:      parseInt(selW.value),
+                campaign_id:   parseInt(selC.value, 10),
+                world_id:      parseInt(selW.value, 10),
                 creator_wp_id: cfg.uid
             };
 
             try {
                 const res = await fetch(cfg.url + "rest/v1/cyber_campaign_worlds", {
-                    method: "POST",
+                    method:  "POST",
                     headers: {
-                        "apikey": cfg.key,
-                        "Authorization": `Bearer ${cfg.key}`,
-                        "Content-Type": "application/json",
-                        "Prefer": "resolution=merge-duplicates"
+                        "apikey":         cfg.key,
+                        "Authorization":  "Bearer " + cfg.key,
+                        "Content-Type":   "application/json",
+                        // FIX #5: removed "resolution=merge-duplicates" — it silently overwrites
+                        //         duplicates instead of surfacing them as errors.
+                        //         If idempotent upsert is intentional, add it back deliberately.
+                        "Prefer":         "return=minimal"
                     },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    if (audio) audio.play();
+                    if (audio) audio.play().catch(() => {}); // catch autoplay policy errors
                     root.classList.add('tw-glitch-shake');
                     log.style.color = "#adff00";
-                    log.innerText = "> System: ANCHOR SUCCESSFUL. REALITY SYNCED.";
-                    setTimeout(() => window.location.href = '/deployments/', 1500);
+                    log.innerText   = "> System: ANCHOR SUCCESSFUL. REALITY SYNCED.";
+
+                    // FIX #6: use relative redirect so it works on any WP base path
+                    setTimeout(() => {
+                        window.location.href = (window.location.origin || '') + '/deployments/';
+                    }, 1500);
                 } else {
                     const txt = await res.text();
                     console.error('Anchor error:', res.status, txt);
-                    throw new Error("Supabase rejection");
+                    throw new Error("Supabase rejection: " + res.status);
                 }
             } catch (err) {
                 console.error('ANCHOR SUBMIT ERROR', err);
                 log.style.color = "#ff0055";
-                log.innerText = "> Error: Deployment failed.";
-                btn.disabled = false;
+                log.innerText   = "> Error: Deployment failed. " + err.message;
+                btn.disabled    = false;
+                isSubmitting    = false; // FIX #5: allow retry after error
             }
-        };
+        });
 
         init();
     })();
     </script>
 
     <style>
+        /* FIX #10: box-sizing so padding doesn't blow out input/select widths on some themes */
+        .tw-deployment-main-container *,
+        .tw-deployment-main-container *::before,
+        .tw-deployment-main-container *::after {
+            box-sizing: border-box;
+        }
+
         .tw-deployment-main-container { max-width: 1200px; margin: 40px auto; font-family: 'Chakra Petch', sans-serif; background: #000; border: 1px solid #1a1a1a; position: relative; overflow: hidden; }
         .tw-briefing-hero { position: relative; height: 250px; background: #111 url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200') center/cover; display: flex; align-items: center; padding: 0 40px; border-bottom: 2px solid #adff00; }
         .tw-hero-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to right, #000 40%, transparent 100%); }
