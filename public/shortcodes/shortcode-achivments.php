@@ -25,8 +25,19 @@ function render_player_achievements($atts) {
     if (empty($results)) return "<p>Brak osiągnięć do wyświetlenia.</p>";
 
     $output = '<div class="achievements-grid">';
-
+        
     foreach ($results as $ach) {
+            // 1. Obliczamy postęp (jeśli odblokowane = 100)
+    $percent = $ach->is_unlocked ? 100 : $ach->progress_percent;
+    
+    // 2. Sprawdzamy czy to Legacy (Hard Reset)
+    // Załóżmy, że masz w bazie pole 'is_legacy' lub sprawdzasz datę
+    $legacy_class = ($ach->is_legacy) ? 'ach-legacy' : '';
+
+    // 3. Generujemy atrybut style ze zmiennymi
+    $style = "--bg-color: {$ach->bg_color}; --prog-percent: {$percent}%;";
+
+    echo "<div class='ach-card {$ach->css_status} {$shape_class} {$legacy_class}' style='{$style}'>";
         // Wybór kształtu na podstawie scope (np. postać = tarcza, konto = hex)
         $shape_class = ($ach->scope === 'character') ? 'ach-shape-shield' : 'ach-shape-hex';
         
