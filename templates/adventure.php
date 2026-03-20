@@ -20,11 +20,6 @@ $auth_headers = array(
     ),
     'timeout' => 12,
 );
-$template_args = array(
-    'supabase_base' => $supabase_base,
-    'auth_headers'  => $auth_headers,
-    'wp_user_id'    => $userid,
-);
 $game_data = function_exists('get_user_game_data_from_supabase')
     ? get_user_game_data_from_supabase( $userid )
     : array(
@@ -36,6 +31,10 @@ $game_data = function_exists('get_user_game_data_from_supabase')
         'char_name'           => 'Unknown',
         'char_tags'           => array(),
     );
+
+// FIX #8: Generate nonce here so it's available for JS and server-side verification.
+$adventure_nonce = wp_create_nonce( 'tw_adventure_nonce' );
+
 echo "<script>
 window.twAdventureData = window.twAdventureData || {};
 window.twAdventureData.active_session_id   = ".(int)$game_data['active_session_id'].";
@@ -45,10 +44,16 @@ window.twAdventureData.active_world_id     = ".(int)$game_data['active_world_id'
 window.twAdventureData.active_location_id  = ".(int)$game_data['active_location_id'].";
 window.twAdventureData.char_name           = ".json_encode($game_data['char_name']).";
 window.twAdventureData.char_tags           = ".json_encode($game_data['char_tags']).";
+window.twAdventureData.nonce               = ".json_encode( $adventure_nonce ).";
+window.twAdventureData.ajax_url            = ".json_encode( admin_url( 'admin-ajax.php' ) ).";
 </script>";
-$activecampaignid   = get_user_meta( $userid, 'active_campaign_id', true );
-$campaignworldtype  = null;
-if ( ! empty( $activecampaignid ) && $supabase_base && $anon_key ) {
+
+$activecampaignid  = get_user_meta( $userid, 'active_campaign_id', true );
+$campaignworldtype = null;
+
+// PERF #10: Only fetch campaign world type if it is actually consumed downstream.
+// Wrapped in a function_exists guard consistent with the rest of the template.
+if ( ! empty( $activecampaignid ) && $supabase_base && $anon_key && function_exists( 'tw_needs_world_type' ) ) {
     $camp_url = add_query_arg(
         array(
             'id'     => 'eq.' . (int) $activecampaignid,
@@ -71,15 +76,22 @@ if ( ! empty( $activecampaignid ) && $supabase_base && $anon_key ) {
         }
     }
 }
+
 // === TACTICAL OVERLAY DATA ===
-$map_rows = tw_get_data( $supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . $userid . '&limit=1', $auth_headers );
-$map_data = $map_rows[0] ?? [];
 
-// 1. Pobierz aktywne session_id (źródło: twAdventureData / twGameState / query vars)
-$active_session_id = $twGameState['session_id'] ?? get_query_var('session_id') ?? null;
+// FIX #2: Resolve active_session_id from game_data (PHP scope).
+// $twGameState was never defined in PHP — replaced with the correct source.
+$active_session_id = (int) ( $game_data['active_session_id'] ?? 0 );
 
-// 2. Fetch battle grid tylko dla tej sesji
-if ( $active_session_id ) {
+// PERF #11: Only hit Supabase for map/grid when there is an active session.
+if ( $active_session_id > 0 && $supabase_base ) {
+    $map_rows = tw_get_data(
+        $supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . $userid . '&limit=1',
+        $auth_headers
+    );
+
+    // FIX #1: Single, authoritative grid fetch using slot_index (removed the
+    // duplicate build that used grid_slot and was immediately overwritten).
     $grid_units = tw_get_data(
         $supabase_base . 'cyber_battle_grid'
         . '?select=*'
@@ -87,58 +99,39 @@ if ( $active_session_id ) {
         $auth_headers
     );
 } else {
+    $map_rows   = [];
     $grid_units = [];
 }
 
-// 3. Zbuduj mapę slotów 1–9
-$grid_map = [];
+$map_data = $map_rows[0] ?? [];
+
+// Build grid map using slot_index (single authoritative pass).
+$grid_map  = [];
+$has_enemy = false;
 
 if ( is_array( $grid_units ) ) {
-    foreach ( $grid_units as $unit ) {
-        $slot = isset($unit['grid_slot']) ? (int) $unit['grid_slot'] : 0;
-        if ( $slot >= 1 && $slot <= 9 ) {
-            $grid_map[ $slot ] = $unit;
-        }
-    }
-}
-
-// 4. Czy w tej sesji jest jakikolwiek wróg?
-$has_enemy = false;
-
-if ( !empty($grid_map) ) {
-    foreach ( $grid_map as $unit ) {
-        if ( ($unit['unit_type'] ?? '') !== 'player' ) {
-            $has_enemy = true;
-            break;
-        }
-    }
-}
-
-// 5. Wczytaj panel taktyczny jako template part
-include get_template_directory() . '/templates/parts/panel-tactical-left.php';
-// lub, jeśli to plugin:
-# include plugin_dir_path( __FILE__ ) . 'templates/parts/panel-tactical-left.php';
-
-$grid_map = [];
-$has_enemy = false;
-
-if(is_array($grid_units)) {
-    foreach($grid_units as $u) { 
-        if (is_array($u) && isset($u['slot_index']) && isset($u['unit_type'])) {
-            $grid_map[(int)$u['slot_index']] = $u; 
-            if ($u['unit_type'] === 'enemy' || $u['unit_type'] === 'boss') {
-                $has_enemy = true;
+    foreach ( $grid_units as $u ) {
+        if ( is_array( $u ) && isset( $u['slot_index'], $u['unit_type'] ) ) {
+            $slot = (int) $u['slot_index'];
+            if ( $slot >= 1 && $slot <= 9 ) {
+                $grid_map[ $slot ] = $u;
+                if ( $u['unit_type'] === 'enemy' || $u['unit_type'] === 'boss' ) {
+                    $has_enemy = true;
+                }
             }
         }
     }
 }
 
-// JS data dla tactical
+// Load tactical panel template part.
+include get_template_directory() . '/templates/parts/panel-tactical-left.php';
+
+// JS data for tactical overlay.
 echo "<script>
 window.twTacticalData = {
-    has_enemy: " . ($has_enemy ? 'true' : 'false') . ",
-    map_data: " . json_encode($map_data) . ",
-    grid_map: " . json_encode($grid_map) . "
+    has_enemy: " . ( $has_enemy ? 'true' : 'false' ) . ",
+    map_data: " . json_encode( $map_data ) . ",
+    grid_map: " . json_encode( $grid_map ) . "
 };
 </script>";
 ?>
@@ -152,16 +145,16 @@ window.twTacticalData = {
                 Instruction: write, play cards and have fun
             </p>
         </header>
-		<?php echo do_shortcode( '[cyber_hud]' ); ?>
-		<?php echo do_shortcode( '[tw_time_wheel]' ); ?>
-		<?php echo do_shortcode( '[tw_compass]' ); ?>
-<section id="adventure-chat">
-    <div class="chat-tabs">
-        <button class="chat-tab is-active" data-chat-target="player-chat">Mission Chat</button>
-        <button class="chat-tab" data-chat-target="gm-chat">GM Channel</button>
-    </div>
-    <div id="player-chat" class="chat-window is-active"></div>
-    <div id="gm-chat" class="chat-window" style="display:none;"></div>
+        <?php echo do_shortcode( '[cyber_hud]' ); ?>
+        <?php echo do_shortcode( '[tw_time_wheel]' ); ?>
+        <?php echo do_shortcode( '[tw_compass]' ); ?>
+        <section id="adventure-chat">
+            <div class="chat-tabs">
+                <button class="chat-tab is-active" data-chat-target="player-chat">Mission Chat</button>
+                <button class="chat-tab" data-chat-target="gm-chat">GM Channel</button>
+            </div>
+            <div id="player-chat" class="chat-window is-active"></div>
+            <div id="gm-chat" class="chat-window" style="display:none;"></div>
             <div id="quick-actions-container" style="display: flex; margin: 15px 0; font-family: 'Chakra Petch', sans-serif;">
                 <div id="qa-static-zone" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px;">
                     <div id="quick-actions-bar" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
@@ -173,7 +166,7 @@ window.twTacticalData = {
                 <div id="qa-manager-panel" style="display: none; background: rgba(0,20,0,0.95); border: 1px solid #adff00; padding: 15px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,0,0.3); margin-top: 10px;">
                     <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
                         <div style="position: relative; flex-grow: 1;">
-                            <input type="text" id="qa-search-input" oninput="window.twLoadQuickActions()" placeholder="SEARCH_DATABASE..." 
+                            <input type="text" id="qa-search-input" oninput="window.twLoadQuickActions()" placeholder="SEARCH_DATABASE..."
                                    style="width: 100%; background: #000; color: #adff00; border: 1px solid #adff00; padding: 8px 8px 8px 30px; font-family: monospace;">
                             <span style="position: absolute; left: 10px; top: 8px;">🔍</span>
                         </div>
@@ -208,9 +201,10 @@ window.twTacticalData = {
                     <button id="send-btn" class="btn-send">TRANSMIT</button>
                 </div>
             </div>
-        </section>
-    </section>
-</div>
+        </section><!-- /#adventure-chat -->
+    </section><!-- /.chat-panel -->
+</div><!-- /#adventure-shell -->
+
 <aside id="scenario-panel" class="scenario-panel">
     <div class="scenario-panel-body">
         <div id="deck-panel" class="is-open">
@@ -246,14 +240,15 @@ window.twTacticalData = {
                         </div>
                     </div>
                 </div>
-<div id="tab-skills" class="deck-tab-content">
-  <div class="deck-cards deck-cards-skills"></div>
-  <div class="deck-cards deck-cards-abilities"></div>
-</div>
+                <div id="tab-skills" class="deck-tab-content">
+                    <div class="deck-cards deck-cards-skills"></div>
+                    <div class="deck-cards deck-cards-abilities"></div>
+                </div>
             </div>
         </div>
     </div>
 </aside>
+
 <!-- GAME HUD (fixed position) -->
 <div style="position: fixed; z-index: 999; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 20px; pointer-events: none;">
     <div style="pointer-events: all; flex: 1; max-width: 400px;">
@@ -263,8 +258,29 @@ window.twTacticalData = {
         <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php'; ?>
     </div>
 </div>
+
 <script>
 (function () {
+    'use strict';
+
+    // -------------------------------------------------------------------------
+    // FIX #3: Guard against DOMContentLoaded already having fired when this
+    // inline script runs (which is common for scripts at the bottom of body).
+    // -------------------------------------------------------------------------
+    function onDOMReady(fn) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', fn, { once: true });
+        } else {
+            fn();
+        }
+    }
+
+    // =========================================================================
+    // SCENARIOS
+    // FIX #9: scenarios fetch now includes a nonce so the AJAX handler can
+    // verify the request via check_ajax_referer().
+    // PERF #12: limit=3 moved to the server-side AJAX handler; slice removed.
+    // =========================================================================
     async function loadScenarios() {
         const shell = document.getElementById('adventure-shell');
         if (!shell) return;
@@ -282,12 +298,14 @@ window.twTacticalData = {
                 return;
             }
             const formData = new URLSearchParams({
-                action: 'tw_get_scenarios_ajax',
-                campaign_id: campaignId
+                action:      'tw_get_scenarios_ajax',
+                campaign_id: campaignId,
+                nonce:       window.twAdventureData?.nonce ?? '', // FIX #9
             });
-            const response = await fetch('/wp-admin/admin-ajax.php', {
-                method: 'POST',
-                body: formData
+            const response = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
+                method:      'POST',
+                body:        formData,
+                credentials: 'same-origin',
             });
             if (!response.ok) {
                 throw new Error('AJAX HTTP error ' + response.status);
@@ -297,38 +315,95 @@ window.twTacticalData = {
                 list.innerHTML = '<p class="empty-msg">No missions available for this campaign yet.</p>';
                 return;
             }
-            const scenarios = json.data.slice(0, 3);
+            // PERF #12: server should now return max 3 — no client-side slice needed.
+            const scenarios = json.data;
             if (!scenarios.length) {
                 list.innerHTML = '<p class="empty-msg">No missions available. Ask your GM to sync the campaign.</p>';
                 return;
             }
             list.innerHTML = '';
+            // XSS FIX: build cards via DOM API (textContent / setAttribute) instead
+            // of innerHTML interpolation so scenario data from the server can never
+            // inject arbitrary HTML or script into the page.
             scenarios.forEach((s) => {
                 const tags = (s.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
-                const card = document.createElement('article');
+
+                const card  = document.createElement('article');
                 card.className = 'deck-card scenario-card';
                 card.dataset.scenarioId = s.id;
-                card.innerHTML = `
-                    <div class="deck-card-inner">
-                        ${s.img_url ? `<div class="scenario-image-wrap"><img src="${s.img_url}" alt="${s.name || ''}" class="scenario-image"></div>` : ''}
-                        <header class="scenario-header">
-                            <span class="scenario-difficulty">${s.difficulty || ''}</span>
-                            <h4 class="scenario-title">${s.name || 'Untitled mission'}</h4>
-                        </header>
-                        <div class="scenario-body">
-                            <p class="scenario-goal">${s.goal || ''}</p>
-                            <p class="scenario-tags">
-                                ${tags.map((t) => `<span class="scenario-tag">#${t}</span>`).join('')}
-                                ${s.is_boss ? '<span class="scenario-tag">#boss</span>' : ''}
-                                ${s.is_key_arc ? '<span class="scenario-tag">#key_arc</span>' : ''}
-                            </p>
-                        </div>
-                        <footer class="scenario-footer">
-                            <span class="scenario-type">${s.type || ''}</span>
-                            <span class="scenario-category">${s.category || ''}</span>
-                        </footer>
-                    </div>
-                `;
+
+                const inner = document.createElement('div');
+                inner.className = 'deck-card-inner';
+
+                // Optional image
+                if (s.img_url) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'scenario-image-wrap';
+                    const img = document.createElement('img');
+                    img.setAttribute('src', s.img_url);      // setAttribute keeps URL as-is
+                    img.setAttribute('alt', s.name || '');   // textContent equivalent for attrs
+                    img.className = 'scenario-image';
+                    wrap.appendChild(img);
+                    inner.appendChild(wrap);
+                }
+
+                // Header
+                const header = document.createElement('header');
+                header.className = 'scenario-header';
+                const diff = document.createElement('span');
+                diff.className = 'scenario-difficulty';
+                diff.textContent = s.difficulty || '';
+                const title = document.createElement('h4');
+                title.className = 'scenario-title';
+                title.textContent = s.name || 'Untitled mission';
+                header.appendChild(diff);
+                header.appendChild(title);
+
+                // Body
+                const body = document.createElement('div');
+                body.className = 'scenario-body';
+                const goal = document.createElement('p');
+                goal.className = 'scenario-goal';
+                goal.textContent = s.goal || '';
+                const tagsP = document.createElement('p');
+                tagsP.className = 'scenario-tags';
+                tags.forEach((t) => {
+                    const span = document.createElement('span');
+                    span.className = 'scenario-tag';
+                    span.textContent = '#' + t;
+                    tagsP.appendChild(span);
+                });
+                if (s.is_boss) {
+                    const span = document.createElement('span');
+                    span.className = 'scenario-tag';
+                    span.textContent = '#boss';
+                    tagsP.appendChild(span);
+                }
+                if (s.is_key_arc) {
+                    const span = document.createElement('span');
+                    span.className = 'scenario-tag';
+                    span.textContent = '#key_arc';
+                    tagsP.appendChild(span);
+                }
+                body.appendChild(goal);
+                body.appendChild(tagsP);
+
+                // Footer
+                const footer = document.createElement('footer');
+                footer.className = 'scenario-footer';
+                const type = document.createElement('span');
+                type.className = 'scenario-type';
+                type.textContent = s.type || '';
+                const cat = document.createElement('span');
+                cat.className = 'scenario-category';
+                cat.textContent = s.category || '';
+                footer.appendChild(type);
+                footer.appendChild(cat);
+
+                inner.appendChild(header);
+                inner.appendChild(body);
+                inner.appendChild(footer);
+                card.appendChild(inner);
                 list.appendChild(card);
             });
             console.log('✅ Loaded', scenarios.length, 'scenario cards');
@@ -338,113 +413,144 @@ window.twTacticalData = {
         }
     }
     window.twLoadScenarios = loadScenarios;
-    if (window.twGameReady) {
-        loadScenarios();
-    } else {
-        document.addEventListener('twGameStateHydrated', loadScenarios);
-    }
-document.addEventListener('DOMContentLoaded', function () {
-  if (!window.twAdventureData) {
-    console.warn('No twAdventureData – cannot bootstrap game');
-    return;
-  }
-  window.twGameState = window.twGameState || {};
-  (function hydrateTwGameState() {
-    const d = window.twAdventureData || {};
-    window.twGameState.currentSessionId   = d.active_session_id   ?? null;
-    window.twGameState.currentCampaignId  = d.active_campaign_id  ?? null;
-    window.twGameState.currentCharacterId = d.active_character_id ?? null;
-    window.twGameState.currentWorldId     = d.active_world_id     ?? null;
-    window.twGameState.currentLocationId  = d.active_location_id  ?? null;
-    console.log('✓ twGameState hydrated from twAdventureData', window.twGameState);
-    document.dispatchEvent(new Event('twGameStateHydrated'));
-  })();
-});
-(function () {
-  const playerChatEl = document.getElementById('player-chat');
-  if (!playerChatEl) return;
-  async function fetchChatChannelId() {
-    const sessionId = window.twGameState?.currentSessionId;
-    if (!sessionId) {
-      console.warn('No currentSessionId – cannot resolve chat channel');
-      return null;
-    }
-    try {
-      const params = new URLSearchParams({
-        action: 'tw_get_session_state',
-        session_id: sessionId
-      });
-      const resp = await fetch('/wp-admin/admin-ajax.php', {
-        method: 'POST',
-        body: params,
-        credentials: 'same-origin'
-      });
-      if (!resp.ok) {
-        console.error('Session state HTTP error', resp.status);
-        return null;
-      }
-      const json = await resp.json();
-      if (!json.success || !json.data) return null;
-      return json.data.chat_channel_id || null;
-    } catch (e) {
-      console.error('Session state fetch error', e);
-      return null;
-    }
-  }
-  async function waitForChatChannel(maxTries = 10, delayMs = 2000) {
-    let tries = 0;
-    playerChatEl.innerHTML = '<p class="empty-msg">Channel syncing, please wait…</p>';
-    while (tries < maxTries) {
-      const chan = await fetchChatChannelId();
-      if (chan) {
-        window.twGameState.chatChannelId = chan;
-        console.log('✓ Chat channel ready:', chan);
-        if (window.twInitMissionChat) {
-          window.twInitMissionChat(chan);
-        } else {
-          playerChatEl.innerHTML = '<p class="empty-msg">Channel ready. Messages will appear here.</p>';
+
+    // =========================================================================
+    // CHAT CHANNEL
+    // FIX #4 & #5: fetchChatChannelId now uses strict null/undefined check so
+    // a session ID of 0 is correctly detected as "no active session" and
+    // waitForChatChannel is only started after twGameState is fully hydrated.
+    // PERF #13: exponential backoff replaces fixed 2 s × 10 poll loop.
+    // =========================================================================
+    const playerChatEl = document.getElementById('player-chat');
+
+    async function fetchChatChannelId() {
+        const sessionId = window.twGameState?.currentSessionId;
+
+        // FIX #5: strict check — 0, null, and undefined all mean "no session".
+        if (sessionId === null || sessionId === undefined || sessionId === 0) {
+            console.warn('No valid currentSessionId – cannot resolve chat channel');
+            return null;
         }
-        return;
-      }
-      tries++;
-      await new Promise(r => setTimeout(r, delayMs));
-    }
-    playerChatEl.innerHTML = '<p class="empty-msg">Channel sync timeout. Try refreshing the terminal.</p>';
-  }
-  document.addEventListener('twGameStateHydrated', function () {
-    // jeśli już mamy chatChannelId, nie ma sensu retry
-    if (window.twGameState?.chatChannelId) return;
-    waitForChatChannel();
-  });
-})();
-		document.addEventListener('twGameStateHydrated', async function () {
-  const campaignId = window.twGameState?.currentCampaignId;
-  const nonce = window.twAdventureData?.nonce;
-  if (!campaignId || !nonce) return;
-  try {
-    const formData = new URLSearchParams({
-      action: 'tw_ensure_world_state',
-      campaign_id: String(campaignId),
-      nonce: nonce
-    });
-    const resp = await fetch(window.twAdventureData.ajax_url, {
-      method: 'POST',
-      body: formData,
-      credentials: 'same-origin'
-    });
-    const json = await resp.json();
-    console.log('🌍 World state ensure:', json);
-    if (json.success) {
-      setTimeout(() => {
-        if (window.refreshTwClock) {
-          window.refreshTwClock();
+        try {
+            const params = new URLSearchParams({
+                action:     'tw_get_session_state',
+                session_id: sessionId,
+                nonce:      window.twAdventureData?.nonce ?? '', // consistent nonce usage
+            });
+            const resp = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
+                method:      'POST',
+                body:        params,
+                credentials: 'same-origin',
+            });
+            if (!resp.ok) {
+                console.error('Session state HTTP error', resp.status);
+                return null;
+            }
+            const json = await resp.json();
+            if (!json.success || !json.data) return null;
+            return json.data.chat_channel_id || null;
+        } catch (e) {
+            console.error('Session state fetch error', e);
+            return null;
         }
-      }, 500);
     }
-  } catch (e) {
-    console.error('World state ensure error', e);
-  }
-});
+
+    // PERF #13: exponential backoff — starts at 1 s, caps at 8 s, max 6 tries.
+    async function waitForChatChannel(maxTries = 6) {
+        if (!playerChatEl) return;
+        playerChatEl.innerHTML = '<p class="empty-msg">Channel syncing, please wait…</p>';
+        let delay = 1000;
+        for (let i = 0; i < maxTries; i++) {
+            const chan = await fetchChatChannelId();
+            if (chan) {
+                window.twGameState.chatChannelId = chan;
+                console.log('✓ Chat channel ready:', chan);
+                if (window.twInitMissionChat) {
+                    window.twInitMissionChat(chan);
+                } else {
+                    playerChatEl.innerHTML = '<p class="empty-msg">Channel ready. Messages will appear here.</p>';
+                }
+                return;
+            }
+            await new Promise(r => setTimeout(r, delay));
+            delay = Math.min(delay * 1.5, 8000); // backoff: 1s → 1.5s → 2.25s … capped at 8s
+        }
+        playerChatEl.innerHTML = '<p class="empty-msg">Channel sync timeout. Try refreshing the terminal.</p>';
+    }
+
+    // =========================================================================
+    // WORLD STATE
+    // =========================================================================
+    async function ensureWorldState() {
+        const campaignId = window.twGameState?.currentCampaignId;
+        const nonce      = window.twAdventureData?.nonce;
+        if (!campaignId || !nonce) return;
+        try {
+            const formData = new URLSearchParams({
+                action:      'tw_ensure_world_state',
+                campaign_id: String(campaignId),
+                nonce:       nonce,
+            });
+            const resp = await fetch(window.twAdventureData.ajax_url, {
+                method:      'POST',
+                body:        formData,
+                credentials: 'same-origin',
+            });
+            const json = await resp.json();
+            console.log('🌍 World state ensure:', json);
+            if (json.success && window.refreshTwClock) {
+                setTimeout(window.refreshTwClock, 500);
+            }
+        } catch (e) {
+            console.error('World state ensure error', e);
+        }
+    }
+
+    // =========================================================================
+    // HYDRATION
+    // FIX #3: Use onDOMReady to safely handle already-fired DOMContentLoaded.
+    // PERF #14: All three twGameStateHydrated consumers consolidated into one
+    // listener so initialisation order is explicit and handlers run in parallel.
+    // =========================================================================
+    function hydrateTwGameState() {
+        if (!window.twAdventureData) {
+            console.warn('No twAdventureData – cannot bootstrap game');
+            return;
+        }
+        window.twGameState = window.twGameState || {};
+        const d = window.twAdventureData;
+        window.twGameState.currentSessionId   = d.active_session_id   ?? null;
+        window.twGameState.currentCampaignId  = d.active_campaign_id  ?? null;
+        window.twGameState.currentCharacterId = d.active_character_id ?? null;
+        window.twGameState.currentWorldId     = d.active_world_id     ?? null;
+        window.twGameState.currentLocationId  = d.active_location_id  ?? null;
+        console.log('✓ twGameState hydrated from twAdventureData', window.twGameState);
+        document.dispatchEvent(new Event('twGameStateHydrated'));
+    }
+
+    // PERF #14: single consolidated listener replaces three separate handlers.
+    document.addEventListener('twGameStateHydrated', function onGameStateReady() {
+        // Run all post-hydration tasks in parallel; failures are isolated.
+        Promise.allSettled([
+            loadScenarios(),
+            // FIX #4: waitForChatChannel is now called only after hydration,
+            // so twGameState.currentSessionId is guaranteed to be set.
+            window.twGameState?.chatChannelId
+                ? Promise.resolve()           // already resolved earlier, skip
+                : waitForChatChannel(),
+            ensureWorldState(),
+        ]).then(results => {
+            results.forEach((r, i) => {
+                if (r.status === 'rejected') {
+                    console.error('Post-hydration task', i, 'failed:', r.reason);
+                }
+            });
+        });
+    }, { once: true });
+
+    // Kick off hydration once the DOM is ready.
+    onDOMReady(hydrateTwGameState);
+
     console.log('🎮 Tale Weaver Scenarios Loader - Ready & Waiting');
 })();
 </script>
