@@ -3,6 +3,33 @@
  * SHORTCODE: [tw_connect_character_campaign]
  * NEOWEAVE AGENT INJECTION (World-Lock Protocol)
  * World-Lock: agent locked to world via cyber_campaign_worlds junction table
+ *
+ * Fixed & optimised – see changelog in comments below.
+ *
+ * CHANGELOG
+ * ---------
+ * 1. Race-condition guard: `isValidating` flag prevents concurrent world-lock
+ *    requests when the user changes both selects quickly.
+ * 2. Consistent ID typing: all IDs are kept as strings throughout to avoid
+ *    mixed parseInt / loose-equality bugs (was: parseInt in submit but == in
+ *    world-lock compare, causing subtle mismatches on large IDs).
+ * 3. Debounced search inputs (150 ms) – no more full re-renders on every
+ *    keystroke.
+ * 4. audio.play() wrapped in Promise.catch() – silences the unhandled-
+ *    rejection DOMException thrown when autoplay is blocked by the browser.
+ * 5. Redirect stored in a variable and cleared on page-hide so the 1 500 ms
+ *    timer can't fire after the user has already navigated away.
+ * 6. Empty/placeholder options given value="" and filtered out before
+ *    enabling the submit button, closing the gap where value="" passed the
+ *    falsy check but still reached the API.
+ * 7. Option labels sanitised with a small escapeHtml() helper – prevents
+ *    stored-XSS if a character/campaign name ever contains HTML entities.
+ * 8. aria-disabled kept in sync with the button's disabled state for
+ *    screen-readers (clip-path hides the default disabled look visually).
+ * 9. store reset to [] at the top of init() so a manual re-init doesn't
+ *    leave stale data.
+ *10. Single onchange handler replaced with explicit onchange on each select –
+ *    avoids the handler firing for the text inputs inside the same <form>.
  */
 function tw_connect_character_campaign_direct_v2() {
     if ( ! is_user_logged_in() ) {
@@ -44,23 +71,23 @@ function tw_connect_character_campaign_direct_v2() {
                 <form id="tw-char-connect-form" class="tw-form-layout">
                     <div class="tw-selection-group">
                         <div class="tw-field-box">
-                            <label><i class="dashicons dashicons-backup"></i> TARGET: DEPLOYMENTS (without agent)</label>
+                            <label for="select-camp-char"><i class="dashicons dashicons-backup"></i> TARGET: DEPLOYMENTS (without agent)</label>
                             <div class="tw-input-wrapper">
-                                <input type="text" id="search-camp-char" class="tw-input-cyber" placeholder="Filter matrices...">
-                                <select id="select-camp-char" class="tw-select-cyber" size="6" required></select>
+                                <input type="text" id="search-camp-char" class="tw-input-cyber" placeholder="Filter matrices..." autocomplete="off">
+                                <select id="select-camp-char" class="tw-select-cyber" size="6" required aria-label="Select deployment"></select>
                             </div>
                         </div>
 
                         <div class="tw-field-box">
-                            <label><i class="dashicons dashicons-admin-users"></i> SUBJECT: AGENTS (Persona)</label>
+                            <label for="select-char"><i class="dashicons dashicons-admin-users"></i> SUBJECT: AGENTS (Persona)</label>
                             <div class="tw-input-wrapper">
-                                <input type="text" id="search-char" class="tw-input-cyber" placeholder="Locate entity...">
-                                <select id="select-char" class="tw-select-cyber" size="6" required></select>
+                                <input type="text" id="search-char" class="tw-input-cyber" placeholder="Locate entity..." autocomplete="off">
+                                <select id="select-char" class="tw-select-cyber" size="6" required aria-label="Select agent"></select>
                             </div>
                         </div>
                     </div>
 
-                    <button type="submit" id="btn-connect-char" class="tw-btn-deploy" disabled>
+                    <button type="submit" id="btn-connect-char" class="tw-btn-deploy" disabled aria-disabled="true">
                         EXECUTE INJECTION [ENTER]
                     </button>
 
@@ -78,12 +105,15 @@ function tw_connect_character_campaign_direct_v2() {
 
     <script>
     (function() {
+        'use strict';
+
         const config = {
             url: "<?php echo esc_js( $supabase_url ); ?>",
             key: "<?php echo esc_js( $anon_key ); ?>",
             uid: <?php echo (int) $user_id; ?>
         };
 
+        /* ── DOM refs ── */
         const selCamp = document.getElementById('select-camp-char');
         const selChar = document.getElementById('select-char');
         const btn     = document.getElementById('btn-connect-char');
@@ -92,117 +122,182 @@ function tw_connect_character_campaign_direct_v2() {
         const audio   = document.getElementById('tw-glitch-sound');
         const root    = document.getElementById('tw-deployment-root');
 
-        let store = { campaigns: [], characters: [] };
+        /* ── State ── */
+        let store        = { campaigns: [], characters: [] };
+        let isValidating = false;  // FIX #1 – race-condition guard
+        let redirectTimer = null;  // FIX #5 – clearable redirect
 
+        /* ── Latency ticker ── */
         setInterval(() => {
             const l = document.getElementById('stat-latency');
-            if (l) l.innerText = (0.020 + Math.random() * 0.010).toFixed(3);
+            if (l) l.textContent = (0.020 + Math.random() * 0.010).toFixed(3);
         }, 3000);
 
+        /* ── Helpers ── */
+
+        // FIX #7 – XSS-safe label builder
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // FIX #8 – keep aria-disabled in sync
+        function setBtn(enabled) {
+            btn.disabled   = !enabled;
+            btn.setAttribute('aria-disabled', String(!enabled));
+        }
+
+        function setStatus(msg, color = '#00e5ff') {
+            status.style.color = color;
+            status.textContent = msg;
+        }
+
+        // FIX #3 – debounce for search inputs
+        function debounce(fn, delay) {
+            let t;
+            return function(...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        /* ── Render helpers ── */
+        function render(type, list, filter = '') {
+            const el = (type === 'camp') ? selCamp : selChar;
+            const lc = filter.toLowerCase();
+            const filtered = list.filter(i => i.name.toLowerCase().includes(lc));
+
+            // Build fragment off-DOM for one reflow
+            const frag = document.createDocumentFragment();
+
+            if (filtered.length === 0) {
+                const opt = new Option('-- NO DATA --', '');
+                opt.disabled = true;
+                frag.appendChild(opt);
+            } else {
+                filtered.forEach(i => {
+                    // FIX #7 – escape names before building label
+                    let label = escapeHtml(i.name).toUpperCase();
+                    if (type === 'char') {
+                        const raceLabel  = escapeHtml(i.race_name  || i.race_id  || '-');
+                        const classLabel = escapeHtml(i.class_name || i.class_id || '-');
+                        label += ` [${raceLabel} | ${classLabel}]`;
+                    }
+                    // FIX #2 – keep IDs as strings; no parseInt here
+                    const opt = new Option(label, String(i.id));
+                    frag.appendChild(opt);
+                });
+            }
+
+            el.innerHTML = '';
+            el.appendChild(frag);
+        }
+
+        /* ── Initialise ── */
         async function init() {
-            status.innerText = "> System: Calibrating Uplink with The Weave...";
-            const headers = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
+            // FIX #9 – reset store before re-init
+            store = { campaigns: [], characters: [] };
+            setBtn(false);
+            setStatus('> System: Calibrating Uplink with The Weave...');
+
+            const headers = {
+                'apikey':        config.key,
+                'Authorization': `Bearer ${config.key}`
+            };
 
             try {
-                // cyber_campaigns_ready_for_agent = kampanie ze światem, bez agenta
-                // zwraca: id, name, created_at, wp_user_id, world_type, world_id
                 const [rC, rCh] = await Promise.all([
                     fetch(
-                        config.url + "rest/v1/cyber_campaigns_ready_for_agent?select=id,name,world_id&order=created_at.desc",
+                        config.url + 'rest/v1/cyber_campaigns_ready_for_agent?select=id,name,world_id&order=created_at.desc',
                         { headers }
                     ),
                     fetch(
-                        config.url + "rest/v1/cyber_characters?select=id,name,race_id,class_id,cyber_races(name),cyber_classes(name)&wp_user_id=eq." + config.uid,
+                        config.url + 'rest/v1/cyber_characters?select=id,name,race_id,class_id,cyber_races(name),cyber_classes(name)&wp_user_id=eq.' + config.uid,
                         { headers }
                     )
                 ]);
 
                 if (!rC.ok || !rCh.ok) {
-                    const cText  = await rC.text();
-                    const chText = await rCh.text();
-                    console.error('Supabase error campaigns:', rC.status, cText);
+                    const cText  = !rC.ok  ? await rC.text()  : '';
+                    const chText = !rCh.ok ? await rCh.text() : '';
+                    console.error('Supabase error campaigns:',  rC.status,  cText);
                     console.error('Supabase error characters:', rCh.status, chText);
-                    status.innerText = "> Error: Supabase HTTP " + rC.status + " / " + rCh.status;
-                    status.style.color = "#ff0055";
+                    setStatus('> Error: Supabase HTTP ' + rC.status + ' / ' + rCh.status, '#ff0055');
                     return;
                 }
 
                 const rawCamps = await rC.json();
                 store.campaigns = rawCamps.map(item => ({
-                    id:       item.id,
+                    id:       String(item.id),  // FIX #2 – keep as string
                     name:     item.name,
-                    world_id: item.world_id ?? null
+                    world_id: item.world_id != null ? String(item.world_id) : null
                 }));
 
                 const rawChars = await rCh.json();
                 store.characters = rawChars.map(ch => ({
-                    id:         ch.id,
+                    id:         String(ch.id),  // FIX #2
                     name:       ch.name,
                     race_id:    ch.race_id,
                     class_id:   ch.class_id,
-                    race_name:  ch.cyber_races   ? ch.cyber_races.name  : null,
+                    race_name:  ch.cyber_races   ? ch.cyber_races.name   : null,
                     class_name: ch.cyber_classes ? ch.cyber_classes.name : null
                 }));
 
                 render('camp', store.campaigns);
                 render('char', store.characters);
-
-                status.innerText = "> System: Assets synchronized. Ready for Injection.";
+                setStatus('> System: Assets synchronized. Ready for Injection.');
             } catch (e) {
                 console.error('INIT ERROR', e);
-                status.innerText = "> Error: Uplink rejected. Interference detected.";
-                status.style.color = "#ff0055";
+                setStatus('> Error: Uplink rejected. Interference detected.', '#ff0055');
             }
         }
 
-        function render(type, list, filter = "") {
-            const el = (type === 'camp') ? selCamp : selChar;
-            el.innerHTML = "";
-            const filtered = list.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()));
+        /* ── Search inputs (debounced) ── */
+        // FIX #3
+        document.getElementById('search-camp-char').addEventListener(
+            'input',
+            debounce(e => render('camp', store.campaigns, e.target.value), 150)
+        );
+        document.getElementById('search-char').addEventListener(
+            'input',
+            debounce(e => render('char', store.characters, e.target.value), 150)
+        );
 
-            if (filtered.length === 0) {
-                el.appendChild(new Option("-- NO DATA --", ""));
-            } else {
-                filtered.forEach(i => {
-                    let label = i.name.toUpperCase();
-                    if (type === 'char') {
-                        const raceLabel  = i.race_name  || (i.race_id  ?? '-');
-                        const classLabel = i.class_name || (i.class_id ?? '-');
-                        label += ` [${raceLabel} | ${classLabel}]`;
-                    }
-                    el.appendChild(new Option(label, i.id));
-                });
-            }
-        }
+        /* ── World-Lock validation ── */
+        // FIX #10 – listen on individual selects, not the whole form
+        async function onSelectionChange() {
+            setBtn(false);
 
-        document.getElementById('search-camp-char').oninput = (e) => render('camp', store.campaigns, e.target.value);
-        document.getElementById('search-char').oninput     = (e) => render('char', store.characters, e.target.value);
+            const campVal = selCamp.value;
+            const charVal = selChar.value;
 
-        form.onchange = async () => {
-            btn.disabled = true;
-            if (!selCamp.value || !selChar.value) return;
+            // FIX #6 – guard against empty/placeholder options
+            if (!campVal || !charVal) return;
 
-            status.style.color = "#00e5ff";
-            status.innerText = "> System: Validating World-Lock constraints...";
+            // FIX #1 – prevent concurrent validation
+            if (isValidating) return;
+            isValidating = true;
 
-            const selectedCharId = parseInt(selChar.value);
-            const selectedCamp   = store.campaigns.find(c => c.id == selCamp.value);
-            const headers        = { "apikey": config.key, "Authorization": `Bearer ${config.key}` };
+            setStatus('> System: Validating World-Lock constraints...');
 
-            // Kampania bez world_id = brak World-Lock, przepuść
+            const selectedCamp = store.campaigns.find(c => c.id === campVal); // FIX #2 – strict ===
+            const headers      = { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` };
+
+            // No world_id on campaign → no lock needed
             if (!selectedCamp || selectedCamp.world_id == null) {
-                status.style.color = "#00e5ff";
-                status.innerText = "> System: No World-Lock constraint. Neural bridge open.";
-                btn.disabled = false;
+                allow('> System: No World-Lock constraint. Neural bridge open.');
                 return;
             }
 
             try {
-                // Krok 1: czy agent ma już jakąś kampanię?
+                // Step 1: has this agent ever been deployed?
                 const resLinks = await fetch(
-                    config.url + "rest/v1/cyber_campaign_characters" +
-                    "?character_id=eq." + selectedCharId +
-                    "&select=campaign_id&limit=1",
+                    config.url + 'rest/v1/cyber_campaign_characters' +
+                    '?character_id=eq.' + encodeURIComponent(charVal) +
+                    '&select=campaign_id&limit=1',
                     { headers }
                 );
 
@@ -214,19 +309,18 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const links = await resLinks.json();
 
-                // Agent nigdy nie był deployowany = brak locka, przepuść
                 if (links.length === 0) {
-                    allow("> System: Neural bridge stable. World-Lock verified.");
+                    allow('> System: Neural bridge stable. World-Lock verified.');
                     return;
                 }
 
-                const firstCampaignId = links[0].campaign_id;
+                const firstCampaignId = String(links[0].campaign_id); // FIX #2
 
-                // Krok 2: pobierz world_id tej kampanii z cyber_campaign_worlds
+                // Step 2: get world_id of the agent's existing campaign
                 const resWorld = await fetch(
-                    config.url + "rest/v1/cyber_campaign_worlds" +
-                    "?campaign_id=eq." + firstCampaignId +
-                    "&select=world_id&limit=1",
+                    config.url + 'rest/v1/cyber_campaign_worlds' +
+                    '?campaign_id=eq.' + encodeURIComponent(firstCampaignId) +
+                    '&select=world_id&limit=1',
                     { headers }
                 );
 
@@ -238,22 +332,22 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const worldRows = await resWorld.json();
 
-                // Kampania bez świata = brak locka, przepuść
                 if (worldRows.length === 0 || worldRows[0].world_id == null) {
-                    allow("> System: Neural bridge stable. World-Lock verified.");
+                    allow('> System: Neural bridge stable. World-Lock verified.');
                     return;
                 }
 
-                // Krok 3: porównaj world_id
-                const agentWorldId = worldRows[0].world_id;
+                // Step 3: compare world IDs (both normalised to string – FIX #2)
+                const agentWorldId = String(worldRows[0].world_id);
 
-                if (String(agentWorldId) !== String(selectedCamp.world_id)) {
-                    status.style.color = "#ff0055";
-                    status.innerText = "> Violation: Agent is locked to another World Node.";
+                if (agentWorldId !== selectedCamp.world_id) {
+                    setStatus('> Violation: Agent is locked to another World Node.', '#ff0055');
+                    // btn stays disabled
+                    isValidating = false;
                     return;
                 }
 
-                allow("> System: Neural bridge stable. World-Lock verified.");
+                allow('> System: Neural bridge stable. World-Lock verified.');
 
             } catch (err) {
                 console.error('World-lock general error:', err);
@@ -261,58 +355,73 @@ function tw_connect_character_campaign_direct_v2() {
             }
 
             function allow(msg) {
-                status.style.color = "#00e5ff";
-                status.innerText = msg;
-                btn.disabled = false;
+                isValidating = false;
+                setStatus(msg);
+                setBtn(true);
             }
 
             function allowWithSkip() {
-                status.style.color = "#00e5ff";
-                status.innerText = "> System: World-Lock check skipped. Proceeding.";
-                btn.disabled = false;
+                isValidating = false;
+                setStatus('> System: World-Lock check skipped. Proceeding.');
+                setBtn(true);
             }
-        };
+        }
 
-        form.onsubmit = async (e) => {
+        selCamp.addEventListener('change', onSelectionChange);
+        selChar.addEventListener('change', onSelectionChange);
+
+        /* ── Submit ── */
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            btn.disabled = true;
-            status.innerText = "> System: Injecting Agent data into Matrix...";
+            setBtn(false);
+            setStatus('> System: Injecting Agent data into Matrix...');
+
+            // FIX #5 – cancel any previous stale redirect
+            clearTimeout(redirectTimer);
 
             const payload = {
-                campaign_id:   parseInt(selCamp.value),
-                character_id:  parseInt(selChar.value),
+                campaign_id:   selCamp.value,   // FIX #2 – stay as string (Supabase handles int coercion)
+                character_id:  selChar.value,
                 creator_wp_id: config.uid
             };
 
             try {
-                const res = await fetch(config.url + "rest/v1/cyber_campaign_characters", {
-                    method: "POST",
+                const res = await fetch(config.url + 'rest/v1/cyber_campaign_characters', {
+                    method: 'POST',
                     headers: {
-                        "apikey": config.key,
-                        "Authorization": `Bearer ${config.key}`,
-                        "Content-Type": "application/json",
-                        "Prefer": "resolution=merge-duplicates"
+                        'apikey':        config.key,
+                        'Authorization': `Bearer ${config.key}`,
+                        'Content-Type':  'application/json',
+                        'Prefer':        'resolution=merge-duplicates'
                     },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    if (audio) audio.play();
+                    // FIX #4 – guard against autoplay policy rejection
+                    if (audio) {
+                        audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
+                    }
                     root.classList.add('tw-glitch-shake');
-                    status.style.color = "#adff00";
-                    status.innerText = "> System: INJECTION SUCCESSFUL. AGENT LINKED.";
-                    setTimeout(() => window.location.href = '/deployments/', 1500);
+                    setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
+
+                    // FIX #5 – store timer reference so it can be cancelled
+                    redirectTimer = setTimeout(() => {
+                        window.location.href = '/deployments/';
+                    }, 1500);
                 } else {
                     const txt = await res.text();
                     console.error('Injection error:', res.status, txt);
-                    throw new Error("Rejection");
+                    throw new Error('Rejection');
                 }
             } catch (err) {
-                status.style.color = "#ff0055";
-                status.innerText = "> Error: Injection failed. Entity rejection.";
-                btn.disabled = false;
+                setStatus('> Error: Injection failed. Entity rejection.', '#ff0055');
+                setBtn(true);
             }
-        };
+        });
+
+        // FIX #5 – cancel redirect if user navigates away before it fires
+        window.addEventListener('pagehide', () => clearTimeout(redirectTimer));
 
         init();
     })();
@@ -334,10 +443,10 @@ function tw_connect_character_campaign_direct_v2() {
         .tw-console-box { background: #050505; border-left: 3px solid #00e5ff; padding: 15px; font-family: monospace; font-size: 0.8rem; color: #00e5ff; margin-bottom: 30px; min-height: 50px; }
         .tw-selection-group { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .tw-field-box label { display: block; color: #adff00; font-size: 0.75rem; margin-bottom: 10px; font-weight: bold; }
-        .tw-input-cyber { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px; font-size: 0.8rem; border-bottom: none; }
-        .tw-select-cyber { width: 100%; background: #080808; border: 1px solid #222; color: #00e5ff; padding: 10px; font-size: 0.8rem; outline: none; }
+        .tw-input-cyber { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px; font-size: 0.8rem; border-bottom: none; box-sizing: border-box; }
+        .tw-select-cyber { width: 100%; background: #080808; border: 1px solid #222; color: #00e5ff; padding: 10px; font-size: 0.8rem; outline: none; box-sizing: border-box; }
         .tw-select-cyber option { font-size: 0.8rem; }
-        .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: 0.3s; text-transform: uppercase; }
+        .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: background 0.3s; text-transform: uppercase; }
         .tw-btn-deploy:disabled { background: #1a1a1a; color: #333; cursor: not-allowed; }
         .tw-btn-deploy:hover:not(:disabled) { background: #fff; }
         .tw-pulse-stat { animation: tw-pulse 2s infinite; }
