@@ -1,0 +1,56 @@
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.ach-card {
+    position: relative;
+    width: 130px;
+    height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    padding: 10px;
+    font-family: sans-serif;
+    transition: transform 0.2s;
+}
+
+/* Kształt Tarczy */
+.ach-shape-shield {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%);
+}
+
+/* Kształt Sześciokąta */
+.ach-shape-hex {
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.ach-card.status-locked, .ach-card.status-hidden {
+    background-color: #333 !important;
+    filter: grayscale(1);
+    opacity: 0.7;
+}
+
+.ach-card .ach-icon {
+    font-size: 2.5rem;
+    margin-bottom: 5px;
+}
+
+.ach-card .ach-title {
+    font-size: 0.8rem;
+    font-weight: bold;
+    line-height: 1.1;
+}
+
+.ach-card .ach-progress {
+    font-size: 0.7rem;
+    margin-top: 5px;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
