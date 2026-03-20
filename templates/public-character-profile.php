@@ -390,6 +390,7 @@ body.character-profile {
 
     <div class="qr-container">
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=<?php echo urlencode( $profile_url ); ?>" alt="">
+        [achivments earned]
     </div>
 </div>
 
