@@ -88,21 +88,6 @@ if ( ! $char ) {
 }
 
 // 5) Atomowa inkrementacja licznika wyświetleń przez RPC (fix Bug #7).
-//
-//    Poprzednia wersja: read-then-write — race condition + brak filtra botów.
-//    Obecna wersja:
-//      a) pomijamy boty/crawlery na podstawie User-Agent,
-//      b) wywołujemy fn_increment_view_count(char_id) — PostgreSQL RPC
-//         wykonujące UPDATE … SET view_count = view_count + 1 atomowo,
-//         bez odczytu obecnej wartości po stronie PHP.
-//
-//    Wymagane SQL (wykonaj raz w Supabase SQL Editor):
-//      CREATE OR REPLACE FUNCTION fn_increment_view_count(char_id BIGINT)
-//      RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
-//        UPDATE cyber_characters
-//           SET view_count = view_count + 1
-//         WHERE id = char_id;
-//      $$;
 
 $is_bot = false;
 $ua     = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
