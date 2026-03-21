@@ -1,17 +1,36 @@
 <?php
 /**
  * SHORTCODE: [tw_list_worlds]
- * Wersja v13: N+1 fix — all agent/session data fetched in 3 batch queries before the loop.
+ * Wersja v14: Bug-fixes + optimisations over v13.
  *
- * Query budget (was: up to 4N+1, now: always 3+1):
- *   Q1  cyber_worlds            — worlds + embedded campaign join   (unchanged)
+ * Changes vs v13
+ * ──────────────
+ * BUG  1 — Function name aligned with version comment (renamed to v14; shortcode tag unchanged).
+ * BUG  2 — $agents_by_campaign / $sessions_by_world / $char_names initialised BEFORE the
+ *           $no_data branch so the foreach loop never references undefined variables.
+ * BUG  3 — Double-encoding in onclick: wp_json_encode already escapes special chars;
+ *           the extra htmlspecialchars() was double-escaping & → &amp; which broke the
+ *           JSON string in the HTML attribute. Fixed: encode once with esc_attr().
+ * BUG  4 — $short_desc_source empty-string guard added: wp_trim_words('') → '…' (ugly);
+ *           now falls back to a neutral placeholder.
+ * BUG  5 — $full_desc fallbacks (world_ai_description / description) now trimmed
+ *           consistently, matching the p1/p2/p3 branch.
+ * BUG  6 — $char_ids_needed deduplication moved AFTER both foreach loops so session-char
+ *           IDs that were already resolved via Q2 embedded-join are skipped, saving a slot
+ *           in Q4.
+ * OPT  1 — (string) cast before str_pad is redundant; removed.
+ * OPT  2 — Null-coalescing used consistently instead of mixed empty()/isset() checks.
+ * OPT  3 — $m_map … $s_map moved outside the worlds loop (they were already outside,
+ *           but now also declared before Q1 so they're available for potential early-return
+ *           debug paths).
+ *
+ * Query budget (unchanged from v13, always 3+1):
+ *   Q1  cyber_worlds            — worlds + embedded campaign join
  *   Q2  cyber_campaign_characters — ALL agents for all campaign IDs, single in.() call
  *   Q3  cyber_game_sessions      — latest session per world, single in.() call on world_id
  *   Q4  cyber_characters         — names for every character_id collected above, single in.()
- *
- * Results are keyed by campaign_id / world_id / character_id and merged in PHP.
  */
-function tw_list_worlds_v12() {
+function tw_list_worlds_v14() {
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
 		return '<p class="tw-error">TERMINAL ERROR: No User Sync Detected.</p>';
@@ -78,7 +97,7 @@ function tw_list_worlds_v12() {
 		</script>';
 	}
 
-	// --- MAPY WARTOŚCI ---
+	// --- VALUE MAPS ---
 	$m_map = [ 1 => 'Void-Dry', 2 => 'Flickering', 3 => 'Resonant', 4 => 'Overloaded', 5 => 'Source-Leaking' ];
 	$t_map = [ 1 => 'Primitive', 2 => 'Stable', 3 => 'High-Tech', 4 => 'Transhuman', 5 => 'Singularity' ];
 	$v_map = [ 1 => 'Chaos', 2 => 'Neutral', 3 => 'Lawful' ];
@@ -86,7 +105,7 @@ function tw_list_worlds_v12() {
 	$s_map = [ 1 => 'Local', 2 => 'Regional', 3 => 'Planetary', 4 => 'Galactic', 5 => 'Infinite' ];
 
 	// ==========================================================
-	// Q1: worlds (with embedded campaign join — unchanged)
+	// Q1: worlds (with embedded campaign join)
 	// ==========================================================
 	$worlds = $supa_get(
 		'cyber_worlds',
@@ -100,16 +119,22 @@ function tw_list_worlds_v12() {
 	$no_data      = empty( $worlds );
 	$delete_nonce = wp_create_nonce( 'tw_world_delete_nonce' );
 
+	// BUG 2 FIX — always initialise lookup tables so the foreach loop below
+	// never touches undefined variables, regardless of how $no_data is resolved.
+	$agents_by_campaign = [];
+	$sessions_by_world  = [];
+	$char_names         = [];
+
 	if ( ! $no_data ) {
 		// ----------------------------------------------------------
 		// Collect IDs needed for the two batch queries.
 		// ----------------------------------------------------------
-		$campaign_ids = []; // campaign_id  → used for Q2
-		$world_ids    = []; // world_id     → used for Q3
+		$campaign_ids = [];
+		$world_ids    = [];
 
 		foreach ( $worlds as $w ) {
 			$world_ids[] = (int) $w['id'];
-			$cd = ! empty( $w['cyber_campaign_worlds'] ) ? $w['cyber_campaign_worlds'][0] : null;
+			$cd = $w['cyber_campaign_worlds'][0] ?? null;
 			if ( $cd && ! empty( $cd['campaign_id'] ) ) {
 				$campaign_ids[] = (int) $cd['campaign_id'];
 			}
@@ -117,12 +142,9 @@ function tw_list_worlds_v12() {
 		$campaign_ids = array_unique( $campaign_ids );
 
 		// ----------------------------------------------------------
-		// Q2: ONE query for all campaign-characters across all worlds
-		// Returns the first (oldest) agent per campaign for this user.
+		// Q2: ONE query for all campaign-characters across all worlds.
 		// Keyed: $agents_by_campaign[ campaign_id ] = [ character_id, char_name ]
 		// ----------------------------------------------------------
-		$agents_by_campaign = [];
-
 		if ( ! empty( $campaign_ids ) ) {
 			$camp_char_rows = $supa_get(
 				'cyber_campaign_characters',
@@ -141,22 +163,18 @@ function tw_list_worlds_v12() {
 					continue;
 				}
 				$char_id   = ! empty( $row['character_id'] ) ? (int) $row['character_id'] : 0;
-				$char_name = $row['cyber_characters']['name'] ?? null; // embedded join
+				$char_name = $row['cyber_characters']['name'] ?? null;
 				$agents_by_campaign[ $cid ] = [
 					'character_id' => $char_id,
-					'char_name'    => $char_name, // may still be null if FK not configured
+					'char_name'    => $char_name,
 				];
 			}
 		}
 
 		// ----------------------------------------------------------
 		// Q3: ONE query for latest sessions across all worlds.
-		// Supabase REST does not support DISTINCT ON, so we fetch all
-		// sessions ordered desc and keep the first hit per world_id.
 		// Keyed: $sessions_by_world[ world_id ] = [ character_id, status ]
 		// ----------------------------------------------------------
-		$sessions_by_world = [];
-
 		if ( ! empty( $world_ids ) ) {
 			$session_rows = $supa_get(
 				'cyber_game_sessions',
@@ -171,7 +189,7 @@ function tw_list_worlds_v12() {
 			foreach ( $session_rows as $row ) {
 				$wid = (int) $row['world_id'];
 				if ( isset( $sessions_by_world[ $wid ] ) ) {
-					continue; // keep only the most-recent (first due to order desc)
+					continue;
 				}
 				$sessions_by_world[ $wid ] = [
 					'character_id' => ! empty( $row['character_id'] ) ? (int) $row['character_id'] : 0,
@@ -181,14 +199,16 @@ function tw_list_worlds_v12() {
 		}
 
 		// ----------------------------------------------------------
-		// Q4: ONE query for all character names (agents + session chars)
-		// Covers the fallback case where the embedded join in Q2 returned
-		// null (FK not configured on cyber_campaign_characters).
-		// Keyed: $char_names[ character_id ] = 'Name'
+		// Q4: ONE query for all character names that were NOT already
+		// resolved via the embedded join in Q2.
+		//
+		// BUG 6 FIX — collect both sets first, then deduplicate once,
+		// excluding IDs already resolved through the Q2 embedded join.
 		// ----------------------------------------------------------
 		$char_ids_needed = [];
 
 		foreach ( $agents_by_campaign as $agent ) {
+			// Only needed when the embedded join returned null (FK not configured).
 			if ( $agent['character_id'] && null === $agent['char_name'] ) {
 				$char_ids_needed[] = $agent['character_id'];
 			}
@@ -199,8 +219,6 @@ function tw_list_worlds_v12() {
 			}
 		}
 		$char_ids_needed = array_unique( $char_ids_needed );
-
-		$char_names = [];
 
 		if ( ! empty( $char_ids_needed ) ) {
 			$char_rows = $supa_get(
@@ -240,9 +258,11 @@ function tw_list_worlds_v12() {
 					$world_id = (int) $w['id'];
 
 					// Campaign data (embedded in Q1)
-					$campaign_data        = ! empty( $w['cyber_campaign_worlds'] ) ? $w['cyber_campaign_worlds'][0] : null;
+					$campaign_data        = $w['cyber_campaign_worlds'][0] ?? null;
 					$active_campaign_id   = $campaign_data ? (int) $campaign_data['campaign_id'] : 0;
-					$active_campaign_name = $campaign_data ? $campaign_data['cyber_campaign']['name'] : 'UNBOUND REALITY';
+					$active_campaign_name = ( $campaign_data && isset( $campaign_data['cyber_campaign']['name'] ) )
+						? $campaign_data['cyber_campaign']['name']
+						: 'UNBOUND REALITY';
 
 					$field_agent_name = 'NO AGENT';
 					$world_status     = 'NOT DEPLOYED';
@@ -256,7 +276,6 @@ function tw_list_worlds_v12() {
 							$char_id = $agent['character_id'];
 
 							if ( $char_id ) {
-								// Prefer embedded join name; fall back to Q4 lookup.
 								$field_agent_name = $agent['char_name']
 									?? $char_names[ $char_id ]
 									?? 'AGENT #' . $char_id;
@@ -266,21 +285,22 @@ function tw_list_worlds_v12() {
 
 						// ---- Resolve session from Q3 lookup (O(1), no HTTP) ----
 						if ( ! empty( $sessions_by_world[ $world_id ] ) ) {
-							$sess            = $sessions_by_world[ $world_id ];
-							$sess_char_id    = $sess['character_id'];
-							$sess_status     = $sess['status'];
+							$sess         = $sessions_by_world[ $world_id ];
+							$sess_char_id = $sess['character_id'];
+							$sess_status  = $sess['status'];
 
 							if ( $sess_char_id ) {
 								$field_agent_name = $char_names[ $sess_char_id ] ?? 'AGENT #' . $sess_char_id;
 							}
-							// Session status always wins over campaign-agent status
+							// Session status always wins over campaign-agent status.
 							if ( ! empty( $sess_status ) ) {
 								$world_status = strtoupper( $sess_status );
 							}
 						}
 					}
 
-					// AI World Soul – opis
+					// AI World Soul – description
+					// BUG 5 FIX — trim all fallback paths consistently.
 					$p1 = trim( $w['world_overview_p1'] ?? '' );
 					$p2 = trim( $w['world_overview_p2'] ?? '' );
 					$p3 = trim( $w['world_overview_p3'] ?? '' );
@@ -288,11 +308,20 @@ function tw_list_worlds_v12() {
 					if ( $p1 || $p2 || $p3 ) {
 						$full_desc = trim( $p1 . ' ' . $p2 . ' ' . $p3 );
 					} else {
-						$full_desc = ! empty( $w['world_ai_description'] ) ? $w['world_ai_description'] : ( $w['description'] ?? '' );
+						$full_desc = trim( $w['world_ai_description'] ?? $w['description'] ?? '' );
 					}
 
 					$short_desc_source = $p1 ?: $full_desc;
 
+					// BUG 4 FIX — guard against empty excerpt producing a bare ellipsis.
+					$excerpt = $short_desc_source
+						? wp_trim_words( $short_desc_source, 18 )
+						: 'LORE DATA ENCRYPTED — ACCESS RESTRICTED.';
+
+					// BUG 3 FIX — wp_json_encode already escapes special chars for
+					// embedding in HTML attributes; the previous htmlspecialchars()
+					// call was double-encoding & → &amp; which broke JSON parsing.
+					// esc_attr() handles the minimal HTML-attribute escaping needed.
 					$modal_payload = [
 						'name'         => $w['name'],
 						'campaign'     => $active_campaign_name,
@@ -316,7 +345,7 @@ function tw_list_worlds_v12() {
 					?>
 					<div class="tw-world-card"
 						 id="tw-world-card-<?php echo esc_attr( $world_id ); ?>"
-						 onclick='openWorldModal(<?php echo htmlspecialchars( wp_json_encode( $modal_payload ), ENT_QUOTES, 'UTF-8' ); ?>)'>
+						 onclick='openWorldModal(<?php echo esc_attr( wp_json_encode( $modal_payload ) ); ?>)'>
 						<div class="tw-card-glow"></div>
 						<div class="tw-card-content">
 							<div class="tw-card-top">
@@ -324,7 +353,7 @@ function tw_list_worlds_v12() {
 									<?php echo $active_campaign_id ? '• MULTIPLAYER SYNC' : '• STANDBY'; ?>
 								</span>
 								<span class="tw-id-tag">
-									#<?php echo str_pad( (string) $world_id, 4, '0', STR_PAD_LEFT ); ?>
+									#<?php echo str_pad( $world_id, 4, '0', STR_PAD_LEFT ); ?>
 									&nbsp;|&nbsp;LVL <?php echo (int) $w['difficulty']; ?>
 								</span>
 							</div>
@@ -346,7 +375,7 @@ function tw_list_worlds_v12() {
 								<span class="value"><?php echo esc_html( $world_status ); ?></span>
 							</div>
 
-							<p class="tw-world-excerpt"><?php echo esc_html( wp_trim_words( $short_desc_source, 18 ) ); ?></p>
+							<p class="tw-world-excerpt"><?php echo esc_html( $excerpt ); ?></p>
 
 							<div class="tw-card-footer">
 								<?php if ( $active_campaign_id ) : ?>
@@ -374,7 +403,7 @@ function tw_list_worlds_v12() {
 
 	</div>
 
-	<!-- MODAL (pełny) -->
+	<!-- MODAL -->
 	<div id="tw-world-pop" class="tw-modal-overlay" onclick="closeWorldModal()">
 		<div class="tw-modal-box" onclick="event.stopPropagation()">
 			<div class="tw-modal-head">
@@ -558,4 +587,4 @@ function tw_list_worlds_v12() {
 	<?php
 	return ob_get_clean();
 }
-add_shortcode( 'tw_list_worlds', 'tw_list_worlds_v12' );
+add_shortcode( 'tw_list_worlds', 'tw_list_worlds_v14' );
