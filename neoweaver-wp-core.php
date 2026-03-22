@@ -28,7 +28,6 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-handlers.php';
 
-
 // ─── Game page scripts (wp_footer, adventure template only) ──────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/chat-realtime.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/char-panel.php';
@@ -46,6 +45,13 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-lis
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-deployments-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-creator.php';
+
+// ─── Wizard shortcode functions (must load before class-neoweaver-public.php
+//     because the class methods delegate to these standalone functions) ───────
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-character-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-campaign-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-world-creator.php';
+
 require_once NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-character-campaign.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-campaign-world.php';
@@ -65,7 +71,6 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quick-actions-c
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-character-echo.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/shortcodes-tags.php';
 
-
 // ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
 
@@ -76,13 +81,10 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
 	// Bug fix (7): enqueue Chart.js once here instead of inline inside the shortcode.
-	// The [tw_loom_of_fate] shortcode can appear multiple times on a page; a raw
-	// <script src="..."> tag would be duplicated on each render and re-execute Chart.js,
-	// redefining the Chart global and destroying existing chart instances.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
 	if ( is_page_template( 'templates/adventure.php' ) ) {
-		wp_enqueue_script( 'nw-panel-tactical-left', plugin_dir_url( __FILE__ ) . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
+		wp_enqueue_script( 'nw-panel-tactical-left', NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
 	}
 } );
 
@@ -119,23 +121,25 @@ add_action( 'plugins_loaded', function () {
 // ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────────
 function neoweaver_enqueue_frontend_styles() {
 	if ( is_page_template( 'templates/adventure.php' ) ) {
-		$base = plugin_dir_url( __FILE__ ) . 'assets/css/';
+		$base = NEOWEAVER_PLUGIN_URL . 'assets/css/';
 		wp_enqueue_style( 'neoweaver-tw-core', $base . 'tw-core.css', [], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-deck', $base . 'tw-deck.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_script(
 			'neoweaver-header-node',
-			plugin_dir_url( __FILE__ ) . 'assets/js/neoweaver-header-node.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-header-node.js',
 			[],
 			'1.0.0',
 			true
 		);
+		// BUG-FIX: was plugin_dir_url(__FILE__) . '../public/assets/css/...' — broken URL.
+		// File lives in the plugin's own assets/css/, so NEOWEAVER_PLUGIN_URL is correct.
 		wp_enqueue_style(
-    'neoweaver-terminal',
-    plugin_dir_url( __FILE__ ) . '../public/assets/css/neoweaver-terminal.css',
-    [],
-    NEOWEAVER_VERSION
-);
+			'neoweaver-terminal',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-terminal.css',
+			[],
+			NEOWEAVER_VERSION
+		);
 		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
 			'supabaseUrl' => tw_supabase_url(),
 			'supabaseKey' => tw_supabase_anon_key(),
