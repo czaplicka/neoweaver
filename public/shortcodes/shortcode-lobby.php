@@ -1,556 +1,669 @@
 <?php
 /**
- * Template Name: Adventure Template
- * Post Type: page
+ * NEOWEAVE LOBBY SHORTCODE + AJAX USER LABELS + AVATARS + ONLINE DOT + LAUNCH/READY + AUTO-JOIN
+ *
+ * SECURITY FIX (Bug #4):
+ *   - neoweave_launch_campaign : check_ajax_referer( 'neoweave_launch', 'nonce' )
+ *   - neoweave_user_labels     : check_ajax_referer( 'neoweave_labels', 'nonce' )
+ *                                + removed wp_ajax_nopriv_ (no reason to expose display
+ *                                  names to unauthenticated users)
+ *   Both nonces are injected into the lobby element as data-* attributes by the
+ *   shortcode so the JS never needs a hard-coded value.
+ *
+ * BUG #5 FIX — online dot now uses last_seen_at heartbeat:
+ *   - JS sends POST neoweave_lobby_heartbeat every 20 s (see ajax-lobby-heartbeat.php)
+ *   - enrichSignups() reads s.last_seen_at instead of s.created_at
+ *   - Online threshold: last_seen_at within the last 90 s (3 missed heartbeats)
+ *   - fetchSignups() selects last_seen_at from cyber_campaign_signups
+ *   - Nonce neoweave_heartbeat injected as data-nonce-heartbeat
  */
-get_header();
-$content_url = content_url();
-echo '<script>window.twContentUrl = ' . json_encode( $content_url ) . ';</script>';
-$userid = get_current_user_id();
-$supabase_base = function_exists( 'tw_supabase_url' )
-    ? trailingslashit( tw_supabase_url() ) . 'rest/v1/'
-    : '';
-$anon_key = function_exists( 'tw_supabase_anon_key' )
-    ? tw_supabase_anon_key()
-    : '';
-$auth_headers = array(
-    'headers' => array(
-        'apikey'        => $anon_key,
-        'Authorization' => 'Bearer ' . $anon_key,
-    ),
-    'timeout' => 12,
-);
-$game_data = function_exists('get_user_game_data_from_supabase')
-    ? get_user_game_data_from_supabase( $userid )
-    : array(
-        'active_session_id'   => 0,
-        'active_campaign_id'  => 0,
-        'active_character_id' => 0,
-        'active_world_id'     => 0,
-        'active_location_id'  => 0,
-        'char_name'           => 'Unknown',
-        'char_tags'           => array(),
-    );
 
-// FIX #8: Generate nonce here so it's available for JS and server-side verification.
-$adventure_nonce = wp_create_nonce( 'tw_adventure_nonce' );
+add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
 
-echo "<script>
-window.twAdventureData = window.twAdventureData || {};
-window.twAdventureData.active_session_id   = ".(int)$game_data['active_session_id'].";
-window.twAdventureData.active_campaign_id  = ".(int)$game_data['active_campaign_id'].";
-window.twAdventureData.active_character_id = ".(int)$game_data['active_character_id'].";
-window.twAdventureData.active_world_id     = ".(int)$game_data['active_world_id'].";
-window.twAdventureData.active_location_id  = ".(int)$game_data['active_location_id'].";
-window.twAdventureData.char_name           = ".json_encode($game_data['char_name']).";
-window.twAdventureData.char_tags           = ".json_encode($game_data['char_tags']).";
-window.twAdventureData.nonce               = ".json_encode( $adventure_nonce ).";
-window.twAdventureData.ajax_url            = ".json_encode( admin_url( 'admin-ajax.php' ) ).";
-</script>";
+function neoweave_lobby_terminal() {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return '<div class="neoweave-terminal">ERROR: OPERATOR NOT IDENTIFIED. ACCESS DENIED.</div>';
+	}
 
-$activecampaignid  = get_user_meta( $userid, 'active_campaign_id', true );
-$campaignworldtype = null;
+	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		return '<div class="neoweave-terminal">ERROR: SUPABASE LINK OFFLINE. CHECK TW_SUPABASE_* IN WP-CONFIG.</div>';
+	}
 
-// PERF #10: Only fetch campaign world type if it is actually consumed downstream.
-// Wrapped in a function_exists guard consistent with the rest of the template.
-if ( ! empty( $activecampaignid ) && $supabase_base && $anon_key && function_exists( 'tw_needs_world_type' ) ) {
-    $camp_url = add_query_arg(
-        array(
-            'id'     => 'eq.' . (int) $activecampaignid,
-            'select' => 'world_type',
-            'limit'  => 1,
-        ),
-        $supabase_base . 'cyber_campaign'
-    );
-    $camp_resp = wp_remote_get( $camp_url, array(
-        'headers' => array(
-            'apikey'        => $anon_key,
-            'Authorization' => 'Bearer ' . $anon_key,
-        ),
-        'timeout' => 10,
-    ) );
-    if ( ! is_wp_error( $camp_resp ) && wp_remote_retrieve_response_code( $camp_resp ) >= 200 && wp_remote_retrieve_response_code( $camp_resp ) < 300 ) {
-        $camp_data = json_decode( wp_remote_retrieve_body( $camp_resp ), true ) ?: array();
-        if ( ! empty( $camp_data[0]['world_type'] ) ) {
-            $campaignworldtype = $camp_data[0]['world_type'];
-        }
-    }
+	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+	$supabase_key  = tw_supabase_anon_key();
+
+	$campaign_id = isset( $_GET['campaign_id'] ) ? intval( $_GET['campaign_id'] ) : 0;
+	if ( $campaign_id <= 0 ) {
+		return '<div class="neoweave-terminal">ERROR: INVALID DEPLOYMENT REFERENCE.</div>';
+	}
+
+	// kampania: nazwa + host_id
+	$campaign_name    = 'UNKNOWN';
+	$campaign_host_id = 0;
+	$camp_url = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=name,wp_user_id';
+	$camp_res = wp_remote_get( $camp_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+	if ( ! is_wp_error( $camp_res ) ) {
+		$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
+		if ( is_array( $camp_data ) && ! empty( $camp_data[0] ) ) {
+			$campaign_name    = $camp_data[0]['name']       ?? 'UNKNOWN';
+			$campaign_host_id = intval( $camp_data[0]['wp_user_id'] ?? 0 );
+		}
+	}
+
+	$ajax_url = admin_url( 'admin-ajax.php' );
+
+	// Per-request nonces.
+	$nonce_launch    = wp_create_nonce( 'neoweave_launch' );
+	$nonce_labels    = wp_create_nonce( 'neoweave_labels' );
+	$nonce_heartbeat = wp_create_nonce( 'neoweave_heartbeat' ); // Bug #5
+
+	$user_map      = [];
+	$current_user  = wp_get_current_user();
+	if ( $current_user && $current_user->ID ) {
+		$user_map[ $current_user->ID ] = $current_user->display_name;
+	}
+	$user_map_json = esc_attr( wp_json_encode( $user_map ) );
+
+	ob_start();
+	?>
+	<style>
+	@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Share+Tech+Mono&display=swap');
+	.neoweave-terminal {
+		background-color: #0a0c00; color: #adff00; font-family: 'Share Tech Mono', monospace;
+		padding: 30px; border: 2px solid #adff00; position: relative; max-width: 700px; margin: 20px auto;
+		text-transform: uppercase; box-shadow: 0 0 20px rgba(173, 255, 0, 0.2);
+	}
+	.terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
+	.terminal-title { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
+	.terminal-status { margin-top: 5px; font-size: 0.9rem; }
+	.blink { animation: blinker 1s linear infinite; }
+	@keyframes blinker { 50% { opacity: 0; } }
+
+	.squad-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 15px;
+		margin-top: 20px;
+	}
+	.squad-slot {
+		border: 1px solid #adff00;
+		padding: 12px;
+		min-height: 80px;
+		display: flex;
+		align-items: center;
+		position: relative;
+	}
+	.slot-body {
+		font-size: 0.8rem;
+		width: 100%;
+		text-align: left;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.slot-empty { opacity: 0.6; }
+	.slot-avatar {
+		width: 60px; height: 60px; border-radius: 50%; border: 0px solid #adff00;
+		object-fit: cover; background: #050600; flex-shrink: 0;
+	}
+	.slot-avatar.placeholder {
+		display: flex; align-items: center; justify-content: center;
+		font-size: 0.5rem; color: #555;
+	}
+	.slot-text-block { display: flex; flex-direction: column; gap: 2px; }
+	.slot-text-line  { line-height: 1.2; }
+	.online-dot {
+		width: 8px; height: 8px; border-radius: 50%; background: #00ff55;
+		box-shadow: 0 0 6px #00ff55; margin-left: auto;
+		animation: onlinePulse 1.2s infinite; flex-shrink: 0;
+	}
+	.online-dot.offline { background: #444; box-shadow: none; animation: none; }
+	@keyframes onlinePulse {
+		0%   { transform: scale(1);   opacity: 1; }
+		50%  { transform: scale(1.4); opacity: 0.4; }
+		100% { transform: scale(1);   opacity: 1; }
+	}
+	.terminal-button {
+		background: #adff00; color: #0a0c00; border: none; padding: 12px 20px;
+		margin-top: 20px; width: 100%; font-family: 'Chakra Petch', sans-serif; font-weight: bold;
+		cursor: pointer; text-align: center; text-decoration: none; display: inline-block;
+	}
+	.terminal-actions { display: flex; gap: 10px; margin-top: 25px; }
+	.terminal-button.secondary {
+		background: #0a0c00; color: #adff00; border: 1px solid #adff00;
+	}
+	</style>
+
+	<div class="neoweave-terminal" id="neoweave-lobby"
+		 data-campaign-id="<?php echo esc_attr( $campaign_id ); ?>"
+		 data-ajax-url="<?php echo esc_url( $ajax_url ); ?>"
+		 data-user-map="<?php echo $user_map_json; ?>"
+		 data-current-user="<?php echo esc_attr( get_current_user_id() ); ?>"
+		 data-host-id="<?php echo esc_attr( $campaign_host_id ); ?>"
+		 data-nonce-launch="<?php echo esc_attr( $nonce_launch ); ?>"
+		 data-nonce-labels="<?php echo esc_attr( $nonce_labels ); ?>"
+		 data-nonce-heartbeat="<?php echo esc_attr( $nonce_heartbeat ); ?>">
+		<div class="terminal-header">
+			<div class="terminal-title">SQUAD DEPLOYMENT: ID_<?php echo esc_html( $campaign_id ); ?></div>
+			<div class="terminal-status">
+				SCANNING FOR AGENT SIGNALS...<span class="blink">_</span><br>
+				> NODE: [<?php echo esc_html( $campaign_name ); ?>]<br>
+				> PROTOCOL: NEURAL_LINK_4_WAY
+			</div>
+		</div>
+
+		<div class="squad-grid">
+			<div class="squad-slot" id="squad-slot-1"><div class="slot-body slot-empty">// WAITING FOR SIGNAL //</div></div>
+			<div class="squad-slot" id="squad-slot-2"><div class="slot-body slot-empty">// WAITING FOR SIGNAL //</div></div>
+			<div class="squad-slot" id="squad-slot-3"><div class="slot-body slot-empty">// WAITING FOR SIGNAL //</div></div>
+			<div class="squad-slot" id="squad-slot-4"><div class="slot-body slot-empty">// WAITING FOR SIGNAL //</div></div>
+		</div>
+
+		<div class="terminal-actions">
+			<button type="button" class="terminal-button" id="neoweave-launch-button">LAUNCH DEPLOYMENT</button>
+			<button type="button" class="terminal-button secondary" id="neoweave-leave-button">LEAVE LOBBY</button>
+		</div>
+	</div>
+
+	<script>
+	(function() {
+
+		/**
+		 * Online threshold: player is considered online if last_seen_at
+		 * is within the last 90 seconds (= 3 missed 20-second heartbeats).
+		 */
+		const ONLINE_THRESHOLD_MS  = 90 * 1000;
+		const HEARTBEAT_INTERVAL_MS = 20 * 1000;
+
+		function initLobbyWithClient(client) {
+			const lobbyEl = document.getElementById('neoweave-lobby');
+			if (!lobbyEl) return;
+
+			const campaignId      = lobbyEl.getAttribute('data-campaign-id');
+			const ajaxUrl         = lobbyEl.getAttribute('data-ajax-url');
+			const currentUserId   = lobbyEl.getAttribute('data-current-user');
+			const hostId          = lobbyEl.getAttribute('data-host-id');
+			const nonceLaunch     = lobbyEl.getAttribute('data-nonce-launch');
+			const nonceLabels     = lobbyEl.getAttribute('data-nonce-labels');
+			const nonceHeartbeat  = lobbyEl.getAttribute('data-nonce-heartbeat');
+
+			const userMapAttr = lobbyEl.getAttribute('data-user-map');
+			let userMap = {};
+			if (userMapAttr) {
+				try { userMap = JSON.parse(userMapAttr); }
+				catch (e) { console.error('LOBBY: failed to parse user map', e); }
+			}
+
+			const slotEls = [
+				document.getElementById('squad-slot-1'),
+				document.getElementById('squad-slot-2'),
+				document.getElementById('squad-slot-3'),
+				document.getElementById('squad-slot-4'),
+			];
+
+			// ─────────────────────────────────────────────
+			// HEARTBEAT  (Bug #5)
+			// Fires immediately on load, then every 20 s.
+			// Updates last_seen_at on cyber_campaign_signups
+			// so other players see a green dot.
+			// ─────────────────────────────────────────────
+			function sendHeartbeat() {
+				if (!ajaxUrl || !campaignId) return;
+				const fd = new FormData();
+				fd.append('action',      'neoweave_lobby_heartbeat');
+				fd.append('nonce',       nonceHeartbeat);
+				fd.append('campaign_id', campaignId);
+				fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+					.catch(e => console.warn('LOBBY: heartbeat failed', e));
+			}
+			sendHeartbeat();
+			const heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+			// Stop heartbeat when tab is hidden / closed
+			document.addEventListener('visibilitychange', () => {
+				if (document.hidden) clearInterval(heartbeatTimer);
+				else { sendHeartbeat(); setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS); }
+			});
+
+			function renderSlots(signups) {
+				signups.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+				for (let i = 0; i < 4; i++) {
+					const slot = slotEls[i];
+					if (!slot) continue;
+					const body = slot.querySelector('.slot-body');
+					if (!body) continue;
+
+					const signup = signups[i];
+					if (signup) {
+						slot.classList.remove('slot-empty');
+						body.classList.remove('slot-empty');
+						body.innerHTML = '';
+
+						const charName   = signup.character_name || ('#' + signup.character_id);
+						const userName   = signup.user_name      || ('USER_' + signup.wp_user_id);
+						const readyLabel = signup.is_ready ? ' [READY]' : ' [IDLE]';
+
+						const avatarUrl = signup.character_avatar || '';
+						let avatarEl = document.createElement('div');
+						avatarEl.className = 'slot-avatar placeholder';
+						if (avatarUrl) {
+							avatarEl = document.createElement('img');
+							avatarEl.className = 'slot-avatar';
+							avatarEl.src = avatarUrl;
+							avatarEl.alt = charName;
+						} else {
+							avatarEl.textContent = 'AV';
+						}
+
+						const textBlock = document.createElement('div');
+						textBlock.className = 'slot-text-block';
+
+						const line1 = document.createElement('div');
+						line1.className   = 'slot-text-line';
+						line1.textContent = 'AGENT ' + charName + readyLabel;
+
+						const line2 = document.createElement('div');
+						line2.className   = 'slot-text-line';
+						line2.textContent = 'OPERATOR ' + userName;
+
+						textBlock.appendChild(line1);
+						textBlock.appendChild(line2);
+
+						const dot = document.createElement('div');
+						dot.className = 'online-dot';
+						if (signup._isOnline === false) { dot.classList.add('offline'); }
+
+						body.appendChild(avatarEl);
+						body.appendChild(textBlock);
+						body.appendChild(dot);
+					} else {
+						slot.classList.add('slot-empty');
+						body.classList.add('slot-empty');
+						body.textContent = '// WAITING FOR SIGNAL //';
+					}
+				}
+			}
+
+			async function enrichSignups(rawSignups) {
+				if (!Array.isArray(rawSignups) || !rawSignups.length) return [];
+
+				const charIds = [...new Set(rawSignups.map(s => s.character_id).filter(Boolean))];
+				const userIds = [...new Set(rawSignups.map(s => s.wp_user_id).filter(Boolean))];
+
+				let charsById = {};
+
+				try {
+					if (charIds.length) {
+						const { data: chars, error: charErr } = await client
+							.from('cyber_characters')
+							.select('id,name,avatar')
+							.in('id', charIds);
+						if (!charErr && Array.isArray(chars)) {
+							chars.forEach(c => { charsById[c.id] = c; });
+						} else {
+							console.error('LOBBY: char lookup error', charErr);
+						}
+					}
+				} catch (e) {
+					console.error('LOBBY: enrichSignups char exception', e);
+				}
+
+				try {
+					if (userIds.length && ajaxUrl) {
+						const formData = new FormData();
+						formData.append('action', 'neoweave_user_labels');
+						formData.append('nonce', nonceLabels);
+						userIds.forEach(id => formData.append('ids[]', id));
+
+						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
+						const json = await res.json();
+						if (json && json.success && json.data && json.data.map) {
+							Object.assign(userMap, json.data.map);
+						} else {
+							console.error('LOBBY: user labels response error', json);
+						}
+					}
+				} catch (e) {
+					console.error('LOBBY: enrichSignups user exception', e);
+				}
+
+				const now = Date.now();
+
+				return rawSignups.map(s => {
+					// Bug #5 fix: use last_seen_at heartbeat, NOT created_at.
+					// Treat NULL last_seen_at (no heartbeat yet) as offline.
+					const seenAt   = s.last_seen_at ? new Date(s.last_seen_at).getTime() : 0;
+					const isOnline = seenAt > 0 && (now - seenAt) < ONLINE_THRESHOLD_MS;
+					return {
+						...s,
+						character_name:   charsById[s.character_id]?.name   || null,
+						character_avatar: charsById[s.character_id]?.avatar || '',
+						user_name:        userMap[String(s.wp_user_id)]    || null,
+						_isOnline:        isOnline,
+					};
+				});
+			}
+
+			async function fetchSignups() {
+				try {
+					const { data, error } = await client
+						.from('cyber_campaign_signups')
+						// Bug #5: added last_seen_at to the select
+						.select('campaign_id, wp_user_id, character_id, created_at, is_ready, last_seen_at')
+						.eq('campaign_id', campaignId);
+					if (error) { console.error('NEOWEAVE LOBBY: signups fetch error', error); return; }
+					renderSlots(await enrichSignups(data || []));
+				} catch (e) {
+					console.error('NEOWEAVE LOBBY: exception while fetching signups', e);
+				}
+			}
+
+			fetchSignups();
+			setInterval(fetchSignups, 3000);
+
+			async function watchForSessionAndRedirect() {
+				try {
+					const { data, error } = await client
+						.from('cyber_game_sessions')
+						.select('id, status')
+						.eq('campaign_id', campaignId)
+						.eq('wp_user_id', currentUserId)
+						.eq('status', 'active')
+						.limit(1);
+					if (!error && data && data.length) {
+						window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
+					}
+				} catch (e) { console.error('SESSION WATCH ERROR', e); }
+			}
+			setInterval(watchForSessionAndRedirect, 4000);
+
+			async function handleLaunchAsHost() {
+				if (!ajaxUrl) { alert('LAUNCH FAILED: missing AJAX URL.'); return; }
+
+				const formData = new FormData();
+				formData.append('action',      'neoweave_launch_campaign');
+				formData.append('campaign_id', campaignId);
+				formData.append('nonce',       nonceLaunch);
+
+				try {
+					const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
+					const json = await res.json();
+					if (json && json.success) {
+						window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
+					} else {
+						const msg = (json && (json.data?.message || json.message)) || 'UNKNOWN ERROR';
+						alert('LAUNCH FAILED: ' + msg);
+					}
+				} catch (e) {
+					console.error('LAUNCH ERROR', e);
+					alert('LAUNCH FAILED: CLIENT EXCEPTION');
+				}
+			}
+
+			const launchBtn = document.getElementById('neoweave-launch-button');
+			if (launchBtn) {
+				if (String(currentUserId) === String(hostId)) {
+					launchBtn.textContent = 'LAUNCH DEPLOYMENT';
+					launchBtn.addEventListener('click', handleLaunchAsHost);
+				} else {
+					launchBtn.textContent = 'READY';
+					let localReady = false;
+					launchBtn.addEventListener('click', async function() {
+						if (!campaignId || !currentUserId) return;
+						const newReady = !localReady;
+						try {
+							const { error } = await client
+								.from('cyber_campaign_signups')
+								.update({ is_ready: newReady })
+								.eq('campaign_id', campaignId)
+								.eq('wp_user_id', currentUserId);
+							if (error) { console.error('READY TOGGLE ERROR', error); return; }
+							localReady = newReady;
+							launchBtn.textContent = newReady ? 'READY ✓' : 'READY';
+						} catch (e) { console.error('READY TOGGLE EXCEPTION', e); }
+					});
+				}
+			}
+
+			const leaveBtn = document.getElementById('neoweave-leave-button');
+			if (leaveBtn && ajaxUrl) {
+				leaveBtn.addEventListener('click', async function() {
+					try {
+						if (campaignId && currentUserId) {
+							try {
+								const { error: readyErr } = await client
+									.from('cyber_campaign_signups')
+									.update({ is_ready: false })
+									.eq('campaign_id', campaignId)
+									.eq('wp_user_id', currentUserId);
+								if (readyErr) { console.error('LEAVE: ready reset error', readyErr); }
+							} catch (e) { console.error('LEAVE: ready reset exception', e); }
+						}
+
+						const formData = new FormData();
+						formData.append('action',      'neoweave_leave_lobby');
+						formData.append('campaign_id', campaignId);
+
+						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
+						const json = await res.json();
+						if (json && json.success) { window.location.href = '/'; }
+						else { console.error('NEOWEAVE LOBBY: leave failed', json); }
+					} catch (e) { console.error('NEOWEAVE LOBBY: leave exception', e); }
+				});
+			}
+		}
+
+		function waitForTwSupabase() {
+			if (window.twSupabase) {
+				console.log('NEOWEAVE LOBBY: binding to global Supabase client');
+				initLobbyWithClient(window.twSupabase);
+			} else {
+				setTimeout(waitForTwSupabase, 500);
+			}
+		}
+
+		waitForTwSupabase();
+	})();
+	</script>
+	<?php
+	return ob_get_clean();
 }
 
-// === TACTICAL OVERLAY DATA ===
+/**
+ * AJAX: mapa wp_user_id -> display_name dla lobby
+ *
+ * SECURITY: requires a valid nonce (neoweave_labels).
+ * nopriv removed — display names must not leak to unauthenticated callers.
+ */
+add_action( 'wp_ajax_neoweave_user_labels', 'neoweave_user_labels' );
+// add_action( 'wp_ajax_nopriv_neoweave_user_labels', ... ) intentionally omitted.
 
-// FIX #2: Resolve active_session_id from game_data (PHP scope).
-// $twGameState was never defined in PHP — replaced with the correct source.
-$active_session_id = (int) ( $game_data['active_session_id'] ?? 0 );
+function neoweave_user_labels() {
+	check_ajax_referer( 'neoweave_labels', 'nonce' );
 
-// PERF #11: Only hit Supabase for map/grid when there is an active session.
-if ( $active_session_id > 0 && $supabase_base ) {
-    $map_rows = tw_get_data(
-        $supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . $userid . '&limit=1',
-        $auth_headers
-    );
+	// BUG-FIX 1: added return after every early wp_send_json_error/success.
+	if ( empty( $_POST['ids'] ) || ! is_array( $_POST['ids'] ) ) {
+		wp_send_json_error( [ 'message' => 'NO_IDS' ] );
+		return;
+	}
 
-    // FIX #1: Single, authoritative grid fetch using slot_index (removed the
-    // duplicate build that used grid_slot and was immediately overwritten).
-    $grid_units = tw_get_data(
-        $supabase_base . 'cyber_battle_grid'
-        . '?select=*'
-        . '&session_id=eq.' . rawurlencode( $active_session_id ),
-        $auth_headers
-    );
-} else {
-    $map_rows   = [];
-    $grid_units = [];
+	$ids = array_unique( array_filter( array_map( 'intval', $_POST['ids'] ) ) );
+
+	if ( empty( $ids ) ) {
+		wp_send_json_success( [ 'map' => [] ] );
+		return;
+	}
+
+	$users = get_users( [
+		'include' => $ids,
+		'fields'  => [ 'ID', 'display_name' ],
+	] );
+
+	$map = [];
+	foreach ( $users as $u ) {
+		$map[ $u->ID ] = $u->display_name;
+	}
+
+	wp_send_json_success( [ 'map' => $map ] );
 }
 
-$map_data = $map_rows[0] ?? [];
+/**
+ * AJAX: host LAUNCH — creates cyber_game_sessions from campaign_signups
+ *
+ * SECURITY: requires a valid nonce (neoweave_launch).
+ * nopriv not registered (login required by is_user_logged_in check below).
+ */
+add_action( 'wp_ajax_neoweave_launch_campaign', 'neoweave_launch_campaign' );
 
-// Build grid map using slot_index (single authoritative pass).
-$grid_map  = [];
-$has_enemy = false;
+function neoweave_launch_campaign() {
+	check_ajax_referer( 'neoweave_launch', 'nonce' );
 
-if ( is_array( $grid_units ) ) {
-    foreach ( $grid_units as $u ) {
-        if ( is_array( $u ) && isset( $u['slot_index'], $u['unit_type'] ) ) {
-            $slot = (int) $u['slot_index'];
-            if ( $slot >= 1 && $slot <= 9 ) {
-                $grid_map[ $slot ] = $u;
-                if ( $u['unit_type'] === 'enemy' || $u['unit_type'] === 'boss' ) {
-                    $has_enemy = true;
-                }
-            }
-        }
-    }
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( [ 'message' => 'not_logged_in' ] );
+	}
+
+	$campaign_id = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
+	if ( $campaign_id <= 0 ) {
+		wp_send_json_error( [ 'message' => 'invalid_campaign' ] );
+	}
+
+	$current_user_id = get_current_user_id();
+
+	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		wp_send_json_error( [ 'message' => 'supabase_config_missing' ] );
+	}
+
+	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+	$supabase_key  = tw_supabase_anon_key();
+
+	// 1) host check
+	$camp_url = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=wp_user_id';
+	$camp_res = wp_remote_get( $camp_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+	if ( is_wp_error( $camp_res ) ) {
+		wp_send_json_error( [ 'message' => 'campaign_fetch_error' ] );
+	}
+	$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
+	$host_id   = isset( $camp_data[0]['wp_user_id'] ) ? intval( $camp_data[0]['wp_user_id'] ) : 0;
+	if ( $host_id !== $current_user_id ) {
+		wp_send_json_error( [ 'message' => 'not_host' ] );
+	}
+
+	// 1b) world_id
+	$world_id  = null;
+	$world_url = $supabase_rest . 'cyber_campaign_worlds?campaign_id=eq.' . $campaign_id . '&select=world_id';
+	$world_res = wp_remote_get( $world_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+	if ( ! is_wp_error( $world_res ) ) {
+		$world_data = json_decode( wp_remote_retrieve_body( $world_res ), true );
+		if ( is_array( $world_data ) && ! empty( $world_data[0]['world_id'] ) ) {
+			$world_id = intval( $world_data[0]['world_id'] );
+		}
+	}
+	if ( ! $world_id ) {
+		wp_send_json_error( [ 'message' => 'no_world_linked' ] );
+	}
+
+	// 1c) start location (0,0)
+	$location_id = null;
+	$loc_url = $supabase_rest
+		. 'cyber_world_map?world_id=eq.' . $world_id
+		. '&coord_x=eq.0&coord_y=eq.0&select=id&limit=1';
+	$loc_res = wp_remote_get( $loc_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+	if ( ! is_wp_error( $loc_res ) ) {
+		$loc_data = json_decode( wp_remote_retrieve_body( $loc_res ), true );
+		if ( is_array( $loc_data ) && ! empty( $loc_data[0]['id'] ) ) {
+			$location_id = intval( $loc_data[0]['id'] );
+		}
+	}
+	if ( ! $location_id ) {
+		wp_send_json_error( [ 'message' => 'no_start_location' ] );
+	}
+
+	// 2) signups
+	$signup_url = $supabase_rest . 'cyber_campaign_signups?campaign_id=eq.' . $campaign_id
+		. '&select=wp_user_id,character_id';
+	$signup_res = wp_remote_get( $signup_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+		],
+	] );
+	if ( is_wp_error( $signup_res ) ) {
+		wp_send_json_error( [ 'message' => 'signup_fetch_error' ] );
+	}
+	$signups = json_decode( wp_remote_retrieve_body( $signup_res ), true );
+	if ( ! is_array( $signups ) || ! count( $signups ) ) {
+		wp_send_json_error( [ 'message' => 'no_signups' ] );
+	}
+
+	// 2b) pause existing active sessions for these users
+	$user_ids = array_filter( array_unique( array_map(
+		static function ( $s ) { return intval( $s['wp_user_id'] ); },
+		$signups
+	) ) );
+
+	if ( ! empty( $user_ids ) ) {
+		$ids_list    = implode( ',', $user_ids );
+		$cleanup_url = $supabase_rest . 'cyber_game_sessions'
+			. '?wp_user_id=in.(' . $ids_list . ')&status=eq.active';
+		wp_remote_request( $cleanup_url, [
+			'method'  => 'PATCH',
+			'headers' => [
+				'apikey'        => $supabase_key,
+				'Authorization' => 'Bearer ' . $supabase_key,
+				'Content-Type'  => 'application/json',
+			],
+			'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
+		] );
+	}
+
+	// 3) insert new active sessions
+	$sessions_payload = [];
+	foreach ( $signups as $s ) {
+		$sessions_payload[] = [
+			'campaign_id'  => $campaign_id,
+			'wp_user_id'   => intval( $s['wp_user_id'] ),
+			'character_id' => intval( $s['character_id'] ),
+			'world_id'     => $world_id,
+			'location_id'  => $location_id,
+			'status'       => 'active',
+		];
+	}
+
+	$session_url = $supabase_rest . 'cyber_game_sessions';
+	$session_res = wp_remote_post( $session_url, [
+		'headers' => [
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+			'Content-Type'  => 'application/json',
+		],
+		'body'    => wp_json_encode( $sessions_payload ),
+	] );
+
+	if ( is_wp_error( $session_res ) || wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
+		wp_send_json_error( [ 'message' => 'session_insert_error' ] );
+	}
+
+	wp_send_json_success( [ 'message' => 'launched' ] );
 }
-
-// Load tactical panel template part.
-include get_template_directory() . '/templates/parts/panel-tactical-left.php';
-
-// JS data for tactical overlay.
-echo "<script>
-window.twTacticalData = {
-    has_enemy: " . ( $has_enemy ? 'true' : 'false' ) . ",
-    map_data: " . json_encode( $map_data ) . ",
-    grid_map: " . json_encode( $grid_map ) . "
-};
-</script>";
-?>
-<div class="adventure-shell chat-only" id="adventure-shell">
-    <section class="chat-panel">
-        <header class="chat-header">
-            <h1 class="chat-title">
-                TERMINAL <span>CONNECTED</span>
-            </h1>
-            <p class="chat-subtitle">
-                Instruction: write, play cards and have fun
-            </p>
-        </header>
-        <?php echo do_shortcode( '[cyber_hud]' ); ?>
-        <?php echo do_shortcode( '[tw_time_wheel]' ); ?>
-        <?php echo do_shortcode( '[tw_compass]' ); ?>
-        <section id="adventure-chat">
-            <div class="chat-tabs">
-                <button class="chat-tab is-active" data-chat-target="player-chat">Mission Chat</button>
-                <button class="chat-tab" data-chat-target="gm-chat">GM Channel</button>
-            </div>
-            <div id="player-chat" class="chat-window is-active"></div>
-            <div id="gm-chat" class="chat-window" style="display:none;"></div>
-            <div id="quick-actions-container" style="display: flex; margin: 15px 0; font-family: 'Chakra Petch', sans-serif;">
-                <div id="qa-static-zone" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px;">
-                    <div id="quick-actions-bar" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-                    <button onclick="window.toggleQAManager()" id="qa-manager-toggle"
-                            style="background: #000; border: 1px dashed #adff00; color: #adff00; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: 'Chakra Petch', sans-serif;">
-                        [+] CMD_CENTER
-                    </button>
-                </div>
-                <div id="qa-manager-panel" style="display: none; background: rgba(0,20,0,0.95); border: 1px solid #adff00; padding: 15px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,0,0.3); margin-top: 10px;">
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
-                        <div style="position: relative; flex-grow: 1;">
-                            <input type="text" id="qa-search-input" oninput="window.twLoadQuickActions()" placeholder="SEARCH_DATABASE..."
-                                   style="width: 100%; background: #000; color: #adff00; border: 1px solid #adff00; padding: 8px 8px 8px 30px; font-family: monospace;">
-                            <span style="position: absolute; left: 10px; top: 8px;">🔍</span>
-                        </div>
-                        <button onclick="window.toggleDeleteMode()" id="toggle-delete-mode-btn"
-                                style="background: none; border: 1px solid #666; color: #666; padding: 8px 15px; cursor: pointer; font-size: 0.8em;">[x] DEL_MODE</button>
-                    </div>
-                    <div id="qa-category-filters" style="display: flex; gap: 8px; margin-bottom: 15px;">
-                        <button onclick="window.setQAFilter('ALL')" class="filter-btn active" style="background: #adff00; color: #000; border: none; padding: 5px 15px; cursor: pointer; font-size: 0.75em; font-weight: bold; border-radius: 3px;">ALL</button>
-                        <button onclick="window.setQAFilter('Red')" class="filter-btn" style="background: none; color: #ff4444; border: 1px solid #ff4444; padding: 5px 15px; cursor: pointer; font-size: 0.75em;">COMBAT</button>
-                        <button onclick="window.setQAFilter('Blue')" class="filter-btn" style="background: none; color: #00ccff; border: 1px solid #00ccff; padding: 5px 15px; cursor: pointer; font-size: 0.75em;">TECH</button>
-                    </div>
-                    <div id="user-actions-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; border-top: 1px solid rgba(173,255,0,0.2); padding-top: 15px;"></div>
-                    <div id="custom-action-form" style="border-top: 1px solid rgba(173,255,0,0.2); padding-top: 15px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                            <input type="text" id="custom-label" placeholder="LABEL" style="background: #000; color: #adff00; border: 1px solid #333; padding: 8px;">
-                            <select id="custom-category" style="background: #000; color: #adff00; border: 1px solid #333; padding: 8px;">
-                                <option value="Custom">USER</option>
-                                <option value="Red">COMBAT</option>
-                                <option value="Blue">TECH</option>
-                            </select>
-                        </div>
-                        <textarea id="custom-template" placeholder="PROMPT" rows="2" style="width: 100%; background: #000; color: #adff00; border: 1px solid #333; padding: 8px; margin-bottom: 8px; font-family: monospace;"></textarea>
-                        <button onclick="window.saveCustomAction()" style="width: 100%; background: #adff00; color: #000; font-weight: bold; padding: 10px; border: none; cursor: pointer;">[EXECUTE_SAVE]</button>
-                    </div>
-                </div>
-            </div>
-            <div class="chat-input-wrapper">
-                <div class="chat-input-inner">
-                    <textarea id="chat-input" class="chat-input" placeholder="What will you do?"></textarea>
-                </div>
-                <div class="chat-action-row">
-                    <button id="send-btn" class="btn-send">TRANSMIT</button>
-                </div>
-            </div>
-        </section><!-- /#adventure-chat -->
-    </section><!-- /.chat-panel -->
-</div><!-- /#adventure-shell -->
-
-<aside id="scenario-panel" class="scenario-panel">
-    <div class="scenario-panel-body">
-        <div id="deck-panel" class="is-open">
-            <div class="deck-tabs-wrapper">
-                <button class="panel-tab is-active" data-tab="tab-scenarios">Mission</button>
-                <button class="panel-tab" data-tab="tab-hand">Augments</button>
-                <button class="panel-tab" data-tab="tab-skills">Skills</button>
-                <button id="toggle-deck" class="panel-tab">✕</button>
-            </div>
-            <div id="deck-container">
-                <div id="tab-scenarios" class="deck-tab-content is-active">
-                    <div class="deck-cards" id="scenarios-list"><p style="text-align:center;padding:20px;">Loading missions...</p></div>
-                </div>
-                <div id="tab-hand" class="deck-tab-content">
-                    <div id="hand-frame">
-                        <div class="hand-type-tabs">
-                            <button class="hand-type-tab is-active" data-type-tab="all">All</button>
-                            <button class="hand-type-tab" data-type-tab="attack">Attack</button>
-                            <button class="hand-type-tab" data-type-tab="social">Social</button>
-                            <button class="hand-type-tab" data-type-tab="control">Control</button>
-                            <button class="hand-type-tab" data-type-tab="passive">Passive</button>
-                            <button class="hand-type-tab" data-type-tab="special">Special</button>
-                            <button class="hand-type-tab" data-type-tab="tech">Tech</button>
-                        </div>
-                        <div class="hand-type-views">
-                            <div class="deck-cards hand-cards is-active" id="hand-cards-all"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-attack"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-social"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-control"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-passive"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-special"></div>
-                            <div class="deck-cards hand-cards" id="hand-cards-tech"></div>
-                        </div>
-                    </div>
-                </div>
-                <div id="tab-skills" class="deck-tab-content">
-                    <div class="deck-cards deck-cards-skills"></div>
-                    <div class="deck-cards deck-cards-abilities"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</aside>
-
-<!-- GAME HUD (fixed position) -->
-<div style="position: fixed; z-index: 999; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 20px; pointer-events: none;">
-    <div style="pointer-events: all; flex: 1; max-width: 400px;">
-        <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php'; ?>
-    </div>
-    <div style="pointer-events: all; flex: 1; max-width: 400px;">
-        <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php'; ?>
-    </div>
-</div>
-
-<script>
-(function () {
-    'use strict';
-
-    // -------------------------------------------------------------------------
-    // FIX #3: Guard against DOMContentLoaded already having fired when this
-    // inline script runs (which is common for scripts at the bottom of body).
-    // -------------------------------------------------------------------------
-    function onDOMReady(fn) {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', fn, { once: true });
-        } else {
-            fn();
-        }
-    }
-
-    // =========================================================================
-    // SCENARIOS
-    // FIX #9: scenarios fetch now includes a nonce so the AJAX handler can
-    // verify the request via check_ajax_referer().
-    // PERF #12: limit=3 moved to the server-side AJAX handler; slice removed.
-    // =========================================================================
-    async function loadScenarios() {
-        const shell = document.getElementById('adventure-shell');
-        if (!shell) return;
-        const list = document.getElementById('scenarios-list');
-        if (!list) {
-            console.warn('⚠️ scenarios-list not found in DOM');
-            return;
-        }
-        list.innerHTML = '<p class="empty-msg">Scanning network for missions...</p>';
-        try {
-            const campaignId = window.twGameState?.currentCampaignId || window.twAdventureData?.active_campaign_id;
-            console.log('🔍 Scenarios: Resolved campaignId:', campaignId);
-            if (!campaignId) {
-                list.innerHTML = '<p class="empty-msg">No active campaign detected.</p>';
-                return;
-            }
-            const formData = new URLSearchParams({
-                action:      'tw_get_scenarios_ajax',
-                campaign_id: campaignId,
-                nonce:       window.twAdventureData?.nonce ?? '', // FIX #9
-            });
-            const response = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
-                method:      'POST',
-                body:        formData,
-                credentials: 'same-origin',
-            });
-            if (!response.ok) {
-                throw new Error('AJAX HTTP error ' + response.status);
-            }
-            const json = await response.json();
-            if (!json.success || !Array.isArray(json.data)) {
-                list.innerHTML = '<p class="empty-msg">No missions available for this campaign yet.</p>';
-                return;
-            }
-            // PERF #12: server should now return max 3 — no client-side slice needed.
-            const scenarios = json.data;
-            if (!scenarios.length) {
-                list.innerHTML = '<p class="empty-msg">No missions available. Ask your GM to sync the campaign.</p>';
-                return;
-            }
-            list.innerHTML = '';
-            // XSS FIX: build cards via DOM API (textContent / setAttribute) instead
-            // of innerHTML interpolation so scenario data from the server can never
-            // inject arbitrary HTML or script into the page.
-            scenarios.forEach((s) => {
-                const tags = (s.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
-
-                const card  = document.createElement('article');
-                card.className = 'deck-card scenario-card';
-                card.dataset.scenarioId = s.id;
-
-                const inner = document.createElement('div');
-                inner.className = 'deck-card-inner';
-
-                // Optional image
-                if (s.img_url) {
-                    const wrap = document.createElement('div');
-                    wrap.className = 'scenario-image-wrap';
-                    const img = document.createElement('img');
-                    img.setAttribute('src', s.img_url);      // setAttribute keeps URL as-is
-                    img.setAttribute('alt', s.name || '');   // textContent equivalent for attrs
-                    img.className = 'scenario-image';
-                    wrap.appendChild(img);
-                    inner.appendChild(wrap);
-                }
-
-                // Header
-                const header = document.createElement('header');
-                header.className = 'scenario-header';
-                const diff = document.createElement('span');
-                diff.className = 'scenario-difficulty';
-                diff.textContent = s.difficulty || '';
-                const title = document.createElement('h4');
-                title.className = 'scenario-title';
-                title.textContent = s.name || 'Untitled mission';
-                header.appendChild(diff);
-                header.appendChild(title);
-
-                // Body
-                const body = document.createElement('div');
-                body.className = 'scenario-body';
-                const goal = document.createElement('p');
-                goal.className = 'scenario-goal';
-                goal.textContent = s.goal || '';
-                const tagsP = document.createElement('p');
-                tagsP.className = 'scenario-tags';
-                tags.forEach((t) => {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#' + t;
-                    tagsP.appendChild(span);
-                });
-                if (s.is_boss) {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#boss';
-                    tagsP.appendChild(span);
-                }
-                if (s.is_key_arc) {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#key_arc';
-                    tagsP.appendChild(span);
-                }
-                body.appendChild(goal);
-                body.appendChild(tagsP);
-
-                // Footer
-                const footer = document.createElement('footer');
-                footer.className = 'scenario-footer';
-                const type = document.createElement('span');
-                type.className = 'scenario-type';
-                type.textContent = s.type || '';
-                const cat = document.createElement('span');
-                cat.className = 'scenario-category';
-                cat.textContent = s.category || '';
-                footer.appendChild(type);
-                footer.appendChild(cat);
-
-                inner.appendChild(header);
-                inner.appendChild(body);
-                inner.appendChild(footer);
-                card.appendChild(inner);
-                list.appendChild(card);
-            });
-            console.log('✅ Loaded', scenarios.length, 'scenario cards');
-        } catch (error) {
-            console.error('❌ Error loading scenarios:', error);
-            list.innerHTML = '<p class="empty-msg">Mission panel offline. Please refresh the terminal.</p>';
-        }
-    }
-    window.twLoadScenarios = loadScenarios;
-
-    // =========================================================================
-    // CHAT CHANNEL
-    // FIX #4 & #5: fetchChatChannelId now uses strict null/undefined check so
-    // a session ID of 0 is correctly detected as "no active session" and
-    // waitForChatChannel is only started after twGameState is fully hydrated.
-    // PERF #13: exponential backoff replaces fixed 2 s × 10 poll loop.
-    // =========================================================================
-    const playerChatEl = document.getElementById('player-chat');
-
-    async function fetchChatChannelId() {
-        const sessionId = window.twGameState?.currentSessionId;
-
-        // FIX #5: strict check — 0, null, and undefined all mean "no session".
-        if (sessionId === null || sessionId === undefined || sessionId === 0) {
-            console.warn('No valid currentSessionId – cannot resolve chat channel');
-            return null;
-        }
-        try {
-            const params = new URLSearchParams({
-                action:     'tw_get_session_state',
-                session_id: sessionId,
-                nonce:      window.twAdventureData?.nonce ?? '', // consistent nonce usage
-            });
-            const resp = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
-                method:      'POST',
-                body:        params,
-                credentials: 'same-origin',
-            });
-            if (!resp.ok) {
-                console.error('Session state HTTP error', resp.status);
-                return null;
-            }
-            const json = await resp.json();
-            if (!json.success || !json.data) return null;
-            return json.data.chat_channel_id || null;
-        } catch (e) {
-            console.error('Session state fetch error', e);
-            return null;
-        }
-    }
-
-    // PERF #13: exponential backoff — starts at 1 s, caps at 8 s, max 6 tries.
-    async function waitForChatChannel(maxTries = 6) {
-        if (!playerChatEl) return;
-        playerChatEl.innerHTML = '<p class="empty-msg">Channel syncing, please wait…</p>';
-        let delay = 1000;
-        for (let i = 0; i < maxTries; i++) {
-            const chan = await fetchChatChannelId();
-            if (chan) {
-                window.twGameState.chatChannelId = chan;
-                console.log('✓ Chat channel ready:', chan);
-                if (window.twInitMissionChat) {
-                    window.twInitMissionChat(chan);
-                } else {
-                    playerChatEl.innerHTML = '<p class="empty-msg">Channel ready. Messages will appear here.</p>';
-                }
-                return;
-            }
-            await new Promise(r => setTimeout(r, delay));
-            delay = Math.min(delay * 1.5, 8000); // backoff: 1s → 1.5s → 2.25s … capped at 8s
-        }
-        playerChatEl.innerHTML = '<p class="empty-msg">Channel sync timeout. Try refreshing the terminal.</p>';
-    }
-
-    // =========================================================================
-    // WORLD STATE
-    // =========================================================================
-    async function ensureWorldState() {
-        const campaignId = window.twGameState?.currentCampaignId;
-        const nonce      = window.twAdventureData?.nonce;
-        if (!campaignId || !nonce) return;
-        try {
-            const formData = new URLSearchParams({
-                action:      'tw_ensure_world_state',
-                campaign_id: String(campaignId),
-                nonce:       nonce,
-            });
-            const resp = await fetch(window.twAdventureData.ajax_url, {
-                method:      'POST',
-                body:        formData,
-                credentials: 'same-origin',
-            });
-            const json = await resp.json();
-            console.log('🌍 World state ensure:', json);
-            if (json.success && window.refreshTwClock) {
-                setTimeout(window.refreshTwClock, 500);
-            }
-        } catch (e) {
-            console.error('World state ensure error', e);
-        }
-    }
-
-    // =========================================================================
-    // HYDRATION
-    // FIX #3: Use onDOMReady to safely handle already-fired DOMContentLoaded.
-    // PERF #14: All three twGameStateHydrated consumers consolidated into one
-    // listener so initialisation order is explicit and handlers run in parallel.
-    // =========================================================================
-    function hydrateTwGameState() {
-        if (!window.twAdventureData) {
-            console.warn('No twAdventureData – cannot bootstrap game');
-            return;
-        }
-        window.twGameState = window.twGameState || {};
-        const d = window.twAdventureData;
-        window.twGameState.currentSessionId   = d.active_session_id   ?? null;
-        window.twGameState.currentCampaignId  = d.active_campaign_id  ?? null;
-        window.twGameState.currentCharacterId = d.active_character_id ?? null;
-        window.twGameState.currentWorldId     = d.active_world_id     ?? null;
-        window.twGameState.currentLocationId  = d.active_location_id  ?? null;
-        console.log('✓ twGameState hydrated from twAdventureData', window.twGameState);
-        document.dispatchEvent(new Event('twGameStateHydrated'));
-    }
-
-    // PERF #14: single consolidated listener replaces three separate handlers.
-    document.addEventListener('twGameStateHydrated', function onGameStateReady() {
-        // Run all post-hydration tasks in parallel; failures are isolated.
-        Promise.allSettled([
-            loadScenarios(),
-            // FIX #4: waitForChatChannel is now called only after hydration,
-            // so twGameState.currentSessionId is guaranteed to be set.
-            window.twGameState?.chatChannelId
-                ? Promise.resolve()           // already resolved earlier, skip
-                : waitForChatChannel(),
-            ensureWorldState(),
-        ]).then(results => {
-            results.forEach((r, i) => {
-                if (r.status === 'rejected') {
-                    console.error('Post-hydration task', i, 'failed:', r.reason);
-                }
-            });
-        });
-    }, { once: true });
-
-    // Kick off hydration once the DOM is ready.
-    onDOMReady(hydrateTwGameState);
-
-    console.log('🎮 Tale Weaver Scenarios Loader - Ready & Waiting');
-})();
-</script>
