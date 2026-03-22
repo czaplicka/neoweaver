@@ -73,31 +73,68 @@ class Neoweaver_Agents_List {
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
 		// ------------------------------------------------------------------
-		// Empty state
-		// ------------------------------------------------------------------
-		if ( empty( $characters ) ) {
-			return '
-			<div class="tw-deployments-empty-wrap">
-				<div class="tw-deployments-empty-screen">
-					<div class="tw-deployments-empty-inner">
-						<div class="tw-deployments-empty-icon">!</div>
-						<p class="tw-deployments-empty-main">NO OPERATIVES DETECTED IN YOUR GRID.</p>
-						<p class="tw-deployments-empty-sub">INITIALIZE A NEW FIELD AGENT TO START THE WEAVING PROCESS.</p>
-						<div class="tw-deployments-empty-actions">
-							<a href="/new-agent/" class="tw-btn-sync terminal-btn">NEW FIELD AGENT</a>
-						</div>
-					</div>
-				</div>
-			</div>';
-		}
-
-		// ------------------------------------------------------------------
-		// Render grid + modal + scripts
+		// Shared styles — output regardless of empty / populated state.
+		// Empty-state classes mirror .tw-no-worlds from [tw_list_worlds].
 		// ------------------------------------------------------------------
 		ob_start();
 		?>
 		<style>
 			:root { --neon: #adff00; --dark: #0a0a0a; --gray: #151515; }
+
+			/* ── Empty state (mirrors .tw-no-worlds in shortcode-tw-list-worlds.php) ── */
+			.tw-agents-empty {
+				text-align: center;
+				padding: 80px 30px 100px;
+				border: 1px dashed #222;
+				border-radius: 10px;
+				font-family: 'Chakra Petch', sans-serif;
+			}
+			.tw-agents-empty-icon {
+				font-size: 48px;
+				color: #adff00;
+				opacity: 0.25;
+				margin-bottom: 20px;
+				font-weight: 900;
+				line-height: 1;
+			}
+			.tw-agents-empty-main {
+				font-size: 1rem;
+				font-weight: 700;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: #fff;
+				margin: 0 0 10px;
+			}
+			.tw-agents-empty-sub {
+				font-size: 0.75rem;
+				color: #555;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				margin: 0 0 30px;
+			}
+			.tw-agents-empty-actions { display: flex; justify-content: center; }
+			.tw-agents-empty-actions .tw-btn-sync {
+				display: inline-block;
+				background: #adff00;
+				color: #000;
+				border: none;
+				padding: 12px 28px;
+				font-weight: 900;
+				border-radius: 4px;
+				cursor: pointer;
+				text-transform: uppercase;
+				font-family: 'Chakra Petch', sans-serif;
+				font-size: 12px;
+				letter-spacing: 0.1em;
+				text-decoration: none;
+				transition: background 0.2s, box-shadow 0.2s;
+			}
+			.tw-agents-empty-actions .tw-btn-sync:hover {
+				background: #fff;
+				box-shadow: 0 0 15px #adff00;
+			}
+
+			/* ── Roster grid ── */
 			.tw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; font-family: 'Chakra Petch', sans-serif; }
 			.tw-card { background: var(--dark); border: 1px solid rgba(173,255,0,0.2); padding: 15px; color: white; position: relative; display: flex; flex-direction: column; }
 			.tw-card-header { display: flex; gap: 12px; margin-bottom: 12px; }
@@ -122,6 +159,30 @@ class Neoweaver_Agents_List {
 			.tw-card-actions { display: flex; gap: 8px; margin-top: auto; }
 			.tw-card-actions .tw-btn { flex: 1 1 50%; }
 		</style>
+		<?php
+		$shared_styles = ob_get_clean();
+
+		// ------------------------------------------------------------------
+		// Empty state
+		// ------------------------------------------------------------------
+		if ( empty( $characters ) ) {
+			return $shared_styles . '
+			<div class="tw-agents-empty">
+				<div class="tw-agents-empty-icon">!</div>
+				<p class="tw-agents-empty-main">NO OPERATIVES DETECTED IN YOUR GRID.</p>
+				<p class="tw-agents-empty-sub">INITIALIZE A NEW FIELD AGENT TO START THE WEAVING PROCESS.</p>
+				<div class="tw-agents-empty-actions">
+					<a href="/new-agent/" class="tw-btn-sync">NEW FIELD AGENT</a>
+				</div>
+			</div>';
+		}
+
+		// ------------------------------------------------------------------
+		// Render grid + modal + scripts
+		// ------------------------------------------------------------------
+		ob_start();
+		echo $shared_styles; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		?>
 
 		<script>
 		window.twCharData = {
