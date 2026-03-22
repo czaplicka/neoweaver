@@ -104,6 +104,17 @@ class Neoweaver_Agents_Repository {
 		return 'in.(' . implode( ',', array_filter( $safe ) ) . ')';
 	}
 
+	/**
+	 * Sanitize a single ID (UUID or integer) for safe use in a Supabase filter.
+	 * Strips everything except alphanumerics and hyphens.
+	 *
+	 * @param  mixed $id
+	 * @return string
+	 */
+	private function sanitize_id( $id ): string {
+		return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $id );
+	}
+
 	// -------------------------------------------------------------------------
 	// Primary roster query (used by the characters list shortcode)
 	// -------------------------------------------------------------------------
@@ -206,7 +217,7 @@ class Neoweaver_Agents_Repository {
 	 * @return array|null
 	 */
 	public function get_by_id( $character_id ): ?array {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+		$safe_id = $this->sanitize_id( $character_id );
 		$url     = $this->table_url( 'cyber_characters', [
 			'id'    => 'eq.' . $safe_id,
 			'limit' => '1',
@@ -309,12 +320,25 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Fetch all Field Agents currently bound to a specific Node (world).
 	 *
-	 * @param int $node_id  Supabase primary key of the cyber_worlds row.
+	 * BUG-FIX: The previous signature typed $node_id as int and passed it
+	 * directly into the Supabase filter. cyber_worlds.id is a UUID string —
+	 * any integer cast collapses it to 0, so the query always returned empty.
+	 * The parameter is now string|int and is run through sanitize_id() so
+	 * UUID values are preserved intact.
+	 *
+	 * @param string|int $node_id  Supabase primary key (UUID) of the cyber_worlds row.
 	 * @return array
 	 */
-	public function get_by_node( int $node_id ): array {
+	public function get_by_node( $node_id ): array {
+		$safe_id = $this->sanitize_id( $node_id );
+
+		if ( empty( $safe_id ) ) {
+			error_log( 'TW Repository: get_by_node — invalid node_id: ' . $node_id );
+			return [];
+		}
+
 		$url = $this->table_url( 'cyber_characters', [
-			'world_id' => 'eq.' . $node_id,
+			'world_id' => 'eq.' . $safe_id,
 		] );
 		return $this->get_json( $url );
 	}
@@ -337,7 +361,7 @@ class Neoweaver_Agents_Repository {
 	 * @return array  Array of tag row arrays (may be empty).
 	 */
 	public function get_echo_tags( $character_id ): array {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+		$safe_id = $this->sanitize_id( $character_id );
 		$url     = $this->table_url( 'cyber_character_complete_tags', [
 			'character_id' => 'eq.' . $safe_id,
 		] );
@@ -379,7 +403,7 @@ class Neoweaver_Agents_Repository {
 	 * @return array|null
 	 */
 	public function get_hud_state( $character_id ): ?array {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+		$safe_id = $this->sanitize_id( $character_id );
 		$url     = $this->table_url( 'cyber_state_of_the_campaign', [
 			'character_id' => 'eq.' . $safe_id,
 			'limit'        => '1',
@@ -403,7 +427,7 @@ class Neoweaver_Agents_Repository {
 	 * @return bool
 	 */
 	public function user_owns_agent( int $wp_user_id, $character_id ): bool {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+		$safe_id = $this->sanitize_id( $character_id );
 		$url     = $this->table_url( 'cyber_characters', [
 			'id'         => 'eq.' . $safe_id,
 			'wp_user_id' => 'eq.' . $wp_user_id,

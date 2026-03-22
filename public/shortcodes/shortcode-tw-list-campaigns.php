@@ -17,7 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  *  - Extended reload delay to 1 200 ms so card fade completes reliably
  *  - Wrapped jQuery async handlers in outer try/catch so unhandled rejections surface
  *  - Guarded all early-return paths in team IIFE with consistent btn reset
- *  - Minor: consistent use of strict comparison, early-return pattern in PHP
+ *  - BUG-FIX: $c_id was cast with (int) which collapses UUID campaign IDs to 0.
+ *    All HTML attributes (data-id, id="campaign-card-*"), PHP href params, and
+ *    the JS delete RPC arg p_campaign_id now use the raw UUID string via $c_id_safe.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -106,8 +108,14 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             <div class="tw-char-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:25px;">
                 <?php foreach ( $active_campaigns as $c ) :
 
-                    $c_id   = (int) $c['id'];
-                    $c_name = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id );
+                    // BUG-FIX: cyber_campaign.id is a UUID string.
+                    // The previous code used (int) $c['id'] which collapses every UUID to 0.
+                    // All downstream uses — DOM id, data-id attribute, href query param, and
+                    // the JS RPC arg p_campaign_id — must use the raw string, not an integer.
+                    // We sanitize by stripping everything except alphanumerics and hyphens
+                    // (safe for UUID v4) and keep a plain string throughout.
+                    $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
+                    $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
                     $world_rel = ! empty( $c['cyber_campaign_worlds'] )
                         ? ( $c['cyber_campaign_worlds'][0]['cyber_worlds'] ?? null )
@@ -139,12 +147,12 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     }
 
                     if ( ! $world_rel ) {
-                        $main_btn = '<a href="/nodes/?campaign_id=' . $c_id . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
+                        $main_btn = '<a href="/nodes/?campaign_id=' . esc_attr( $c_id_safe ) . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
                     } elseif ( ! $char_rel ) {
-                        $main_btn = '<a href="/agents/?campaign_id=' . $c_id . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
+                        $main_btn = '<a href="/agents/?campaign_id=' . esc_attr( $c_id_safe ) . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
                     } else {
                         $main_btn = '<button class="tw-action-btn enter-matrix"'
-                            . ' data-id="'    . $c_id . '"'
+                            . ' data-id="'    . esc_attr( $c_id_safe ) . '"'
                             . ' data-mode="'  . esc_attr( $mode_str ) . '"'
                             . ' data-join="'  . esc_attr( strtoupper( $join_code ) ) . '"'
                             . ' data-world="' . esc_attr( (string) $world_id ) . '">'
@@ -153,19 +161,19 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     }
                 ?>
 
-                    <div id="campaign-card-<?php echo $c_id; ?>" class="tw-char-card"
+                    <div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-char-card"
                          style="background:#0a0a0a; border:1px solid #1a1a1a; padding:25px; position:relative; transition:0.3s; <?php echo ! $is_active ? 'opacity:0.3; filter:grayscale(1);' : ''; ?>">
 
                         <div class="tw-card-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
                             <div>
-                                <div class="tw-id-tag" style="font-family:monospace; font-size:0.6rem; color:#444; letter-spacing:1px;">UPLINK_ID: <?php echo $c_id; ?></div>
+                                <div class="tw-id-tag" style="font-family:monospace; font-size:0.6rem; color:#444; letter-spacing:1px;">UPLINK_ID: <?php echo esc_html( $c_id_safe ); ?></div>
                                 <h3 style="color:#adff00; margin:5px 0; font-size:1.4rem; text-transform:uppercase;"><?php echo $c_name; ?></h3>
                                 <div style="display:flex; align-items:center; gap:8px;">
                                     <span class="status-dot" style="width:7px; height:7px; border-radius:50%; background:<?php echo $is_active ? '#adff00' : '#ff0055'; ?>; box-shadow:0 0 5px <?php echo $is_active ? '#adff00' : '#ff0055'; ?>;"></span>
                                     <span style="font-size:0.65rem; color:#888; font-weight:bold; letter-spacing:1px;"><?php echo $is_active ? 'CONNECTION STABLE' : 'LINK SEVERED'; ?></span>
                                 </div>
                             </div>
-                            <div style="text-align:right;"><!-- BUG FIX: removed stray "%" after "right" -->
+                            <div style="text-align:right;">
                                 <span class="tw-badge-cyber" style="border:1px solid #adff00; color:#adff00; font-size:0.6rem; padding:3px 8px; font-weight:bold;"><?php echo esc_html( $mode_str ); ?></span>
                             </div>
                         </div>
@@ -176,7 +184,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:<?php echo $world_rel ? '#fff' : '#ff0055'; ?>; font-weight:bold; text-align:right;">
                                     <?php echo $world_rel ? esc_html( $world_rel['name'] ) : 'MISSING ANCHOR'; ?>
                                     <?php if ( ! $world_rel ) : ?>
-                                        <a href="/nodes/?campaign_id=<?php echo $c_id; ?>"
+                                        <a href="/nodes/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>"
                                            class="tw-mini-btn"
                                            style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">
                                             LINK NODE
@@ -190,7 +198,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;">
                                     <?php echo $operative_name; ?>
                                     <?php if ( ! $char_rel ) : ?>
-                                        <a href="/agents/?campaign_id=<?php echo $c_id; ?>"
+                                        <a href="/agents/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>"
                                            class="tw-mini-btn"
                                            style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">
                                             ASSIGN AGENT
@@ -224,9 +232,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 </button>
                             <?php endif; ?>
 
-                            <!-- BUG FIX: was esc_js() which is for JS strings; esc_attr() is correct for HTML attributes -->
                             <button class="tw-delete-campaign-btn"
-                                    data-id="<?php echo esc_attr( $c_id ); ?>"
+                                    data-id="<?php echo esc_attr( $c_id_safe ); ?>"
                                     data-name="<?php echo esc_attr( $c_name ); ?>"
                                     style="background:transparent; border:1px solid #222; color:#333; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">
                                 TERMINATE
@@ -257,7 +264,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 e.preventDefault();
 
                 const btn      = $(this);
-                const campId   = btn.data('id');
+                const campId   = btn.data('id');   // UUID string — not cast to int
                 const campName = btn.data('name');
 
                 if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) {
@@ -274,7 +281,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                 try {
                     const { error } = await window.twSupabase.rpc('fn_delete_campaign', {
-                        p_campaign_id: campId
+                        p_campaign_id: campId  // UUID string passed as-is to RPC
                     });
 
                     if (error) {
@@ -286,8 +293,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                     const card = $('#campaign-card-' + campId);
                     if (card.length) {
-                        // Fade card, then reload once the transition finishes.
-                        // BUG FIX: 1200 ms > the 0.3 s CSS transition + network overhead.
                         card.css({ opacity: '0', 'pointer-events': 'none' });
                     }
                     setTimeout(() => window.location.reload(), 1200);
@@ -304,7 +309,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 e.preventDefault();
 
                 const btn    = $(this);
-                const campId = btn.data('id');
+                const campId = btn.data('id');   // UUID string
                 const mode   = String(btn.data('mode') || 'SOLO').toUpperCase();
 
                 if (!campId) {
@@ -360,8 +365,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         return;
                     }
 
-                    // BUG FIX: unified key lookup – prefer wp_user_id, fall back to userid.
-                    // Both keys are checked in one expression rather than two separate OR branches.
                     const adv = window.twAdventureData || {};
                     const currentWpUserId = adv.wp_user_id || adv.userid || null;
 
@@ -374,8 +377,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     const client  = window.twSupabase;
                     const worldId = btn.data('world') || null;
 
-                    // Wrap the whole async flow in a self-invoking async function and
-                    // BUG FIX: catch the outer promise so unhandled rejection is visible.
                     (async () => {
                         try {
                             // Step 1: resolve this operator's character for the campaign's world.

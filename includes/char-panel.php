@@ -18,10 +18,17 @@ add_action( 'wp_footer', function () {
 	document.addEventListener('DOMContentLoaded', function () {
 	    console.log('navButtons count =', document.querySelectorAll('.tw-nav-btn').length);
 
-	    document.querySelectorAll('.tw-nav-btn').forEach(btn => {
-	        btn.classList.remove('active');
-	        btn.classList.add('panel-open');
-	    });
+	    // BUG-FIX: The original code immediately called classList.remove('active')
+	    // AND classList.add('panel-open') on every nav button before any user
+	    // interaction. This caused two problems:
+	    //   1. panel-open was added at init but openPanel/closePanel only ever
+	    //      removed 'active', never 'panel-open' — so the side-nav appeared
+	    //      open on first load and the class was permanently stuck.
+	    //   2. Stripping 'active' before the default-tab assignment below
+	    //      was harmless but misleading.
+	    // Fix: remove both lines entirely. The buttons start without either
+	    // class; the default-tab block below adds 'active' to exactly one
+	    // button, which is the correct initial state.
 
 	    const panel       = document.getElementById('charPanel');
 	    const sideNav     = document.getElementById('twSideNav');
@@ -30,6 +37,7 @@ add_action( 'wp_footer', function () {
 	    const saveBtn     = document.getElementById('twSaveNotes');
 	    const notesField  = document.getElementById('twNotesField');
 
+	    // Activate the default tab button — no panel-open class needed here.
 	    const defaultTab = 'status';
 	    document.querySelector(`.tw-nav-btn[data-tab="${defaultTab}"]`)?.classList.add('active');
 	    document.getElementById(defaultTab)?.classList.add('active');

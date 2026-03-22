@@ -64,16 +64,30 @@ add_action( 'wp_footer', function () {
 
 	            if (skillsErr) throw skillsErr;
 
+	            // BUG-FIX: The original query selected 'type' from cyber_abilities,
+	            // but the DB column is 'ability_type'. Also selected 'tags' expecting
+	            // a comma-delimited string, but cyber_abilities.tags is jsonb — calling
+	            // .split(',') on a JS object produces "[object Object]" tokens.
+	            // Fixed: select 'ability_type' instead of 'type', and handle tags as
+	            // a JSON array (Array.isArray check) rather than splitting a string.
 	            const { data: charAbilities, error: abilitiesErr } = await supa
 	                .from('cyber_character_abilities')
-	                .select('ability:cyber_abilities (name, description, type, cost, tags)')
+	                .select('ability:cyber_abilities (name, description, ability_type, cost, tags)')
 	                .eq('character_id', charId);
 
 	            if (abilitiesErr) throw abilitiesErr;
 
 	            skillsWrap.innerHTML = (charSkills || []).map(row => {
-	                const s    = row.skill || {};
-	                const tags = (s.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+	                const s = row.skill || {};
+
+	                // cyber_skills.tags may also be jsonb — handle both array and string.
+	                let tags = [];
+	                if (Array.isArray(s.tags)) {
+	                    tags = s.tags.map(t => String(t).trim()).filter(Boolean);
+	                } else if (typeof s.tags === 'string' && s.tags) {
+	                    tags = s.tags.split(',').map(t => t.trim()).filter(Boolean);
+	                }
+
 	                return `
 	                <article class="deck-card skill-card">
 	                    <div class="deck-card-inner">
@@ -93,8 +107,20 @@ add_action( 'wp_footer', function () {
 	            }).join('') || '<p>Brak umiejętności.</p>';
 
 	            abilitiesWrap.innerHTML = (charAbilities || []).map(row => {
-	                const a    = row.ability || {};
-	                const tags = (a.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+	                const a = row.ability || {};
+
+	                // BUG-FIX: use ability_type (correct column name) not type.
+	                const abilityType = a.ability_type || '';
+
+	                // BUG-FIX: tags is jsonb (array) in cyber_abilities, not a
+	                // comma-delimited string. Handle both array and string safely.
+	                let tags = [];
+	                if (Array.isArray(a.tags)) {
+	                    tags = a.tags.map(t => String(t).trim()).filter(Boolean);
+	                } else if (typeof a.tags === 'string' && a.tags) {
+	                    tags = a.tags.split(',').map(t => t.trim()).filter(Boolean);
+	                }
+
 	                return `
 	                <article class="deck-card ability-card">
 	                    <div class="deck-card-inner">
@@ -102,7 +128,7 @@ add_action( 'wp_footer', function () {
 	                            <h3 class="deck-card-title">${a.name || 'Zdolność'}</h3>
 	                        </header>
 	                        <div class="deck-card-subtitle">
-	                            ${a.type ? `<span class="card-type">${a.type}</span>` : ''}
+	                            ${abilityType ? `<span class="card-type">${abilityType}</span>` : ''}
 	                            ${a.cost ? `<span class="card-mechanic">${a.cost}</span>` : ''}
 	                        </div>
 	                        <div class="card-body">

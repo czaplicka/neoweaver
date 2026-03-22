@@ -1,5 +1,5 @@
 <?php
-// BUG-FIX 2: File was missing the PHP opening tag entirely — PHP parsed it
+// BUG-FIX: File was missing the PHP opening tag entirely — PHP parsed it
 // as plain text so none of the functions below were ever defined, causing
 // get_user_game_data_from_supabase() and tw_get_current_character_id() to
 // silently not exist at runtime.
@@ -9,15 +9,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Agregacja danych o sesji, postaci i świecie z Supabase.
+ *
+ * BUG-FIX: All IDs from cyber_game_sessions were coerced with (int), but
+ * session.id, campaign_id, character_id, world_id, and scenario_id are all
+ * UUID strings in Supabase. Casting them to int collapses every UUID to 0,
+ * breaking every downstream Supabase query that filters on those values.
+ *
+ * Fix: IDs are now stored as raw strings sanitized with
+ * preg_replace('/[^a-zA-Z0-9\-]/', '', ...) — safe for both UUID v4 and
+ * any legacy integer IDs. The defaults array is also changed from 0 to ''
+ * so callers can correctly detect "no ID" with empty() instead of !$id.
+ *
+ * location_id is a regular integer FK — it keeps (int) casting.
  */
 if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
     function get_user_game_data_from_supabase( $wp_user_id ) {
         $defaults = [
-            'active_session_id'   => 0,
-            'active_campaign_id'  => 0,
-            'active_character_id' => 0,
-            'active_scenario_id'  => 0,
-            'active_world_id'     => 0,
+            'active_session_id'   => '',
+            'active_campaign_id'  => '',
+            'active_character_id' => '',
+            'active_scenario_id'  => '',
+            'active_world_id'     => '',
             'active_location_id'  => 0,
             'char_name'           => 'Nieznany Bohater',
             'char_class'          => '',
@@ -29,6 +41,11 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         if ( ! $wp_user_id ) {
             return $defaults;
         }
+
+        // Helper: UUID-safe ID sanitization — never use (int) on a UUID.
+        $sanitize_id = function ( $raw ): string {
+            return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw );
+        };
 
         // 1. Aktywna sesja (cyber_game_sessions)
         $sessions = tw_supabase_get(
@@ -48,17 +65,18 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
         $session = $sessions[0];
 
-        $defaults['active_session_id']   = isset( $session['id'] )           ? (int) $session['id']           : 0;
-        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )  ? (int) $session['campaign_id']  : 0;
-        $defaults['active_character_id'] = isset( $session['character_id'] ) ? (int) $session['character_id'] : 0;
-        $defaults['active_world_id']     = isset( $session['world_id'] )     ? (int) $session['world_id']     : 0;
-        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] )? (int) $session['scenario_id']  : 0;
-        $defaults['active_location_id']  = isset( $session['location_id'] )  ? (int) $session['location_id']  : 0;
+        // UUID columns — sanitize as strings, never cast to int.
+        $defaults['active_session_id']   = isset( $session['id'] )           ? $sanitize_id( $session['id'] )           : '';
+        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )  ? $sanitize_id( $session['campaign_id'] )  : '';
+        $defaults['active_character_id'] = isset( $session['character_id'] ) ? $sanitize_id( $session['character_id'] ) : '';
+        $defaults['active_world_id']     = isset( $session['world_id'] )     ? $sanitize_id( $session['world_id'] )     : '';
+        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? $sanitize_id( $session['scenario_id'] ) : '';
+
+        // location_id is an integer FK — (int) is correct here.
+        $defaults['active_location_id']  = isset( $session['location_id'] ) ? (int) $session['location_id'] : 0;
 
         // 2. Postać + TAGI
         if ( $defaults['active_character_id'] ) {
-            // Use the repository-style Supabase helper; get_character_tags() is
-            // not guaranteed to exist, so inline the same query here.
             $tags_data = tw_supabase_get(
                 'cyber_character_complete_tags',
                 [ 'character_id' => 'eq.' . $defaults['active_character_id'] ]
@@ -102,19 +120,20 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
 /**
  * Skrót – pobiera active_character_id dla aktualnego użytkownika.
+ * Returns the UUID string (or empty string if not found).
  */
 if ( ! function_exists( 'tw_get_current_character_id' ) ) {
-    function tw_get_current_character_id() {
+    function tw_get_current_character_id(): string {
         $wp_user_id = get_current_user_id();
         if ( ! $wp_user_id ) {
-            return 0;
+            return '';
         }
 
         $game_data = get_user_game_data_from_supabase( $wp_user_id );
         if ( ! is_array( $game_data ) ) {
-            return 0;
+            return '';
         }
 
-        return isset( $game_data['active_character_id'] ) ? (int) $game_data['active_character_id'] : 0;
+        return (string) ( $game_data['active_character_id'] ?? '' );
     }
 }

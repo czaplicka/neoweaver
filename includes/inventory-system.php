@@ -177,10 +177,10 @@ add_action( 'wp_footer', function () {
 	            const dragging = document.querySelector('.dragging');
 	            if (!dragging) return;
 
-	            const invId        = dragging.dataset.inventoryId;
-	            const itemType     = dragging.dataset.itemSlot;
-	            const itemSound    = dragging.dataset.soundUrl || '';
-	            const isToEquip    = zone.classList.contains('inv-slot');
+	            const invId          = dragging.dataset.inventoryId;
+	            const itemType       = dragging.dataset.itemSlot;
+	            const itemSound      = dragging.dataset.soundUrl || '';
+	            const isToEquip      = zone.classList.contains('inv-slot');
 	            const targetSlotName = isToEquip ? zone.dataset.slot : null;
 
 	            if (!invId) return;
@@ -201,27 +201,44 @@ add_action( 'wp_footer', function () {
 	    });
 	}
 
+	/**
+	 * BUG-FIX: The previous implementation patched cyber_character_inventory
+	 * directly from the browser via the Supabase anon key with no ownership
+	 * check. Any logged-in user who knew another character's inventory row ID
+	 * could equip or unequip that character's items.
+	 *
+	 * Fix: route the mutation through a WordPress AJAX endpoint
+	 * (tw_update_inventory_slot) that:
+	 *   1. Verifies the nonce.
+	 *   2. Resolves the current user's active character_id server-side.
+	 *   3. Confirms the inventory row belongs to that character before patching.
+	 * The anon key never leaves the server for write operations.
+	 */
 	async function updateItemEquipmentStatus(inventoryId, isEquipped, slotName = null) {
-	    const config = window.twAdventureData;
-	    if (!config) return;
+	    const config  = window.twAdventureData;
+	    const ajaxUrl = config?.ajax_url || '/wp-admin/admin-ajax.php';
+	    const nonce   = config?.nonce    || '';
 
-	    const url = `${config.supabase_url}/rest/v1/cyber_character_inventory?id=eq.${inventoryId}`;
+	    const fd = new FormData();
+	    fd.append('action',       'tw_update_inventory_slot');
+	    fd.append('nonce',        nonce);
+	    fd.append('inventory_id', inventoryId);
+	    fd.append('is_equipped',  isEquipped ? '1' : '0');
+	    fd.append('slot_name',    slotName || '');
 
 	    try {
-	        const response = await fetch(url, {
-	            method: 'PATCH',
-	            headers: {
-	                apikey: config.supabase_anon_key,
-	                Authorization: `Bearer ${config.supabase_anon_key}`,
-	                'Content-Type': 'application/json',
-	            },
-	            body: JSON.stringify({ is_equipped: isEquipped, equipped_slot: slotName }),
+	        const response = await fetch(ajaxUrl, {
+	            method:      'POST',
+	            body:        fd,
+	            credentials: 'same-origin',
 	        });
 
-	        if (response.ok) {
+	        const data = await response.json();
+
+	        if (data.success) {
 	            await refreshInventoryUI();
 	        } else {
-	            console.error('Inventory update failed', await response.text());
+	            console.error('Inventory update failed', data);
 	        }
 	    } catch (err) {
 	        console.error('Inventory update error:', err);
@@ -240,6 +257,93 @@ add_action( 'wp_footer', function () {
 	</script>
 	<?php
 }, 40 );
+
+// ─── AJAX handler: tw_update_inventory_slot ──────────────────────────────────
+// Server-side ownership-checked inventory equip/unequip endpoint.
+// Replaces the previous pattern of patching Supabase directly from JS.
+add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot' );
+
+if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
+	function tw_handle_update_inventory_slot(): void {
+		// 1. Nonce verification.
+		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+			wp_send_json_error( [ 'message' => 'Security check failed' ] );
+			return;
+		}
+
+		// 2. Must be logged in.
+		$wp_user_id = get_current_user_id();
+		if ( ! $wp_user_id ) {
+			wp_send_json_error( [ 'message' => 'Not logged in' ] );
+			return;
+		}
+
+		// 3. Validate and sanitize inputs.
+		$inventory_id = isset( $_POST['inventory_id'] )
+			? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['inventory_id'] )
+			: '';
+		if ( empty( $inventory_id ) ) {
+			wp_send_json_error( [ 'message' => 'Missing inventory_id' ] );
+			return;
+		}
+
+		$is_equipped = ! empty( $_POST['is_equipped'] ) && $_POST['is_equipped'] === '1';
+		$slot_name   = isset( $_POST['slot_name'] )
+			? sanitize_text_field( (string) $_POST['slot_name'] )
+			: null;
+		if ( $slot_name === '' ) {
+			$slot_name = null;
+		}
+
+		// 4. Resolve the active character_id for this user.
+		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
+			wp_send_json_error( [ 'message' => 'Game data helper missing' ] );
+			return;
+		}
+		$game_data    = get_user_game_data_from_supabase( $wp_user_id );
+		$character_id = $game_data['active_character_id'] ?? '';
+
+		if ( empty( $character_id ) ) {
+			wp_send_json_error( [ 'message' => 'No active character' ] );
+			return;
+		}
+
+		// 5. Ownership check: confirm the inventory row belongs to this character
+		//    before allowing any mutation.
+		$ownership_rows = tw_supabase_get(
+			'cyber_character_inventory',
+			[
+				'id'           => 'eq.' . $inventory_id,
+				'character_id' => 'eq.' . $character_id,
+				'select'       => 'id',
+				'limit'        => 1,
+			]
+		);
+
+		if ( empty( $ownership_rows ) ) {
+			wp_send_json_error( [ 'message' => 'Inventory item not found or not owned by current character' ] );
+			return;
+		}
+
+		// 6. Perform the PATCH server-side using the project-wide helper.
+		$patch_body = [ 'is_equipped' => $is_equipped, 'equipped_slot' => $slot_name ];
+
+		$result = tw_supabase_request(
+			'PATCH',
+			'cyber_character_inventory',
+			[ 'id' => 'eq.' . $inventory_id ],
+			$patch_body
+		);
+
+		if ( ! $result['ok'] ) {
+			error_log( 'TW tw_handle_update_inventory_slot: Supabase PATCH failed, code=' . $result['code'] );
+			wp_send_json_error( [ 'message' => 'Database update failed', 'code' => $result['code'] ] );
+			return;
+		}
+
+		wp_send_json_success( [ 'message' => 'Inventory updated' ] );
+	}
+}
 
 /**
  * TALE WEAVER – LOOT & INVENTORY TAGS

@@ -195,11 +195,24 @@ add_action( 'wp_footer', function () {
                     }
 
                     if (cardData.time_cost_minutes > 0) {
-                        const { error } = await window.twSupabase.rpc('add_game_time', {
-                            minutes_to_add:    parseInt(cardData.time_cost_minutes),
-                            campaign_id_param: parseInt(window.twAdventureData?.active_campaign_id || 1)
-                        });
-                        if (error) console.error('Supabase RPC Error:', error);
+                        // BUG-FIX: cyber_campaign.id is a UUID string.
+                        // The previous code used parseInt(active_campaign_id || 1) which
+                        // converts any UUID to NaN, then falls back to the literal integer 1,
+                        // advancing time on campaign #1 instead of the player's actual campaign.
+                        // Fix: pass the UUID string directly — no parseInt, no numeric fallback.
+                        const campaignIdForRpc = window.twAdventureData?.active_campaign_id
+                            || window.twGameState?.currentCampaignId
+                            || null;
+
+                        if (!campaignIdForRpc) {
+                            console.error('add_game_time RPC: no active campaign_id available');
+                        } else {
+                            const { error } = await window.twSupabase.rpc('add_game_time', {
+                                minutes_to_add:    parseInt(cardData.time_cost_minutes),
+                                campaign_id_param: campaignIdForRpc  // UUID string, not parseInt
+                            });
+                            if (error) console.error('Supabase RPC Error:', error);
+                        }
                     }
 
                     if (typeof window.twSendToChat === 'function') {
@@ -288,12 +301,21 @@ document.addEventListener('DOMContentLoaded', () => {
     jQuery(document).on('click', '.scenario-card', function () {
         const $card      = jQuery(this);
         const scenarioId = $card.data('scenario-id');
-        const campaignId = window.twGameState?.currentCampaignId || 1;
+        // UUID string — do not parseInt; use the raw value from game state.
+        const campaignId = window.twGameState?.currentCampaignId
+            || window.twAdventureData?.active_campaign_id
+            || null;
+
+        if (!campaignId) {
+            console.error('Scenario click: no active campaign_id');
+            return;
+        }
 
         $card.addClass('is-loading').text('\u23F3 Generating...');
 
         jQuery.post(twAjaxUrl, {
             action:      'tw_start_scenario_generation',
+            nonce:       window.twAdventureData?.nonce || '',
             scenario_id: scenarioId,
             campaign_id: campaignId
         }).done(() => {

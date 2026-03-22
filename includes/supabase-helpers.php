@@ -106,13 +106,22 @@ if ( ! function_exists( 'tw_get_data' ) ) {
  * Pobiera założone (is_equipped=true) przedmioty postaci z cyber_character_inventory.
  * Używane np. w panelu postaci na stronie gry.
  *
- * @param int $character_id
+ * BUG-FIX: character_id is a UUID string in Supabase (cyber_characters.id).
+ * The previous code cast it with (int) / intval(), which collapses every UUID
+ * to 0 and returns an empty array for every character. Fixed by using
+ * UUID-safe string sanitization identical to the pattern in
+ * Neoweaver_Agents_Repository::in_filter(): strip everything except
+ * alphanumerics and hyphens, which covers UUID v4 and legacy integer IDs.
+ *
+ * @param string|int $character_id  UUID or integer primary key of cyber_characters.
  * @return array
  */
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
 	function get_character_equipped_items( $character_id ) {
-		$character_id = (int) $character_id;
-		if ( $character_id <= 0 ) {
+		// UUID-safe sanitization — never use (int) or intval() on a UUID.
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+
+		if ( empty( $safe_id ) ) {
 			error_log( 'Invalid character_id in get_character_equipped_items' );
 			return [];
 		}
@@ -120,7 +129,7 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 		return tw_supabase_get(
 			'cyber_character_inventory',
 			[
-				'character_id' => 'eq.' . $character_id,
+				'character_id' => 'eq.' . $safe_id,
 				'is_equipped'  => 'eq.true',
 				'select'       => 'quantity,cyber_items(name,img_url,slot,rarity,size)',
 			]

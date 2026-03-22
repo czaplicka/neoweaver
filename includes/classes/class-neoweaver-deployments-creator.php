@@ -124,6 +124,21 @@ class Neoweaver_Deployments_Creator {
 		return null;
 	}
 
+	/**
+	 * Sanitize a UUID or integer ID for safe use in a Supabase REST payload.
+	 *
+	 * cyber_worlds.id and cyber_characters.id are UUID strings. Passing them
+	 * as PHP int (or casting with intval()) collapses every UUID to 0, breaking
+	 * FK constraints on insert. Strip everything except alphanumerics and
+	 * hyphens — safe for both UUID v4 and legacy integer IDs.
+	 *
+	 * @param  mixed $raw_id
+	 * @return string  Sanitized ID, or '' if nothing valid remains.
+	 */
+	private function sanitize_id( $raw_id ): string {
+		return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw_id );
+	}
+
 	// -------------------------------------------------------------------------
 	// Validation
 	// -------------------------------------------------------------------------
@@ -133,9 +148,11 @@ class Neoweaver_Deployments_Creator {
 	 *
 	 * Checks:
 	 *  1. Required fields are present and non-empty:
-	 *     wp_user_id, name, game_mode, world_type, gm_style, game_length, priority.
+	 *     wp_user_id, name, game_mode, gm_style, game_length, priority.
+	 *     (world_type is intentionally excluded — it is set during world linkage,
+	 *     not at campaign creation time, and is nullable in cyber_campaign.)
 	 *  2. Deployment name is a non-empty string.
-	 *  3. Numeric fields (game_mode, world_type, game_length, priority) are > 0.
+	 *  3. Numeric fields (game_mode, game_length, priority) are > 0.
 	 *
 	 * Returns true on success, WP_Error with a descriptive code on failure.
 	 *
@@ -143,8 +160,8 @@ class Neoweaver_Deployments_Creator {
 	 * @return true|WP_Error
 	 */
 	public function validate( array $data ) {
-		// Required field keys.
-		$required = [ 'wp_user_id', 'name', 'game_mode', 'world_type', 'gm_style', 'game_length', 'priority' ];
+		// Required field keys (world_type excluded — nullable, set during linkage).
+		$required = [ 'wp_user_id', 'name', 'game_mode', 'gm_style', 'game_length', 'priority' ];
 		foreach ( $required as $field ) {
 			if ( ! isset( $data[ $field ] ) || $data[ $field ] === '' ) {
 				return new WP_Error(
@@ -160,7 +177,7 @@ class Neoweaver_Deployments_Creator {
 		}
 
 		// Numeric range guards for selectable fields (1–5 per UI).
-		$numeric_fields = [ 'game_mode', 'world_type', 'game_length', 'priority' ];
+		$numeric_fields = [ 'game_mode', 'game_length', 'priority' ];
 		foreach ( $numeric_fields as $field ) {
 			if ( (int) $data[ $field ] < 1 ) {
 				return new WP_Error(
@@ -195,7 +212,7 @@ class Neoweaver_Deployments_Creator {
 			'wp_user_id'  => intval( $data['wp_user_id'] ),
 			'name'        => sanitize_text_field( $data['name'] ),
 			'game_mode'   => intval( $data['game_mode'] ),
-			'world_type'  => intval( $data['world_type'] ),
+			'world_type'  => isset( $data['world_type'] ) ? intval( $data['world_type'] ) : null,
 			'gm_style'    => sanitize_text_field( $data['gm_style'] ),
 			'customize'   => sanitize_textarea_field( $data['customize'] ?? '' ),
 			'is_active'   => true,
@@ -217,26 +234,36 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Link a world (Node) to the deployment in cyber_campaign_worlds.
 	 *
-	 * Column names exactly match the original shortcode JS POST body:
-	 *   campaign_id, world_id, creator_wp_id.
+	 * BUG-FIX: $world_id was typed as int and passed directly to Supabase.
+	 * cyber_worlds.id is a UUID string — intval() on a UUID collapses it to 0,
+	 * causing the FK constraint to reject the insert or store a corrupt value.
+	 * The parameter is now typed as string|int and run through sanitize_id()
+	 * before use. Callers in create() are updated accordingly.
 	 *
-	 * @param string $campaign_id      UUID of the newly created campaign.
-	 * @param int    $world_id         Supabase primary key of cyber_worlds.
-	 * @param int    $creator_wp_id    WordPress user ID of the campaign creator.
+	 * @param string      $campaign_id    UUID of the newly created campaign.
+	 * @param string|int  $world_id       Supabase primary key (UUID) of cyber_worlds.
+	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
 	 * @return bool  true on success, false on failure.
 	 */
-	public function link_world( string $campaign_id, int $world_id, int $creator_wp_id ): bool {
+	public function link_world( string $campaign_id, $world_id, int $creator_wp_id ): bool {
+		$safe_world_id = $this->sanitize_id( $world_id );
+
+		if ( empty( $safe_world_id ) ) {
+			error_log( 'TW Deployments: link_world — invalid world_id: ' . $world_id );
+			return false;
+		}
+
 		$payload = [
-			'campaign_id'    => $campaign_id,
-			'world_id'       => $world_id,
-			'creator_wp_id'  => $creator_wp_id,
+			'campaign_id'   => $campaign_id,
+			'world_id'      => $safe_world_id,
+			'creator_wp_id' => $creator_wp_id,
 		];
 
 		$url = $this->table_url( 'cyber_campaign_worlds' );
 		$row = $this->post_json( $url, $payload );
 
 		if ( ! $row ) {
-			error_log( 'TW Deployments: link_world failed — campaign=' . $campaign_id . ' world=' . $world_id );
+			error_log( 'TW Deployments: link_world failed — campaign=' . $campaign_id . ' world=' . $safe_world_id );
 			return false;
 		}
 
@@ -246,18 +273,28 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Link a Field Agent to the deployment in cyber_campaign_characters.
 	 *
-	 * Column names exactly match the original shortcode JS POST body:
-	 *   campaign_id, character_id, creator_wp_id.
+	 * BUG-FIX: $character_id was typed as int and passed directly to Supabase.
+	 * cyber_characters.id is a UUID string — intval() on a UUID collapses it
+	 * to 0, causing the FK constraint to reject the insert or store a corrupt
+	 * value. The parameter is now typed as string|int and run through
+	 * sanitize_id() before use. Callers in create() are updated accordingly.
 	 *
-	 * @param string $campaign_id      UUID of the newly created campaign.
-	 * @param int    $character_id     Supabase primary key of cyber_characters.
-	 * @param int    $creator_wp_id    WordPress user ID of the campaign creator.
+	 * @param string      $campaign_id    UUID of the newly created campaign.
+	 * @param string|int  $character_id   Supabase primary key (UUID) of cyber_characters.
+	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
 	 * @return bool  true on success, false on failure.
 	 */
-	public function link_character( string $campaign_id, int $character_id, int $creator_wp_id ): bool {
+	public function link_character( string $campaign_id, $character_id, int $creator_wp_id ): bool {
+		$safe_character_id = $this->sanitize_id( $character_id );
+
+		if ( empty( $safe_character_id ) ) {
+			error_log( 'TW Deployments: link_character — invalid character_id: ' . $character_id );
+			return false;
+		}
+
 		$payload = [
 			'campaign_id'   => $campaign_id,
-			'character_id'  => $character_id,
+			'character_id'  => $safe_character_id,
 			'creator_wp_id' => $creator_wp_id,
 		];
 
@@ -265,7 +302,7 @@ class Neoweaver_Deployments_Creator {
 		$row = $this->post_json( $url, $payload );
 
 		if ( ! $row ) {
-			error_log( 'TW Deployments: link_character failed — campaign=' . $campaign_id . ' character=' . $character_id );
+			error_log( 'TW Deployments: link_character failed — campaign=' . $campaign_id . ' character=' . $safe_character_id );
 			return false;
 		}
 
@@ -291,12 +328,16 @@ class Neoweaver_Deployments_Creator {
 	 * the pipeline — the deployment row itself already exists by that point
 	 * and unlinking is recoverable from the admin side.
 	 *
-	 * @param array    $data          Sanitised deployment data (all required fields).
-	 * @param int|null $world_id      Optional: link this Node to the deployment.
-	 * @param int|null $character_id  Optional: link this Field Agent to the deployment.
+	 * BUG-FIX: $world_id and $character_id are now string|null (UUID) instead
+	 * of int|null, matching the actual Supabase column types. Callers that
+	 * previously cast these to int before passing them here must stop doing so.
+	 *
+	 * @param array            $data          Sanitised deployment data (all required fields).
+	 * @param string|int|null  $world_id      Optional: link this Node to the deployment.
+	 * @param string|int|null  $character_id  Optional: link this Field Agent to the deployment.
 	 * @return string|null  New campaign UUID, or null on hard failure.
 	 */
-	public function create( array $data, ?int $world_id = null, ?int $character_id = null ): ?string {
+	public function create( array $data, $world_id = null, $character_id = null ): ?string {
 		// 1. Validate.
 		$valid = $this->validate( $data );
 		if ( is_wp_error( $valid ) ) {

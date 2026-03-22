@@ -20,6 +20,15 @@
  *   - JS lives in assets/js/ and is enqueued via wp_enqueue_script().
  *   No inline <style> or <script> blocks belong in this class.
  *
+ * WIZARD SHORTCODES:
+ *   The three creation wizards (character, campaign, world) have been extracted
+ *   into their own files under public/shortcodes/:
+ *     - shortcode-character-creator.php  → [tale_weaver_character_creator]
+ *     - shortcode-campaign-creator.php   → [tw_create_campaign]
+ *     - shortcode-world-creator.php      → [tw_world_creator]
+ *   The methods here delegate to the standalone functions defined in those files.
+ *   Asset enqueueing and shortcode registration remain in this class.
+ *
  * @package Neoweaver
  */
 
@@ -41,19 +50,16 @@ class Neoweaver_Public {
 	/** @var Neoweaver_Nodes_Creator */
 	protected Neoweaver_Nodes_Creator $nodes_creator;
 
-	// ── Transient TTL (seconds) for campaign-creator lookup lists ──────────
-	private const CAMPAIGN_CACHE_TTL = 60;
-
 	public function __construct(
 		Neoweaver_Agents_List $agents_list,
 		Neoweaver_Agents_Creator $agents_creator,
 		Neoweaver_Deployments_Creator $deployments_creator,
 		Neoweaver_Nodes_Creator $nodes_creator
 	) {
-		$this->agents_list          = $agents_list;
-		$this->agents_creator       = $agents_creator;
-		$this->deployments_creator  = $deployments_creator;
-		$this->nodes_creator        = $nodes_creator;
+		$this->agents_list         = $agents_list;
+		$this->agents_creator      = $agents_creator;
+		$this->deployments_creator = $deployments_creator;
+		$this->nodes_creator       = $nodes_creator;
 
 		add_shortcode( 'tw_list_characters',            [ $this, 'shortcode_list_characters' ] );
 		add_shortcode( 'tale_weaver_character_creator', [ $this, 'shortcode_character_creator' ] );
@@ -61,9 +67,9 @@ class Neoweaver_Public {
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
 		add_shortcode( 'tw_active_node',                [ $this, 'shortcode_active_node' ] );
 
-		add_action( 'wp_enqueue_scripts',  [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_footer',           [ $this, 'enqueue_quick_actions_bridge' ] );
-		add_action( 'wp_footer',           [ $this, 'render_tag_update_popup' ] );
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'wp_footer',          [ $this, 'enqueue_quick_actions_bridge' ] );
+		add_action( 'wp_footer',          [ $this, 'render_tag_update_popup' ] );
 	}
 
 	// =========================================================================
@@ -74,7 +80,7 @@ class Neoweaver_Public {
 	 * Enqueue per-wizard CSS and JS on the front-end.
 	 *
 	 * Each wizard gets its own stylesheet and script file so browsers can cache
-	 * them independently.  All files live under the child-theme's assets/
+	 * them independently. All files live under the child-theme's assets/
 	 * directory and are versioned via filemtime() for automatic cache-busting.
 	 */
 	public function enqueue_assets(): void {
@@ -160,69 +166,16 @@ class Neoweaver_Public {
 		$path = get_stylesheet_directory() . '/templates/partials/' . $partial;
 
 		if ( ! file_exists( $path ) ) {
-			// Surface a visible dev-only hint; harmless in production (outputs nothing visible).
 			return '<!-- Neoweaver: missing partial ' . esc_html( $partial ) . ' -->';
 		}
 
 		ob_start();
-		// Import $tw_data into the partial's local scope via extract — all
-		// keys are prefixed with 'tw_' in the callers to prevent collisions.
 		( static function ( $tw_data, $__path ) {
-			extract( [ 'tw_data' => $tw_data ], EXTR_SKIP ); // expose as $tw_data
+			extract( [ 'tw_data' => $tw_data ], EXTR_SKIP );
 			include $__path;
 		} )( $tw_data, $path );
 
 		return ob_get_clean() ?: '';
-	}
-
-	/**
-	 * Fetch a Supabase REST resource with optional per-user transient caching.
-	 *
-	 * @param string $table      Table name (appended to the REST base URL).
-	 * @param array  $query_args Query-string parameters (e.g. ['select' => 'id,name']).
-	 * @param int    $user_id    Cache key component; 0 = no caching.
-	 * @param int    $ttl        Transient lifetime in seconds.
-	 * @return array  Decoded JSON rows, or an empty array on failure.
-	 */
-	private function supabase_get( string $table, array $query_args, int $user_id = 0, int $ttl = 0 ): array {
-		$cache_key = $ttl > 0 && $user_id > 0
-			? 'tw_sb_' . $user_id . '_' . md5( $table . serialize( $query_args ) )
-			: '';
-
-		if ( $cache_key ) {
-			$cached = get_transient( $cache_key );
-			if ( $cached !== false ) {
-				return $cached;
-			}
-		}
-
-		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon_key = tw_supabase_anon_key();
-		$headers  = [
-			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . $anon_key,
-		];
-
-		$response = wp_remote_get(
-			add_query_arg( $query_args, $url_base . $table ),
-			[ 'headers' => $headers ]
-		);
-
-		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-			$reason = is_wp_error( $response )
-				? $response->get_error_message()
-				: wp_remote_retrieve_response_code( $response );
-			error_log( "NeoWeaver: Supabase fetch failed for '{$table}' – {$reason}" );
-			return [];
-		}
-
-		$rows = json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
-
-		if ( $cache_key ) {
-			set_transient( $cache_key, $rows, $ttl );
-		}
-
-		return $rows;
 	}
 
 	// =========================================================================
@@ -246,170 +199,44 @@ class Neoweaver_Public {
 
 	// =========================================================================
 	// SHORTCODE: character creator
+	// Delegate to standalone function in shortcode-character-creator.php
 	// =========================================================================
 
 	/**
 	 * [tale_weaver_character_creator]
-	 *
-	 * Renders the 9-step character creation wizard.
-	 *
-	 * RENDER-ONLY. The form submits via fetch() to the theme endpoint at
-	 * {stylesheet_dir}/endpoint/tw-endpoint-character.php.
-	 *
-	 * BUG FIX #8:
-	 *   The old selectClass() JS inferred the skill limit from the visible
-	 *   <strong> class-name text (hardcoded "PSYCHIC" check). That broke
-	 *   whenever a class was renamed in Supabase.
-	 *
-	 *   Fix: loadClasses() now stores each class's skill_limit value as a
-	 *   data-skill-limit attribute on the radio <input>.  selectClass() reads
-	 *   that attribute — no string comparison needed, and any class can have
-	 *   any limit set directly in Supabase.
-	 *
-	 *   The JS change lives in assets/js/tw-character-creator.js.
-	 *   This method only passes the nonce and endpoint URL through wp_localize_script().
-	 *
-	 * CSS scope: .neoweaver-screen #tw-char-creator  (tw-character-creator.css)
-	 * JS file:   assets/js/tw-character-creator.js   (enqueued by enqueue_assets())
+	 * Delegates to neoweaver_shortcode_character_creator() defined in
+	 * public/shortcodes/shortcode-character-creator.php.
 	 */
 	public function shortcode_character_creator(): string {
-		if ( ! is_user_logged_in() ) {
-			return $this->screen( '<div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div>' );
-		}
-
-		$nonce    = wp_create_nonce( 'tw_character_nonce' );
-		$endpoint = get_stylesheet_directory_uri() . '/endpoint/tw-endpoint-character.php';
-
-		// Pass nonce and endpoint to the already-enqueued JS file.
-		wp_localize_script(
-			'neoweaver-char-creator',
-			'twCharCreatorConfig',
-			[
-				'nonce'    => $nonce,
-				'endpoint' => $endpoint,
-			]
-		);
-
-		// Attribute definitions rendered server-side so the PHP loop stays in PHP.
-		$attrs = [
-			'body'   => [ 'BODY (STR+CON)',    'Brute force, health pool, heavy lifting.' ],
-			'reflex' => [ 'REFLEX (DEX)',       'Speed, evasion, precision aiming.' ],
-			'mind'   => [ 'MIND (INT+WIS)',     'Logic, repair, investigation, awareness.' ],
-			'spirit' => [ 'SPIRIT (CHA+WILL)', 'Magic power, persuasion, willpower.' ],
-		];
-
-		$html = $this->load_template( 'character-creator.php', [
-			'attrs' => $attrs,
-		] );
-
-		return $this->screen( $html );
+		return neoweaver_shortcode_character_creator();
 	}
 
 	// =========================================================================
 	// SHORTCODE: campaign / deployment creator
+	// Delegate to standalone function in shortcode-campaign-creator.php
 	// =========================================================================
 
 	/**
 	 * [tw_create_campaign]
-	 *
-	 * Renders the 8-step deployment (campaign) creation wizard.
-	 *
-	 * OPTIMISATION 1:
-	 *   The two Supabase look-up lists (worlds, characters) are now cached per
-	 *   user with a short transient (CAMPAIGN_CACHE_TTL seconds).  On a warm
-	 *   cache this page renders with zero outbound HTTP calls.  The transient
-	 *   key includes the user ID so different operators never see each other's
-	 *   data.
-	 *
-	 * CSS scope: .neoweaver-screen #tw-campaign-creator-container
-	 * JS file:   assets/js/tw-campaign-creator.js
+	 * Delegates to neoweaver_shortcode_campaign_creator() defined in
+	 * public/shortcodes/shortcode-campaign-creator.php.
 	 */
 	public function shortcode_campaign_creator(): string {
-		$user_id = get_current_user_id();
-		if ( ! $user_id ) {
-			return $this->screen( '<p class="tw-error">UPLINK REQUIRED. LOG IN.</p>' );
-		}
-
-		// OPTIMISATION 1 — cached Supabase look-ups.
-		$worlds     = $this->supabase_get(
-			'cyber_worlds',
-			[ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ],
-			$user_id,
-			self::CAMPAIGN_CACHE_TTL
-		);
-		$characters = $this->supabase_get(
-			'cyber_characters',
-			[ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ],
-			$user_id,
-			self::CAMPAIGN_CACHE_TTL
-		);
-
-		$campaign_nonce = wp_create_nonce( 'tw_campaign_nonce' );
-
-		wp_localize_script(
-			'neoweaver-campaign-creator',
-			'twCampaignConfig',
-			[ 'nonce' => $campaign_nonce ]
-		);
-
-		$html = $this->load_template( 'campaign-creator.php', [
-			'worlds'     => $worlds,
-			'characters' => $characters,
-		] );
-
-		return $this->screen( $html );
+		return neoweaver_shortcode_campaign_creator();
 	}
 
 	// =========================================================================
 	// SHORTCODE: node / world creator
+	// Delegate to standalone function in shortcode-world-creator.php
 	// =========================================================================
 
 	/**
 	 * [tw_world_creator]
-	 *
-	 * Renders the 11-step Node (World) creation wizard.
-	 *
-	 * CSS scope: .neoweaver-screen #tw-world-creator-container
-	 * JS file:   assets/js/tw-world-creator.js
+	 * Delegates to neoweaver_shortcode_world_creator() defined in
+	 * public/shortcodes/shortcode-world-creator.php.
 	 */
 	public function shortcode_world_creator(): string {
-		if ( ! is_user_logged_in() ) {
-			return $this->screen( '<div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div>' );
-		}
-
-		$nonce    = wp_create_nonce( 'tw_world_nonce' );
-		$endpoint = get_stylesheet_directory_uri() . '/endpoint/tw-endpoint-world.php';
-		$nodes_url = home_url( '/nodes/' );
-
-		wp_localize_script(
-			'neoweaver-world-creator',
-			'twWorldCreatorConfig',
-			[
-				'nonce'     => $nonce,
-				'endpoint'  => $endpoint,
-				'nodesUrl'  => $nodes_url,
-			]
-		);
-
-		// World-step option definitions stay in PHP — they are static config
-		// with no business logic, and keeping them here lets translators use
-		// standard WP i18n functions in the future without touching JS.
-		$world_steps = [
-			3  => [ 'WORLD_SIZE',     'Define expansion magnitude',  [ ['Local Node','A single, dense micro-world.'], ['Few Nodes','A vast region.'], ['Multi Nodes','Full nodes simulation.'], ['World','Multiple systems.'], ['Infinite','Infinite reality stream.'] ],          'size'       ],
-			4  => [ 'NODE_ECONOMY',   'Resource availability',       [ ['Frayed','Survival is a miracle.'], ['Scarcity','Basic scavenge economy.'], ['Balanced','Stable commerce.'], ['Wealthy','High consumerism.'], ['Abundant','Digital abundance.'] ],                       'wealth'     ],
-			5  => [ 'ENTROPY_DANGER', 'Entropy & Threat Rate',       [ ['Coherent','Stable world.'], ['Stable','Manageable threats.'], ['Unstable','Standard risks.'], ['Critical','The Fray is strong.'], ['Catastrophic','Systemic collapse.'] ],                             'difficulty' ],
-			6  => [ 'NODE_MAGIC',     'Weave Permeability',          [ ['None','Strict logic.'], ['Glitched','Rare anomalies.'], ['Standard','Standard utility.'], ['High','Reality is soft.'], ['Extreme','Chaos rules.'] ],                                                   'magic'      ],
-			7  => [ 'NODE_GODS',      'Higher Protocols / Admins',   [ ['Absent','No entities.'], ['Echoes','Forgotten Admins.'], ['Observers','Silent code.'], ['Active','Demanding data.'], ['Manifested','God-AI active.'] ],                                                'gods'       ],
-			8  => [ 'NODE_TECH',      'Technological Anchor',        [ ['Retro','Analog/CRT, late \'90.'], ['Modern','Networked. Today'], ['Advanced','Cybernetics. Tomorrow'], ['Future','Sentient AI. Close future'], ['Transcendent','Post-human. Apocalyptic future'] ],    'technology' ],
-			9  => [ 'NODE_SOCIAL',    'Thread interaction',          [ ['Hostile','Tribal survival.'], ['Strained','Faction tension.'], ['Pragmatic','Uneasy peace.'], ['Integrated','Common goals.'], ['Unified','Hive-mind.'] ],                                               'relations'  ],
-			10 => [ 'NODE_MORALITY',  'Ethical Framework',           [ ['Chaotic','Fittest survives.'], ['Gray','Ambiguity.'], ['Lawful','Strict codes.'] ],                                                                                                                     'moral'      ],
-		];
-
-		$html = $this->load_template( 'world-creator.php', [
-			'world_steps' => $world_steps,
-		] );
-
-		return $this->screen( $html );
+		return neoweaver_shortcode_world_creator();
 	}
 
 	// =========================================================================

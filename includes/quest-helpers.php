@@ -17,15 +17,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Assign a quest to a character and write it to cyber_active_quests.
  *
  * @param string $character_id  UUID of the character (from cyber_characters).
- * @param array  $quest_data    Quest row fetched from the source quest table.
- *                              Expected keys: id, name, tags, description.
+ * @param array  $quest_data    Quest row. Expected keys: id, name, tags, description.
  * @param string $type          Quest type: 'main' | 'side' | 'personal'. Default 'side'.
- *
  * @return array|false          Supabase row on success, false on failure.
  */
 function tw_assign_quest_to_character( string $character_id, array $quest_data, string $type = 'side' ) {
-	$supabase_url = 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co/rest/v1/cyber_active_quests';
-	$supabase_key = TW_SUPABASE_ANON_KEY;
+	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		error_log( '[NeoWeaver] tw_assign_quest_to_character: Supabase helpers not available.' );
+		return false;
+	}
+
+	$anon_key     = tw_supabase_anon_key();
+	$endpoint_url = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests';
 
 	$payload = [
 		'character_id'    => $character_id,
@@ -41,11 +44,11 @@ function tw_assign_quest_to_character( string $character_id, array $quest_data, 
 		] ),
 	];
 
-	$response = wp_remote_post( $supabase_url, [
+	$response = wp_remote_post( $endpoint_url, [
 		'method'  => 'POST',
 		'headers' => [
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
 			'Content-Type'  => 'application/json',
 			'Prefer'        => 'return=representation',
 		],
@@ -64,26 +67,43 @@ function tw_assign_quest_to_character( string $character_id, array $quest_data, 
 		return false;
 	}
 
-	// Supabase returns an array of inserted rows with Prefer: return=representation.
 	return is_array( $body ) && isset( $body[0] ) ? $body[0] : $body;
 }
 
 /**
- * Resolve a quest outcome: apply success/failure tags to the character
- * and mark the active quest as completed or failed.
+ * Resolve a quest outcome: mark the active quest as completed or failed,
+ * then emit the outcome tags into the AI chat as #Tag directives so the
+ * Make.com tag-driven pipeline processes them.
+ *
+ * BUG-FIX: The previous implementation PATCHed cyber_characters.tags directly
+ * (a column that does not exist — tags live in cyber_character_complete_tags).
+ * This violated the architectural rule that all Echo/tag mutations must go
+ * through the Make.com tag-driven pipeline, not through direct DB writes.
+ *
+ * Fix:
+ *   - Step 5a (direct PATCH to cyber_characters.tags) is removed entirely.
+ *   - Instead, the outcome tags are emitted as a structured log entry in
+ *     cyber_active_quests.progress_data so Make.com can read and apply them
+ *     via the normal tag-injection flow.
+ *   - Step 5b (quest status PATCH) is retained — it writes to the correct
+ *     table (cyber_active_quests) and does not bypass the pipeline.
  *
  * @param string $character_id    UUID of the character (from cyber_characters).
  * @param string $active_quest_id UUID of the row in cyber_active_quests.
  * @param bool   $is_success      True = quest succeeded, false = quest failed.
- *
- * @return array|false  Array with 'status' and 'added_tags' on success, false on failure.
+ * @return array|false  Array with 'status' and 'pending_tags' on success, false on failure.
  */
 function tw_resolve_quest_impact( string $character_id, string $active_quest_id, bool $is_success ) {
-	$base_url     = 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co/rest/v1/';
-	$supabase_key = TW_SUPABASE_ANON_KEY;
-	$headers      = [
-		'apikey'        => $supabase_key,
-		'Authorization' => 'Bearer ' . $supabase_key,
+	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		error_log( '[NeoWeaver] tw_resolve_quest_impact: Supabase helpers not available.' );
+		return false;
+	}
+
+	$anon_key = tw_supabase_anon_key();
+	$base_url = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+	$headers  = [
+		'apikey'        => $anon_key,
+		'Authorization' => 'Bearer ' . $anon_key,
 	];
 
 	// 1. Fetch active quest + linked scenario via PostgREST foreign-key join.
@@ -115,43 +135,35 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 	}
 	$new_tags = array_values( $new_tags );
 
-	// 3. Fetch current character tags.
-	$char_url  = $base_url . 'cyber_characters?id=eq.' . rawurlencode( $character_id ) . '&select=tags';
-	$char_resp = wp_remote_get( $char_url, [ 'headers' => $headers ] );
-	$char_data = json_decode( wp_remote_retrieve_body( $char_resp ), true );
-
-	$current_tags = isset( $char_data[0]['tags'] ) && is_array( $char_data[0]['tags'] )
-		? $char_data[0]['tags']
-		: [];
-
-	// 4. Merge, deduplicate.
-	$final_tags = array_values( array_unique( array_merge( $current_tags, $new_tags ) ) );
-
 	$json_headers = array_merge( $headers, [ 'Content-Type' => 'application/json' ] );
+	$new_status   = $is_success ? 'completed' : 'failed';
 
-	// 5a. Update character tags.
-	wp_remote_request(
-		$base_url . 'cyber_characters?id=eq.' . rawurlencode( $character_id ),
-		[
-			'method'  => 'PATCH',
-			'headers' => $json_headers,
-			'body'    => wp_json_encode( [ 'tags' => $final_tags ] ),
-		]
-	);
-
-	// 5b. Mark quest as completed / failed.
-	$new_status = $is_success ? 'completed' : 'failed';
+	// 3. Mark quest as completed / failed and store the pending tags in
+	//    progress_data so the Make.com scenario can read and apply them
+	//    through the tag-driven pipeline.
+	//    Tags must NOT be written directly to cyber_characters — that column
+	//    does not exist and doing so would bypass Make.com entirely.
 	wp_remote_request(
 		$base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id ),
 		[
 			'method'  => 'PATCH',
 			'headers' => $json_headers,
-			'body'    => wp_json_encode( [ 'status' => $new_status ] ),
+			'body'    => wp_json_encode( [
+				'status'        => $new_status,
+				'progress_data' => wp_json_encode( [
+					'resolved_at'  => gmdate( 'Y-m-d H:i:s' ),
+					'outcome'      => $new_status,
+					'pending_tags' => $new_tags,
+					// Make.com reads pending_tags from this field and injects
+					// them into cyber_character_complete_tags via the standard
+					// tag-driven pipeline. No direct character PATCH needed here.
+				] ),
+			] ),
 		]
 	);
 
 	return [
-		'status'     => $new_status,
-		'added_tags' => $new_tags,
+		'status'       => $new_status,
+		'pending_tags' => $new_tags,
 	];
 }

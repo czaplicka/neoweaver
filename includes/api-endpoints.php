@@ -13,6 +13,11 @@
  * BUG-FIX 9  : neoweaver_create_campaign had no nonce verification.
  * BUG-FIX 14 : $body variable collision in character endpoint fixed by
  *              renaming the attribute variables.
+ * BUG-FIX 15 : RPC seeding in neoweaver_create_world() passed p_world_id as
+ *              (int) $world_id. cyber_worlds.id is a UUID string — casting to
+ *              int collapses it to 0, so all three seeding RPCs were called
+ *              with p_world_id=0 and seeded a non-existent world. Fixed by
+ *              passing the raw UUID string instead.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -118,10 +123,19 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 		return new WP_Error( 'no_id', 'World created but no ID returned.', [ 'status' => 500 ] );
 	}
 
+	// BUG-FIX 15: cyber_worlds.id is a UUID string. The previous code cast
+	// $world_id with (int) before passing it to the RPCs as p_world_id, which
+	// collapsed every UUID to 0. All three seeding RPCs were therefore called
+	// with p_world_id=0 and seeded a non-existent world.
+	// Fix: sanitize as a UUID-safe string (strip non-alphanumeric/hyphen chars)
+	// and pass the raw string to the RPCs. The PostgreSQL RPC parameter type
+	// for p_world_id is uuid, which expects a string, not an integer.
+	$safe_world_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id );
+
 	// RPC seeding — fire-and-forget (non-fatal if they fail)
 	$rpc_base  = nw_supabase_base() . 'rpc/';
 	$rpc_hdrs  = nw_supabase_headers();
-	$world_arg = wp_json_encode( [ 'p_world_id' => (int) $world_id ] );
+	$world_arg = wp_json_encode( [ 'p_world_id' => $safe_world_id ] );
 
 	foreach ( [ 'fn_seed_complete_world_rpc', 'fn_seed_world_tags', 'fn_world_tags_to_globals_random' ] as $rpc ) {
 		$rpc_res = wp_remote_post( $rpc_base . $rpc, [
@@ -139,12 +153,12 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 		}
 	}
 
-	error_log( 'TW_ENDPOINT_WORLD: SUCCESS world_id=' . $world_id );
+	error_log( 'TW_ENDPOINT_WORLD: SUCCESS world_id=' . $safe_world_id );
 
 	return rest_ensure_response( [
 		'success' => true,
 		'data'    => [
-			'worldid' => (int) $world_id,
+			'worldid' => $safe_world_id,
 			'message' => 'World created and seeding launched.',
 		],
 	] );
@@ -194,7 +208,10 @@ function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Respons
 	$attr_reflex = max( 1, min( 5, (int) ( $request->get_param( 'attr_reflex' ) ?? 3 ) ) );
 	$attr_mind   = max( 1, min( 5, (int) ( $request->get_param( 'attr_mind' )   ?? 3 ) ) );
 	$attr_spirit = max( 1, min( 5, (int) ( $request->get_param( 'attr_spirit' ) ?? 3 ) ) );
-	$node_id     = $request->get_param( 'node_id' ) ? (int) $request->get_param( 'node_id' ) : null;
+
+	// node_id is a UUID — sanitize as string, not int.
+	$node_id_raw = $request->get_param( 'node_id' );
+	$node_id     = $node_id_raw ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $node_id_raw ) : null;
 
 	// Delegate to the creator class so all pipeline steps (HUD, echo tags,
 	// starting package) run in one place.
@@ -224,13 +241,11 @@ function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Respons
 
 	// Handle avatar upload if present
 	if ( ! empty( $_FILES['avatar']['tmp_name'] ) ) {
-		// WordPress media upload pipeline
 		if ( ! function_exists( 'wp_handle_upload' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/file.php';
 		}
 		$upload = wp_handle_upload( $_FILES['avatar'], [ 'test_form' => false ] );
 		if ( ! empty( $upload['url'] ) ) {
-			// PATCH avatar_url onto the character row
 			$patch_url = add_query_arg( [ 'id' => 'eq.' . $agent_id ], $base . 'cyber_characters' );
 			wp_remote_request( $patch_url, [
 				'method'  => 'PATCH',
@@ -260,7 +275,6 @@ function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Respons
 function neoweaver_create_campaign( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	error_log( 'TW_ENDPOINT_CAMPAIGN: START (REST API)' );
 
-	// BUG-FIX 9: nonce was not checked at all in the original
 	$nonce = $request->get_param( 'nonce' ) ?? '';
 	if ( ! wp_verify_nonce( $nonce, 'tw_campaign_nonce' ) ) {
 		return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
@@ -287,8 +301,11 @@ function neoweaver_create_campaign( WP_REST_Request $request ): WP_REST_Response
 		return new WP_Error( 'missing_name', 'Campaign name is required.', [ 'status' => 400 ] );
 	}
 
-	$world_id     = $request->get_param( 'world_id' )     ? (int) $request->get_param( 'world_id' )     : null;
-	$character_id = $request->get_param( 'character_id' ) ? (int) $request->get_param( 'character_id' ) : null;
+	// world_id and character_id are UUIDs — sanitize as strings.
+	$world_id_raw     = $request->get_param( 'world_id' );
+	$character_id_raw = $request->get_param( 'character_id' );
+	$world_id         = $world_id_raw     ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id_raw )     : null;
+	$character_id     = $character_id_raw ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id_raw ) : null;
 
 	$campaign_id = $creator->create( $data, $world_id, $character_id );
 
@@ -324,7 +341,9 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		return new WP_Error( 'unauthorized', 'You must be logged in.', [ 'status' => 401 ] );
 	}
 
-	$campaign_id = (int) ( $request->get_param( 'campaign_id' ) ?? 0 );
+	// campaign_id is a UUID — sanitize as string.
+	$campaign_id_raw = $request->get_param( 'campaign_id' ) ?? '';
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
 	if ( ! $campaign_id ) {
 		return new WP_Error( 'missing_campaign', 'Missing campaign ID.', [ 'status' => 400 ] );
 	}
@@ -335,7 +354,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	// Fetch campaign with linked world and character
+	// Fetch campaign with linked world and character.
 	$query_url = add_query_arg( [
 		'id'     => 'eq.' . $campaign_id,
 		'select' => 'cyber_campaign_worlds(world_id),cyber_campaign_characters(character_id)',
@@ -357,18 +376,23 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		return new WP_Error( 'campaign_not_found', 'Campaign not found.', [ 'status' => 404 ] );
 	}
 
-	$world_id     = $campaign['cyber_campaign_worlds'][0]['world_id']       ?? null;
+	// world_id and character_id are UUIDs — keep as strings.
+	$world_id     = $campaign['cyber_campaign_worlds'][0]['world_id']         ?? null;
 	$character_id = $campaign['cyber_campaign_characters'][0]['character_id'] ?? null;
 
 	if ( ! $character_id ) {
 		return new WP_Error( 'no_character', 'No character linked to this campaign.', [ 'status' => 400 ] );
 	}
 
-	// Resolve start location (0,0) in the world
+	// Sanitize UUID FKs before using in queries.
+	$safe_world_id     = $world_id     ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id )     : null;
+	$safe_character_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+
+	// Resolve start location (0,0) in the world.
 	$start_location_id = null;
-	if ( $world_id ) {
+	if ( $safe_world_id ) {
 		$loc_url  = add_query_arg( [
-			'world_id' => 'eq.' . (int) $world_id,
+			'world_id' => 'eq.' . $safe_world_id,
 			'coord_x'  => 'eq.0',
 			'coord_y'  => 'eq.0',
 			'select'   => 'id',
@@ -377,6 +401,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		$loc_resp = wp_remote_get( $loc_url, [ 'headers' => nw_supabase_headers(), 'timeout' => 10 ] );
 		if ( ! is_wp_error( $loc_resp ) && wp_remote_retrieve_response_code( $loc_resp ) < 300 ) {
 			$loc_data          = json_decode( wp_remote_retrieve_body( $loc_resp ), true ) ?: [];
+			// location_id is an integer PK — (int) is correct here.
 			$start_location_id = ! empty( $loc_data[0]['id'] ) ? (int) $loc_data[0]['id'] : null;
 		}
 	}
@@ -385,12 +410,12 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		return new WP_Error( 'no_start_location', 'No start location (0,0) for this world.', [ 'status' => 404 ] );
 	}
 
-	// INSERT session
+	// INSERT session — UUID FKs passed as strings.
 	$session_body = [
 		'campaign_id'  => $campaign_id,
-		'character_id' => $character_id,
+		'character_id' => $safe_character_id,
 		'wp_user_id'   => $user_id,
-		'world_id'     => $world_id,
+		'world_id'     => $safe_world_id,
 		'location_id'  => $start_location_id,
 		'status'       => 'active',
 	];
@@ -414,14 +439,14 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 		return new WP_Error( 'no_session_id', 'Session created but no ID returned.', [ 'status' => 500 ] );
 	}
 
-	$session_id = (int) $session_data[0]['id'];
+	// Session ID is also a UUID — store as string in user meta.
+	$session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $session_data[0]['id'] );
 
-	// Persist to WP user meta for fast retrieval
 	update_user_meta( $user_id, 'active_session_id',   $session_id );
 	update_user_meta( $user_id, 'active_campaign_id',  $campaign_id );
-	update_user_meta( $user_id, 'active_character_id', $character_id );
-	if ( $world_id ) {
-		update_user_meta( $user_id, 'active_world_id', $world_id );
+	update_user_meta( $user_id, 'active_character_id', $safe_character_id );
+	if ( $safe_world_id ) {
+		update_user_meta( $user_id, 'active_world_id', $safe_world_id );
 	}
 
 	error_log( 'TW_ENDPOINT_START_GAME_SESSION: SUCCESS session_id=' . $session_id );
@@ -432,8 +457,8 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 			'message'      => 'Session created.',
 			'session_id'   => $session_id,
 			'campaign_id'  => $campaign_id,
-			'character_id' => $character_id,
-			'world_id'     => $world_id,
+			'character_id' => $safe_character_id,
+			'world_id'     => $safe_world_id,
 		],
 	] );
 }
@@ -461,7 +486,9 @@ function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Respons
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	$url = add_query_arg( [ 'id' => 'eq.' . (int) $session_id ], $base . 'cyber_game_sessions' );
+	// session_id stored in user meta is a UUID string — sanitize before use.
+	$safe_session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $session_id );
+	$url             = add_query_arg( [ 'id' => 'eq.' . $safe_session_id ], $base . 'cyber_game_sessions' );
 
 	$response = wp_remote_request( $url, [
 		'method'  => 'PATCH',
@@ -470,12 +497,6 @@ function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Respons
 		'timeout' => 10,
 	] );
 
-	// BUG-FIX 5: The original code called delete_user_meta() BEFORE checking
-	// whether the Supabase PATCH actually succeeded. If the PATCH failed, the
-	// session row would stay 'active' in Supabase while the user meta was already
-	// wiped, making the session invisible to get_user_game_data_from_supabase()
-	// but never actually closed — a permanently orphaned session.
-	// Fix: check the Supabase response first; only clear meta on success.
 	if ( is_wp_error( $response ) ) {
 		return new WP_Error( 'supabase_error', 'Communication error with Supabase.', [ 'status' => 500 ] );
 	}
@@ -484,19 +505,18 @@ function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Respons
 		return new WP_Error( 'patch_failed', 'Supabase returned HTTP ' . $code, [ 'status' => $code ] );
 	}
 
-	// Supabase PATCH confirmed — safe to clear local meta.
 	delete_user_meta( $user_id, 'active_session_id' );
 	delete_user_meta( $user_id, 'active_campaign_id' );
 	delete_user_meta( $user_id, 'active_character_id' );
 	delete_user_meta( $user_id, 'active_world_id' );
 
-	error_log( 'TW_ENDPOINT_END_GAME_SESSION: SUCCESS session_id=' . $session_id );
+	error_log( 'TW_ENDPOINT_END_GAME_SESSION: SUCCESS session_id=' . $safe_session_id );
 
 	return rest_ensure_response( [
 		'success' => true,
 		'data'    => [
 			'message'    => 'Session ended successfully.',
-			'session_id' => (int) $session_id,
+			'session_id' => $safe_session_id,
 			'user_id'    => (int) $user_id,
 		],
 	] );
@@ -504,9 +524,7 @@ function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Respons
 
 // ===========================================================================
 // ROUTE REGISTRATION
-// BUG-FIX 6: neoweaver_end_game_session and neoweaver_create_campaign were
-// calling register_rest_route() at file-scope (outside rest_api_init). Moved
-// ALL registrations into a single add_action('rest_api_init') block.
+// BUG-FIX 6: All registrations moved into a single add_action('rest_api_init').
 // ===========================================================================
 
 add_action( 'rest_api_init', function () {

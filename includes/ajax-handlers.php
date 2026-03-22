@@ -20,20 +20,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   tw_get_game_session_status()
  *   tw_get_chat_channel_id_by_session()
  *
- * Supabase credentials are read from the constants tw_supabase_url() /
- * tw_supabase_anon_key() (defined in wp-config via the Hostinger Supabase
- * integration) rather than bare TW_SUPABASE_* constants, keeping the same
- * convention used everywhere else in the plugin.
+ * Supabase credentials are read from tw_supabase_url() / tw_supabase_anon_key()
+ * (defined in wp-config via the Hostinger Supabase integration) rather than
+ * bare TW_SUPABASE_* constants, keeping the same convention used everywhere
+ * else in the plugin.
  */
 
 // ============================================================
 // INTERNAL HELPERS — declared first so AJAX handlers can call them
 // ============================================================
 
-/**
- * Return a Supabase REST URL for the given table + query string.
- * Centralises URL construction so every handler stays DRY.
- */
 if ( ! function_exists( 'tw_supa_url' ) ) {
 	function tw_supa_url( string $table, string $query = '' ): string {
 		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table;
@@ -41,9 +37,6 @@ if ( ! function_exists( 'tw_supa_url' ) ) {
 	}
 }
 
-/**
- * Shared headers array for every Supabase REST call.
- */
 if ( ! function_exists( 'tw_supa_headers' ) ) {
 	function tw_supa_headers(): array {
 		$key = tw_supabase_anon_key();
@@ -55,23 +48,31 @@ if ( ! function_exists( 'tw_supa_headers' ) ) {
 	}
 }
 
-/**
- * PATCH the scenario_status (and optionally active_scenario_id) on
- * the cyber_game_sessions row that matches $campaign_id.
- */
+if ( ! function_exists( 'tw_sanitize_supabase_id' ) ) {
+	function tw_sanitize_supabase_id( $raw_id ): string {
+		return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw_id );
+	}
+}
+
 if ( ! function_exists( 'tw_update_game_session_status' ) ) {
-	function tw_update_game_session_status( int $campaign_id, string $status, int $scenario_id = 0 ): bool {
+	function tw_update_game_session_status( $campaign_id, string $status, $scenario_id = 0 ): bool {
 		if ( ! function_exists( 'tw_supabase_url' ) ) {
+			return false;
+		}
+
+		$safe_campaign_id = tw_sanitize_supabase_id( $campaign_id );
+		if ( empty( $safe_campaign_id ) ) {
+			error_log( 'tw_update_game_session_status: invalid campaign_id: ' . $campaign_id );
 			return false;
 		}
 
 		$body = [ 'scenario_status' => $status, 'updated_at' => current_time( 'mysql' ) ];
 		if ( $scenario_id ) {
-			$body['active_scenario_id'] = $scenario_id;
+			$body['active_scenario_id'] = (int) $scenario_id;
 		}
 
 		$response = wp_remote_request(
-			tw_supa_url( 'cyber_game_sessions', 'campaign_id=eq.' . $campaign_id ),
+			tw_supa_url( 'cyber_game_sessions', 'campaign_id=eq.' . $safe_campaign_id ),
 			[
 				'method'  => 'PATCH',
 				'headers' => tw_supa_headers(),
@@ -84,18 +85,22 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 	}
 }
 
-/**
- * Return the scenario_status string for the most-recent session of
- * $campaign_id, or an empty string on any error.
- */
 if ( ! function_exists( 'tw_get_game_session_status' ) ) {
-	function tw_get_game_session_status( int $campaign_id ): string {
+	function tw_get_game_session_status( $campaign_id ): string {
 		if ( ! function_exists( 'tw_supabase_url' ) ) {
 			return '';
 		}
 
+		$safe_campaign_id = tw_sanitize_supabase_id( $campaign_id );
+		if ( empty( $safe_campaign_id ) ) {
+			return '';
+		}
+
 		$response = wp_remote_get(
-			tw_supa_url( 'cyber_game_sessions', 'campaign_id=eq.' . $campaign_id . '&select=scenario_status&limit=1' ),
+			tw_supa_url(
+				'cyber_game_sessions',
+				'campaign_id=eq.' . $safe_campaign_id . '&select=scenario_status&limit=1'
+			),
 			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
 		);
 
@@ -108,18 +113,19 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 	}
 }
 
-/**
- * Look up the chat_channel_id stored on the cyber_game_sessions row
- * for $session_id. Returns null if not found or on error.
- */
 if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
-	function tw_get_chat_channel_id_by_session( int $session_id ): ?int {
+	function tw_get_chat_channel_id_by_session( $session_id ): ?int {
 		if ( ! function_exists( 'tw_supabase_url' ) ) {
 			return null;
 		}
 
+		$safe_session_id = tw_sanitize_supabase_id( $session_id );
+		if ( empty( $safe_session_id ) ) {
+			return null;
+		}
+
 		$response = wp_remote_get(
-			tw_supa_url( 'cyber_game_sessions', 'id=eq.' . $session_id . '&select=chat_channel_id&limit=1' ),
+			tw_supa_url( 'cyber_game_sessions', 'id=eq.' . $safe_session_id . '&select=chat_channel_id&limit=1' ),
 			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
 		);
 
@@ -140,40 +146,48 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 
 if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 
-	add_action( 'wp_ajax_tw_start_scenario_generation',        'tw_start_scenario_generation' );
-	add_action( 'wp_ajax_nopriv_tw_start_scenario_generation', 'tw_start_scenario_generation' );
+	// BUG-FIX: was registered on both wp_ajax_ and wp_ajax_nopriv_ with no
+	// nonce check, so any unauthenticated visitor could fire the Make.com
+	// scenario-generation webhook with arbitrary IDs.
+	// Fixed: removed wp_ajax_nopriv_ registration and added check_ajax_referer().
+	add_action( 'wp_ajax_tw_start_scenario_generation', 'tw_start_scenario_generation' );
 
 	function tw_start_scenario_generation(): void {
-		// Uncomment for debugging:
-		// error_log( '🚀 SCENARIO START: ' . print_r( $_POST, true ) );
-
-		$scenario_id = (int) ( $_POST['scenario_id'] ?? 0 );
-		$campaign_id = (int) ( $_POST['campaign_id'] ?? 0 );
-
-		if ( ! $scenario_id || ! $campaign_id ) {
-			wp_send_json_error( 'Missing IDs' );
+		// Nonce must be present and valid — rejects unauthenticated callers.
+		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+			wp_send_json_error( 'Security check failed' );
+			return;
 		}
 
 		$wp_user_id = get_current_user_id();
 		if ( ! $wp_user_id ) {
 			wp_send_json_error( 'No WP user' );
+			return;
+		}
+
+		$scenario_id = (int) ( $_POST['scenario_id'] ?? 0 );
+		$campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? '' );
+
+		if ( ! $scenario_id || ! $campaign_id ) {
+			wp_send_json_error( 'Missing IDs' );
+			return;
 		}
 
 		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 			wp_send_json_error( 'Game data helper missing' );
+			return;
 		}
 
 		$game_data  = get_user_game_data_from_supabase( $wp_user_id );
-		$session_id = (int) ( $game_data['active_session_id'] ?? 0 );
+		$session_id = tw_sanitize_supabase_id( $game_data['active_session_id'] ?? '' );
 
 		if ( ! $session_id ) {
 			wp_send_json_error( 'No active session found' );
+			return;
 		}
 
 		$chat_channel_id = tw_get_chat_channel_id_by_session( $session_id );
 
-		// Update session status before firing the webhook so Make.com
-		// always sees "generating" if it polls back immediately.
 		tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
 
 		$payload = [
@@ -181,7 +195,7 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			'scenario_id'     => $scenario_id,
 			'session_id'      => $session_id,
 			'user_id'         => $wp_user_id,
-			'char_id'         => (int) ( $game_data['active_character_id'] ?? 0 ),
+			'char_id'         => tw_sanitize_supabase_id( $game_data['active_character_id'] ?? '' ),
 			'chat_channel_id' => $chat_channel_id,
 		];
 
@@ -208,10 +222,11 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 	add_action( 'wp_ajax_nopriv_tw_check_scenario_status', 'tw_check_scenario_status' );
 
 	function tw_check_scenario_status(): void {
-		$campaign_id = (int) ( $_GET['campaign_id'] ?? 0 );
+		$campaign_id = tw_sanitize_supabase_id( $_GET['campaign_id'] ?? '' );
 
 		if ( ! $campaign_id ) {
 			wp_send_json_error( 'No campaign' );
+			return;
 		}
 
 		$status = tw_get_game_session_status( $campaign_id );
@@ -220,7 +235,7 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 }
 
 // ============================================================
-// 3. GET AI / GM MESSAGE  (filters by chat_channel_id)
+// 3. GET AI / GM MESSAGE
 // ============================================================
 
 if ( ! function_exists( 'tw_get_ai_message' ) ) {
@@ -245,16 +260,14 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 			return;
 		}
 
-		// A. Resolve active session
 		$game_data  = get_user_game_data_from_supabase( $wp_user_id );
-		$session_id = (int) ( $game_data['active_session_id'] ?? 0 );
+		$session_id = tw_sanitize_supabase_id( $game_data['active_session_id'] ?? '' );
 
 		if ( ! $session_id ) {
 			wp_send_json_error( 'No active session' );
 			return;
 		}
 
-		// B. Resolve chat channel for this session
 		$chat_channel_id = tw_get_chat_channel_id_by_session( $session_id );
 
 		if ( ! $chat_channel_id ) {
@@ -262,7 +275,6 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 			return;
 		}
 
-		// C. Fetch latest AI/GM message from the correct channel
 		$response = wp_remote_get(
 			tw_supa_url(
 				'cyber_chat_messages',
@@ -290,7 +302,7 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 }
 
 // ============================================================
-// 4. LORE TIPS (for weaving overlay)
+// 4. LORE TIPS
 // ============================================================
 
 if ( ! function_exists( 'tw_get_lore_tips' ) ) {

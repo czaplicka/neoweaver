@@ -5,7 +5,10 @@
  * 1. tw_localize_deck_vars()  - localizes twGameConfig to JS on the terminal page.
  * 2. tw_get_scenarios_ajax()  - returns available (unplayed) scenarios for a campaign.
  *
- * Requires TW_SUPABASE_PROJECT_ID and TW_SUPABASE_ANON_KEY constants (wp-config.php).
+ * Credentials are read exclusively via tw_supabase_url() / tw_supabase_anon_key()
+ * (defined in supabase-config.php / wp-config.php), matching the project-wide
+ * convention. Raw TW_SUPABASE_* constants are no longer referenced here.
+ *
  * JS handle expected: 'adventure-js'
  */
 
@@ -29,20 +32,21 @@ function tw_localize_deck_vars() {
         return;
     }
 
-    // campaign_id from query var or GET fallback
-    $campaign_id = get_query_var( 'campaign_id' );
-    if ( ! $campaign_id && isset( $_GET['campaign_id'] ) ) {
-        $campaign_id = (int) $_GET['campaign_id'];
+    // campaign_id from query var or GET fallback.
+    // BUG-FIX: cyber_campaign.id is a UUID — do not cast with (int).
+    // Sanitize by stripping non-alphanumeric/hyphen characters instead.
+    $campaign_id_raw = get_query_var( 'campaign_id' );
+    if ( ! $campaign_id_raw && isset( $_GET['campaign_id'] ) ) {
+        $campaign_id_raw = $_GET['campaign_id'];
     }
+    $campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
 
-    // Auto-detect last campaign for this user if not provided
-    if (
-        ! $campaign_id &&
-        defined( 'TW_SUPABASE_PROJECT_ID' ) &&
-        defined( 'TW_SUPABASE_ANON_KEY' )
-    ) {
-        $supabase_url = 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co';
-        $anon_key     = TW_SUPABASE_ANON_KEY;
+    // Auto-detect last campaign for this user if not provided.
+    // BUG-FIX: use tw_supabase_url() / tw_supabase_anon_key() helpers instead
+    // of raw TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY constants, which
+    // may not be defined (only the helper functions are guaranteed to exist).
+    if ( ! $campaign_id && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
+        $anon_key = tw_supabase_anon_key();
 
         $campaign_url = add_query_arg(
             [
@@ -50,7 +54,7 @@ function tw_localize_deck_vars() {
                 'order'      => 'created_at.desc',
                 'limit'      => 1,
             ],
-            $supabase_url . '/rest/v1/cyber_campaign'
+            trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_campaign'
         );
 
         error_log( 'tw_localize_deck_vars: campaign lookup URL = ' . $campaign_url );
@@ -72,7 +76,8 @@ function tw_localize_deck_vars() {
             if ( $code >= 200 && $code < 300 ) {
                 $body = json_decode( $body_raw, true );
                 if ( ! empty( $body ) && isset( $body[0]['id'] ) ) {
-                    $campaign_id = (int) $body[0]['id'];
+                    // Keep as string — UUID must not be cast to int.
+                    $campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $body[0]['id'] );
                     error_log( 'tw_localize_deck_vars: found campaign_id=' . $campaign_id . ' for user ' . $user_id );
                 } else {
                     error_log( 'Supabase campaign lookup: empty/invalid body for user ' . $user_id . ' body=' . $body_raw );
@@ -83,7 +88,6 @@ function tw_localize_deck_vars() {
         }
     }
 
-    $campaign_id = (int) $campaign_id;
     error_log( 'tw_localize_deck_vars fired, campaign_id=' . $campaign_id . ', user_id=' . $user_id );
 
     wp_localize_script(
@@ -92,7 +96,7 @@ function tw_localize_deck_vars() {
         [
             'ajaxurl'     => admin_url( 'admin-ajax.php' ),
             'nonce'       => wp_create_nonce( 'tw_deck_nonce' ),
-            'campaign_id' => $campaign_id,
+            'campaign_id' => $campaign_id,   // UUID string, not int
             'user_id'     => (int) $user_id,
         ]
     );
@@ -107,30 +111,37 @@ add_action( 'wp_ajax_nopriv_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax' );
 
 function tw_get_scenarios_ajax() {
 
-    // Uncomment once JS sends the nonce:
-    // if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
-    //     wp_send_json_error( [ 'message' => 'Invalid nonce' ] );
-    // }
-
-    $campaign_id = isset( $_POST['campaign_id'] ) ? (int) $_POST['campaign_id'] : 0;
-    error_log( 'tw_get_scenarios_ajax: received campaign_id=' . $campaign_id );
-
-    if (
-        ! $campaign_id ||
-        ! defined( 'TW_SUPABASE_PROJECT_ID' ) ||
-        ! defined( 'TW_SUPABASE_ANON_KEY' )
-    ) {
-        wp_send_json_error( [ 'message' => 'Missing campaign_id or Supabase config' ] );
+    // BUG-FIX: nonce was commented out, leaving this endpoint completely
+    // unauthenticated — any visitor could enumerate all scenarios.
+    // The nonce is now enforced. The JS side must send it as the 'nonce'
+    // POST field (wp_localize_script already provides twGameConfig.nonce).
+    if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => 'Security check failed' ] );
+        return;
     }
 
-    $supabase_url = 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co';
-    $anon_key     = TW_SUPABASE_ANON_KEY;
-    $headers      = [
+    // BUG-FIX: cyber_campaign.id is a UUID — (int) cast collapses it to 0.
+    // Sanitize with UUID-safe stripping instead.
+    $campaign_id_raw = $_POST['campaign_id'] ?? '';
+    $campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
+
+    error_log( 'tw_get_scenarios_ajax: received campaign_id=' . $campaign_id );
+
+    // BUG-FIX: previously checked for TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY
+    // constants, which may not be defined. Use the project-wide helpers instead.
+    if ( ! $campaign_id || ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+        wp_send_json_error( [ 'message' => 'Missing campaign_id or Supabase config' ] );
+        return;
+    }
+
+    $anon_key    = tw_supabase_anon_key();
+    $rest_base   = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+    $headers     = [
         'apikey'        => $anon_key,
         'Authorization' => 'Bearer ' . $anon_key,
     ];
 
-    // Helper - single Supabase GET with unified error handling
+    // Helper — single Supabase GET with unified error handling.
     $supa_get = function ( $url, $label ) use ( $headers ) {
         $resp = wp_remote_get( $url, [ 'headers' => $headers, 'timeout' => 10 ] );
         if ( is_wp_error( $resp ) ) {
@@ -143,13 +154,14 @@ function tw_get_scenarios_ajax() {
         return json_decode( wp_remote_retrieve_body( $resp ), true );
     };
 
-    // 1. Campaign
-    $campaign_url = $supabase_url . '/rest/v1/cyber_campaign?id=eq.' . $campaign_id;
+    // 1. Campaign — use UUID string directly in the filter.
+    $campaign_url = $rest_base . 'cyber_campaign?id=eq.' . $campaign_id;
     error_log( 'tw_get_scenarios_ajax: campaign URL = ' . $campaign_url );
 
     $campaigns = $supa_get( $campaign_url, 'campaign' );
     if ( empty( $campaigns ) || ! is_array( $campaigns ) ) {
         wp_send_json_error( [ 'message' => 'Campaign not found' ] );
+        return;
     }
 
     $campaign       = $campaigns[0];
@@ -157,8 +169,8 @@ function tw_get_scenarios_ajax() {
     $difficulty_min = $world_type - 1;
     $difficulty_max = $world_type + 1;
 
-    // 2. Played scenarios
-    $played_url = $supabase_url . '/rest/v1/cyber_campaign_played_scenarios?campaign_id=eq.' . $campaign_id;
+    // 2. Played scenarios — filter by UUID campaign_id.
+    $played_url = $rest_base . 'cyber_campaign_played_scenarios?campaign_id=eq.' . $campaign_id;
     error_log( 'tw_get_scenarios_ajax: played scenarios URL = ' . $played_url );
 
     $played     = $supa_get( $played_url, 'played scenarios' ) ?: [];
@@ -166,13 +178,13 @@ function tw_get_scenarios_ajax() {
 
     error_log( 'tw_get_scenarios_ajax: played_ids=' . ( $played_ids ? implode( ',', $played_ids ) : 'none' ) );
 
-    // 3. Difficulty range (min 1)
+    // 3. Difficulty range (min 1).
     $difficulty_values = array_unique( array_filter(
         [ $difficulty_min, $world_type, $difficulty_max ],
         fn( $v ) => $v >= 1
     ) );
 
-    // 4. Scenarios query
+    // 4. Scenarios query.
     $url = add_query_arg(
         [
             'difficulty' => 'in.(' . implode( ',', $difficulty_values ) . ')',
@@ -180,7 +192,7 @@ function tw_get_scenarios_ajax() {
             'order'      => 'id.desc',
             'limit'      => 3,
         ],
-        $supabase_url . '/rest/v1/cyber_scenarios'
+        $rest_base . 'cyber_scenarios'
     );
 
     if ( ! empty( $played_ids ) ) {
@@ -193,6 +205,7 @@ function tw_get_scenarios_ajax() {
 
     if ( empty( $scenarios ) || ! is_array( $scenarios ) ) {
         wp_send_json_error( [ 'message' => 'No scenarios available' ] );
+        return;
     }
 
     wp_send_json_success( $scenarios );

@@ -92,7 +92,7 @@ class Neoweaver_Agents_Creator {
 	 * @return array|null
 	 */
 	private function post_json( string $url, array $body ): ?array {
-		$headers         = $this->headers();
+		$headers           = $this->headers();
 		$headers['Prefer'] = 'return=representation';
 
 		$res = wp_remote_post( $url, [
@@ -118,6 +118,23 @@ class Neoweaver_Agents_Creator {
 			return $data[0]; // Supabase wraps even single rows in an array.
 		}
 		return null;
+	}
+
+	/**
+	 * Sanitize a Node / World ID for safe use in a Supabase REST filter.
+	 *
+	 * cyber_worlds.id is a UUID string. Using intval() on a UUID collapses it
+	 * to 0, making every Node-existence and Entropy query return empty results
+	 * (the guards become dead code) and writing 0 as a FK breaks the insert.
+	 *
+	 * This helper strips everything except alphanumerics and hyphens, which is
+	 * safe for both UUID v4 strings and any legacy integer IDs.
+	 *
+	 * @param  mixed $raw_id  Raw ID value from form data.
+	 * @return string         Sanitized ID string, or '' if nothing valid remains.
+	 */
+	private function sanitize_id( $raw_id ): string {
+		return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw_id );
 	}
 
 	// -------------------------------------------------------------------------
@@ -153,8 +170,16 @@ class Neoweaver_Agents_Creator {
 
 		// 2 & 3. Node existence + Entropy guard (only when a node_id is provided).
 		if ( ! empty( $data['node_id'] ) ) {
+			// BUG-FIX: cyber_worlds.id is a UUID. The previous code used
+			// intval( $data['node_id'] ) which collapses any UUID string to 0,
+			// making the Supabase query always return empty — the Node-existence
+			// check and the Entropy guard were therefore never enforced.
+			// Use sanitize_id() instead: strips non-alphanumeric/hyphen chars
+			// while preserving the UUID string intact.
+			$safe_node_id = $this->sanitize_id( $data['node_id'] );
+
 			$node_url = $this->table_url( 'cyber_worlds', [
-				'id'    => 'eq.' . intval( $data['node_id'] ),
+				'id'    => 'eq.' . $safe_node_id,
 				'limit' => '1',
 			] );
 			$nodes = $this->get_json( $node_url );
@@ -167,9 +192,11 @@ class Neoweaver_Agents_Creator {
 			}
 
 			// 4. Duplicate living agent guard.
+			// BUG-FIX: same UUID-vs-intval issue applies to the world_id filter
+			// here — fixed by reusing $safe_node_id from above.
 			$dup_url = $this->table_url( 'cyber_characters', [
 				'wp_user_id' => 'eq.' . $wp_user_id,
-				'world_id'   => 'eq.' . intval( $data['node_id'] ),
+				'world_id'   => 'eq.' . $safe_node_id,
 				'status'     => 'neq.STATUS_DEAD',
 				'limit'      => '1',
 			] );
@@ -201,13 +228,25 @@ class Neoweaver_Agents_Creator {
 	 * @return string|null  New character ID, or null on failure.
 	 */
 	public function insert_character_row( array $data, int $wp_user_id ): ?string {
+		// BUG-FIX: cyber_characters.world_id is a UUID FK referencing
+		// cyber_worlds.id. The previous code used intval( $data['node_id'] )
+		// which converts any UUID string to 0, causing the FK constraint to
+		// reject the insert or silently write a wrong value.
+		// Use sanitize_id() to preserve the UUID string as-is.
+		$world_id = null;
+		if ( ! empty( $data['node_id'] ) ) {
+			$sanitized = $this->sanitize_id( $data['node_id'] );
+			// If sanitization produces a non-empty result it's a valid ID.
+			$world_id = ( $sanitized !== '' ) ? $sanitized : null;
+		}
+
 		$payload = [
 			'wp_user_id'     => $wp_user_id,
 			'name'           => sanitize_text_field( $data['character_name'] ),
 			'pronouns'       => sanitize_text_field( $data['pronouns'] ?? '' ),
 			'race_id'        => sanitize_text_field( $data['race'] ),
 			'class_id'       => sanitize_text_field( $data['class'] ),
-			'world_id'       => ! empty( $data['node_id'] ) ? intval( $data['node_id'] ) : null,
+			'world_id'       => $world_id,
 			'backstory'      => sanitize_textarea_field( $data['backstory'] ?? '' ),
 			'attr_body'      => intval( $data['attr_body']   ?? 3 ),
 			'attr_reflex'    => intval( $data['attr_reflex'] ?? 3 ),
