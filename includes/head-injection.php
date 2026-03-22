@@ -2,58 +2,28 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
-// ==========================================
-// 5. GLOBAL DATA INJECTION (wp_head)
-// ==========================================
-
-/**
- * Game-page detection helper.
- *
- * Zwraca true tylko dla stron gry.
- */
 if ( ! function_exists( 'tw_is_game_page' ) ) {
-
-	// Domyślna wartość, ustawiana później na hooku 'wp'.
-	$GLOBALS['tw_is_game_page_cache'] = false;
-
 	function tw_is_game_page(): bool {
-		return (bool) ( $GLOBALS['tw_is_game_page_cache'] ?? false );
-	}
-
-	/**
-	 * Ustawiamy cache dopiero gdy główne zapytanie jest gotowe.
-	 */
-	add_action( 'wp', function () {
-		// Na wszelki wypadek – jeśli nie ma globalnego query, wyłączamy.
-		if ( ! function_exists( 'is_singular' ) || ! function_exists( 'is_page' ) ) {
-			$GLOBALS['tw_is_game_page_cache'] = false;
-			return;
-		}
-
-		if ( ! is_singular() && ! is_page() ) {
-			$GLOBALS['tw_is_game_page_cache'] = false;
-			return;
-		}
+		// Bez is_singular / is_page – tylko template + slug.
 
 		$template = get_page_template_slug( get_queried_object_id() );
 		if ( $template && str_starts_with( (string) $template, 'templates/' ) ) {
-			$GLOBALS['tw_is_game_page_cache'] = true;
-			return;
+			return true;
 		}
 
 		$game_slugs = [ 'game', 'play', 'legend', 'deployments', 'field-agents', 'nodes', 'inventory' ];
 		$slug       = get_post_field( 'post_name', get_queried_object_id() );
+
 		foreach ( $game_slugs as $prefix ) {
 			if ( str_starts_with( (string) $slug, $prefix ) ) {
-				$GLOBALS['tw_is_game_page_cache'] = true;
-				return;
+				return true;
 			}
 		}
 
-		$GLOBALS['tw_is_game_page_cache'] = false;
-	}, 5 );
+		return false;
+	}
 }
+
 
 /**
  * Wstrzykujemy:
