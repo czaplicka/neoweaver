@@ -2,8 +2,6 @@
 /**
  * SHORTCODE: [tw_essences]
  */
-if ( ! function_exists( 'tw_essences_shortcode' ) ) {
-
 	/**
 	 * Essence config — defined once, outside the callback, so it's
 	 * not rebuilt on every shortcode render (e.g. multiple uses per page).
@@ -17,7 +15,7 @@ if ( ! function_exists( 'tw_essences_shortcode' ) ) {
 		'venom'  => [ 'label' => 'Venom',  'icon' => '🧪', 'color' => '#9400d3' ],
 		'weaver' => [ 'label' => 'Weaver', 'icon' => '🧶', 'color' => '#adff00' ],
 	];
-
+if ( ! function_exists( 'tw_essences_shortcode' ) ) {
 	function tw_essences_shortcode(): string {
 
 		// ── Auth guard ────────────────────────────────────────────────────────
