@@ -23,26 +23,21 @@
 
 /* ---------------------------------------------------------------------------
    1. NEOWEAVER-SCREEN WRAPPER
-      Every public shortcode method in Neoweaver_Public wraps its output in
-      <div class="neoweaver-screen">...</div>.
-      This wrapper is the layout boundary between game UI and theme chrome.
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen {
     position: relative;
-    z-index: 1;                /* sits above CTA / footer (z-index: 0) */
-    margin: 80px auto 80px;   /* breathing room from header above and CTA/footer below */
-    max-width: 1280px;        /* hard cap — individual monitors can be narrower */
+    z-index: 1;
+    margin: 80px auto 80px;
+    max-width: 1280px;
     box-sizing: border-box;
-    /* Ensure the wrapper always grows to fit its content — never clips steps */
     height: auto !important;
     overflow: visible !important;
 }
 
 
 /* ---------------------------------------------------------------------------
-   2. THEME CTA & FOOTER — forced below game screens
-      Push CTA and footer to z-index: 0 so they never float above the wizard.
+   2. THEME CTA & FOOTER
    --------------------------------------------------------------------------- */
 
 .cta-contact-section,
@@ -54,10 +49,7 @@ footer {
 
 
 /* ---------------------------------------------------------------------------
-   3. MONITOR WRAPPER — inside .neoweaver-screen
-      Individual shortcodes set their own max-width through their root ID;
-      here we only ensure the monitor never overflows its .neoweaver-screen
-      parent and that height is always content-driven.
+   3. MONITOR WRAPPER
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen .tw-monitor-outer {
@@ -69,17 +61,13 @@ footer {
 
 
 /* ---------------------------------------------------------------------------
-   4. SCREEN BEZEL — inside .neoweaver-screen
-      overflow: visible is the critical fix that prevents wizard steps
-      (especially dynamically-expanded sections like the subrace panel)
-      from being clipped by the bezel container.
-      padding-bottom ensures bottom nav buttons are never hidden.
+   4. SCREEN BEZEL
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen .tw-screen-bezel {
     position: relative;
-    overflow: visible !important;  /* NEVER clip wizard steps */
-    padding-bottom: 60px;          /* room for nav row at bottom of each step */
+    overflow: visible !important;
+    padding-bottom: 60px;
     height: auto !important;
     box-sizing: border-box;
 }
@@ -87,21 +75,29 @@ footer {
 
 /* ---------------------------------------------------------------------------
    5. STEP VISIBILITY SAFETY NET
-      Ensure .tw-step and .tw-terminal-step never collapse to zero height
-      when active, regardless of what the page theme does to display/height.
+      NOTE: We intentionally do NOT set display here — each wizard's own CSS
+      controls whether active steps use flex, grid, or block. Setting
+      display:block !important here would break flex-based wizards.
+      We only guarantee height and overflow are not collapsing.
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen .tw-step.active,
 .neoweaver-screen .tw-terminal-step.active {
-    display: block !important;
     height: auto !important;
     overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Hidden (inactive) steps must be truly hidden */
+.neoweaver-screen .tw-step:not(.active),
+.neoweaver-screen .tw-terminal-step:not(.active) {
+    display: none !important;
 }
 
 
 /* ---------------------------------------------------------------------------
    6. COMMON BOX-SIZING RESET
-      Applied only inside .neoweaver-screen to avoid bleed into the theme.
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen *,
@@ -113,8 +109,6 @@ footer {
 
 /* ---------------------------------------------------------------------------
    7. LOADING OVERLAY
-      Full-screen fixed overlay used by the character creator submit flow.
-      Sits on top of everything, including game screens.
    --------------------------------------------------------------------------- */
 
 #tw-character-loading-overlay {
@@ -182,7 +176,7 @@ footer {
 
 
 /* ---------------------------------------------------------------------------
-   8. ERROR STATE — used when user is not logged in
+   8. ERROR STATE
    --------------------------------------------------------------------------- */
 
 .neoweaver-screen .tw-error,
@@ -194,12 +188,3 @@ footer {
     padding: 20px;
     border: 1px solid #ff0055;
 }
-
-
-/* =============================================================================
-   END OF SHARED RULES
-   Screen-specific overrides (colours, dimensions, grid columns, etc.) live
-   inside each shortcode's inline <style> block, scoped to their root ID, e.g.:
-     .neoweaver-screen #tw-char-creator .tw-screen-bezel { padding: 60px; }
-     .neoweaver-screen #tw-campaign-creator-container .tw-screen-bezel { padding: 40px; }
-   =========================================================================== */
