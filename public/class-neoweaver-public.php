@@ -79,45 +79,52 @@ class Neoweaver_Public {
 	/**
 	 * Enqueue per-wizard CSS and JS on the front-end.
 	 *
-	 * Character and campaign wizards load from the child theme (assets/ there).
-	 * World creator loads from the plugin (assets/css/world-creator.css and
-	 * assets/js/tw-world-creator.js live in the plugin, not the theme).
+	 * All assets live in the plugin's own assets/ directory.
+	 * Files are loaded only if they exist (file_exists check), so adding a new
+	 * wizard is as simple as dropping css/js files here and adding a row below.
+	 * Versioning via filemtime() ensures automatic cache-busting.
 	 */
 	public function enqueue_assets(): void {
 		if ( is_admin() ) {
 			return;
 		}
 
-		$theme_uri = get_stylesheet_directory_uri();
-		$theme_dir = get_stylesheet_directory();
+		$plugin_url = NEOWEAVER_PLUGIN_URL;
+		$plugin_dir = NEOWEAVER_PLUGIN_DIR;
 
-		// ── Wizards served from the child theme ──────────────────────────────
-		$theme_assets = [
-			// [ handle, css-path, js-path, js-deps, js-in-footer ]
+		// [ handle, css-file, js-file, js-deps, js-in-footer ]
+		$assets = [
 			[
 				'neoweaver-char-creator',
-				'/assets/css/tw-character-creator.css',
-				'/assets/js/tw-character-creator.js',
+				'assets/css/tw-character-creator.css',
+				'assets/js/tw-character-creator.js',
 				[ 'jquery' ],
 				true,
 			],
 			[
 				'neoweaver-campaign-creator',
-				'/assets/css/tw-campaign-creator.css',
-				'/assets/js/tw-campaign-creator.js',
+				'assets/css/tw-campaign-creator.css',
+				'assets/js/tw-campaign-creator.js',
+				[],
+				true,
+			],
+			[
+				'neoweaver-world-creator',
+				'assets/css/world-creator.css',
+				'assets/js/tw-world-creator.js',
 				[],
 				true,
 			],
 		];
 
-		foreach ( $theme_assets as [ $handle, $css_rel, $js_rel, $deps, $in_footer ] ) {
-			$css_file = $theme_dir . $css_rel;
-			$js_file  = $theme_dir . $js_rel;
+		foreach ( $assets as [ $handle, $css_rel, $js_rel, $deps, $in_footer ] ) {
+			$css_file = $plugin_dir . $css_rel;
+			$js_file  = $plugin_dir . $js_rel;
 
 			if ( file_exists( $css_file ) ) {
 				wp_enqueue_style(
 					$handle,
-					$theme_uri . $css_rel,
+					$plugin_url . $css_rel,
 					[ 'neoweaver-public' ],
 					(string) filemtime( $css_file )
 				);
@@ -126,38 +133,12 @@ class Neoweaver_Public {
 			if ( file_exists( $js_file ) ) {
 				wp_enqueue_script(
 					$handle,
-					$theme_uri . $js_rel,
+					$plugin_url . $js_rel,
 					$deps,
 					(string) filemtime( $js_file ),
 					$in_footer
 				);
 			}
-		}
-
-		// ── World creator — served from the plugin ───────────────────────────
-		$plugin_uri = NEOWEAVER_PLUGIN_URL;
-		$plugin_dir = NEOWEAVER_PLUGIN_DIR;
-
-		$wc_css = $plugin_dir . 'assets/css/world-creator.css';
-		$wc_js  = $plugin_dir . 'assets/js/tw-world-creator.js';
-
-		if ( file_exists( $wc_css ) ) {
-			wp_enqueue_style(
-				'neoweaver-world-creator',
-				$plugin_uri . 'assets/css/world-creator.css',
-				[ 'neoweaver-public' ],
-				(string) filemtime( $wc_css )
-			);
-		}
-
-		if ( file_exists( $wc_js ) ) {
-			wp_enqueue_script(
-				'neoweaver-world-creator',
-				$plugin_uri . 'assets/js/tw-world-creator.js',
-				[],
-				(string) filemtime( $wc_js ),
-				true
-			);
 		}
 	}
 
@@ -219,42 +200,24 @@ class Neoweaver_Public {
 
 	// =========================================================================
 	// SHORTCODE: character creator
-	// Delegate to standalone function in shortcode-character-creator.php
 	// =========================================================================
 
-	/**
-	 * [tale_weaver_character_creator]
-	 * Delegates to neoweaver_shortcode_character_creator() defined in
-	 * public/shortcodes/shortcode-character-creator.php.
-	 */
 	public function shortcode_character_creator(): string {
 		return neoweaver_shortcode_character_creator();
 	}
 
 	// =========================================================================
 	// SHORTCODE: campaign / deployment creator
-	// Delegate to standalone function in shortcode-campaign-creator.php
 	// =========================================================================
 
-	/**
-	 * [tw_create_campaign]
-	 * Delegates to neoweaver_shortcode_campaign_creator() defined in
-	 * public/shortcodes/shortcode-campaign-creator.php.
-	 */
 	public function shortcode_campaign_creator(): string {
 		return neoweaver_shortcode_campaign_creator();
 	}
 
 	// =========================================================================
 	// SHORTCODE: node / world creator
-	// Delegate to standalone function in shortcode-world-creator.php
 	// =========================================================================
 
-	/**
-	 * [tw_world_creator]
-	 * Delegates to neoweaver_shortcode_world_creator() defined in
-	 * public/shortcodes/shortcode-world-creator.php.
-	 */
 	public function shortcode_world_creator(): string {
 		return neoweaver_shortcode_world_creator();
 	}
@@ -274,10 +237,6 @@ class Neoweaver_Public {
 	// FOOTER SCRIPT: Quick Actions Bridge (game page only)
 	// =========================================================================
 
-	/**
-	 * Outputs the twQuickActionsBridge script in wp_footer,
-	 * only on pages using the adventure template.
-	 */
 	public function enqueue_quick_actions_bridge(): void {
 		if ( ! is_page_template( 'templates/adventure.php' ) ) {
 			return;
@@ -310,9 +269,6 @@ class Neoweaver_Public {
 	// FOOTER SCRIPT: Tag Update Popup (game page only)
 	// =========================================================================
 
-	/**
-	 * Outputs showTagUpdate() JS helper in wp_footer, only on page ID 2857.
-	 */
 	public function render_tag_update_popup(): void {
 		if ( ! is_page( 2857 ) ) {
 			return;
