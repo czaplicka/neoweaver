@@ -28,41 +28,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Neoweaver_Agents_List {
 
-	/**
-	 * Repository used for all Supabase reads.
-	 *
-	 * @var Neoweaver_Agents_Repository
-	 */
 	private Neoweaver_Agents_Repository $repo;
 
-	/**
-	 * @param Neoweaver_Agents_Repository $repo
-	 */
 	public function __construct( Neoweaver_Agents_Repository $repo ) {
 		$this->repo = $repo;
 	}
 
-	// -------------------------------------------------------------------------
-	// Primary render method (used by the tw_list_characters shortcode)
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Render the full character roster for a WordPress user.
-	 *
-	 * Fetches characters (with tags + inventory already attached) via
-	 * Neoweaver_Agents_Repository::get_for_wp_user() and returns the
-	 * complete HTML + inline JS that was previously embedded in the
-	 * tw_list_characters_shortcode() function.
-	 *
-	 * No output is echo'd; the string is returned so WordPress shortcode
-	 * infrastructure can place it correctly in the page.
-	 *
-	 * @param int $wp_user_id
-	 * @return string  HTML + JS string ready for output.
-	 */
 	public function render_roster( int $wp_user_id ): string {
 
-		// Validate Supabase config before attempting any query.
 		$supabase_url = function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '';
 		$anon_key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
 
@@ -72,66 +45,65 @@ class Neoweaver_Agents_List {
 
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
-		// ------------------------------------------------------------------
-		// Shared styles — output regardless of empty / populated state.
-		// Empty-state classes mirror .tw-no-worlds from [tw_list_worlds].
-		// ------------------------------------------------------------------
+		// Shared styles — output in both empty and populated states.
+		// Empty-state CSS intentionally mirrors .tw-no-worlds from tw_list_worlds.
 		ob_start();
 		?>
 		<style>
 			:root { --neon: #adff00; --dark: #0a0a0a; --gray: #151515; }
 
-			/* ── Empty state (mirrors .tw-no-worlds in shortcode-tw-list-worlds.php) ── */
+			/* ── Empty state — pixel-match of .tw-no-worlds ── */
 			.tw-agents-empty {
 				text-align: center;
-				padding: 80px 30px 100px;
-				border: 1px dashed #222;
-				border-radius: 10px;
+				padding: 100px 0;
+				/* no border: tw-no-worlds has none either */
 				font-family: 'Chakra Petch', sans-serif;
 			}
+			/* ⚠️ emoji icon — same as .tw-alert-icon */
 			.tw-agents-empty-icon {
-				font-size: 48px;
-				color: #adff00;
-				opacity: 0.25;
+				font-size: 40px;
 				margin-bottom: 20px;
-				font-weight: 900;
+				opacity: 0.3;
 				line-height: 1;
 			}
+			/* "NO REALITIES…" equivalent */
 			.tw-agents-empty-main {
 				font-size: 1rem;
-				font-weight: 700;
-				letter-spacing: 0.12em;
-				text-transform: uppercase;
-				color: #fff;
+				color: #adff00;
 				margin: 0 0 10px;
-			}
-			.tw-agents-empty-sub {
-				font-size: 0.75rem;
-				color: #555;
-				letter-spacing: 0.08em;
+				font-weight: 700;
 				text-transform: uppercase;
-				margin: 0 0 30px;
+				letter-spacing: 0.05em;
 			}
+			/* subtitle — matches the <small> in tw-no-worlds */
+			.tw-agents-empty-sub {
+				display: block;
+				font-size: 0.85rem;
+				color: #fff;
+				margin: 0 0 28px;
+			}
+			/* CTA button — neon green bg, BLACK text (never green-on-green) */
 			.tw-agents-empty-actions { display: flex; justify-content: center; }
 			.tw-agents-empty-actions .tw-btn-sync {
 				display: inline-block;
 				background: #adff00;
-				color: #000;
+				color: #000 !important;
 				border: none;
-				padding: 12px 28px;
+				padding: 10px 22px;
 				font-weight: 900;
 				border-radius: 4px;
 				cursor: pointer;
 				text-transform: uppercase;
 				font-family: 'Chakra Petch', sans-serif;
-				font-size: 12px;
-				letter-spacing: 0.1em;
+				font-size: 11px;
+				letter-spacing: 0.05em;
 				text-decoration: none;
 				transition: background 0.2s, box-shadow 0.2s;
 			}
 			.tw-agents-empty-actions .tw-btn-sync:hover {
 				background: #fff;
 				box-shadow: 0 0 15px #adff00;
+				color: #000 !important;
 			}
 
 			/* ── Roster grid ── */
@@ -168,9 +140,9 @@ class Neoweaver_Agents_List {
 		if ( empty( $characters ) ) {
 			return $shared_styles . '
 			<div class="tw-agents-empty">
-				<div class="tw-agents-empty-icon">!</div>
+				<div class="tw-agents-empty-icon">⚠️</div>
 				<p class="tw-agents-empty-main">NO OPERATIVES DETECTED IN YOUR GRID.</p>
-				<p class="tw-agents-empty-sub">INITIALIZE A NEW FIELD AGENT TO START THE WEAVING PROCESS.</p>
+				<small class="tw-agents-empty-sub">Initialize a new Field Agent to start the weaving process.</small>
 				<div class="tw-agents-empty-actions">
 					<a href="/new-agent/" class="tw-btn-sync">NEW FIELD AGENT</a>
 				</div>
@@ -305,12 +277,6 @@ class Neoweaver_Agents_List {
 
 			(async () => {
 				try {
-					// BUG-FIX 3: Added .eq('wp_user_id', ...) ownership guard.
-					// Without it any logged-in user could delete any character
-					// by ID by calling this function from the browser console.
-					// twAdventureData.wp_user_id is injected server-side via
-					// tw_inject_global_data() and cannot be spoofed by the
-					// client (Supabase RLS must also enforce this on the DB side).
 					const currentUserId = window.twAdventureData?.wp_user_id;
 					if ( ! currentUserId ) {
 						alert( 'IDENTITY NOT VERIFIED. CANNOT TERMINATE OPERATIVE.' );
@@ -322,7 +288,7 @@ class Neoweaver_Agents_List {
 						.from('cyber_characters')
 						.delete()
 						.eq('id', charId)
-						.eq('wp_user_id', currentUserId); // ownership guard
+						.eq('wp_user_id', currentUserId);
 
 					if (error) {
 						console.error('SUPABASE DELETE CHARACTER ERROR', error);
@@ -367,39 +333,11 @@ class Neoweaver_Agents_List {
 	// Data-preparation helpers
 	// -------------------------------------------------------------------------
 
-	public function get_roster( int $wp_user_id ): array {
-		return [];
-	}
-
-	public function get_selectable_agents( int $wp_user_id ): array {
-		return [];
-	}
-
-	public function get_agents_in_node( int $node_id ): array {
-		return [];
-	}
-
-	public function get_data_ghosts_for_node( int $node_id, int $wp_user_id ): array {
-		return [];
-	}
-
-	// -------------------------------------------------------------------------
-	// Additional render helpers
-	// -------------------------------------------------------------------------
-
-	public function render_agent_select( int $wp_user_id ): string {
-		return '';
-	}
-
-	public function render_active_agent_badge( int $wp_user_id ): string {
-		return '';
-	}
-
-	// -------------------------------------------------------------------------
-	// API payload helper
-	// -------------------------------------------------------------------------
-
-	public function to_api_payload( int $wp_user_id ): array {
-		return [];
-	}
+	public function get_roster( int $wp_user_id ): array { return []; }
+	public function get_selectable_agents( int $wp_user_id ): array { return []; }
+	public function get_agents_in_node( int $node_id ): array { return []; }
+	public function get_data_ghosts_for_node( int $node_id, int $wp_user_id ): array { return []; }
+	public function render_agent_select( int $wp_user_id ): string { return ''; }
+	public function render_active_agent_badge( int $wp_user_id ): string { return ''; }
+	public function to_api_payload( int $wp_user_id ): array { return []; }
 }
