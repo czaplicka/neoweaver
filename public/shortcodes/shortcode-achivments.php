@@ -1,64 +1,73 @@
-function render_player_achievements($atts) {
+function render_player_achievements( $atts ) {
     // Parametry: type (all/earned), user_id (opcjonalnie), character_id (opcjonalnie)
-    $a = shortcode_atts([
-        'type' => 'all',
-        'user_id' => get_current_user_id(),
-        'char_id' => null
-    ], $atts);
+    $a = shortcode_atts(
+        [
+            'type'    => 'all',
+            'user_id' => get_current_user_id(),
+            'char_id' => null,
+        ],
+        $atts
+    );
 
-    // UWAGA: Tutaj musisz podpiąć swoje połączenie z bazą (np. przez global $wpdb lub SDK Supabase)
-    // Poniżej przykładowa logika pobierania danych z View:
-    
-    $query = "SELECT * FROM player_achievements_view WHERE user_id = '{$a['user_id']}'";
-    
-    if ($a['char_id']) {
-        $query .= " AND (character_id = '{$a['char_id']}' OR character_id IS NULL)";
+    // TODO: tu podepnij swój dostęp do Supabase zamiast prostego konkatenowania SQL
+    $user_id = intval( $a['user_id'] ); // minimalne zabezpieczenie
+    $query   = "SELECT * FROM player_achievements_view WHERE user_id = {$user_id}";
+
+    if ( ! empty( $a['char_id'] ) ) {
+        $char_id = intval( $a['char_id'] );
+        $query  .= " AND (character_id = {$char_id} OR character_id IS NULL)";
     }
-    
-    if ($a['type'] === 'earned') {
+
+    if ( $a['type'] === 'earned' ) {
         $query .= " AND is_unlocked = true";
     }
 
     // Pobierz wyniki (używając Twojej metody dostępu do danych)
-    $results = fetch_from_supabase($query); // Funkcja pomocnicza
+    $results = fetch_from_supabase( $query ); // Funkcja pomocnicza
 
-    if (empty($results)) return "<p>Brak osiągnięć do wyświetlenia.</p>";
+    if ( empty( $results ) ) {
+        return '<p>Brak osiągnięć do wyświetlenia.</p>';
+    }
 
     $output = '<div class="achievements-grid">';
-        
-    foreach ($results as $ach) {
-            // 1. Obliczamy postęp (jeśli odblokowane = 100)
-    $percent = $ach->is_unlocked ? 100 : $ach->progress_percent;
-    
-    // 2. Sprawdzamy czy to Legacy (Hard Reset)
-    // Załóżmy, że masz w bazie pole 'is_legacy' lub sprawdzasz datę
-    $legacy_class = ($ach->is_legacy) ? 'ach-legacy' : '';
 
-    // 3. Generujemy atrybut style ze zmiennymi
-    $style = "--bg-color: {$ach->bg_color}; --prog-percent: {$percent}%;";
+    foreach ( $results as $ach ) {
+        // 1. Procent postępu
+        $percent = ! empty( $ach->is_unlocked ) ? 100 : ( $ach->progress_percent ?? 0 );
 
-    echo "<div class='ach-card {$ach->css_status} {$shape_class} {$legacy_class}' style='{$style}'>";
-        // Wybór kształtu na podstawie scope (np. postać = tarcza, konto = hex)
-        $shape_class = ($ach->scope === 'character') ? 'ach-shape-shield' : 'ach-shape-hex';
-        
-        $output .= "<div class='ach-card {$ach->css_status} {$shape_class}' style='background-color: {$ach->bg_color};'>";
-        
-        // Ikona (zakładamy FontAwesome lub podobne)
-        $icon = ($ach->css_status === 'status-hidden') ? 'question' : $ach->icon_slug;
-        $output .= "<div class='ach-icon'><i class='fas fa-{$icon}'></i></div>";
-        
-        // Tytuł
-        $output .= "<div class='ach-title'>" . esc_html($ach->display_title) . "</div>";
-        
-        // Progres (pokaż tylko jeśli nieodblokowane i nieukryte)
-        if (!$ach->is_unlocked && $ach->css_status !== 'status-hidden' && $ach->goal > 1) {
-            $output .= "<div class='ach-progress'>{$ach->current_progress}/{$ach->goal}</div>";
+        // 2. Legacy
+        $legacy_class = ! empty( $ach->is_legacy ) ? 'ach-legacy' : '';
+
+        // 3. Kształt na podstawie scope
+        $scope       = $ach->scope ?? 'account';
+        $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
+
+        // 4. Style z CSS variables (jeśli z nich korzystasz)
+        $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
+        $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
+
+        // 5. Ikona
+        $status = $ach->css_status ?? '';
+        $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
+
+        $output .= '<div class="ach-card ' . esc_attr( $status . ' ' . $shape_class . ' ' . $legacy_class ) . '" style="' . esc_attr( $style ) . '">';
+
+        $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '"></i></div>';
+
+        $output .= '<div class="ach-title">' . esc_html( $ach->display_title ) . '</div>';
+
+        // Progres (pokaż tylko jeśli nieodblokowane i nieukryte i ma sensowny goal)
+        $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
+        if ( empty( $ach->is_unlocked ) && $status !== 'status-hidden' && $goal > 1 ) {
+            $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
+            $output .= '<div class="ach-progress">' . esc_html( $current . '/' . $goal ) . '</div>';
         }
-        
-        $output .= "</div>";
+
+        $output .= '</div>';
     }
 
     $output .= '</div>';
+
     return $output;
 }
-add_shortcode('achievements', 'render_player_achievements');
+add_shortcode( 'achievements', 'render_player_achievements' );
