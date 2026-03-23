@@ -84,7 +84,7 @@ input[type="text"]:focus, textarea:focus {
     background: rgba(0, 20, 0, 0.4);
 }
 
-/* --- BUTTONS --- */
+/* --- NAV BUTTONS --- */
 .tw-nav-row {
     display: flex;
     justify-content: space-between;
@@ -115,20 +115,43 @@ input[type="text"]:focus, textarea:focus {
     box-shadow: 0 0 40px var(--neon-green);
 }
 
-/* --- MEGA CARDS (RACE / CLASS) --- */
+/* --- MEGA CARDS (RADIO GRID) ---
+ *
+ * FIX: was `repeat(auto-fit, minmax(240px, 1fr))` which caused the 5th card
+ * to wrap onto a second row when the container was narrower than 5 × 240 px.
+ *
+ * Changed to `repeat(5, 1fr)` so all five options always sit on one row.
+ * `min-width: 0` on both the grid and each label prevents grid blowout when
+ * card text is long.  Card min-height reduced 220 px → 160 px and font sizes
+ * trimmed slightly so the row stays compact.
+ *
+ * The :has() rule below keeps 3-option steps (e.g. NODE_MORALITY) centred
+ * in three equal-width columns instead of stretching across five.
+ */
 .tw-radio-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    min-width: 0;
 }
 
-.tw-card-label { cursor: pointer; perspective: 1000px; }
+/* 3-option steps: centre three columns, don't stretch to full width */
+.tw-radio-grid:has(> :nth-child(3):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 260px));
+    justify-content: center;
+}
+
+.tw-card-label {
+    cursor: pointer;
+    perspective: 1000px;
+    min-width: 0;
+}
 .tw-card-label input { display: none; }
 
 .tw-card-visual {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255,255,255,0.12);
-    padding: 18px;
+    padding: 14px;
     text-align: center;
     transition: all 0.3s ease;
     height: 100%;
@@ -138,7 +161,7 @@ input[type="text"]:focus, textarea:focus {
     justify-content: flex-end;
     position: relative;
     overflow: hidden;
-    min-height: 220px;
+    min-height: 160px;
 }
 
 .tw-card-visual img {
@@ -150,19 +173,19 @@ input[type="text"]:focus, textarea:focus {
     z-index: 1;
 }
 
-/* Nazwy + tagi pod grafiką – mniejsze / ciaśniejsze */
 .tw-card-visual strong {
     display: block;
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     color: #fff;
     margin-bottom: 4px;
     z-index: 1;
     text-transform: uppercase;
     letter-spacing: 1px;
     text-shadow: 0 0 4px black;
+    word-break: break-word;
 }
 .tw-card-visual span {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #aaa;
     z-index: 1;
 }
