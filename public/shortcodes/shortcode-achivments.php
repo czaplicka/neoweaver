@@ -9,8 +9,7 @@ function render_player_achievements( $atts ) {
         $atts
     );
 
-    // TODO: tu podepnij swój dostęp do Supabase zamiast prostego konkatenowania SQL
-    $user_id = intval( $a['user_id'] ); // minimalne zabezpieczenie
+       $user_id = intval( $a['user_id'] ); // minimalne zabezpieczenie
     $query   = "SELECT * FROM player_achievements_view WHERE user_id = {$user_id}";
 
     if ( ! empty( $a['char_id'] ) ) {
@@ -23,7 +22,7 @@ function render_player_achievements( $atts ) {
     }
 
     // Pobierz wyniki (używając Twojej metody dostępu do danych)
-    $results = fetch_from_supabase( $query ); // Funkcja pomocnicza
+ $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
 
     if ( empty( $results ) ) {
         return '<p>Brak osiągnięć do wyświetlenia.</p>';
