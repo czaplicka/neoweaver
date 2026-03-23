@@ -12,7 +12,7 @@ function tw_compass_render() {
     if (!$wp_user_id) return '';
 
     // Bug 3: only render on the adventure page template
-    if (!is_page_template('template/adventure.php')) return '';
+    if (!is_page_template('templates/adventure.php')) return '';
 
     // Opt 2: enqueue styles once via WordPress, not inline on every render
     if (!wp_style_is('neoweaver-compass', 'enqueued')) {
