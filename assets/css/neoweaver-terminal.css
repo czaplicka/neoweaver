@@ -1,0 +1,153 @@
+:root {
+  /* ... bez zmian ... */
+  --tw-bg-ghost: rgba(3, 7, 18, 0.12); /* jeszcze lżejsze */
+  --tw-blur: 12px; /* wyższy blur dla frosted glass */
+}
+
+/* HUD WRAPPER – ultra ghost jak chat */
+.cyber-hud-wrapper {
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 100001;
+    background: var(--tw-bg-ghost); /* identycznie jak chat */
+    backdrop-filter: blur(var(--tw-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--tw-blur)) saturate(180%);
+    
+    border-bottom: 1px solid rgba(0, 210, 255, 0.25);
+    box-shadow: 
+        inset 0 0 20px rgba(0, 210, 255, 0.1),
+        0 4px 24px rgba(0,0,0,0.7),
+        0 0 24px rgba(0, 210, 255, 0.15);
+    
+    max-height: 40px; overflow: hidden;
+    transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* smooth */
+    font-family: 'Chakra Petch', sans-serif;
+}
+
+.cyber-hud-wrapper.is-open { 
+    max-height: 550px; 
+    background: rgba(3, 7, 18, 0.28);
+    border-color: rgba(0, 210, 255, 0.45);
+    box-shadow: 
+        inset 0 0 40px rgba(0, 210, 255, 0.15),
+        0 8px 40px rgba(0,0,0,0.8);
+}
+
+/* GÓRNY PASEK – minimal gradient + glow */
+.status-dots-row {
+    height: 40px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 30px; cursor: pointer;
+    background: 
+        radial-gradient(circle at 0% 50%, rgba(0,210,255,0.15) 0%, transparent 40%),
+        radial-gradient(circle at 100% 50%, rgba(0,210,255,0.1) 0%, transparent 40%);
+}
+
+.hud-status-label { 
+    font-size: 10px; color: var(--tw-monitor); font-weight: 700;
+    text-shadow: 0 0 20px var(--tw-monitor-glow);
+    letter-spacing: 3px; text-transform: uppercase;
+}
+
+/* Dots bez zmian – kontrolujesz --base-color */
+
+/* SIATKA – ultra ghost, scroll neon */
+.cyber-hud-grid {
+    display: flex; overflow-x: auto; padding: 24px 28px 20px; gap: 18px;
+    scrollbar-width: thin; scrollbar-color: var(--tw-monitor) transparent;
+}
+
+.hud-column { 
+    min-width: 200px; flex: 1; 
+    background: rgba(15, 23, 42, 0.12); /* ultra cienkie */
+    backdrop-filter: blur(10px) saturate(200%);
+    padding: 18px 16px; 
+    border: 1px solid rgba(0, 210, 255, 0.2);
+    border-radius: 12px; /* bardziej zaokrąglone */
+    box-shadow: 
+        inset 0 0 12px rgba(255,255,255,0.05),
+        0 4px 20px rgba(0,0,0,0.6);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* bounce hover */
+}
+.hud-column:hover {
+    background: rgba(15, 23, 42, 0.25);
+    border-color: rgba(0, 210, 255, 0.5);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 
+        inset 0 0 20px rgba(255,255,255,0.08),
+        0 12px 40px rgba(0,210,255,0.2);
+}
+
+/* Labelki + liczby – glow tekst */
+.hud-labels { 
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 12px; font-size: 9px; color: #a1a1aa;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(0,0,0,0.8);
+}
+.val-num { 
+    font-size: 24px; /* ciut większe */
+    color: #fff; font-weight: 800; line-height: 1;
+    text-shadow: 0 0 16px rgba(255,255,255,0.3);
+}
+
+/* BARY – cieńsze tło, mocniejszy scanline */
+.hud-bar-container { 
+    height: 5px; /* cieńsze */
+    background: rgba(15, 23, 42, 0.6); 
+    margin-bottom: 14px; position: relative; border-radius: 999px; overflow: hidden;
+}
+
+.scanlines {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: 
+        repeating-linear-gradient(0deg, transparent 0px, rgba(255,255,255,0.04) 1px, transparent 2px),
+        linear-gradient(90deg, rgba(0,210,255,0.1) 0%, transparent 50%, rgba(0,210,255,0.1) 100%);
+    z-index: 5; pointer-events: none; background-size: 100% 100%, 8px 100%;
+}
+
+.center-line { 
+    position: absolute; left: 50%; top: 0; width: 1px; height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.6), transparent);
+    z-index: 10; transform: translateX(-50%);
+}
+
+.hud-bar-fill { 
+    height: 100%; position: absolute; 
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), 
+                box-shadow 0.4s ease;
+    border-radius: 999px;
+    box-shadow: 0 0 16px rgba(255,255,255,0.25); /* mocniejszy glow */
+}
+
+/* TAGI – chipy jak w 2026 bento glass */
+.tag-cloud { display: flex; flex-direction: column; gap: 6px; min-height: 45px; }
+.tag-item {
+    font-size: 9px; color: #f4f4f5; 
+    background: rgba(0,210,255,0.08);
+    backdrop-filter: blur(6px);
+    padding: 5px 12px; border-radius: 20px; /* bardziej pill */
+    border: 1px solid rgba(0,210,255,0.3);
+    text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;
+    transition: all 0.25s ease;
+}
+.tag-item:hover { 
+    background: rgba(0,210,255,0.15);
+    box-shadow: 0 0 12px rgba(0,210,255,0.4);
+}
+
+/* STOPKA – neon pulse */
+.hud-close-trigger { 
+    text-align: center; padding: 16px; 
+    color: #8b949e; font-size: 10px; cursor: pointer;
+    border-top: 1px solid rgba(0,210,255,0.2); 
+    letter-spacing: 4px; transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+}
+.hud-close-trigger:hover { 
+    color: var(--tw-monitor); letter-spacing: 6px;
+    background: rgba(0,210,255,0.12);
+    box-shadow: inset 0 0 20px rgba(0,210,255,0.2);
+    animation: neonPulse 1.5s infinite;
+}
+@keyframes neonPulse {
+    0%, 100% { text-shadow: 0 0 8px var(--tw-monitor-glow); }
+    50% { text-shadow: 0 0 20px var(--tw-monitor-glow), 0 0 30px var(--tw-monitor-glow); }
+}
