@@ -1,5 +1,34 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! function_exists( 'tw_get_player_achievements' ) ) {
+    function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
+
+        $filters = [
+            'user_id' => 'eq.' . intval( $user_id ),
+            'select'  => 'achievement_id,user_id,character_id,display_title,display_description,icon_slug,bg_color,scope,goal,current_progress,is_unlocked,unlocked_at,progress_percent,css_status',
+        ];
+
+        if ( ! empty( $char_id ) ) {
+            $filters['character_id'] = 'eq.' . intval( $char_id );
+        }
+
+        if ( $type === 'earned' ) {
+            $filters['is_unlocked'] = 'eq.true';
+        }
+
+        // to korzysta z Twojego istniejącego helpera Supabase
+        $rows = tw_supabase_get( 'player_achievements_view', $filters );
+
+        $results = [];
+        foreach ( $rows as $row ) {
+            $results[] = (object) $row;
+        }
+
+        return $results;
+    }
+}
 function render_player_achievements( $atts ) {
-    // Parametry: type (all/earned), user_id (opcjonalnie), character_id (opcjonalnie)
     $a = shortcode_atts(
         [
             'type'    => 'all',
@@ -9,20 +38,7 @@ function render_player_achievements( $atts ) {
         $atts
     );
 
-       $user_id = intval( $a['user_id'] ); // minimalne zabezpieczenie
-    $query   = "SELECT * FROM player_achievements_view WHERE user_id = {$user_id}";
-
-    if ( ! empty( $a['char_id'] ) ) {
-        $char_id = intval( $a['char_id'] );
-        $query  .= " AND (character_id = {$char_id} OR character_id IS NULL)";
-    }
-
-    if ( $a['type'] === 'earned' ) {
-        $query .= " AND is_unlocked = true";
-    }
-
-    // Pobierz wyniki (używając Twojej metody dostępu do danych)
- $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
+    $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
 
     if ( empty( $results ) ) {
         return '<p>Brak osiągnięć do wyświetlenia.</p>';
@@ -31,21 +47,16 @@ function render_player_achievements( $atts ) {
     $output = '<div class="achievements-grid">';
 
     foreach ( $results as $ach ) {
-        // 1. Procent postępu
-        $percent = ! empty( $ach->is_unlocked ) ? 100 : ( $ach->progress_percent ?? 0 );
+        $percent = ! empty( $ach->is_unlocked ) ? 100 : (float) $ach->progress_percent;
 
-        // 2. Legacy
-        $legacy_class = ! empty( $ach->is_legacy ) ? 'ach-legacy' : '';
+        $legacy_class = ''; // na razie puste, dodamy jak będzie pole w widoku
 
-        // 3. Kształt na podstawie scope
         $scope       = $ach->scope ?? 'account';
         $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
 
-        // 4. Style z CSS variables (jeśli z nich korzystasz)
         $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
         $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
-        // 5. Ikona
         $status = $ach->css_status ?? '';
         $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
 
@@ -55,7 +66,6 @@ function render_player_achievements( $atts ) {
 
         $output .= '<div class="ach-title">' . esc_html( $ach->display_title ) . '</div>';
 
-        // Progres (pokaż tylko jeśli nieodblokowane i nieukryte i ma sensowny goal)
         $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
         if ( empty( $ach->is_unlocked ) && $status !== 'status-hidden' && $goal > 1 ) {
             $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
