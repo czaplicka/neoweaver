@@ -1,13 +1,27 @@
 <?php
 /**
- * TALE WEAVER – Quick Actions CMD_CENTER v2.1
+ * TALE WEAVER – Quick Actions CMD_CENTER v2.2
  * Renders the Glass Terminal quick-actions bar only on the adventure page template.
- * Loaded via WPCode snippet or included in class-neoweaver-public.php.
+ *
+ * BUG FIX (v2.2): The bare `if ( is_page_template(...) )` at the top level of
+ * the file caused a "Function is_singular was called incorrectly" notice on
+ * every page load.  When WordPress requires this file during plugins_loaded the
+ * call executes immediately — before the main query has run — so the conditional
+ * tag always returns false and triggers _doing_it_wrong().
+ *
+ * Fix: wrap the <script> output in a wp_footer action (priority 46, after all
+ * other game-page scripts).  is_page_template() is safe inside wp_footer
+ * because the main query is resolved long before wp_footer fires.
+ * This matches the pattern used by char-panel.php, chat-realtime.php,
+ * scenarios-loader.php, deck-core.php, skills-loader.php, etc.
  *
  * Tables used:
  *   cyber_quick_actions  – global actions (display_order, label, template, category, required_tag/s, is_permanent)
  *   cyber_combos         – combo actions
  *   cyber_user_actions   – per-character custom actions (character_id, label, template, category)
+ *
+ * Changelog v2.2:
+ *   - BUG FIX: moved is_page_template() check inside wp_footer hook (was at file-include time)
  *
  * Changelog v2.1:
  *   - Fix: currentCharId now resolved lazily so gameState has time to hydrate
@@ -24,10 +38,16 @@
  *   - Opt: render functions wrapped in individual try/catch so one failure can't block the other
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
-if ( is_page_template( 'templates/adventure.php' ) ) :
-?>
+add_action( 'wp_footer', function () {
+	// Safe here: wp_footer fires after the main query has run.
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
+		return;
+	}
+	?>
 <script>
 (function($) {
     'use strict';
@@ -44,27 +64,18 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
 
     // ── LAZY HELPERS ──────────────────────────────────────────────────────────
 
-    /**
-     * Resolve the active character ID lazily so gameState has time to hydrate.
-     * Falls back to localStorage.
-     */
     function getCharId() {
         return window.gameState?.activeCharacterId
             || localStorage.getItem('activeCharId')
             || null;
     }
 
-    /**
-     * Resolve the Supabase client lazily.
-     * Prefers the global instance; falls back to constructing one.
-     * Note: the standard CDN global is `window.supabase` (lowercase), not `Supabase`.
-     */
     function getSupabase() {
         if (window.twSupabase) return window.twSupabase;
         if (typeof window.supabase?.createClient === 'function') {
             window.twSupabase = window.supabase.createClient(
-                window.twGlobals?.supabaseUrl || '<?php echo esc_js( trailingslashit( twsupabaseurl() ) ); ?>',
-                window.twGlobals?.anonKey     || '<?php echo esc_js( twsupabaseanonkey() ); ?>'
+                window.twGlobals?.supabaseUrl || '<?php echo esc_js( trailingslashit( tw_supabase_url() ) ); ?>',
+                window.twGlobals?.anonKey     || '<?php echo esc_js( tw_supabase_anon_key() ); ?>'
             );
             return window.twSupabase;
         }
@@ -112,7 +123,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
     function isActionAvailable(action) {
         if (action.is_permanent) return true;
 
-        // Normalise required tags from either column, filtering out empty strings
         const reqTags = (
             action.required_tags
                 ? action.required_tags.split(',')
@@ -152,7 +162,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
         bar.innerHTML = '';
         bar.appendChild(fragment);
 
-        // Restore active class on the matching filter button
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.toggle(
                 'active',
@@ -197,11 +206,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
 
     // ── ACTION CLICK ──────────────────────────────────────────────────────────
 
-    /**
-     * Paste the action template into the chat input.
-     * Dispatches input + change events so reactive frameworks (React, Vue, game
-     * engines) pick up the programmatic value change.
-     */
     window.handleQuickActionClick = function(template) {
         const input =
             window.gameState?.userInput ||
@@ -230,7 +234,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
         await loadAllData();
     };
 
-    /** Called by inventory/deck module to update which tags the player holds. */
     window.twUpdatePlayerTags = function(tags) {
         playerTagSet = new Set(
             Array.isArray(tags) ? tags.map(t => t.trim()).filter(Boolean) : []
@@ -260,14 +263,12 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
 
     window.setQAFilter = function(filter, ev) {
         currentFilter = filter;
-        // Normalise event: support both direct calls and inline onclick
         const event = ev || window.event;
         document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
         if (event?.target?.classList) event.target.classList.add('active');
         renderQuickActionsUI([...allActions, ...combos]);
     };
 
-    // Debounced search – avoids a full re-render on every keypress
     let _searchTimer = null;
     window.twLoadQuickActions = function() {
         clearTimeout(_searchTimer);
@@ -279,7 +280,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
                 (a.label    || '').toLowerCase().includes(search) ||
                 (a.template || '').toLowerCase().includes(search)
             );
-            // Respect current category filter while searching
             renderQuickActionsUI(filtered);
         }, 200);
     };
@@ -325,7 +325,6 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
 
     // ── UTILITIES ─────────────────────────────────────────────────────────────
 
-    /** Minimal HTML escaper – prevents XSS when injecting action labels. */
     function escapeHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;')
@@ -353,4 +352,5 @@ if ( is_page_template( 'templates/adventure.php' ) ) :
 
 })(jQuery);
 </script>
-<?php endif;
+	<?php
+}, 46 );
