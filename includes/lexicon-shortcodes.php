@@ -56,7 +56,7 @@ add_action(
         </script>
         <?php
     },
-    1
+    10
 );
 // ==========================================
 // Shortcode [cyber_text]
