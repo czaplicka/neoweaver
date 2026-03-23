@@ -187,3 +187,34 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 		);
 	}
 }
+/**
+* achivments
+	*/
+if ( ! function_exists( 'tw_get_player_achievements' ) ) {
+    function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
+
+        $filters = [
+            'user_id' => 'eq.' . intval( $user_id ),
+            'select'  => '*', // albo konkretnie: 'id,display_title,icon_slug,is_unlocked,...'
+        ];
+
+        if ( ! empty( $char_id ) ) {
+            // jeśli w widoku masz osobne pola, to najprościej dwa warianty osobno
+            $filters['character_id'] = 'eq.' . intval( $char_id );
+        }
+
+        if ( $type === 'earned' ) {
+            $filters['is_unlocked'] = 'eq.true';
+        }
+
+        $rows = tw_supabase_get( 'player_achievements_view', $filters );
+
+        // tw_supabase_get zwraca tablicę asocjacyjną, więc zamieniam na obiekty jak w Twoim foreach
+        $results = [];
+        foreach ( $rows as $row ) {
+            $results[] = (object) $row;
+        }
+
+        return $results;
+    }
+}
