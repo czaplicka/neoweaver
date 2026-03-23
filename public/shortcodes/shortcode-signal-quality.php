@@ -1,3 +1,4 @@
+<?php
 add_shortcode('SIGNAL_QUALITY', function() use ($signal_strength, $world_tech_level) {
     ob_start(); ?>
     <div class="neoweave-signal-monitor">
