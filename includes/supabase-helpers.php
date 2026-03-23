@@ -51,10 +51,10 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 			'sslverify' => true,
 		];
 
-		// Zwykły merge – nadpisuje wartości zamiast robić z nich tablice.
+		// Zamiast array_merge_recursive – zwykły merge.
 		$args = array_merge( $default_args, (array) $extra_args );
 
-		// Twardy safeguard: upewnij się, że timeout jest skalarem.
+		// Safeguard: timeout MUSI być liczbą, nie tablicą.
 		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
 			$args['timeout'] = 15;
 		}
@@ -117,7 +117,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 
 		$args = array_merge( $default_args, (array) $extra_args );
 
-		// Safeguard timeout.
 		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
 			$args['timeout'] = 15;
 		}
@@ -145,7 +144,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
  */
 if ( ! function_exists( 'tw_get_data' ) ) {
 	function tw_get_data( $url, $args = [] ) {
-		// Domyślne bezpieczeństwo (timeout).
 		$defaults = [
 			'timeout'   => 15,
 			'sslverify' => true,
