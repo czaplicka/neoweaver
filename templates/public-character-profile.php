@@ -65,6 +65,61 @@ if ( ! $char_id ) {
     get_footer();
     exit;
 }
+if ( ! $char_id ) {
+    status_header( 403 );
+    get_header();
+    ?>
+    <div class="neo-monitor-frame neo-crt">
+        <div class="neo-scanlines"></div>
+        <div class="neo-noise"></div>
+
+        <div class="neo-terminal-wrapper">
+            <header class="neo-os-header">
+                <div class="neo-os-header-left">
+                    <span class="neo-status-dot neo-blink"></span> 
+                    <span class="neo-os-brand">NEO_WEAVE_OS_1.0.0</span>
+                </div>
+                <div class="neo-os-header-right">
+                    <span class="neo-node-id">SYSTEM_STREAM: CHARACTER_TRACE</span>
+                </div>
+            </header>
+
+            <main class="neo-os-content">
+                <div class="neo-status-bar">
+                    <span class="neo-sys-path">
+                        UPLINK_PATH: <span class="neo-accent">CORE://LEGEND/LOOKUP</span>
+                    </span>
+                </div>
+
+                <div class="neo-content-area">
+                    <p>> QUERY: FIELD_AGENT_SIGNATURE</p>
+                    <p class="neo-accent">> RESULT: NO MATCH FOUND</p>
+                    <p>> STATUS: ACCESS_DENIED / PROFILE_ENCRYPTED</p>
+                    <p>> HINT: VERIFY LINK OR REQUEST NEW UPLINK FROM GAME MASTER</p>
+                </div>
+            </main>
+
+            <footer class="neo-os-footer">
+                <div class="neo-progress-container">
+                    <div class="neo-progress-bar"></div>
+                </div>
+                <div class="neo-os-footer-meta">
+                    <div class="neo-meta-item">
+                        <span class="status-dot"></span><span class="neo-label"> SESSION:</span> 
+                        <span class="neo-value neo-accent">IDLE</span>
+                    </div>
+                    <div class="neo-meta-item">
+                        <span class="neo-label">SYNC:</span> 
+                        <span id="sync-value" class="neo-value">00.0%</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    <?php
+    get_footer();
+    exit;
+}
 
 // P1 FIX: Resolve credentials once at the top; pass as arguments to helpers
 // instead of calling tw_supabase_url() / tw_supabase_anon_key() repeatedly.
@@ -133,11 +188,6 @@ if ( ! function_exists( 'get_public_character_inventory' ) ) {
 
 // ── Fetch character (P1: credentials passed, not re-called inside) ────────────
 $char = get_public_character_data( $char_id, $supabase_url, $anon_key );
-
-if ( ! $char ) {
-    // B1 FIX: wp_die() before get_header() so no partial HTML is sent.
-    wp_die( 'ACCESS DENIED: Profile private or non-existent.', '', [ 'response' => 403 ] );
-}
 
 // ── Bot detection & view counter ──────────────────────────────────────────────
 $is_bot = false;
