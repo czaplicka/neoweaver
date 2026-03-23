@@ -11,7 +11,59 @@
 $char_id = isset( $_GET['char_id'] ) ? intval( $_GET['char_id'] ) : 0;
 
 if ( ! $char_id ) {
-    wp_die( 'Character not found.', '', [ 'response' => 404 ] );
+    status_header( 404 );
+    get_header();
+    ?>
+    <div class="neo-monitor-frame neo-crt">
+        <div class="neo-scanlines"></div>
+        <div class="neo-noise"></div>
+
+        <div class="neo-terminal-wrapper">
+            <header class="neo-os-header">
+                <div class="neo-os-header-left">
+                    <span class="neo-status-dot neo-blink"></span> 
+                    <span class="neo-os-brand">NEO_WEAVE_OS_1.0.0</span>
+                </div>
+                <div class="neo-os-header-right">
+                    <span class="neo-node-id">SYSTEM_STREAM: CHARACTER_TRACE</span>
+                </div>
+            </header>
+
+            <main class="neo-os-content">
+                <div class="neo-status-bar">
+                    <span class="neo-sys-path">
+                        UPLINK_PATH: <span class="neo-accent">CORE://LEGEND/LOOKUP</span>
+                    </span>
+                </div>
+
+                <div class="neo-content-area">
+                    <p>> QUERY: FIELD_AGENT_SIGNATURE</p>
+                    <p class="neo-accent">> RESULT: NO MATCH FOUND</p>
+                    <p>> STATUS: CHARACTER PROFILE NOT FOUND OR ACCESS LOCKED</p>
+                    <p>> HINT: VERIFY LINK OR REQUEST NEW UPLINK FROM GAME MASTER</p>
+                </div>
+            </main>
+
+            <footer class="neo-os-footer">
+                <div class="neo-progress-container">
+                    <div class="neo-progress-bar"></div>
+                </div>
+                <div class="neo-os-footer-meta">
+                    <div class="neo-meta-item">
+                        <span class="status-dot"></span><span class="neo-label"> SESSION:</span> 
+                        <span class="neo-value neo-accent">IDLE</span>
+                    </div>
+                    <div class="neo-meta-item">
+                        <span class="neo-label">SYNC:</span> 
+                        <span id="sync-value" class="neo-value">00.0%</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+    <?php
+    get_footer();
+    exit;
 }
 
 // P1 FIX: Resolve credentials once at the top; pass as arguments to helpers
