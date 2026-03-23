@@ -1,3 +1,4 @@
+<?php
 add_shortcode('ACTIVE_ID', function($atts) {
     // 1. Konfiguracja Supabase (pobierana z wp-config.php zgodnie z Twoim opisem)
     $supabase_url = SUPABASE_URL; 
