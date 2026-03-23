@@ -79,9 +79,9 @@ class Neoweaver_Public {
 	/**
 	 * Enqueue per-wizard CSS and JS on the front-end.
 	 *
-	 * Each wizard gets its own stylesheet and script file so browsers can cache
-	 * them independently. All files live under the child-theme's assets/
-	 * directory and are versioned via filemtime() for automatic cache-busting.
+	 * Character and campaign wizards load from the child theme (assets/ there).
+	 * World creator loads from the plugin (assets/css/world-creator.css and
+	 * assets/js/tw-world-creator.js live in the plugin, not the theme).
 	 */
 	public function enqueue_assets(): void {
 		if ( is_admin() ) {
@@ -91,7 +91,8 @@ class Neoweaver_Public {
 		$theme_uri = get_stylesheet_directory_uri();
 		$theme_dir = get_stylesheet_directory();
 
-		$assets = [
+		// ── Wizards served from the child theme ──────────────────────────────
+		$theme_assets = [
 			// [ handle, css-path, js-path, js-deps, js-in-footer ]
 			[
 				'neoweaver-char-creator',
@@ -107,16 +108,9 @@ class Neoweaver_Public {
 				[],
 				true,
 			],
-			[
-				'neoweaver-world-creator',
-				'/assets/css/tw-world-creator.css',
-				'/assets/js/tw-world-creator.js',
-				[],
-				true,
-			],
 		];
 
-		foreach ( $assets as [ $handle, $css_rel, $js_rel, $deps, $in_footer ] ) {
+		foreach ( $theme_assets as [ $handle, $css_rel, $js_rel, $deps, $in_footer ] ) {
 			$css_file = $theme_dir . $css_rel;
 			$js_file  = $theme_dir . $js_rel;
 
@@ -138,6 +132,32 @@ class Neoweaver_Public {
 					$in_footer
 				);
 			}
+		}
+
+		// ── World creator — served from the plugin ───────────────────────────
+		$plugin_uri = NEOWEAVER_PLUGIN_URL;
+		$plugin_dir = NEOWEAVER_PLUGIN_DIR;
+
+		$wc_css = $plugin_dir . 'assets/css/world-creator.css';
+		$wc_js  = $plugin_dir . 'assets/js/tw-world-creator.js';
+
+		if ( file_exists( $wc_css ) ) {
+			wp_enqueue_style(
+				'neoweaver-world-creator',
+				$plugin_uri . 'assets/css/world-creator.css',
+				[ 'neoweaver-public' ],
+				(string) filemtime( $wc_css )
+			);
+		}
+
+		if ( file_exists( $wc_js ) ) {
+			wp_enqueue_script(
+				'neoweaver-world-creator',
+				$plugin_uri . 'assets/js/tw-world-creator.js',
+				[],
+				(string) filemtime( $wc_js ),
+				true
+			);
 		}
 	}
 
