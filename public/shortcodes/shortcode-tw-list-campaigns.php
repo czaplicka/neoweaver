@@ -20,13 +20,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *  - BUG-FIX: $c_id was cast with (int) which collapses UUID campaign IDs to 0.
  *    All HTML attributes (data-id, id="campaign-card-*"), PHP href params, and
  *    the JS delete RPC arg p_campaign_id now use the raw UUID string via $c_id_safe.
+ *  - STYLE-FIX: empty-state CSS added to match .tw-no-worlds and .tw-agents-empty.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
     function tw_list_campaigns_final_v8_modes() {
 
-        // Never render inside WP Admin.
         if ( is_admin() ) {
             return '';
         }
@@ -75,45 +75,115 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed. Check your Uplink.</p>';
         }
 
-        // BUG FIX: json_decode can return null on malformed JSON – guard before use.
         $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( ! is_array( $decoded ) ) {
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
         $active_campaigns = $decoded;
 
+        // ── Shared empty-state styles (mirrors .tw-no-worlds and .tw-agents-empty) ──
+        $empty_styles = '
+        <style>
+            .tw-campaigns-empty {
+                text-align: center;
+                padding: 100px 0;
+                font-family: \'Chakra Petch\', sans-serif;
+            }
+            .tw-campaigns-empty-icon {
+                font-size: 40px;
+                margin-bottom: 20px;
+                opacity: 0.3;
+                line-height: 1;
+            }
+            .tw-campaigns-empty-main {
+                font-size: 1rem;
+                color: #adff00;
+                margin: 0 0 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            .tw-campaigns-empty-sub {
+                display: block;
+                font-size: 0.85rem;
+                color: #fff;
+                margin: 0 0 28px;
+            }
+            .tw-campaigns-empty-actions {
+                display: flex;
+                justify-content: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            .tw-campaigns-empty-actions .tw-btn-sync {
+                display: inline-block;
+                background: #adff00;
+                color: #000 !important;
+                border: none;
+                padding: 10px 22px;
+                font-weight: 900;
+                border-radius: 4px;
+                cursor: pointer;
+                text-transform: uppercase;
+                font-family: \'Chakra Petch\', sans-serif;
+                font-size: 11px;
+                letter-spacing: 0.05em;
+                text-decoration: none;
+                transition: background 0.2s, box-shadow 0.2s;
+            }
+            .tw-campaigns-empty-actions .tw-btn-sync:hover {
+                background: #fff;
+                box-shadow: 0 0 15px #adff00;
+                color: #000 !important;
+            }
+            .tw-campaigns-empty-actions .tw-btn-outline {
+                display: inline-block;
+                background: transparent;
+                color: #adff00 !important;
+                border: 1px dashed #444;
+                padding: 10px 22px;
+                font-weight: 700;
+                border-radius: 4px;
+                cursor: pointer;
+                text-transform: uppercase;
+                font-family: \'Chakra Petch\', sans-serif;
+                font-size: 11px;
+                letter-spacing: 0.05em;
+                text-decoration: none;
+                transition: border-color 0.2s, color 0.2s;
+            }
+            .tw-campaigns-empty-actions .tw-btn-outline:hover {
+                border-color: #adff00;
+                color: #fff !important;
+            }
+        </style>';
+
         if ( empty( $active_campaigns ) ) {
-            return '
-            <div class="tw-deployments-empty-wrap">
-                <div class="tw-deployments-empty-screen">
-                    <div class="tw-deployments-empty-inner">
-                        <div class="tw-deployments-empty-icon">!</div>
-                        <p class="tw-deployments-empty-main">NO DEPLOYMENTS DETECTED IN YOUR GRID.</p>
-                        <p class="tw-deployments-empty-sub">CREATE A NEW DEPLOYMENT TO BEGIN THE WEAVING PROCESS.</p>
-                        <div class="tw-deployments-empty-actions">
-                            <a href="/new-deployment/" class="tw-btn-sync terminal-btn">NEW DEPLOYMENT</a>
-                            <a href="/new-node/" class="tw-btn-outline">NEW NODE</a>
-                        </div>
-                    </div>
+            return $empty_styles . '
+            <div class="tw-campaigns-empty">
+                <div class="tw-campaigns-empty-icon">⚠️</div>
+                <p class="tw-campaigns-empty-main">NO DEPLOYMENTS DETECTED IN YOUR GRID.</p>
+                <small class="tw-campaigns-empty-sub">Create a new Deployment to begin the weaving process.</small>
+                <div class="tw-campaigns-empty-actions">
+                    <a href="/new-deployment/" class="tw-btn-sync">NEW DEPLOYMENT</a>
+                    <a href="/new-node/" class="tw-btn-outline">NEW NODE</a>
                 </div>
             </div>';
         }
 
-        // BUG FIX: only create nonce when we actually need it (non-empty list).
         $game_nonce = wp_create_nonce( 'tw_game_nonce' );
 
-        ob_start(); ?>
+        ob_start();
+
+        // Inject empty-state styles even on populated pages so they're ready
+        // if JS later removes all cards and reveals the empty state.
+        echo $empty_styles; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        ?>
 
         <div class="tw-char-wrapper" style="font-family:'Chakra Petch', sans-serif;">
             <div class="tw-char-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:25px;">
                 <?php foreach ( $active_campaigns as $c ) :
 
-                    // BUG-FIX: cyber_campaign.id is a UUID string.
-                    // The previous code used (int) $c['id'] which collapses every UUID to 0.
-                    // All downstream uses — DOM id, data-id attribute, href query param, and
-                    // the JS RPC arg p_campaign_id — must use the raw string, not an integer.
-                    // We sanitize by stripping everything except alphanumerics and hyphens
-                    // (safe for UUID v4) and keep a plain string throughout.
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
@@ -131,7 +201,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                     $is_active = ! empty( $c['is_active'] );
 
-                    // BUG FIX: isset guard before int-cast; avoids PHP notice on missing key.
                     $game_mode = isset( $c['game_mode'] ) ? (int) $c['game_mode'] : 1;
                     $mode_str  = ( $game_mode === 2 ) ? 'TEAM' : 'SOLO';
                     $is_team   = ( $game_mode === 2 );
@@ -254,17 +323,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
             const GLOBAL_NONCE = '<?php echo esc_js( $game_nonce ); ?>';
 
-            // ─── Helper: reset a button to its original label ─────────────────────
             function resetBtn(btn, label) {
                 btn.prop('disabled', false).text(label).css('opacity', '1');
             }
 
-            // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────────
+            // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────
             $('.tw-delete-campaign-btn').on('click', async function(e) {
                 e.preventDefault();
 
                 const btn      = $(this);
-                const campId   = btn.data('id');   // UUID string — not cast to int
+                const campId   = btn.data('id');
                 const campName = btn.data('name');
 
                 if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) {
@@ -281,7 +349,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                 try {
                     const { error } = await window.twSupabase.rpc('fn_delete_campaign', {
-                        p_campaign_id: campId  // UUID string passed as-is to RPC
+                        p_campaign_id: campId
                     });
 
                     if (error) {
@@ -304,12 +372,12 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 }
             });
 
-            // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────────
+            // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
 
                 const btn    = $(this);
-                const campId = btn.data('id');   // UUID string
+                const campId = btn.data('id');
                 const mode   = String(btn.data('mode') || 'SOLO').toUpperCase();
 
                 if (!campId) {
@@ -318,7 +386,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 }
 
                 if (mode === 'SOLO') {
-                    // ── SOLO ──────────────────────────────────────────────────────
                     btn.text('INITIALIZING...').css('opacity', '0.7');
 
                     const fd = new FormData();
@@ -356,7 +423,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     });
 
                 } else {
-                    // ── TEAM ──────────────────────────────────────────────────────
                     btn.text('LINKING...').css('opacity', '0.7');
 
                     if (!window.twSupabase) {
@@ -379,7 +445,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                     (async () => {
                         try {
-                            // Step 1: resolve this operator's character for the campaign's world.
                             let characterId = null;
 
                             if (worldId) {
@@ -400,13 +465,11 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 characterId = (charRows && charRows.length) ? charRows[0].id : null;
                             }
 
-                            // Step 2: no character → redirect to creation.
                             if (!characterId) {
                                 window.location.href = '/agents/?campaign_id=' + campId;
                                 return;
                             }
 
-                            // Step 3: idempotent signup check.
                             const { data: existingSignups, error: existingError } = await client
                                 .from('cyber_campaign_signups')
                                 .select('id')
@@ -421,7 +484,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 return;
                             }
 
-                            // Step 4: insert signup only if not already present.
                             if (!existingSignups || !existingSignups.length) {
                                 const { error: signupError } = await client
                                     .from('cyber_campaign_signups')
@@ -450,7 +512,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 }
             });
 
-            // ─── 3. COPY HASH ─────────────────────────────────────────────────────
+            // ─── 3. COPY HASH ─────────────────────────────────────────────────
             $('.tw-copy-join-btn').on('click', async function(e) {
                 e.preventDefault();
 
@@ -466,7 +528,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(code);
                     } else {
-                        // Fallback for non-secure contexts (http / older browsers).
                         const temp = $('<input>');
                         $('body').append(temp);
                         temp.val(code).select();
