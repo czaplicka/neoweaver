@@ -93,5 +93,5 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 		<?php
 	}
 
-	add_action( 'wp_head', 'tw_inject_global_data', 1 );
+	add_action( 'wp_head', 'tw_inject_global_data', 10 );
 }
