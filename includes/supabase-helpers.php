@@ -6,6 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
 	function tw_supabase_rest_base() {
+		if ( ! function_exists( 'tw_supabase_url' ) ) {
+			error_log( 'TW: tw_supabase_url() is not defined.' );
+			return '';
+		}
+
 		return trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	}
 }
@@ -15,13 +20,30 @@ if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
  */
 if ( ! function_exists( 'tw_supabase_get' ) ) {
 	function tw_supabase_get( $endpoint, $query = [], $extra_args = [] ) {
-		$url = tw_supabase_rest_base() . ltrim( $endpoint, '/' );
-		if ( ! empty( $query ) ) {
+		$base = tw_supabase_rest_base();
+		if ( empty( $base ) ) {
+			return [];
+		}
+
+		$endpoint = ltrim( (string) $endpoint, '/' );
+		if ( $endpoint === '' ) {
+			error_log( 'TW tw_supabase_get error: empty endpoint' );
+			return [];
+		}
+
+		$url = $base . $endpoint;
+
+		if ( ! empty( $query ) && is_array( $query ) ) {
 			$url = add_query_arg( $query, $url );
 		}
 
+		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW: tw_supabase_anon_key() is not defined.' );
+			return [];
+		}
+
 		$default_args = [
-			'headers' => [
+			'headers'  => [
 				'apikey'        => tw_supabase_anon_key(),
 				'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
 			],
@@ -29,7 +51,14 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 			'sslverify' => true,
 		];
 
-		$args     = array_merge_recursive( $default_args, $extra_args );
+		// Zwykły merge – nadpisuje wartości zamiast robić z nich tablice.
+		$args = array_merge( $default_args, (array) $extra_args );
+
+		// Twardy safeguard: upewnij się, że timeout jest skalarem.
+		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
+			$args['timeout'] = 15;
+		}
+
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
@@ -49,13 +78,30 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
  */
 if ( ! function_exists( 'tw_supabase_request' ) ) {
 	function tw_supabase_request( $method, $endpoint, $query = [], $body = null, $extra_args = [] ) {
-		$url = tw_supabase_rest_base() . ltrim( $endpoint, '/' );
-		if ( ! empty( $query ) ) {
+		$base = tw_supabase_rest_base();
+		if ( empty( $base ) ) {
+			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+		}
+
+		$endpoint = ltrim( (string) $endpoint, '/' );
+		if ( $endpoint === '' ) {
+			error_log( 'TW tw_supabase_request error: empty endpoint' );
+			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+		}
+
+		$url = $base . $endpoint;
+
+		if ( ! empty( $query ) && is_array( $query ) ) {
 			$url = add_query_arg( $query, $url );
 		}
 
+		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW: tw_supabase_anon_key() is not defined.' );
+			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+		}
+
 		$default_args = [
-			'method'  => strtoupper( $method ),
+			'method'  => strtoupper( (string) $method ),
 			'headers' => [
 				'apikey'        => tw_supabase_anon_key(),
 				'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
@@ -69,7 +115,13 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 			$default_args['body'] = wp_json_encode( $body );
 		}
 
-		$args     = array_merge_recursive( $default_args, $extra_args );
+		$args = array_merge( $default_args, (array) $extra_args );
+
+		// Safeguard timeout.
+		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
+			$args['timeout'] = 15;
+		}
+
 		$response = wp_remote_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
@@ -93,8 +145,21 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
  */
 if ( ! function_exists( 'tw_get_data' ) ) {
 	function tw_get_data( $url, $args = [] ) {
+		// Domyślne bezpieczeństwo (timeout).
+		$defaults = [
+			'timeout'   => 15,
+			'sslverify' => true,
+		];
+
+		$args = array_merge( $defaults, (array) $args );
+
+		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
+			$args['timeout'] = 15;
+		}
+
 		$response = wp_remote_get( $url, $args );
 		if ( is_wp_error( $response ) ) {
+			error_log( 'TW tw_get_data error: ' . print_r( $response, true ) );
 			return [];
 		}
 		$body = wp_remote_retrieve_body( $response );
@@ -104,22 +169,10 @@ if ( ! function_exists( 'tw_get_data' ) ) {
 
 /**
  * Pobiera założone (is_equipped=true) przedmioty postaci z cyber_character_inventory.
- * Używane np. w panelu postaci na stronie gry.
- *
- * BUG-FIX: character_id is a UUID string in Supabase (cyber_characters.id).
- * The previous code cast it with (int) / intval(), which collapses every UUID
- * to 0 and returns an empty array for every character. Fixed by using
- * UUID-safe string sanitization identical to the pattern in
- * Neoweaver_Agents_Repository::in_filter(): strip everything except
- * alphanumerics and hyphens, which covers UUID v4 and legacy integer IDs.
- *
- * @param string|int $character_id  UUID or integer primary key of cyber_characters.
- * @return array
  */
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
 	function get_character_equipped_items( $character_id ) {
-		// UUID-safe sanitization — never use (int) or intval() on a UUID.
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id );
 
 		if ( empty( $safe_id ) ) {
 			error_log( 'Invalid character_id in get_character_equipped_items' );
