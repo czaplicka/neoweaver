@@ -63,7 +63,7 @@ if ( ! function_exists( 'neoweaver_shortcode_world_creator' ) ) {
 			10 => [ 'NODE_MORALITY',  'Ethical Framework',           [ ['Chaotic','Fittest survives.'], ['Gray','Ambiguity.'], ['Lawful','Strict codes.'] ],                                                                                                                     'moral'      ],
 		];
 
-		$path = get_stylesheet_directory() . '/templates/partials/world-creator.php';
+		$path = NEOWEAVER_PLUGIN_DIR . '/templates/partials/world-creator.php';
 		if ( ! file_exists( $path ) ) {
 			return '<!-- Neoweaver: missing partial world-creator.php -->';
 		}
