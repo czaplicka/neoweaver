@@ -1,0 +1,330 @@
+:root {
+    --neon-green: #adff00;
+    --neon-glow: rgba(173, 255, 0, 0.6);
+    --glass-bg: rgba(10, 15, 20, 0.85);
+    --glass-border: rgba(173, 255, 0, 0.3);
+    --text-main: #e0e0e0;
+}
+
+/* --- KONTENER GŁÓWNY --- */
+#tw-creator-wrapper {
+    font-family: 'Chakra Petch', sans-serif;
+    color: var(--text-main);
+    max-width: 1200px;
+    margin: 100px auto 60px auto;
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 0 40px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.6);
+    padding: 60px;
+    border-radius: 12px;
+    min-height: 800px;
+    overflow: hidden;
+}
+
+/* SCANLINES */
+#tw-creator-wrapper::before {
+    content: " "; display: block; position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03),
+                                     rgba(0, 255, 0, 0.01),
+                                     rgba(0, 0, 255, 0.03));
+    z-index: 2; background-size: 100% 3px, 3px 100%; pointer-events: none;
+}
+
+h2 {
+    color: var(--neon-green);
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 2.2rem;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 15px var(--neon-glow);
+}
+
+.tw-question-text {
+    font-size: 1.3rem;
+    color: #ccc;
+    margin-bottom: 40px;
+    font-weight: 300;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 18px;
+}
+
+/* --- ANIMACJE --- */
+.tw-step { display: none; opacity: 0; }
+.tw-step.active {
+    display: flex; flex-direction: column;
+    animation: glitchFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+@keyframes glitchFadeIn {
+    0% { opacity: 0; transform: scale(0.98); filter: blur(4px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+/* --- INPUTS --- */
+input[type="text"], textarea {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+    border-left: 5px solid #444;
+    color: #fff;
+    padding: 18px;
+    font-size: 1.3rem;
+    font-family: 'Chakra Petch', sans-serif;
+    width: 100%;
+    outline: none;
+    transition: 0.3s;
+}
+input[type="text"]:focus, textarea:focus {
+    border-color: var(--neon-green);
+    border-left-color: var(--neon-green);
+    box-shadow: 0 0 20px var(--neon-glow);
+    background: rgba(0, 20, 0, 0.4);
+}
+
+/* --- BUTTONS --- */
+.tw-nav-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 50px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 30px;
+    position: relative;
+    z-index: 5;
+}
+.tw-btn-nav {
+    background: transparent;
+    border: 2px solid var(--neon-green);
+    color: var(--neon-green);
+    padding: 12px 40px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+    transition: 0.3s;
+}
+.tw-btn-nav:hover {
+    background: var(--neon-green);
+    color: #000;
+    box-shadow: 0 0 40px var(--neon-green);
+}
+
+/* --- MEGA CARDS (RACE / CLASS) --- */
+.tw-radio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.tw-card-label { cursor: pointer; perspective: 1000px; }
+.tw-card-label input { display: none; }
+
+.tw-card-visual {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 18px;
+    text-align: center;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    overflow: hidden;
+    min-height: 220px;
+}
+
+.tw-card-visual img {
+    width: 180px;
+    height: auto;
+    margin-bottom: 14px;
+    transition: 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8));
+    z-index: 1;
+}
+
+/* Nazwy + tagi pod grafiką – mniejsze / ciaśniejsze */
+.tw-card-visual strong {
+    display: block;
+    font-size: 1.25rem;
+    color: #fff;
+    margin-bottom: 4px;
+    z-index: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 0 0 4px black;
+}
+.tw-card-visual span {
+    font-size: 0.8rem;
+    color: #aaa;
+    z-index: 1;
+}
+
+/* Hover / selected */
+.tw-card-label:hover .tw-card-visual {
+    border-color: rgba(173, 255, 0, 0.7);
+    background: rgba(255,255,255,0.05);
+    transform: translateY(-6px);
+}
+.tw-card-label:hover .tw-card-visual img {
+    transform: scale(1.08) translateY(-6px);
+    filter: drop-shadow(0 0 18px var(--neon-glow));
+}
+.tw-card-label input:checked + .tw-card-visual {
+    border-color: var(--neon-green);
+    background: rgba(173, 255, 0, 0.08);
+    box-shadow: 0 0 30px rgba(173, 255, 0, 0.18) inset,
+                0 0 16px rgba(173, 255, 0, 0.25);
+}
+
+/* --- SKILLS (GRID) --- */
+.tw-skill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    max-height: 550px;
+    overflow-y: auto;
+    padding: 10px;
+}
+.tw-skill-item input { display: none; }
+.tw-skill-card {
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    padding: 18px;
+    transition: 0.2s;
+    cursor: pointer;
+}
+.tw-skill-card img {
+    width: 54px;
+    height: 54px;
+    margin-right: 20px;
+    opacity: 0.7;
+    transition: 0.3s;
+}
+.tw-skill-item:hover .tw-skill-card {
+    border-color: #777;
+    background: rgba(255,255,255,0.08);
+}
+.tw-skill-item input:checked + .tw-skill-card {
+    border-color: var(--neon-green);
+    background: rgba(173, 255, 0, 0.08);
+}
+.tw-skill-item input:checked + .tw-skill-card img {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px var(--neon-green));
+}
+.tw-skill-item input:checked + .tw-skill-card h5 {
+    color: var(--neon-green);
+    margin: 0;
+    font-size: 1.05rem;
+}
+.tw-skill-item input:checked + .tw-skill-card span {
+    color: #fff;
+}
+.tw-skill-text {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+.tw-skill-text span {
+    font-size: 0.9rem;
+    color: #888;
+}
+
+.tw-skill-category {
+    grid-column: 1 / -1;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    color: var(--neon-green);
+    text-transform: uppercase;
+    border-bottom: 1px solid #444;
+    padding-bottom: 8px;
+}
+
+/* --- ATTRIBUTES --- */
+.tw-attr-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 22px;
+    background: rgba(0,0,0,0.4);
+    padding: 22px;
+    border-left: 5px solid #333;
+    transition: 0.3s;
+}
+.tw-attr-row:hover {
+    border-left-color: var(--neon-green);
+    background: rgba(255,255,255,0.03);
+}
+.tw-attr-info h4 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.3rem;
+    letter-spacing: 1px;
+}
+.tw-attr-val {
+    width: 70px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: var(--neon-green);
+    font-size: 2.3rem;
+    font-weight: 700;
+    text-shadow: 0 0 15px var(--neon-glow);
+}
+
+/* --- EQUIPMENT --- */
+.tw-eq-label input { display: none; }
+.tw-eq-tile {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #333;
+    padding: 26px;
+    transition: 0.3s;
+    cursor: pointer;
+    position: relative;
+    margin-bottom: 15px;
+    display: block;
+}
+.tw-eq-tile b {
+    font-size: 1.15rem;
+    color: #fff;
+    display: block;
+    margin-bottom: 5px;
+}
+.tw-eq-tile:hover {
+    border-color: #666;
+    background: rgba(255,255,255,0.05);
+}
+.tw-eq-label input:checked + .tw-eq-tile {
+    border-color: var(--neon-green);
+    background: rgba(173, 255, 0, 0.05);
+    box-shadow: 0 0 20px rgba(173,255,0,0.1);
+}
+.tw-eq-label input:checked + .tw-eq-tile b {
+    color: var(--neon-green);
+    text-shadow: 0 0 8px var(--neon-green);
+}
+
+/* --- UPLOAD --- */
+.tw-upload-box {
+    border: 3px dashed #444;
+    padding: 50px;
+    text-align: center;
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.tw-upload-box:hover {
+    border-color: var(--neon-green);
+    background: rgba(173,255,0,0.03);
+}
