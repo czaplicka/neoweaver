@@ -1,15 +1,17 @@
 function get_cyber_world_news_ajax() {
     $world_id = sanitize_text_field($_POST['world_id']);
-    $character_id = sanitize_text_field($_POST['character_id']); // ID aktywnej postaci
+    $character_id = sanitize_text_field($_POST['character_id']); 
     $current_day = intval($_POST['current_day']);
     $current_hour = intval($_POST['current_hour']);
+    $clearance = isset($_POST['clearance']) ? intval($_POST['clearance']) : 0;
 
     $supa_url = SUPABASE_URL;
     $supa_key = SUPABASE_KEY;
 
-    // Filtry: ten świat, aktywne, oraz czas (tylko to, co już się wydarzyło w grze)
-    // lte = less than or equal (mniejsze lub równe obecnemu dniowi)
-    $url = $supa_url . "/rest/v1/cyber_world_news?world_id=eq.$world_id&game_day=lte.$current_day&is_active=eq.true&order=game_day.desc,game_hour.desc";
+    // Poprawiony URL z logiką godziny i clearance
+    $url = $supa_url . "/rest/v1/cyber_world_news?world_id=eq.$world_id&is_active=eq.true&clearance_level=lte.$clearance";
+    $url .= "&or=(game_day.lt.$current_day,and(game_day.eq.$current_day,game_hour.lte.$current_hour))";
+    $url .= "&order=game_day.desc,game_hour.desc";
 
     $response = wp_remote_get($url, [
         'headers' => [
@@ -18,13 +20,21 @@ function get_cyber_world_news_ajax() {
         ]
     ]);
 
-    $news = json_decode(wp_remote_retrieve_body($response), true);
+    $body = wp_remote_retrieve_body($response);
+    $news = json_decode($body, true);
 
-    // Sprawdzamy, czy są nieprzeczytane
+    if (!is_array($news)) {
+        wp_send_json(['news' => [], 'unread_count' => 0]);
+        return;
+    }
+
     $unread_count = 0;
     foreach ($news as &$item) {
-        $read_by = is_array($item['read_by']) ? $item['read_by'] : json_decode($item['read_by'], true);
-        $item['is_new'] = !in_array($character_id, (array)$read_by);
+        $read_by = $item['read_by'];
+        if (is_string($read_by)) $read_by = json_decode($read_by, true);
+        $read_by = is_array($read_by) ? $read_by : [];
+
+        $item['is_new'] = !in_array($character_id, $read_by);
         if ($item['is_new']) $unread_count++;
     }
 
@@ -33,26 +43,3 @@ function get_cyber_world_news_ajax() {
         'unread_count' => $unread_count
     ]);
 }
-// Akcja oznaczania newsa jako przeczytany
-function mark_news_read_ajax() {
-    $news_id = sanitize_text_field($_POST['news_id']);
-    $char_id = sanitize_text_field($_POST['char_id']);
-
-    $supa_url = SUPABASE_URL;
-    $supa_key = SUPABASE_KEY;
-
-    $response = wp_remote_post($supa_url . "/rest/v1/rpc/mark_news_as_read", [
-        'headers' => [
-            'apikey' => $supa_key,
-            'Authorization' => 'Bearer ' . $supa_key,
-            'Content-Type' => 'application/json'
-        ],
-        'body' => json_encode([
-            'news_id' => $news_id,
-            'char_id' => $char_id
-        ])
-    ]);
-
-    wp_send_json_success();
-}
-add_action('wp_ajax_mark_news_read', 'mark_news_read_ajax');
