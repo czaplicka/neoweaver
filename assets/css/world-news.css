@@ -176,3 +176,17 @@
     border-left: 3px solid #ff0055; /* Czerwony pasek dla nieprzeczytanych */
     padding-left: 10px;
 }
+/* Licznik powiadomień nad ikoną */
+#news-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff0055;
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 50%;
+    font-weight: bold;
+    box-shadow: 0 0 10px #ff0055;
+    display: none; /* Pokazywane przez JS */
+}
