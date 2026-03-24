@@ -149,3 +149,30 @@
 .type-social_media .news-title { color: #00ccff; }
 .type-encrypted .news-body { filter: blur(2px); cursor: help; }
 .type-encrypted:hover .news-body { filter: blur(0); transition: 0.3s; }
+/* Miganie ikony gdy są nowe wiadomości */
+.has-unread .dashicons-rss {
+    animation: news-pulse 1.5s infinite;
+    color: #fff; /* Jaśniejszy kolor dla nowych */
+}
+
+@keyframes news-pulse {
+    0% { text-shadow: 0 0 2px #adff00; }
+    50% { text-shadow: 0 0 15px #adff00, 0 0 20px #ff0055; opacity: 0.8; }
+    100% { text-shadow: 0 0 2px #adff00; }
+}
+
+/* Formatowanie czasu gry wewnątrz newsa */
+.news-game-time {
+    font-family: 'Chakra Petch';
+    font-size: 0.7rem;
+    color: #adff00;
+    border: 1px solid #adff00;
+    padding: 2px 5px;
+    margin-right: 10px;
+    background: rgba(173, 255, 0, 0.1);
+}
+
+.news-item.is-new-item {
+    border-left: 3px solid #ff0055; /* Czerwony pasek dla nieprzeczytanych */
+    padding-left: 10px;
+}
