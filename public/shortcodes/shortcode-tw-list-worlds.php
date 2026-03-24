@@ -2,6 +2,39 @@
 /**
  * SHORTCODE: [tw_list_worlds]
  */
+function neoweaver_enqueue_worlds_assets() {
+	// Ładuj tylko na front-endzie
+	if ( is_admin() ) {
+		return;
+	}
+
+	// Opcjonalnie: tylko jeśli jest shortcode na stronie
+	if ( is_singular() ) {
+		global $post;
+		if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
+			return;
+		}
+	}
+
+	$plugin_url = plugin_dir_url( dirname( __FILE__ ) ); // dostosuj w zależności od miejsca pliku
+
+	wp_enqueue_style(
+		'tw-list-worlds',
+		$plugin_url . 'public/assets/css/tw-list-worlds.css',
+		[],
+		'1.0.0'
+	);
+
+	wp_enqueue_script(
+		'tw-list-worlds',
+		$plugin_url . 'public/assets/js/tw-list-worlds.js',
+		[ 'jquery' ], // albo [] jeśli nie korzystasz
+		'1.0.0',
+		true
+	);
+}
+add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_worlds_assets' );
+
 function tw_list_worlds_v14() {
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
