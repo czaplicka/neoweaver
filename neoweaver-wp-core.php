@@ -96,7 +96,8 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_script( 'nw-panel-tactical-left', NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
 		wp_enqueue_script( 'neoweaver-interference', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-interference.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 wp_enqueue_script( 'neoweaver-interference', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [], NEOWEAVER_VERSION, true );
-		wp_enqueue_script( 'neoweaver-world-news', NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css', [], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'world-news', NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css', [], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'world-news', NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
 
 	}
