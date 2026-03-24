@@ -116,3 +116,36 @@
 /* Custom Scrollbar */
 .cyber-modal-content::-webkit-scrollbar { width: 5px; }
 .cyber-modal-content::-webkit-scrollbar-thumb { background: #adff00; }
+.news-header {
+    display: flex;
+    gap: 10px;
+    font-size: 0.75rem;
+    margin-bottom: 5px;
+    opacity: 0.8;
+}
+
+.news-icon {
+    color: #adff00;
+}
+
+.news-tags {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #adff00;
+    filter: brightness(0.7);
+    font-style: italic;
+}
+
+.no-data, .loading-text, .error {
+    text-align: center;
+    padding: 40px 20px;
+    font-style: italic;
+    letter-spacing: 2px;
+}
+
+.error { color: #ff0055; }
+
+/* Stylizacja dla konkretnych typów */
+.type-social_media .news-title { color: #00ccff; }
+.type-encrypted .news-body { filter: blur(2px); cursor: help; }
+.type-encrypted:hover .news-body { filter: blur(0); transition: 0.3s; }
