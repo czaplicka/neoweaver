@@ -1,3 +1,4 @@
+<?php
 function get_cyber_world_news_ajax() {
     $world_id = sanitize_text_field($_POST['world_id']);
     $character_id = sanitize_text_field($_POST['character_id']); 
