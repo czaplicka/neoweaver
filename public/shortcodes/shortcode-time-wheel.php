@@ -1,3 +1,4 @@
+<?php
 // 1. Rejestracja plików (bez automatycznego ładowania wszędzie)
 function tw_register_time_wheel_assets() {
     wp_register_style(
