@@ -10,6 +10,7 @@
 #tw-creator-wrapper {
     font-family: 'Chakra Petch', sans-serif;
     color: var(--text-main);
+    width: 100%;
     max-width: 1200px;
     margin: 100px auto 60px auto;
     position: relative;
@@ -21,6 +22,7 @@
     border-radius: 12px;
     min-height: 800px;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 /* SCANLINES */
@@ -115,27 +117,13 @@ input[type="text"]:focus, textarea:focus {
     box-shadow: 0 0 40px var(--neon-green);
 }
 
-/* --- MEGA CARDS (RADIO GRID) ---
- *
- * FIX: was `repeat(auto-fit, minmax(240px, 1fr))` which caused the 5th card
- * to wrap onto a second row when the container was narrower than 5 × 240 px.
- *
- * Changed to `repeat(5, 1fr)` so all five options always sit on one row.
- * `min-width: 0` on both the grid and each label prevents grid blowout when
- * card text is long.  Card min-height reduced 220 px → 160 px and font sizes
- * trimmed slightly so the row stays compact.
- *
- * The :has() rule below keeps 3-option steps (e.g. NODE_MORALITY) centred
- * in three equal-width columns instead of stretching across five.
- */
+/* --- RADIO GRID --- */
 .tw-radio-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 16px;
     min-width: 0;
 }
-
-/* 3-option steps: centre three columns, don't stretch to full width */
 .tw-radio-grid:has(> :nth-child(3):last-child) {
     grid-template-columns: repeat(3, minmax(0, 260px));
     justify-content: center;
@@ -164,13 +152,80 @@ input[type="text"]:focus, textarea:focus {
     min-height: 160px;
 }
 
-.tw-card-visual img {
-    width: 180px;
-    height: auto;
-    margin-bottom: 14px;
-    transition: 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8));
-    z-index: 1;
+/* ---------------------------------------------------------------
+   EMOJI ICONS via CSS ::before on .tw-card-visual
+   Targeted by data-field attribute on the parent .tw-radio-grid.
+   Each field gets a set of 5 emoji — one per card, selected via
+   :nth-child so no extra HTML markup is needed.
+   --------------------------------------------------------------- */
+
+.tw-card-visual::before {
+    content: '';
+    display: block;
+    font-size: 2.4rem;
+    line-height: 1;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 6px var(--neon-glow));
+    flex-shrink: 0;
+}
+
+/* SIZE */
+[data-field="size"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '📍'; }
+[data-field="size"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '🗺️'; }
+[data-field="size"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '🌐'; }
+[data-field="size"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '🪐'; }
+[data-field="size"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '♾️'; }
+
+/* WEALTH */
+[data-field="wealth"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '🩹'; }
+[data-field="wealth"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '🔩'; }
+[data-field="wealth"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '⚖️'; }
+[data-field="wealth"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '💎'; }
+[data-field="wealth"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '🏦'; }
+
+/* DIFFICULTY */
+[data-field="difficulty"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '☮️'; }
+[data-field="difficulty"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '🛡️'; }
+[data-field="difficulty"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '⚡'; }
+[data-field="difficulty"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '☣️'; }
+[data-field="difficulty"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '💀'; }
+
+/* MAGIC */
+[data-field="magic"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '🔬'; }
+[data-field="magic"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '🌀'; }
+[data-field="magic"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '✨'; }
+[data-field="magic"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '🔮'; }
+[data-field="magic"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '🌌'; }
+
+/* GODS */
+[data-field="gods"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '🔇'; }
+[data-field="gods"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '👁️'; }
+[data-field="gods"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '📡'; }
+[data-field="gods"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '⚙️'; }
+[data-field="gods"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '🤖'; }
+
+/* TECHNOLOGY */
+[data-field="technology"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '📼'; }
+[data-field="technology"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '💻'; }
+[data-field="technology"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '🦾'; }
+[data-field="technology"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '🧬'; }
+[data-field="technology"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '🌠'; }
+
+/* RELATIONS */
+[data-field="relations"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '⚔️'; }
+[data-field="relations"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '😤'; }
+[data-field="relations"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '🤝'; }
+[data-field="relations"] .tw-card-label:nth-child(4) .tw-card-visual::before { content: '🤜'; }
+[data-field="relations"] .tw-card-label:nth-child(5) .tw-card-visual::before { content: '🧠'; }
+
+/* MORAL */
+[data-field="moral"] .tw-card-label:nth-child(1) .tw-card-visual::before { content: '🎲'; }
+[data-field="moral"] .tw-card-label:nth-child(2) .tw-card-visual::before { content: '🌫️'; }
+[data-field="moral"] .tw-card-label:nth-child(3) .tw-card-visual::before { content: '⚖️'; }
+
+/* Karta zaznaczona — emoji się rozświetla */
+.tw-card-label input:checked + .tw-card-visual::before {
+    filter: drop-shadow(0 0 12px var(--neon-green)) brightness(1.3);
 }
 
 .tw-card-visual strong {
@@ -195,10 +250,6 @@ input[type="text"]:focus, textarea:focus {
     border-color: rgba(173, 255, 0, 0.7);
     background: rgba(255,255,255,0.05);
     transform: translateY(-6px);
-}
-.tw-card-label:hover .tw-card-visual img {
-    transform: scale(1.08) translateY(-6px);
-    filter: drop-shadow(0 0 18px var(--neon-glow));
 }
 .tw-card-label input:checked + .tw-card-visual {
     border-color: var(--neon-green);
@@ -233,121 +284,55 @@ input[type="text"]:focus, textarea:focus {
     opacity: 0.7;
     transition: 0.3s;
 }
-.tw-skill-item:hover .tw-skill-card {
-    border-color: #777;
-    background: rgba(255,255,255,0.08);
-}
-.tw-skill-item input:checked + .tw-skill-card {
-    border-color: var(--neon-green);
-    background: rgba(173, 255, 0, 0.08);
-}
-.tw-skill-item input:checked + .tw-skill-card img {
-    opacity: 1;
-    filter: drop-shadow(0 0 8px var(--neon-green));
-}
-.tw-skill-item input:checked + .tw-skill-card h5 {
-    color: var(--neon-green);
-    margin: 0;
-    font-size: 1.05rem;
-}
-.tw-skill-item input:checked + .tw-skill-card span {
-    color: #fff;
-}
-.tw-skill-text {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-}
-.tw-skill-text span {
-    font-size: 0.9rem;
-    color: #888;
-}
-
+.tw-skill-item:hover .tw-skill-card { border-color: #777; background: rgba(255,255,255,0.08); }
+.tw-skill-item input:checked + .tw-skill-card { border-color: var(--neon-green); background: rgba(173, 255, 0, 0.08); }
+.tw-skill-item input:checked + .tw-skill-card img { opacity: 1; filter: drop-shadow(0 0 8px var(--neon-green)); }
+.tw-skill-item input:checked + .tw-skill-card h5 { color: var(--neon-green); margin: 0; font-size: 1.05rem; }
+.tw-skill-item input:checked + .tw-skill-card span { color: #fff; }
+.tw-skill-text { display: flex; flex-direction: column; text-align: left; }
+.tw-skill-text span { font-size: 0.9rem; color: #888; }
 .tw-skill-category {
     grid-column: 1 / -1;
-    margin-top: 30px;
-    margin-bottom: 15px;
-    font-size: 1.1rem;
-    color: var(--neon-green);
+    margin-top: 30px; margin-bottom: 15px;
+    font-size: 1.1rem; color: var(--neon-green);
     text-transform: uppercase;
-    border-bottom: 1px solid #444;
-    padding-bottom: 8px;
+    border-bottom: 1px solid #444; padding-bottom: 8px;
 }
 
 /* --- ATTRIBUTES --- */
 .tw-attr-row {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     margin-bottom: 22px;
     background: rgba(0,0,0,0.4);
     padding: 22px;
     border-left: 5px solid #333;
     transition: 0.3s;
 }
-.tw-attr-row:hover {
-    border-left-color: var(--neon-green);
-    background: rgba(255,255,255,0.03);
-}
-.tw-attr-info h4 {
-    margin: 0;
-    color: #fff;
-    font-size: 1.3rem;
-    letter-spacing: 1px;
-}
+.tw-attr-row:hover { border-left-color: var(--neon-green); background: rgba(255,255,255,0.03); }
+.tw-attr-info h4 { margin: 0; color: #fff; font-size: 1.3rem; letter-spacing: 1px; }
 .tw-attr-val {
-    width: 70px;
-    text-align: center;
-    background: transparent;
-    border: none;
-    color: var(--neon-green);
-    font-size: 2.3rem;
-    font-weight: 700;
+    width: 70px; text-align: center;
+    background: transparent; border: none;
+    color: var(--neon-green); font-size: 2.3rem; font-weight: 700;
     text-shadow: 0 0 15px var(--neon-glow);
 }
 
 /* --- EQUIPMENT --- */
 .tw-eq-label input { display: none; }
 .tw-eq-tile {
-    background: rgba(0,0,0,0.4);
-    border: 1px solid #333;
-    padding: 26px;
-    transition: 0.3s;
-    cursor: pointer;
-    position: relative;
-    margin-bottom: 15px;
-    display: block;
+    background: rgba(0,0,0,0.4); border: 1px solid #333;
+    padding: 26px; transition: 0.3s; cursor: pointer;
+    position: relative; margin-bottom: 15px; display: block;
 }
-.tw-eq-tile b {
-    font-size: 1.15rem;
-    color: #fff;
-    display: block;
-    margin-bottom: 5px;
-}
-.tw-eq-tile:hover {
-    border-color: #666;
-    background: rgba(255,255,255,0.05);
-}
-.tw-eq-label input:checked + .tw-eq-tile {
-    border-color: var(--neon-green);
-    background: rgba(173, 255, 0, 0.05);
-    box-shadow: 0 0 20px rgba(173,255,0,0.1);
-}
-.tw-eq-label input:checked + .tw-eq-tile b {
-    color: var(--neon-green);
-    text-shadow: 0 0 8px var(--neon-green);
-}
+.tw-eq-tile b { font-size: 1.15rem; color: #fff; display: block; margin-bottom: 5px; }
+.tw-eq-tile:hover { border-color: #666; background: rgba(255,255,255,0.05); }
+.tw-eq-label input:checked + .tw-eq-tile { border-color: var(--neon-green); background: rgba(173, 255, 0, 0.05); box-shadow: 0 0 20px rgba(173,255,0,0.1); }
+.tw-eq-label input:checked + .tw-eq-tile b { color: var(--neon-green); text-shadow: 0 0 8px var(--neon-green); }
 
 /* --- UPLOAD --- */
 .tw-upload-box {
-    border: 3px dashed #444;
-    padding: 50px;
-    text-align: center;
-    background: rgba(0,0,0,0.4);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.3s;
+    border: 3px dashed #444; padding: 50px;
+    text-align: center; background: rgba(0,0,0,0.4);
+    border-radius: 8px; cursor: pointer; transition: 0.3s;
 }
-.tw-upload-box:hover {
-    border-color: var(--neon-green);
-    background: rgba(173,255,0,0.03);
-}
+.tw-upload-box:hover { border-color: var(--neon-green); background: rgba(173,255,0,0.03); }
