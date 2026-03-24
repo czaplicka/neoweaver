@@ -43,3 +43,4 @@ function get_cyber_world_news_ajax() {
         'unread_count' => $unread_count
     ]);
 }
+add_action('wp_ajax_get_cyber_news', 'get_cyber_world_news_ajax');
