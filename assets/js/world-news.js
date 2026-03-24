@@ -46,3 +46,28 @@ function fetchNews() {
         }
     });
 }
+// Funkcja odświeżająca status powiadomień (wywoływana np. co zmianę lokacji)
+function checkNewsNotifications() {
+    jQuery.post('/wp-admin/admin-ajax.php', {
+        action: 'get_cyber_news',
+        world_id: window.currentWorldId,
+        character_id: window.currentCharacterId,
+        current_day: window.gameState.day, // Twoja zmienna czasu gry
+        current_hour: window.gameState.hour
+    }, function(response) {
+        if (response.unread_count > 0) {
+            jQuery('#cyber-news-trigger').addClass('has-unread');
+            // Opcjonalnie: dodaj licznik nad ikoną
+            jQuery('#news-badge').text(response.unread_count).show();
+        } else {
+            jQuery('#cyber-news-trigger').removeClass('has-unread');
+            jQuery('#news-badge').hide();
+        }
+    });
+}
+
+// Oznaczanie jako przeczytane po otwarciu modala
+function markNewsAsRead(newsId) {
+    // Tutaj wysyłasz szybki UPDATE do Supabase dodający character_id do tablicy read_by
+    // AI GM może to robić automatycznie przy otwarciu modala
+}
