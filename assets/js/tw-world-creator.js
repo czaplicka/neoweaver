@@ -202,7 +202,10 @@
 
 			fetch( restUrl, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce || '' },
+				headers: {
+    'Content-Type': 'application/json',
+    'X-WP-Nonce':   config.restNonce || '',   // ← wp_rest nonce dla cookie auth
+},
 				body: JSON.stringify( data ),
 				credentials: 'same-origin',
 			} )
