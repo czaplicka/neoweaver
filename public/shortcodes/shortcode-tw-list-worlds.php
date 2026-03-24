@@ -322,7 +322,7 @@ function tw_list_worlds_v14() {
 						'conf_summary' => $w['conflict_summary'] ?? '',
 						'conf_side_1'  => $w['conflict_race_1_name'] ?? '',
 						'conf_side_2'  => $w['conflict_race_2_name'] ?? '',
-					};
+					];
 					?>
 					<div class="tw-world-card"
 						 id="tw-world-card-<?php echo esc_attr( $world_id ); ?>"
@@ -436,135 +436,6 @@ function tw_list_worlds_v14() {
 			<div id="m-desc" class="tw-modal-body"></div>
 		</div>
 	</div>
-
-	<style>
-		.tw-terminal-interface { padding: 20px; min-height: 400px; font-family: 'Chakra Petch', sans-serif; color: #fff; }
-		.tw-world-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
-		.tw-world-init-wrap { margin-bottom: 25px; display: flex; justify-content: center; }
-		.tw-world-init-card { position: relative; width: 100%; max-width: 520px; padding: 20px; background: radial-gradient(circle at top, rgba(173,255,0,0.08), rgba(0,0,0,0.85)); border: 1px solid rgba(173,255,0,0.5); border-radius: 8px; overflow: hidden; }
-		.tw-world-init-ring { position: absolute; border-radius: 50%; border: 2px solid rgba(173,255,0,0.25); box-shadow: 0 0 25px rgba(173,255,0,0.3); animation: tw-world-spin 3s linear infinite; pointer-events: none; }
-		.tw-world-init-ring-outer { width: 180px; height: 180px; top: -40px; right: -40px; border-top-color: #adff00; border-bottom-color: transparent; }
-		.tw-world-init-ring-inner { width: 110px; height: 110px; top: 0; right: 0; border-top-color: #00e5ff; border-left-color: transparent; animation-duration: 2s; animation-direction: reverse; }
-		.tw-world-init-core { position: relative; z-index: 2; }
-		.tw-world-init-title { font-size: 0.8rem; color: #adff00; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px; }
-		.tw-world-init-text { font-size: 0.8rem; color: #ccffcc; }
-		@keyframes tw-world-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-		.tw-world-card { position: relative; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 8px; overflow: hidden; transition: 0.4s cubic-bezier(0.2, 1, 0.3, 1); cursor: pointer; min-height: 220px; }
-		.tw-world-card:hover { border-color: #adff00; transform: translateY(-5px); }
-		.tw-card-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at top right, rgba(173,255,0,0.05), transparent); pointer-events: none; }
-		.tw-card-content { padding: 20px; display: flex; flex-direction: column; height: 100%; }
-		.tw-card-top { display: flex; justify-content: space-between; margin-bottom: 15px; }
-		.tw-status-tag { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-		.status-online { color: #adff00; text-shadow: 0 0 5px #adff00; }
-		.status-idle  { color: #555; }
-		.tw-id-tag { color: #333; font-size: 10px; font-family: monospace; }
-		.tw-world-title { color: #fff; margin: 0 0 10px 0; font-size: 1.4rem; text-transform: uppercase; }
-		.tw-campaign-link, .tw-agent-line, .tw-status-line { font-size: 11px; margin-bottom: 4px; }
-		.tw-campaign-link .label, .tw-agent-line .label, .tw-status-line .label { color: #00e5ff; opacity: 0.6; margin-right: 5px; }
-		.tw-campaign-link .value { color: #00e5ff; font-weight: bold; }
-		.tw-agent-line .label, .tw-status-line .label { color: #adff00; }
-		.tw-agent-line .value, .tw-status-line .value { color: #fff; font-weight: 600; }
-		.tw-world-excerpt { color: #888; font-size: 13px; line-height: 1.5; flex-grow: 1; }
-		.tw-card-footer { margin-top: 15px; display: flex; gap: 8px; flex-wrap: wrap; }
-		.tw-btn-sync { background: #adff00; color: #000; border: none; padding: 10px; flex: 1 1 55%; font-weight: 900; border-radius: 4px; cursor: pointer; text-transform: uppercase; transition: 0.2s; font-size: 11px; }
-		.tw-btn-sync:hover { background: #fff; box-shadow: 0 0 15px #adff00; }
-		.tw-btn-setup { background: transparent; border: 1px dashed #444; color: #888; flex: 1 1 55%; padding: 10px; font-size: 11px; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
-		.tw-btn-setup:hover { border-color: #00e5ff; color: #00e5ff; }
-		.tw-btn-delete { background: transparent; border: 1px solid #441111; color: #ff6666; flex: 1 1 40%; padding: 8px; font-size: 10px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
-		.tw-btn-delete:hover { border-color: #ff0000; color: #ff0000; }
-		.tw-no-worlds { text-align: center; padding: 100px 0; border: 1px dashed #222; border-radius: 10px; }
-		.tw-alert-icon { font-size: 40px; margin-bottom: 20px; opacity: 0.3; }
-		.tw-modal-overlay { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); backdrop-filter: blur(8px); }
-		.tw-modal-box { background: #0d1117; margin: 40px auto; padding: 30px; border: 1px solid #adff00; width: 90%; max-width: 850px; border-radius: 8px; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 50px rgba(0,0,0,1); }
-		.tw-modal-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #222; padding-bottom: 15px; margin-bottom: 20px; }
-		.tw-modal-grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; background: rgba(173,255,0,0.03); padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #222; }
-		.m-stat-item { font-size: 0.8rem; }
-		.m-stat-item strong { color: #adff00; margin-right: 5px; font-size: 0.7rem; opacity: 0.8; }
-		.tw-modal-conflict { margin: 0 0 25px 0; padding: 12px 15px; border-radius: 5px; border: 1px solid #333; background: rgba(0,0,0,0.35); }
-		.conflict-tags { font-size: 0.75rem; margin-bottom: 8px; color: #adff00; }
-		.conflict-tags span { display: inline-block; margin-right: 6px; font-family: 'Chakra Petch', sans-serif; font-size: 0.7rem; opacity: 0.9; }
-		.conflict-main h4 { font-size: 0.9rem; margin: 4px 0; color: #00e5ff; text-transform: uppercase; letter-spacing: 0.08em; }
-		.tw-conf-sides { font-size: 0.8rem; color: #ccc; margin: 4px 0 0 0; }
-		.tw-modal-lore { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 25px; }
-		.lore-section h4 { font-size: 0.75rem; color: #00e5ff; margin: 0 0 10px 0; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 5px; }
-		.lore-section p { font-size: 0.85rem; color: #bbb; margin: 0; line-height: 1.5; }
-		.tw-modal-body-title { font-size: 0.7rem; color: #adff00; margin-bottom: 8px; font-weight: bold; letter-spacing: 2px; }
-		.tw-modal-body { line-height: 1.7; font-size: 1rem; color: #ddd; background: rgba(0,0,0,0.4); padding: 20px; border-radius: 5px; border-left: 2px solid #adff00; }
-		.tw-modal-close { color: #adff00; font-size: 35px; cursor: pointer; line-height: 0.5; }
-		@media (max-width: 768px) { .tw-modal-grid-stats { grid-template-columns: repeat(2, 1fr); } .tw-modal-lore { grid-template-columns: 1fr; } .tw-card-footer { flex-direction: column; } }
-	</style>
-
-	<script>
-	function openWorldModal(data) {
-		document.getElementById('m-name').innerText       = data.name || '';
-		document.getElementById('m-campaign').innerText   = data.campaign || '';
-		document.getElementById('m-desc').innerText       = data.desc || '';
-		document.getElementById('m-magic').innerText      = data.magic || '';
-		document.getElementById('m-tech').innerText       = data.tech || '';
-		document.getElementById('m-vibe').innerText       = data.vibe || '';
-		document.getElementById('m-wealth').innerText     = data.wealth || '';
-		document.getElementById('m-size').innerText       = data.size || '';
-		document.getElementById('m-diff').innerText       = data.diff || '';
-		document.getElementById('m-gods').innerText       = data.gods || '';
-		document.getElementById('m-relations').innerText  = data.relations || '';
-		document.getElementById('m-tag1').innerText       = data.tag1 || '';
-		document.getElementById('m-tag2').innerText       = data.tag2 || '';
-		document.getElementById('m-tag3').innerText       = data.tag3 || '';
-		document.getElementById('m-conf-title').innerText   = data.conf_title || '';
-		document.getElementById('m-conf-summary').innerText = data.conf_summary || '';
-
-		if (data.conf_side_1 || data.conf_side_2) {
-			document.getElementById('m-conf-sides').innerText =
-				(data.conf_side_1 || 'Side A') + ' vs ' + (data.conf_side_2 || 'Side B');
-		} else {
-			document.getElementById('m-conf-sides').innerText = '';
-		}
-
-		document.getElementById('tw-world-pop').style.display = 'block';
-	}
-
-	function closeWorldModal() {
-		document.getElementById('tw-world-pop').style.display = 'none';
-	}
-
-	function twDeleteWorld(worldId) {
-		if (!confirm('This will erase the world from the grid (and all linked data via cascade). Proceed?')) {
-			return;
-		}
-
-		if (!window.twSupabase) {
-			alert('SUPABASE CLIENT OFFLINE. CANNOT ERASE WORLD.');
-			return;
-		}
-
-		const client  = window.twSupabase;
-		const btnCard = document.getElementById('tw-world-card-' + worldId);
-		if (btnCard) btnCard.style.opacity = '0.5';
-
-		(async () => {
-			try {
-				const { data, error } = await client.rpc('fn_delete_world', { p_world_id: worldId });
-
-				if (error) {
-					console.error('SUPABASE RPC WORLD DELETE ERROR', error);
-					alert('Deletion failed: ' + (error.message || 'Grid denied execution.'));
-					if (btnCard) btnCard.style.opacity = '1';
-					return;
-				}
-
-				if (btnCard) {
-					btnCard.style.opacity      = '0.3';
-					btnCard.style.pointerEvents = 'none';
-				}
-				setTimeout(() => window.location.reload(), 500);
-			} catch (e) {
-				console.error('WORLD DELETE EXCEPTION', e);
-				alert('Deletion failed: client exception.');
-				if (btnCard) btnCard.style.opacity = '1';
-			}
-		})();
-	}
-	</script>
 	<?php
 	return ob_get_clean();
 }
