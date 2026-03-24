@@ -33,15 +33,16 @@ if ( ! function_exists( 'neoweaver_shortcode_world_creator' ) ) {
 		// regardless of domain changes — JS builds paths from this base.
 		$uploads_url = wp_upload_dir()['baseurl'];
 
-		wp_localize_script(
-			'neoweaver-world-creator',
-			'twWorldCreatorConfig',
-			[
-				'nonce'      => $nonce,
-				'nodesUrl'   => $nodes_url,
-				'uploadsUrl' => $uploads_url,
-			]
-		);
+wp_localize_script(
+    'neoweaver-world-creator',
+    'twWorldCreatorConfig',
+    [
+        'nonce'      => $nonce,                              // tw_world_nonce → idzie do body JSON
+        'restNonce'  => wp_create_nonce( 'wp_rest' ),        // → idzie do X-WP-Nonce header
+        'nodesUrl'   => $nodes_url,
+        'uploadsUrl' => $uploads_url,
+    ]
+);
 
 		// Spinner CSS — loaded here (not in enqueue_assets) because it is only
 		// needed when the world creator shortcode is actually on the page.
