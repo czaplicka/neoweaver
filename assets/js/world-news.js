@@ -92,6 +92,13 @@ function markNewsAsRead(newsId) {
         }
     });
 }
+jQuery('.close-cyber-modal').on('click', function() {
+    jQuery('.news-item.is-new-item').each(function() {
+        const newsId = jQuery(this).data('id');
+        markNewsAsRead(newsId);
+    });
+    jQuery('#cyber-news-modal').fadeOut(200);
+});
 // Zakładamy, że te zmienne są dostępne globalnie w Twoim pluginie
 const NEO_TIME = {
     day: 12,
