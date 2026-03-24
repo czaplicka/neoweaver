@@ -6,6 +6,9 @@
  * Steps start at array index 3 (step 3 = first choice step).
  * Steps 1-2 are the name/description fields rendered separately.
  *
+ * The data-field attribute on .tw-radio-grid is used by world-creator.css
+ * to assign per-category emoji icons via CSS ::before selectors.
+ *
  * @var array $tw_data
  */
 if ( ! isset( $tw_data['world_steps'] ) || ! is_array( $tw_data['world_steps'] ) ) {
@@ -14,7 +17,7 @@ if ( ! isset( $tw_data['world_steps'] ) || ! is_array( $tw_data['world_steps'] )
 }
 
 $world_steps  = $tw_data['world_steps'];
-$total_steps  = 2 + count( $world_steps ) + 1; // name+desc | choices | customize+submit
+$total_steps  = 2 + count( $world_steps ) + 1;
 ?>
 
 <div id="tw-creator-wrapper">
@@ -56,7 +59,7 @@ $total_steps  = 2 + count( $world_steps ) + 1; // name+desc | choices | customiz
 			<h2>// <?php echo esc_html( strtoupper( $step_def[0] ?? '' ) ); ?></h2>
 			<p class="tw-question-text"><?php echo esc_html( $label ); ?></p>
 
-			<div class="tw-radio-grid">
+			<div class="tw-radio-grid" data-field="<?php echo esc_attr( $field_key ); ?>">
 				<?php foreach ( $options as $idx => $opt ) :
 					$opt_label = $opt[0] ?? '';
 					$opt_desc  = $opt[1] ?? '';
