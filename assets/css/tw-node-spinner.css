@@ -1,0 +1,88 @@
+/* =============================================================================
+   tw-node-spinner.css
+   Full-screen overlay shown during world/node deployment.
+   Appended to <body> by tw-world-creator.js — hidden by default.
+   ============================================================================= */
+
+#tw-node-spinner {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(0, 20, 0, 0.97), rgba(0, 0, 0, 0.99));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+#tw-node-spinner.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.tw-spinner-inner {
+    text-align: center;
+    font-family: 'Chakra Petch', sans-serif;
+    color: #adff00;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+/* Two concentric spinning rings */
+.tw-spinner-ring {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    border: 3px solid rgba(173, 255, 0, 0.15);
+    border-top-color: #adff00;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: tw-spin 1.2s linear infinite;
+    box-shadow: 0 0 30px rgba(173, 255, 0, 0.35);
+}
+
+.tw-spinner-ring--2 {
+    width: 210px;
+    height: 210px;
+    border-top-color: #00e5ff;
+    border-right-color: rgba(0, 229, 255, 0.3);
+    animation-duration: 2s;
+    animation-direction: reverse;
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+}
+
+/* Spacer so text sits below the rings */
+.tw-spinner-text {
+    margin-top: 140px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(173, 255, 0, 0.8);
+    animation: tw-pulse 1.6s ease-in-out infinite;
+}
+
+.tw-spinner-sub {
+    font-size: 0.8rem;
+    color: #00e5ff;
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+    opacity: 0.8;
+}
+
+@keyframes tw-spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes tw-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
