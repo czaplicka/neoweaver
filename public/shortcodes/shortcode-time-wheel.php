@@ -1,24 +1,30 @@
-<?php
-function tw_enqueue_time_wheel_assets() {
-    // CSS – "pusty" handle + inline definicja
-    wp_register_style( 'tw-time-wheel', false );
-    wp_enqueue_style( 'tw-time-wheel' );
-    wp_add_inline_style( 'tw-time-wheel', tw_time_wheel_css() );
-
-    // JS – osobny plik
-    wp_enqueue_script(
+// 1. Rejestracja plików (bez automatycznego ładowania wszędzie)
+function tw_register_time_wheel_assets() {
+    wp_register_style(
         'tw-time-wheel',
-        get_stylesheet_directory_uri() . '/js/tw-time-wheel.js',
+        get_stylesheet_directory_uri() . '/assets/css/tw-time-wheel.css',
+        [],
+        '1.0.0'
+    );
+
+    wp_register_script(
+        'tw-time-wheel',
+        get_stylesheet_directory_uri() . '/assets/js/tw-time-wheel.js',
         [ 'jquery' ],
         '1.0.0',
         true
     );
 }
-add_action( 'wp_enqueue_scripts', 'tw_enqueue_time_wheel_assets' );
+add_action( 'wp_enqueue_scripts', 'tw_register_time_wheel_assets' );
 
+// 2. Shortcode – ładuje pliki TYLKO tam, gdzie shortcode jest użyty
 add_shortcode( 'tw_time_wheel', 'tw_display_time_wheel' );
 
 function tw_display_time_wheel() {
+    // enqueue tylko dla tej strony z shortcode
+    wp_enqueue_style( 'tw-time-wheel' );
+    wp_enqueue_script( 'tw-time-wheel' );
+
     $wp_user_id = get_current_user_id();
     $game_data  = get_user_game_data_from_supabase( $wp_user_id );
 
