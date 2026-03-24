@@ -33,3 +33,26 @@ function get_cyber_world_news_ajax() {
         'unread_count' => $unread_count
     ]);
 }
+// Akcja oznaczania newsa jako przeczytany
+function mark_news_read_ajax() {
+    $news_id = sanitize_text_field($_POST['news_id']);
+    $char_id = sanitize_text_field($_POST['char_id']);
+
+    $supa_url = SUPABASE_URL;
+    $supa_key = SUPABASE_KEY;
+
+    $response = wp_remote_post($supa_url . "/rest/v1/rpc/mark_news_as_read", [
+        'headers' => [
+            'apikey' => $supa_key,
+            'Authorization' => 'Bearer ' . $supa_key,
+            'Content-Type' => 'application/json'
+        ],
+        'body' => json_encode([
+            'news_id' => $news_id,
+            'char_id' => $char_id
+        ])
+    ]);
+
+    wp_send_json_success();
+}
+add_action('wp_ajax_mark_news_read', 'mark_news_read_ajax');
