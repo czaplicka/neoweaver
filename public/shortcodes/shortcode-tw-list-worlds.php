@@ -2,6 +2,8 @@
 /**
  * SHORTCODE: [tw_list_worlds]
  */
+
+// Enqueue CSS/JS tylko tam, gdzie shortcode
 function neoweaver_enqueue_worlds_assets() {
 	// Ładuj tylko na front-endzie
 	if ( is_admin() ) {
@@ -16,7 +18,8 @@ function neoweaver_enqueue_worlds_assets() {
 		}
 	}
 
-	$plugin_url = plugin_dir_url( dirname( __FILE__ ) ); // dostosuj w zależności od miejsca pliku
+	// Dostosuj w zależności od miejsca pliku shortcode (tu: /public/shortcodes/)
+	$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 
 	wp_enqueue_style(
 		'tw-list-worlds',
@@ -28,13 +31,16 @@ function neoweaver_enqueue_worlds_assets() {
 	wp_enqueue_script(
 		'tw-list-worlds',
 		$plugin_url . 'public/assets/js/tw-list-worlds.js',
-		[ 'jquery' ], // albo [] jeśli nie korzystasz
+		[ 'jquery' ],
 		'1.0.0',
 		true
 	);
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_worlds_assets' );
 
+/**
+ * SHORTCODE LOGIKA
+ */
 function tw_list_worlds_v14() {
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
@@ -140,7 +146,15 @@ function tw_list_worlds_v14() {
 			if ( ! empty( $w['id'] ) ) {
 				$world_ids[] = (string) $w['id']; // uuid-safe
 			}
-			$cd = $w['cyber_campaign_worlds'][0] ?? null;
+
+			$cd_raw = $w['cyber_campaign_worlds'] ?? null;
+			$cd     = null;
+
+			// Supabase zwykle zwraca tablicę rekordów, ale zabezpieczamy się
+			if ( is_array( $cd_raw ) && ! empty( $cd_raw ) ) {
+				$cd = $cd_raw[0];
+			}
+
 			if ( $cd && ! empty( $cd['campaign_id'] ) ) {
 				$campaign_ids[] = (string) $cd['campaign_id']; // uuid-safe
 			}
@@ -175,7 +189,11 @@ function tw_list_worlds_v14() {
 				}
 
 				$char_id   = ! empty( $row['character_id'] ) ? (string) $row['character_id'] : '';
-				$char_name = $row['cyber_characters']['name'] ?? null;
+
+				$char_name = null;
+				if ( isset( $row['cyber_characters'] ) && is_array( $row['cyber_characters'] ) ) {
+					$char_name = $row['cyber_characters']['name'] ?? null;
+				}
 
 				$agents_by_campaign[ $cid ] = [
 					'character_id' => $char_id,
@@ -278,12 +296,27 @@ function tw_list_worlds_v14() {
 
 					$world_id = ! empty( $w['id'] ) ? (string) $w['id'] : '';
 
-					// Campaign data (embedded in Q1)
-					$campaign_data        = $w['cyber_campaign_worlds'][0] ?? null;
-					$active_campaign_id   = $campaign_data && ! empty( $campaign_data['campaign_id'] ) ? (string) $campaign_data['campaign_id'] : '';
-					$active_campaign_name = ( $campaign_data && isset( $campaign_data['cyber_campaign']['name'] ) )
-						? $campaign_data['cyber_campaign']['name']
-						: 'UNBOUND REALITY';
+					// Campaign data (embedded in Q1) — zabezpieczenie na PHP 8.1
+					$cd_raw        = $w['cyber_campaign_worlds'] ?? null;
+					$campaign_data = null;
+
+					if ( is_array( $cd_raw ) && ! empty( $cd_raw ) ) {
+						$campaign_data = $cd_raw[0];
+					}
+
+					$active_campaign_id = ( $campaign_data && ! empty( $campaign_data['campaign_id'] ) )
+						? (string) $campaign_data['campaign_id']
+						: '';
+
+					$active_campaign_name = 'UNBOUND REALITY';
+					if (
+						$campaign_data
+						&& isset( $campaign_data['cyber_campaign'] )
+						&& is_array( $campaign_data['cyber_campaign'] )
+						&& isset( $campaign_data['cyber_campaign']['name'] )
+					) {
+						$active_campaign_name = $campaign_data['cyber_campaign']['name'];
+					}
 
 					$field_agent_name = 'NO AGENT';
 					$world_status     = 'NOT DEPLOYED';
