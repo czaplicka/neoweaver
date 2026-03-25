@@ -1,0 +1,122 @@
+/* Kontener główny panelu */
+#neoweave-vehicle-interface {
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #adff00;
+    padding: 15px;
+    font-family: 'Chakra Petch', sans-serif;
+    color: #adff00;
+    box-shadow: 0 0 15px rgba(173, 255, 0, 0.2);
+    text-transform: uppercase;
+}
+
+/* Tekst Neonowy */
+.neoweave-neon-text {
+    text-shadow: 0 0 5px #adff00;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #adff00;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+
+/* Statystyki (Paski postępu) */
+.stat-row {
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+}
+
+.progress-bar {
+    background: #1a1a1a;
+    border: 1px solid #adff00;
+    height: 10px;
+    margin: 4px 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar div {
+    height: 100%;
+    transition: width 0.5s ease-in-out;
+}
+
+/* Slot na moduły */
+.v-slot {
+    background: rgba(173, 255, 0, 0.05);
+    border: 1px dashed #adff00;
+    min-height: 50px;
+    margin-bottom: 10px;
+    padding: 10px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.v-slot:hover {
+    background: rgba(173, 255, 0, 0.15);
+}
+
+.v-slot label {
+    font-size: 0.6rem;
+    position: absolute;
+    top: -5px;
+    left: 10px;
+    background: #000;
+    padding: 0 5px;
+}
+
+/* Przedmioty/Moduły (Draggable) */
+.module-item {
+    background: #adff00;
+    color: #000;
+    padding: 8px;
+    margin: 5px 0;
+    cursor: grab;
+    font-weight: bold;
+    font-size: 0.9rem;
+    border: 1px solid #000;
+}
+
+.module-item:active {
+    cursor: grabbing;
+    opacity: 0.7;
+}
+
+/* Garaż (Storage) */
+#garage-container {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #444;
+    min-height: 100px;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+/* Cargo Manifest */
+.cargo-manifest {
+    margin-top: 20px;
+    background: rgba(0, 229, 255, 0.05); /* Błękitny akcent dla cargo */
+    border-left: 3px solid #00e5ff;
+    padding: 10px;
+}
+
+.cargo-manifest h4 {
+    color: #00e5ff;
+    font-size: 0.8rem;
+    margin: 0 0 10px 0;
+}
+
+/* Efekt błędu/Przeciążenia */
+.overloaded {
+    color: #ff0044 !important;
+    border-color: #ff0044 !important;
+    animation: flicker 0.2s infinite;
+}
+
+@keyframes flicker {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+.terminal-hr {
+    border: 0;
+    border-top: 1px solid #333;
+    margin: 15px 0;
+}
