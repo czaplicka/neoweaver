@@ -1,4 +1,32 @@
 <?php
+// 1. Rejestracja skryptów i styli
+function neoweaver_enqueue_services_assets() {
+    if ( is_admin() ) {
+        return;
+    }
+
+    // Sprawdzamy czy shortcode jest obecny w treści postu
+    global $post;
+    if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'neoweave_services_panel' ) ) {
+        
+        $plugin_url = plugin_dir_url( dirname( __FILE__, 1 ) );
+
+        // CSS
+        wp_enqueue_style(
+            'neoweave-services-css',
+            $plugin_url . 'public/assets/css/services.css',
+            [],
+            '1.0.1'
+        );
+
+        // JS - poprawione z style na script
+        wp_enqueue_script(
+            'neoweave-services-js',
+            $plugin_url . 'public/assets/js/services.js',
+            ['jquery'],
+            '1.0.1',
+            true
+        );
 function neoweave_service_modal_shortcode() {
     ob_start();
     ?>
