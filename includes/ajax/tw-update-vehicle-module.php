@@ -45,3 +45,28 @@ function neoweave_update_vehicle_module() {
 
     wp_send_json_success(['message' => 'Vehicle Calibrated.']);
 }
+function neoweave_get_vehicle_cargo_weight($vehicle_id) {
+    $supa_url = SUPABASE_URL;
+    $supa_key = SUPABASE_KEY;
+
+    // Pobieramy przedmioty, których 'container_id' odpowiada ID naszego pojazdu
+    $url = "$supa_url/rest/v1/cyber_items?container_id=eq.$vehicle_id&select=mass";
+    
+    $response = wp_remote_get($url, [
+        'headers' => [
+            'apikey' => $supa_key,
+            'Authorization' => 'Bearer ' . $supa_key
+        ]
+    ]);
+
+    $items = json_decode(wp_remote_retrieve_body($response), true);
+    $total_mass = 0;
+
+    if (!empty($items)) {
+        foreach ($items as $item) {
+            $total_mass += (int)$item['mass'];
+        }
+    }
+
+    return $total_mass;
+}
