@@ -19,18 +19,18 @@ function neoweaver_enqueue_worlds_assets() {
 	}
 
 	// Dostosuj w zależności od miejsca pliku shortcode (tu: /public/shortcodes/)
-	$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+	$plugin_url = plugin_dir_url( dirname( __FILE__,1 ) );
 
 	wp_enqueue_style(
 		'tw-list-worlds',
-		$plugin_url . 'public/assets/css/tw-list-worlds.css',
+		$plugin_url . 'assets/css/tw-list-worlds.css',
 		[],
 		'1.0.0'
 	);
 
 	wp_enqueue_script(
 		'tw-list-worlds',
-		$plugin_url . 'public/assets/js/tw-list-worlds.js',
+		$plugin_url . 'assets/js/tw-list-worlds.js',
 		[ 'jquery' ],
 		'1.0.0',
 		true
