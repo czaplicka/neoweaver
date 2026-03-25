@@ -1,4 +1,35 @@
 <?php
+// Enqueue CSS/JS tylko tam, gdzie shortcode
+function neoweaver_enqueue_vehicle_assets() {
+	// Ładuj tylko na front-endzie
+	if ( is_admin() ) {
+		return;
+	}
+
+	// Opcjonalnie: tylko jeśli jest shortcode na stronie
+	if ( is_singular() ) {
+		global $post;
+		if ( empty( $post ) || false === strpos( $post->post_content, '[neoweave_vehicle_panel' ) ) {
+			return;
+		}
+	}
+
+	// Dostosuj w zależności od miejsca pliku shortcode (tu: /public/shortcodes/)
+	$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+
+	wp_enqueue_style(
+		'vehicle-panel',
+		$plugin_url . 'public/assets/css/vehicle-panel.css',
+		[],
+		'1.0.0'
+	);
+    	wp_enqueue_style(
+		'vehicle-panel',
+		$plugin_url . 'public/assets/js/vehicle-panel.js',
+		[],
+		'1.0.0'
+	);
+    
 function neoweave_vehicle_panel_shortcode() {
     // Pobranie danych o aktywnym pojeździe Agenta z sesji/Supa
     // Zakładamy, że mamy $character_id i $campaign_id
