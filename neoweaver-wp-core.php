@@ -68,6 +68,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-map.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-neoweave_my_world_archive.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quests.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-quick-actions-cmd-center.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-services.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-signal-quality.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-time-wheel.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-character-campaign.php';
