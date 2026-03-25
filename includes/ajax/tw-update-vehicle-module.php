@@ -70,3 +70,59 @@ function neoweave_get_vehicle_cargo_weight($vehicle_id) {
 
     return $total_mass;
 }
+/**
+ * Oblicza aktualny stan bagażnika i limit
+ */
+function neoweave_get_vehicle_storage_info($vehicle_id) {
+    $supa_url = SUPABASE_URL;
+    $supa_key = SUPABASE_KEY;
+
+    // 1. Pobierz dane pojazdu i jego modułów
+    $v_res = wp_remote_get("$supa_url/rest/v1/cyber_vehicles?id=eq.$vehicle_id&select=*,slot_utility(*)", [
+        'headers' => ['apikey' => $supa_key, 'Authorization' => 'Bearer ' . $supa_key]
+    ]);
+    $vehicle = json_decode(wp_remote_retrieve_body($v_res), true)[0];
+
+    // 2. Wyciągnij limit z modułu utility (szukamy tagu storage_X)
+    $max_capacity = 5; // Bazowy podręczny schowek
+    if (isset($vehicle['slot_utility']['effect_tags'])) {
+        foreach ($vehicle['slot_utility']['effect_tags'] as $tag) {
+            if (strpos($tag, 'storage_') === 0) {
+                $max_capacity = (int)str_replace('storage_', '', $tag);
+            }
+        }
+    }
+
+    // 3. Sumuj masę przedmiotów w kontenerze pojazdu
+    $items_res = wp_remote_get("$supa_url/rest/v1/cyber_items?container_id=eq.$vehicle_id&select=mass", [
+        'headers' => ['apikey' => $supa_key, 'Authorization' => 'Bearer ' . $supa_key]
+    ]);
+    $items = json_decode(wp_remote_retrieve_body($items_res), true);
+    
+    $current_mass = 0;
+    foreach ($items as $i) { $current_mass += $i['mass']; }
+
+    return [
+        'current' => $current_mass,
+        'max' => $max_capacity,
+        'is_overloaded' => ($current_mass > $max_capacity)
+    ];
+}
+
+/**
+ * Oblicza koszt paliwa za podróż (uwzględniając skill i wagę)
+ */
+function neoweave_calculate_travel_cost($vehicle_id, $character_id) {
+    $storage = neoweave_get_vehicle_storage_info($vehicle_id);
+    
+    $base_cost = 1;
+    if ($storage['is_overloaded']) {
+        $base_cost += 2; // Kara za przeciążenie
+    }
+
+    // Pobierz skill Vehicles (zakładając skalę 1-5)
+    // $skill_level = get_character_skill($character_id, 'Vehicles'); 
+    // if ($skill_level >= 3) $base_cost -= 0.5; // Bonus za profesjonalną jazdę
+
+    return max(0.5, $base_cost);
+}
