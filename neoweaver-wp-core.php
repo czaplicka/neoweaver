@@ -41,6 +41,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-deck-scenarios.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quest-helpers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/shortcodes-tags.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-save-player-notes.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax/tw-update-vehicle-module.php';
 
 // ─── Class autoload ──────────────────────────────────────────────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
@@ -74,6 +75,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-connect-camp
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-essence.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-campaigns.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-tw-list-worlds.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-vehicle-panel.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-weaver-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-world-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-world-news.php';
