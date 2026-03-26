@@ -1,25 +1,4 @@
 <?php
-/**
- * NeoWeaver REST API Endpoints
- *
- * Registers all /wp-json/neoweaver/v1/ routes.
- * Loaded by neoweaver-wp-core.php via require_once BEFORE plugins_loaded.
- *
- * BUG-FIX 4  : This file was never require_once'd — no routes existed.
- * BUG-FIX 5  : neoweaver_create_character() was truncated mid-function.
- * BUG-FIX 6  : neoweaver_end_game_session and neoweaver_create_campaign
- *              called register_rest_route() at file scope instead of inside
- *              rest_api_init — they were never actually registered.
- * BUG-FIX 9  : neoweaver_create_campaign had no nonce verification.
- * BUG-FIX 14 : $body variable collision in character endpoint fixed by
- *              renaming the attribute variables.
- * BUG-FIX 15 : RPC seeding in neoweaver_create_world() passed p_world_id as
- *              (int) $world_id. cyber_worlds.id is a UUID string — casting to
- *              int collapses it to 0, so all three seeding RPCs were called
- *              with p_world_id=0 and seeded a non-existent world. Fixed by
- *              passing the raw UUID string instead.
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -99,7 +78,12 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 
 	// INSERT cyber_worlds
 	$insert = wp_remote_post( $base . 'cyber_worlds', [
-		'headers' => nw_supabase_headers( true ),
+		'headers' => [
+    'apikey'        => tw_supabase_service_key(),
+    'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+    'Content-Type'  => 'application/json',
+    'Prefer'        => 'return=representation',
+],
 		'body'    => wp_json_encode( $payload ),
 		'timeout' => 15,
 	] );
@@ -123,13 +107,6 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 		return new WP_Error( 'no_id', 'World created but no ID returned.', [ 'status' => 500 ] );
 	}
 
-	// BUG-FIX 15: cyber_worlds.id is a UUID string. The previous code cast
-	// $world_id with (int) before passing it to the RPCs as p_world_id, which
-	// collapsed every UUID to 0. All three seeding RPCs were therefore called
-	// with p_world_id=0 and seeded a non-existent world.
-	// Fix: sanitize as a UUID-safe string (strip non-alphanumeric/hyphen chars)
-	// and pass the raw string to the RPCs. The PostgreSQL RPC parameter type
-	// for p_world_id is uuid, which expects a string, not an integer.
 	$safe_world_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id );
 
 	// RPC seeding — fire-and-forget (non-fatal if they fail)
@@ -163,13 +140,6 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 		],
 	] );
 }
-
-// ===========================================================================
-// CHARACTER / AGENT ENDPOINT
-// BUG-FIX 5  : Was truncated; fully implemented below.
-// BUG-FIX 14 : Renamed $body (attr) → $attr_body to avoid collision with
-//              the HTTP response body variable used later in the function.
-// ===========================================================================
 
 function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	error_log( 'TW_ENDPOINT_CHARACTER: START (REST API)' );
