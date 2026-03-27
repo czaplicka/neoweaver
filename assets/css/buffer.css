@@ -219,3 +219,14 @@
 /* Scrollbar Style */
 .card-slot-container::-webkit-scrollbar { width: 5px; }
 .card-slot-container::-webkit-scrollbar-thumb { background: var(--neon); }
+.foundry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+.foundry-item .cyber-card-css {
+    width: 100%; /* Dopasuje się do siatki */
+    height: auto;
+    min-height: 250px;
+}
