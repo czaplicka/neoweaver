@@ -107,7 +107,17 @@ add_action( 'wp_enqueue_scripts', function () {
 			'foundry'   => wp_create_nonce( 'foundry_nonce' ),
 		]
 	]);
+wp_enqueue_script( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js', [ 'jquery' ], '1.0.0', true );
 
+// TEGO BRAKOWAŁO W TWOIM PLIKU PHP:
+wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
+    'ajaxurl' => admin_url( 'admin-ajax.php' ),
+    'nonces'  => [
+        'use_card'  => wp_create_nonce( 'use_card_nonce' ),
+        'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
+        'foundry'   => wp_create_nonce( 'foundry_nonce' ),
+    ]
+]);
 	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
