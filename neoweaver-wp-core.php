@@ -134,6 +134,20 @@ add_action( 'plugins_loaded', function () {
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
+add_action( 'wp_footer', function() {
+    if ( ! is_user_logged_in() ) return;
+    $url = defined('NEOWEAVER_SUPA_URL') ? NEOWEAVER_SUPA_URL : '';
+    $key = defined('NEOWEAVER_SUPA_KEY') ? NEOWEAVER_SUPA_KEY : '';
+    if ( ! $url || ! $key ) return;
+    ?>
+    <script>
+    if (!window.twSupabase && window.supabase) {
+        window.twSupabase = window.supabase.createClient('<?= esc_js($url) ?>', '<?= esc_js($key) ?>');
+    }
+    </script>
+    <?php
+}, 5 ); // priorytet 5 — ładuje się przed wszystkimi innymi hookami wp_footer pluginu
+
 // ─── Enqueue game page CSS ────────────────────────────────────────────────────
 function neoweaver_enqueue_frontend_styles(): void {
 	if ( is_page_template( 'templates/adventure.php' ) ) {
