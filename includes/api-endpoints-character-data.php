@@ -6,14 +6,18 @@
  *   GET /wp-json/neoweaver/v1/races    → rows from cyber_races
  *   GET /wp-json/neoweaver/v1/classes  → rows from cyber_classes
  *
- * The JS wizard fetches these directly from Supabase using the anon key,
- * but these endpoints are provided as a server-side fallback and for
- * environments where direct Supabase access is restricted (CORS / RLS).
+ * Why server-side proxy instead of direct browser → Supabase fetch?
+ * Supabase RLS blocks anonymous browser requests to cyber_races / cyber_classes
+ * because those tables have no public SELECT policy. PHP runs server-side
+ * with the anon key and bypasses that restriction cleanly.
  *
  * Both endpoints:
- *  - Require the user to be logged in (neoweaver_user_can_play).
- *  - Cache results for 5 minutes via a WordPress transient.
- *  - Return only safe, public columns (id, name, description, icon).
+ *  - Are PUBLIC (no login required — race/class lists are world-building
+ *    reference data visible on the character creation page before login).
+ *  - Cache results for 5 minutes via a WordPress transient to avoid
+ *    hammering Supabase on every page load.
+ *  - Return only safe, public columns: id, name, description
+ *    (the `icon` column does NOT exist in cyber_races / cyber_classes).
  *
  * @package Neoweaver
  */
@@ -29,6 +33,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Fetch rows from a cyber_ lookup table with transient caching.
  *
+ * Uses tw_supabase_get() (the shared server-side helper) instead of raw
+ * wp_remote_get so we benefit from its error handling and header setup.
+ *
  * @param string $table        Supabase table name, e.g. 'cyber_races'.
  * @param string $select_cols  Comma-separated column list for the ?select= param.
  * @param string $order        Order param, e.g. 'name.asc'.
@@ -42,41 +49,29 @@ function nw_fetch_lookup_table( string $table, string $select_cols, string $orde
 		return $cached;
 	}
 
-	$base = nw_supabase_base();
-	if ( ! $base ) {
-		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	if ( ! function_exists( 'tw_supabase_get' ) ) {
+		return new WP_Error( 'config_missing', 'Supabase helpers not loaded.', [ 'status' => 500 ] );
 	}
 
-	$url = add_query_arg(
+	$data = tw_supabase_get(
+		$table,
 		[
 			'select' => $select_cols,
 			'order'  => $order,
-		],
-		$base . $table
+		]
 	);
 
-	$response = wp_remote_get( $url, [
-		'headers' => nw_supabase_headers(),
-		'timeout' => 15,
-	] );
-
-	if ( is_wp_error( $response ) ) {
-		error_log( 'TW Lookup fetch error [' . $table . ']: ' . $response->get_error_message() );
+	// tw_supabase_get returns [] on error (it logs internally).
+	// We can't distinguish an empty table from a fetch error here, but
+	// we do NOT cache an empty result so a retry is possible.
+	if ( ! is_array( $data ) ) {
 		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
 	}
 
-	$code = wp_remote_retrieve_response_code( $response );
-	if ( $code < 200 || $code >= 300 ) {
-		error_log( 'TW Lookup HTTP ' . $code . ' [' . $table . ']: ' . wp_remote_retrieve_body( $response ) );
-		return new WP_Error( 'http_error', 'Supabase HTTP ' . $code, [ 'status' => $code ] );
+	if ( ! empty( $data ) ) {
+		set_transient( $cache_key, $data, $ttl );
 	}
 
-	$data = json_decode( wp_remote_retrieve_body( $response ), true );
-	if ( ! is_array( $data ) ) {
-		return new WP_Error( 'parse_error', 'Invalid response from database.', [ 'status' => 500 ] );
-	}
-
-	set_transient( $cache_key, $data, $ttl );
 	return $data;
 }
 
@@ -85,7 +80,10 @@ function nw_fetch_lookup_table( string $table, string $select_cols, string $orde
 // ---------------------------------------------------------------------------
 
 function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$data = nw_fetch_lookup_table( 'cyber_races', 'id,name,description,icon' );
+	// BUG-FIX: removed `icon` from select — that column does not exist in
+	// cyber_races. Querying a non-existent column causes a Supabase 400
+	// which tw_supabase_get logs as an error and returns [].
+	$data = nw_fetch_lookup_table( 'cyber_races', 'id,name,description' );
 	if ( is_wp_error( $data ) ) {
 		return $data;
 	}
@@ -97,7 +95,8 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 // ---------------------------------------------------------------------------
 
 function neoweaver_get_classes( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$data = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description,icon' );
+	// BUG-FIX: removed `icon` from select — same reason as races above.
+	$data = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description' );
 	if ( is_wp_error( $data ) ) {
 		return $data;
 	}
@@ -105,8 +104,7 @@ function neoweaver_get_classes( WP_REST_Request $request ): WP_REST_Response|WP_
 }
 
 // ---------------------------------------------------------------------------
-// Route registration — hooked inside the existing rest_api_init in api-endpoints.php.
-// We add a second add_action here; WordPress merges them correctly.
+// Route registration
 // ---------------------------------------------------------------------------
 
 add_action( 'rest_api_init', function () {
@@ -114,13 +112,16 @@ add_action( 'rest_api_init', function () {
 	register_rest_route( 'neoweaver/v1', '/races', [
 		'methods'             => 'GET',
 		'callback'            => 'neoweaver_get_races',
-		'permission_callback' => 'neoweaver_user_can_play',
+		// BUG-FIX: was neoweaver_user_can_play (requires login).
+		// Race/class data is public reference data shown BEFORE the user
+		// logs in (character creator wizard step 1). Changed to __return_true.
+		'permission_callback' => '__return_true',
 	] );
 
 	register_rest_route( 'neoweaver/v1', '/classes', [
 		'methods'             => 'GET',
 		'callback'            => 'neoweaver_get_classes',
-		'permission_callback' => 'neoweaver_user_can_play',
+		'permission_callback' => '__return_true',
 	] );
 
 } );
