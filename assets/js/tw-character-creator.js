@@ -4,23 +4,18 @@
  * Drives the 7-step Field Agent creation wizard rendered by
  * [tale_weaver_character_creator] shortcode.
  *
- * Responsibilities:
- *  - Multi-step navigation with progress bar + phase label.
- *  - Dynamic fetch of race / class cards from Supabase (Steps 2 & 3).
- *  - Dynamic fetch of user's Nodes for Node Binding (Step 5).
- *  - Attribute stepper logic (pool of 12 pts, min 1 / max 5 per attr).
- *  - Avatar drag-and-drop + preview (Step 6).
- *  - Summary population (Step 7).
- *  - JSON POST to /wp-json/neoweaver/v1/character/create with spinner.
- *  - Redirect to /agents/ on success.
+ * Races and classes are fetched from the WP REST proxy endpoints
+ * (/wp-json/neoweaver/v1/races and /wp-json/neoweaver/v1/classes)
+ * which call Supabase server-side, bypassing any RLS restrictions
+ * that would block direct browser → Supabase queries.
  *
  * Config (injected via wp_localize_script as twCharCreatorConfig):
  *   nonce      — tw_character_nonce for the body JSON
  *   restNonce  — wp_rest nonce for X-WP-Nonce header
  *   restUrl    — full URL to character/create endpoint
  *   agentsUrl  — redirect target after success
- *   supabaseUrl — Supabase project URL
- *   supabaseKey — anon key for reading public race/class/world data
+ *   supabaseUrl — Supabase project URL (still used for Node BINDING)
+ *   supabaseKey — anon key (still used for cyber_worlds)
  */
 ( function () {
 	'use strict';
@@ -35,6 +30,8 @@
 		const sbKey        = config.supabaseKey || '';
 		const restUrl      = config.restUrl || '/wp-json/neoweaver/v1/character/create';
 		const agentsUrl    = config.agentsUrl || '/agents/';
+		// WP REST proxy base — same origin, no CORS issues, no RLS.
+		const wpRestBase   = ( config.restBase || '/wp-json/neoweaver/v1' ).replace( /\/$/, '' );
 
 		const steps          = Array.from( wrapper.querySelectorAll( '.tw-step' ) );
 		const totalSteps     = parseInt( wrapper.dataset.totalSteps, 10 ) || steps.length;
@@ -44,31 +41,29 @@
 		const statusEl       = wrapper.querySelector( '.tw-char-status' );
 
 		let current     = 0;
-		let avatarFile  = null; // File object from input
+		let avatarFile  = null;
 
-		// Form state — collected progressively as the user moves forward.
 		const formState = {
 			character_name : '',
 			pronouns       : '',
 			backstory      : '',
-			race           : null,   // { id, name }
-			class          : null,   // { id, name }
+			race           : null,
+			class          : null,
 			attr_body      : 1,
 			attr_reflex    : 1,
 			attr_mind      : 1,
 			attr_spirit    : 1,
-			node_id        : null,   // { id, name }
+			node_id        : null,
 		};
 
-		// Attribute pool constants (mirror of shortcode PHP).
 		const ATTR_POOL = parseInt( ( document.getElementById( 'tw-attr-pool' ) || {} ).value || '12', 10 );
 		const ATTR_MIN  = 1;
 		const ATTR_MAX  = 5;
 		const ATTR_KEYS = [ 'body', 'reflex', 'mind', 'spirit' ];
 
-		// ── Pronouns: radio + custom field ───────────────────────────────────
+		// ── Pronouns: radio chip + custom field ──────────────────────────────
 		( function initPronouns() {
-			const radios     = wrapper.querySelectorAll( '.tw-pronoun-radio' );
+			const radios      = wrapper.querySelectorAll( '.tw-pronoun-radio' );
 			const customInput = document.getElementById( 'tw-char-pronouns-custom' );
 			if ( ! radios.length ) return;
 
@@ -84,12 +79,8 @@
 				}
 			}
 
-			radios.forEach( function ( r ) {
-				r.addEventListener( 'change', syncPronouns );
-			} );
-			if ( customInput ) {
-				customInput.addEventListener( 'input', syncPronouns );
-			}
+			radios.forEach( r => r.addEventListener( 'change', syncPronouns ) );
+			if ( customInput ) customInput.addEventListener( 'input', syncPronouns );
 		} )();
 
 		// ── Spinner ──────────────────────────────────────────────────────────
@@ -130,7 +121,7 @@
 			} );
 		}
 
-		// ── Show a specific step ──────────────────────────────────────────────
+		// ── Show step ─────────────────────────────────────────────────────────
 		function showStep( idx ) {
 			idx = Math.max( 0, Math.min( steps.length - 1, idx ) );
 			steps.forEach( ( s, i ) => s.classList.toggle( 'active', i === idx ) );
@@ -141,7 +132,6 @@
 				populateSummary();
 			}
 
-			// Lazy-load dynamic grids when entering their step for the first time.
 			const phase = steps[ idx ] ? steps[ idx ].dataset.phase : '';
 			if ( phase === 'RACE PROTOCOL'   && ! gridsLoaded.race   ) loadRaces();
 			if ( phase === 'CLASS MATRIX'    && ! gridsLoaded.class  ) loadClasses();
@@ -156,17 +146,14 @@
 			if ( ! step ) return true;
 
 			if ( idx === 0 ) {
-				// Step 1 — identity
 				const nameInput = wrapper.querySelector( '#tw-char-name' );
 				if ( ! nameInput || ! nameInput.value.trim() ) {
 					nameInput && nameInput.focus();
 					setStatus( 'ERROR: Agent designation is required.', true );
 					return false;
 				}
-				// Persist values so summary can read them.
 				formState.character_name = nameInput.value.trim();
 
-				// Read pronouns from radio selection.
 				const checkedRadio = wrapper.querySelector( '.tw-pronoun-radio:checked' );
 				if ( checkedRadio ) {
 					if ( checkedRadio.value === 'custom' ) {
@@ -182,21 +169,13 @@
 			}
 
 			if ( step.dataset.phase === 'RACE PROTOCOL' ) {
-				if ( ! formState.race ) {
-					setStatus( 'ERROR: Select a race to continue.', true );
-					return false;
-				}
+				if ( ! formState.race ) { setStatus( 'ERROR: Select a race to continue.', true ); return false; }
 				return true;
 			}
-
 			if ( step.dataset.phase === 'CLASS MATRIX' ) {
-				if ( ! formState.class ) {
-					setStatus( 'ERROR: Select a class to continue.', true );
-					return false;
-				}
+				if ( ! formState.class ) { setStatus( 'ERROR: Select a class to continue.', true ); return false; }
 				return true;
 			}
-
 			if ( step.dataset.phase === 'BIOMETRIC CALIBRATION' ) {
 				const used = ATTR_KEYS.reduce( ( sum, k ) => sum + ( formState[ 'attr_' + k ] || ATTR_MIN ), 0 );
 				if ( used !== ATTR_POOL ) {
@@ -205,23 +184,25 @@
 				}
 				return true;
 			}
-
 			if ( step.dataset.phase === 'NODE BINDING' ) {
-				if ( ! formState.node_id ) {
-					setStatus( 'ERROR: Bind the agent to a Node before continuing.', true );
-					return false;
-				}
+				if ( ! formState.node_id ) { setStatus( 'ERROR: Bind the agent to a Node before continuing.', true ); return false; }
 				return true;
 			}
-
-			// Avatar and summary steps are always valid.
 			return true;
 		}
 
 		// ── Dynamic grid state ────────────────────────────────────────────────
 		const gridsLoaded = { race: false, class: false, nodes: false };
 
-		// Build a Supabase GET URL with anon key headers as query params.
+		// Fetch via WP REST proxy (server-side Supabase call, no RLS issues).
+		function wpGet( path ) {
+			return fetch( wpRestBase + path, {
+				credentials : 'same-origin',
+				headers     : { 'X-WP-Nonce': config.restNonce || '' },
+			} ).then( r => r.json() );
+		}
+
+		// Direct Supabase fetch (still used for cyber_worlds — user-scoped via RLS).
 		function sbGet( table, params ) {
 			const url = new URL( sbUrl + table );
 			Object.entries( params || {} ).forEach( ( [ k, v ] ) => url.searchParams.set( k, v ) );
@@ -233,11 +214,10 @@
 			} ).then( r => r.json() );
 		}
 
-		// Render a single selection card inside a dynamic grid.
 		function makeCard( id, name, desc, emoji, selectedId, onSelect ) {
 			const div  = document.createElement( 'div' );
 			div.className = 'tw-dyn-card' + ( selectedId === id ? ' selected' : '' );
-			div.dataset.id   = id;
+			div.dataset.id = id;
 			div.innerHTML =
 				'<span class="tw-dyn-icon">' + ( emoji || '◈' ) + '</span>' +
 				'<strong>' + esc( name ) + '</strong>' +
@@ -250,29 +230,26 @@
 			return div;
 		}
 
-		// Minimal HTML escaping.
 		function esc( str ) {
 			return String( str || '' )
-				.replace( /&/g, '&amp;' )
-				.replace( /</g, '&lt;' )
-				.replace( />/g, '&gt;' )
-				.replace( /"/g, '&quot;' );
+				.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
+				.replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
 		}
 
-		// ── Step 2: Races ─────────────────────────────────────────────────────
-		// NOTE: cyber_races does NOT have an `icon` column — select only real columns.
+		// ── Step 2: Races — via WP REST proxy ────────────────────────────────
 		function loadRaces() {
 			gridsLoaded.race = true;
 			const grid = document.getElementById( 'tw-race-grid' );
-			if ( ! grid || ! sbUrl || ! sbKey ) return;
+			if ( ! grid ) return;
 
-			sbGet( 'cyber_races', { select: 'id,name,description', order: 'name.asc' } )
+			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING RACE DATA FROM NODE…</div>';
+
+			wpGet( '/races' )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
-					// Supabase returns an object with `message` on error.
 					if ( ! Array.isArray( rows ) || ! rows.length ) {
-						const errMsg = ( rows && rows.message ) ? rows.message : 'No race data available.';
-						grid.innerHTML = '<p class="tw-error-msg">' + esc( errMsg ) + '</p>';
+						const msg = ( rows && rows.error ) ? rows.error : 'No race data available.';
+						grid.innerHTML = '<p class="tw-error-msg">' + esc( msg ) + '</p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
@@ -288,18 +265,20 @@
 				} );
 		}
 
-		// ── Step 3: Classes ───────────────────────────────────────────────────
+		// ── Step 3: Classes — via WP REST proxy ──────────────────────────────
 		function loadClasses() {
 			gridsLoaded.class = true;
 			const grid = document.getElementById( 'tw-class-grid' );
-			if ( ! grid || ! sbUrl || ! sbKey ) return;
+			if ( ! grid ) return;
 
-			sbGet( 'cyber_classes', { select: 'id,name,description', order: 'name.asc' } )
+			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING CLASS DATA FROM NODE…</div>';
+
+			wpGet( '/classes' )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! Array.isArray( rows ) || ! rows.length ) {
-						const errMsg = ( rows && rows.message ) ? rows.message : 'No class data available.';
-						grid.innerHTML = '<p class="tw-error-msg">' + esc( errMsg ) + '</p>';
+						const msg = ( rows && rows.error ) ? rows.error : 'No class data available.';
+						grid.innerHTML = '<p class="tw-error-msg">' + esc( msg ) + '</p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
@@ -315,7 +294,7 @@
 				} );
 		}
 
-		// ── Step 5: Nodes ─────────────────────────────────────────────────────
+		// ── Step 5: Nodes — still direct Supabase (user-scoped via RLS) ──────
 		function loadNodes() {
 			gridsLoaded.nodes = true;
 			const grid = document.getElementById( 'tw-node-grid' );
@@ -329,13 +308,10 @@
 						return;
 					}
 					rows.forEach( function ( row ) {
-						// Skip hard-reset nodes (Entropy >= 100).
 						if ( parseInt( row.entropy, 10 ) >= 100 ) return;
-
-						const entropy  = parseInt( row.entropy, 10 ) || 0;
+						const entropy   = parseInt( row.entropy, 10 ) || 0;
 						const diffLabel = [ '', 'Coherent', 'Stable', 'Unstable', 'Critical', 'Catastrophic' ][ parseInt( row.difficulty, 10 ) ] || '—';
 						const desc = 'Diff: ' + diffLabel + ' · Entropy: ' + entropy + '%';
-
 						grid.appendChild( makeCard(
 							row.id, row.name, row.description || desc, '🌐',
 							formState.node_id ? formState.node_id.id : null,
@@ -351,9 +327,8 @@
 				} );
 		}
 
-		// ── Step 4: Attribute stepper ─────────────────────────────────────────
+		// ── Attribute steppers ────────────────────────────────────────────────
 		( function initAttrSteppers() {
-			// Initialise formState from the rendered input values.
 			ATTR_KEYS.forEach( function ( k ) {
 				const inp = document.getElementById( 'tw-attr-' + k );
 				formState[ 'attr_' + k ] = inp ? parseInt( inp.value, 10 ) : ATTR_MIN;
@@ -362,42 +337,32 @@
 			function usedPoints() {
 				return ATTR_KEYS.reduce( ( s, k ) => s + ( formState[ 'attr_' + k ] || ATTR_MIN ), 0 );
 			}
-
 			function updateRemainingLabel() {
 				const el = document.getElementById( 'tw-attr-remaining' );
 				if ( el ) el.textContent = ATTR_POOL - usedPoints();
 			}
-
 			function updatePips( key, val ) {
 				const row = wrapper.querySelector( '.tw-attr-row[data-attr="' + key + '"]' );
 				if ( ! row ) return;
 				row.querySelectorAll( '.tw-pip' ).forEach( function ( pip ) {
-					const p = parseInt( pip.dataset.pip, 10 );
-					pip.classList.toggle( 'active', p <= val );
+					pip.classList.toggle( 'active', parseInt( pip.dataset.pip, 10 ) <= val );
 				} );
 			}
-
 			function applyChange( key, delta ) {
-				const current = formState[ 'attr_' + key ] || ATTR_MIN;
-				const next    = current + delta;
-
+				const cur  = formState[ 'attr_' + key ] || ATTR_MIN;
+				const next = cur + delta;
 				if ( next < ATTR_MIN || next > ATTR_MAX ) return;
 				if ( delta > 0 && usedPoints() >= ATTR_POOL ) {
 					setStatus( 'ERROR: No attribute points remaining.', true );
 					return;
 				}
-
 				formState[ 'attr_' + key ] = next;
-
 				const inp = document.getElementById( 'tw-attr-' + key );
 				if ( inp ) inp.value = next;
-
 				updatePips( key, next );
 				updateRemainingLabel();
 				setStatus( '', false );
 			}
-
-			// Delegate clicks on +/- buttons.
 			wrapper.addEventListener( 'click', function ( e ) {
 				const btn = e.target.closest( '.tw-attr-btn' );
 				if ( ! btn ) return;
@@ -405,11 +370,10 @@
 				const delta = btn.classList.contains( 'tw-attr-plus' ) ? 1 : -1;
 				if ( key ) applyChange( key, delta );
 			} );
-
 			updateRemainingLabel();
 		} )();
 
-		// ── Step 6: Avatar ────────────────────────────────────────────────────
+		// ── Avatar ────────────────────────────────────────────────────────────
 		( function initAvatar() {
 			const dropZone  = document.getElementById( 'tw-avatar-drop' );
 			const fileInput = document.getElementById( 'tw-char-avatar' );
@@ -418,47 +382,39 @@
 			const img       = document.getElementById( 'tw-avatar-img' );
 			const clearBtn  = document.getElementById( 'tw-avatar-clear' );
 			const trigger   = wrapper.querySelector( '.tw-upload-trigger' );
-
 			if ( ! dropZone || ! fileInput ) return;
 
 			function showFile( file ) {
 				if ( file && file.type.startsWith( 'image/' ) ) {
 					avatarFile = file;
 					const reader = new FileReader();
-					reader.onload = function ( ev ) {
-						if ( img ) img.src = ev.target.result;
-						if ( preview  ) preview.style.display  = 'none';
+					reader.onload = ev => {
+						if ( img )      img.src = ev.target.result;
+						if ( preview )  preview.style.display  = 'none';
 						if ( selected ) selected.style.display = '';
 					};
 					reader.readAsDataURL( file );
 				}
 			}
-
 			function clearFile() {
 				avatarFile = null;
 				if ( fileInput ) fileInput.value = '';
-				if ( img )      img.src          = '';
+				if ( img )      img.src = '';
 				if ( selected ) selected.style.display = 'none';
 				if ( preview )  preview.style.display  = '';
 			}
-
 			if ( trigger )  trigger.addEventListener( 'click', () => fileInput.click() );
 			if ( clearBtn ) clearBtn.addEventListener( 'click', clearFile );
-
-			fileInput.addEventListener( 'change', function () {
-				showFile( this.files[0] || null );
-			} );
-
-			dropZone.addEventListener( 'dragover', e => { e.preventDefault(); dropZone.classList.add( 'drag-over' ); } );
+			fileInput.addEventListener( 'change', function () { showFile( this.files[0] || null ); } );
+			dropZone.addEventListener( 'dragover',  e => { e.preventDefault(); dropZone.classList.add( 'drag-over' ); } );
 			dropZone.addEventListener( 'dragleave', () => dropZone.classList.remove( 'drag-over' ) );
 			dropZone.addEventListener( 'drop', function ( e ) {
-				e.preventDefault();
-				dropZone.classList.remove( 'drag-over' );
+				e.preventDefault(); dropZone.classList.remove( 'drag-over' );
 				showFile( e.dataTransfer.files[0] || null );
 			} );
 		} )();
 
-		// ── Summary population ────────────────────────────────────────────────
+		// ── Summary ───────────────────────────────────────────────────────────
 		function populateSummary() {
 			function set( field, val ) {
 				const el = document.getElementById( 'tw-summary-' + field );
@@ -469,13 +425,12 @@
 			set( 'backstory',      formState.backstory || '—' );
 			set( 'race',           formState.race  ? formState.race.name  : '—' );
 			set( 'class',          formState.class ? formState.class.name : '—' );
-
 			const attrStr = ATTR_KEYS.map( k =>
 				k.toUpperCase().slice( 0, 3 ) + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN )
 			).join( ' · ' );
-			set( 'attrs',    attrStr );
-			set( 'node_id',  formState.node_id ? formState.node_id.name : '—' );
-			set( 'avatar',   avatarFile ? avatarFile.name : 'None' );
+			set( 'attrs',   attrStr );
+			set( 'node_id', formState.node_id ? formState.node_id.name : '—' );
+			set( 'avatar',  avatarFile ? avatarFile.name : 'None' );
 		}
 
 		// ── Navigation ────────────────────────────────────────────────────────
@@ -489,15 +444,12 @@
 		wrapper.addEventListener( 'click', function ( e ) {
 			const btn = e.target.closest( 'button' );
 			if ( ! btn ) return;
-
 			if ( btn.classList.contains( 'tw-btn-next' ) ) {
 				if ( validateStep( current ) ) { setStatus( '', false ); showStep( current + 1 ); }
 				return;
 			}
 			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
-				setStatus( '', false );
-				showStep( current - 1 );
-				return;
+				setStatus( '', false ); showStep( current - 1 ); return;
 			}
 			if ( btn.classList.contains( 'tw-summary-edit' ) ) {
 				const goto = parseInt( btn.dataset.goto, 10 );
@@ -509,15 +461,13 @@
 			}
 		} );
 
-		// ── Submit / deploy ───────────────────────────────────────────────────
+		// ── Submit ────────────────────────────────────────────────────────────
 		const submitBtn = wrapper.querySelector( '#tw-char-submit' );
-		if ( submitBtn ) {
-			submitBtn.addEventListener( 'click', doSubmit );
-		}
+		if ( submitBtn ) submitBtn.addEventListener( 'click', doSubmit );
 
 		function buildPayload() {
 			return {
-				nonce          : config.nonce        || '',
+				nonce          : config.nonce || '',
 				character_name : formState.character_name,
 				pronouns       : formState.pronouns,
 				backstory      : formState.backstory,
@@ -533,8 +483,6 @@
 
 		function doSubmit() {
 			const payload = buildPayload();
-
-			// Final validation before send.
 			if ( ! payload.character_name ) { setStatus( 'ERROR: Agent name is required.', true ); return; }
 			if ( ! payload.race )           { setStatus( 'ERROR: Race selection is required.', true ); return; }
 			if ( ! payload.class )          { setStatus( 'ERROR: Class selection is required.', true ); return; }
@@ -544,7 +492,6 @@
 			submitBtn.textContent = 'SYNCHRONIZING…';
 			setStatus( '', false );
 			showSpinner();
-
 			const t0 = Date.now();
 
 			let fetchOptions;
@@ -552,22 +499,9 @@
 				const fd = new FormData();
 				Object.entries( payload ).forEach( ( [ k, v ] ) => fd.append( k, v ) );
 				fd.append( 'avatar', avatarFile, avatarFile.name );
-				fetchOptions = {
-					method      : 'POST',
-					headers     : { 'X-WP-Nonce': config.restNonce || '' },
-					body        : fd,
-					credentials : 'same-origin',
-				};
+				fetchOptions = { method: 'POST', headers: { 'X-WP-Nonce': config.restNonce || '' }, body: fd, credentials: 'same-origin' };
 			} else {
-				fetchOptions = {
-					method      : 'POST',
-					headers     : {
-						'Content-Type' : 'application/json',
-						'X-WP-Nonce'   : config.restNonce || '',
-					},
-					body        : JSON.stringify( payload ),
-					credentials : 'same-origin',
-				};
+				fetchOptions = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.restNonce || '' }, body: JSON.stringify( payload ), credentials: 'same-origin' };
 			}
 
 			fetch( restUrl, fetchOptions )
@@ -600,11 +534,9 @@
 			const t = parseInt( tick.dataset.tick, 10 );
 			tick.style.left = ( ( t / totalSteps ) * 100 ) + '%';
 		} );
-
-		// Lazy-load races immediately since Step 2 is close.
-		loadRaces();
-
 		updateProgress( 0 );
+		// Pre-load races since step 2 is immediately next.
+		loadRaces();
 
 	} );
 } )();

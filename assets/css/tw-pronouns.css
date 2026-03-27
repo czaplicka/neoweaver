@@ -1,0 +1,131 @@
+/**
+ * tw-pronouns.css
+ * Styled pronoun chip selector for the NeoWeaver character creator.
+ * Uses the #adff00 neon-green accent and Chakra Petch font.
+ */
+
+/* ── fieldset reset ─────────────────────────────────────────────────── */
+.tw-pronoun-fieldset {
+	border  : none;
+	padding : 0;
+	margin  : 24px 0 0;
+}
+
+.tw-pronoun-fieldset .tw-field-label__legend {
+	display       : block;
+	font-family   : 'Chakra Petch', monospace;
+	font-size     : .7rem;
+	font-weight   : 600;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color         : #adff00;
+	margin-bottom : 12px;
+	opacity       : .8;
+}
+
+/* ── chip row ───────────────────────────────────────────────────────── */
+.tw-pronoun-options {
+	display   : flex;
+	flex-wrap : wrap;
+	gap       : 10px;
+}
+
+/* ── hide native radio ──────────────────────────────────────────────── */
+.tw-pronoun-option {
+	position : relative;
+	cursor   : pointer;
+}
+
+.tw-pronoun-radio {
+	position : absolute;
+	opacity  : 0;
+	width    : 0;
+	height   : 0;
+	pointer-events: none;
+}
+
+/* ── chip base ──────────────────────────────────────────────────────── */
+.tw-pronoun-label {
+	display       : inline-block;
+	padding       : 7px 18px;
+	font-family   : 'Chakra Petch', monospace;
+	font-size     : .8rem;
+	font-weight   : 500;
+	letter-spacing: .08em;
+	text-transform: lowercase;
+	color         : #adff00;
+	background    : transparent;
+	border        : 1px solid rgba(173,255,0,.3);
+	border-radius : 3px;
+	transition    : background .15s, border-color .15s, color .15s, box-shadow .15s;
+	white-space   : nowrap;
+	position      : relative;
+	overflow      : hidden;
+}
+
+/* corner accent */
+.tw-pronoun-label::before {
+	content    : '';
+	position   : absolute;
+	top        : 0;
+	left       : 0;
+	width      : 6px;
+	height     : 6px;
+	border-top : 2px solid #adff00;
+	border-left: 2px solid #adff00;
+	opacity    : 0;
+	transition : opacity .15s;
+}
+
+/* ── hover ──────────────────────────────────────────────────────────── */
+.tw-pronoun-option:hover .tw-pronoun-label {
+	border-color: rgba(173,255,0,.7);
+	background  : rgba(173,255,0,.07);
+	box-shadow  : 0 0 8px rgba(173,255,0,.2);
+}
+.tw-pronoun-option:hover .tw-pronoun-label::before {
+	opacity: 1;
+}
+
+/* ── selected (radio:checked) ───────────────────────────────────────── */
+.tw-pronoun-radio:checked + .tw-pronoun-label {
+	background  : rgba(173,255,0,.15);
+	border-color: #adff00;
+	color       : #ffffff;
+	box-shadow  : 0 0 14px rgba(173,255,0,.35), inset 0 0 6px rgba(173,255,0,.1);
+	text-shadow : 0 0 8px rgba(173,255,0,.6);
+}
+.tw-pronoun-radio:checked + .tw-pronoun-label::before {
+	opacity: 1;
+}
+
+/* ── focus-visible ring ─────────────────────────────────────────────── */
+.tw-pronoun-radio:focus-visible + .tw-pronoun-label {
+	outline       : 2px solid #adff00;
+	outline-offset: 3px;
+}
+
+/* ── custom text input ──────────────────────────────────────────────── */
+#tw-char-pronouns-custom {
+	display      : block;
+	width        : 100%;
+	max-width    : 240px;
+	margin-top   : 12px;
+	padding      : 7px 12px;
+	font-family  : 'Chakra Petch', monospace;
+	font-size    : .85rem;
+	color        : #adff00;
+	background   : rgba(0,0,0,.5);
+	border       : 1px solid rgba(173,255,0,.4);
+	border-radius: 3px;
+	outline      : none;
+	transition   : border-color .15s, box-shadow .15s;
+}
+#tw-char-pronouns-custom:focus {
+	border-color: #adff00;
+	box-shadow  : 0 0 10px rgba(173,255,0,.3);
+}
+#tw-char-pronouns-custom::placeholder {
+	color  : rgba(173,255,0,.35);
+	fontstyle: normal;
+}
