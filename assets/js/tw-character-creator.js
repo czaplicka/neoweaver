@@ -66,6 +66,32 @@
 		const ATTR_MAX  = 5;
 		const ATTR_KEYS = [ 'body', 'reflex', 'mind', 'spirit' ];
 
+		// ── Pronouns: radio + custom field ───────────────────────────────────
+		( function initPronouns() {
+			const radios     = wrapper.querySelectorAll( '.tw-pronoun-radio' );
+			const customInput = document.getElementById( 'tw-char-pronouns-custom' );
+			if ( ! radios.length ) return;
+
+			function syncPronouns() {
+				const checked = wrapper.querySelector( '.tw-pronoun-radio:checked' );
+				if ( ! checked ) return;
+				if ( checked.value === 'custom' ) {
+					if ( customInput ) customInput.style.display = '';
+					formState.pronouns = ( customInput ? customInput.value.trim() : '' ) || 'custom';
+				} else {
+					if ( customInput ) customInput.style.display = 'none';
+					formState.pronouns = checked.value;
+				}
+			}
+
+			radios.forEach( function ( r ) {
+				r.addEventListener( 'change', syncPronouns );
+			} );
+			if ( customInput ) {
+				customInput.addEventListener( 'input', syncPronouns );
+			}
+		} )();
+
 		// ── Spinner ──────────────────────────────────────────────────────────
 		const spinner = document.createElement( 'div' );
 		spinner.id = 'tw-char-spinner';
@@ -139,8 +165,19 @@
 				}
 				// Persist values so summary can read them.
 				formState.character_name = nameInput.value.trim();
-				formState.pronouns       = ( wrapper.querySelector( '#tw-char-pronouns' ) || {} ).value || '';
-				formState.backstory      = ( wrapper.querySelector( '#tw-char-backstory' ) || {} ).value || '';
+
+				// Read pronouns from radio selection.
+				const checkedRadio = wrapper.querySelector( '.tw-pronoun-radio:checked' );
+				if ( checkedRadio ) {
+					if ( checkedRadio.value === 'custom' ) {
+						const customEl = document.getElementById( 'tw-char-pronouns-custom' );
+						formState.pronouns = ( customEl ? customEl.value.trim() : '' ) || 'custom';
+					} else {
+						formState.pronouns = checkedRadio.value;
+					}
+				}
+
+				formState.backstory = ( wrapper.querySelector( '#tw-char-backstory' ) || {} ).value || '';
 				return true;
 			}
 
@@ -185,8 +222,6 @@
 		const gridsLoaded = { race: false, class: false, nodes: false };
 
 		// Build a Supabase GET URL with anon key headers as query params.
-		// We inject the key as a query arg because fetch() headers alone aren't
-		// enough when CORS is the concern, and the anon key is public by design.
 		function sbGet( table, params ) {
 			const url = new URL( sbUrl + table );
 			Object.entries( params || {} ).forEach( ( [ k, v ] ) => url.searchParams.set( k, v ) );
@@ -199,7 +234,6 @@
 		}
 
 		// Render a single selection card inside a dynamic grid.
-		// `onSelect( id, name )` is called when the card is clicked.
 		function makeCard( id, name, desc, emoji, selectedId, onSelect ) {
 			const div  = document.createElement( 'div' );
 			div.className = 'tw-dyn-card' + ( selectedId === id ? ' selected' : '' );
@@ -226,28 +260,31 @@
 		}
 
 		// ── Step 2: Races ─────────────────────────────────────────────────────
+		// NOTE: cyber_races does NOT have an `icon` column — select only real columns.
 		function loadRaces() {
 			gridsLoaded.race = true;
 			const grid = document.getElementById( 'tw-race-grid' );
 			if ( ! grid || ! sbUrl || ! sbKey ) return;
 
-			sbGet( 'cyber_races', { select: 'id,name,description,icon', order: 'name.asc' } )
+			sbGet( 'cyber_races', { select: 'id,name,description', order: 'name.asc' } )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
-					if ( ! rows || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No race data available.</p>';
+					// Supabase returns an object with `message` on error.
+					if ( ! Array.isArray( rows ) || ! rows.length ) {
+						const errMsg = ( rows && rows.message ) ? rows.message : 'No race data available.';
+						grid.innerHTML = '<p class="tw-error-msg">' + esc( errMsg ) + '</p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
 						grid.appendChild( makeCard(
-							row.id, row.name, row.description, row.icon || '👤',
+							row.id, row.name, row.description, '👤',
 							formState.race ? formState.race.id : null,
 							function ( id, name ) { formState.race = { id, name }; setStatus( '', false ); }
 						) );
 					} );
 				} )
-				.catch( function () {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load races.</p>';
+				.catch( function ( err ) {
+					grid.innerHTML = '<p class="tw-error-msg">Failed to load races: ' + esc( err.message ) + '</p>';
 				} );
 		}
 
@@ -257,23 +294,24 @@
 			const grid = document.getElementById( 'tw-class-grid' );
 			if ( ! grid || ! sbUrl || ! sbKey ) return;
 
-			sbGet( 'cyber_classes', { select: 'id,name,description,icon', order: 'name.asc' } )
+			sbGet( 'cyber_classes', { select: 'id,name,description', order: 'name.asc' } )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
-					if ( ! rows || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No class data available.</p>';
+					if ( ! Array.isArray( rows ) || ! rows.length ) {
+						const errMsg = ( rows && rows.message ) ? rows.message : 'No class data available.';
+						grid.innerHTML = '<p class="tw-error-msg">' + esc( errMsg ) + '</p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
 						grid.appendChild( makeCard(
-							row.id, row.name, row.description, row.icon || '⚡',
+							row.id, row.name, row.description, '⚡',
 							formState.class ? formState.class.id : null,
 							function ( id, name ) { formState.class = { id, name }; setStatus( '', false ); }
 						) );
 					} );
 				} )
-				.catch( function () {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load classes.</p>';
+				.catch( function ( err ) {
+					grid.innerHTML = '<p class="tw-error-msg">Failed to load classes: ' + esc( err.message ) + '</p>';
 				} );
 		}
 
@@ -283,14 +321,10 @@
 			const grid = document.getElementById( 'tw-node-grid' );
 			if ( ! grid || ! sbUrl || ! sbKey ) return;
 
-			// We know the user's WP user ID via the nonce cookie session —
-			// Supabase RLS will filter to their worlds automatically.
-			// Fallback: fetch all worlds ordered by name (RLS on cyber_worlds
-			// filters by wp_user_id on the Supabase side).
 			sbGet( 'cyber_worlds', { select: 'id,name,description,difficulty,entropy', order: 'name.asc' } )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
-					if ( ! rows || ! rows.length ) {
+					if ( ! Array.isArray( rows ) || ! rows.length ) {
 						grid.innerHTML = '<p class="tw-error-msg">No Nodes found. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
 						return;
 					}
@@ -312,8 +346,8 @@
 						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes found. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
 					}
 				} )
-				.catch( function () {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes.</p>';
+				.catch( function ( err ) {
+					grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes: ' + esc( err.message ) + '</p>';
 				} );
 		}
 
@@ -513,8 +547,6 @@
 
 			const t0 = Date.now();
 
-			// Use FormData when an avatar file is present so we can send multipart.
-			// Otherwise send plain JSON (same pattern as world creator).
 			let fetchOptions;
 			if ( avatarFile ) {
 				const fd = new FormData();
@@ -564,8 +596,6 @@
 		}
 
 		// ── Boot ──────────────────────────────────────────────────────────────
-		// Position tick marks evenly across the progress track (JS, not CSS,
-		// because we don't know totalSteps at CSS time).
 		wrapper.querySelectorAll( '.tw-progress-tick' ).forEach( function ( tick ) {
 			const t = parseInt( tick.dataset.tick, 10 );
 			tick.style.left = ( ( t / totalSteps ) * 100 ) + '%';
