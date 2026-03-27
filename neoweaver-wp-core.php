@@ -11,12 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 define( 'NEOWEAVER_VERSION',    '0.0.7' );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// ─── Helpers & core includes ────────────────────────────────────────────────────────
+// ─── Helpers & core includes ──────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-config.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/supabase-helpers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/game-data.php';
@@ -24,7 +24,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-public-profile.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/head-injection.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/lexicon-shortcodes.php';
 
-// ─── AJAX handlers ────────────────────────────────────────────────────────────────────────────────────
+// ─── AJAX handlers ────────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-handlers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-lobby-heartbeat.php';
@@ -43,15 +43,14 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/shortcodes-tags.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-save-player-notes.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax/tw-update-vehicle-module.php';
 
-// ─── Class autoload ──────────────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Class autoload ───────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-deployments-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-creator.php';
 
-// ─── Wizard shortcode functions (must load before class-neoweaver-public.php
-//     because the class methods delegate to these standalone functions) ───────
+// ─── Wizard shortcode functions (must load before class-neoweaver-public.php)
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-achivments.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-active-id.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-campaign-creator.php';
@@ -82,31 +81,30 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-world-creator.p
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-world-news.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php';
 
-// ─── REST API endpoints ──────────────────────────────────────────────────────────────────────────────────────────
+// ─── REST API endpoints ───────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
+// Character data lookup endpoints (races, classes) — cached, read-only.
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints-character-data.php';
 
-// ─── Enqueue shared public assets ──────────────────────────────────────────────────────
+// ─── Enqueue shared public assets ─────────────────────────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
-	wp_enqueue_style( 'neoweaver', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css', [], NEOWEAVER_VERSION );
-	wp_enqueue_style( 'neoweaver', NEOWEAVER_PLUGIN_URL . 'assets/css/achivments.css', [], NEOWEAVER_VERSION );
+	wp_enqueue_style( 'neoweaver',        NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css',        [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
-	// Bug fix (7): enqueue Chart.js once here instead of inline inside the shortcode.
+	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
 	if ( is_page_template( 'templates/adventure.php' ) ) {
 		wp_enqueue_script( 'nw-panel-tactical-left', NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
-		wp_enqueue_script( 'neoweaver-interference', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-interference.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-wp_enqueue_script( 'neoweaver-interference', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [], NEOWEAVER_VERSION, true );
-		wp_enqueue_script( 'world-news', NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css', [], NEOWEAVER_VERSION, true );
-		wp_enqueue_script( 'world-news', NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-
-
+		wp_enqueue_script( 'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-interference.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_style(  'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [], NEOWEAVER_VERSION );
+		wp_enqueue_style(  'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css', [], NEOWEAVER_VERSION );
+		wp_enqueue_script( 'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 	}
 } );
 
-// ─── Register plugin page templates ─────────────────────────────────────────────────────
+// ─── Register plugin page templates ──────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	add_filter( 'theme_page_templates', function ( $templates ) {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
@@ -126,7 +124,7 @@ add_action( 'plugins_loaded', function () {
 	} );
 } );
 
-// ─── Bootstrap game classes ──────────────────────────────────────────────────────────────────────────────────────────────────────
+// ─── Bootstrap game classes ───────────────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	$repo                = new Neoweaver_Agents_Repository();
 	$list                = new Neoweaver_Agents_List( $repo );
@@ -136,27 +134,25 @@ add_action( 'plugins_loaded', function () {
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
-// ─── Enqueue game page CSS ────────────────────────────────────────────────────────────────────────────────────────
-function neoweaver_enqueue_frontend_styles() {
+// ─── Enqueue game page CSS ────────────────────────────────────────────────────
+function neoweaver_enqueue_frontend_styles(): void {
 	if ( is_page_template( 'templates/adventure.php' ) ) {
 		$base = NEOWEAVER_PLUGIN_URL . 'assets/css/';
 		wp_enqueue_style( 'neoweaver-tw-core', $base . 'tw-core.css', [], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
 		wp_enqueue_style( 'neoweaver-tw-deck', $base . 'tw-deck.css', [ 'neoweaver-tw-core' ], '1.0.0' );
+		wp_enqueue_style(
+			'neoweaver-terminal',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-terminal.css',
+			[],
+			NEOWEAVER_VERSION
+		);
 		wp_enqueue_script(
 			'neoweaver-header-node',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-header-node.js',
 			[],
 			'1.0.0',
 			true
-		);
-		// BUG-FIX: was plugin_dir_url(__FILE__) . '../public/assets/css/...' — broken URL.
-		// File lives in the plugin's own assets/css/, so NEOWEAVER_PLUGIN_URL is correct.
-		wp_enqueue_style(
-			'neoweaver-terminal',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-terminal.css',
-			[],
-			NEOWEAVER_VERSION
 		);
 		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
 			'supabaseUrl' => tw_supabase_url(),
