@@ -92,3 +92,99 @@ function cyber_deck_builder_shortcode() {
     return ob_get_clean();
 }
 add_shortcode('cyber_deck_builder', 'cyber_deck_builder_shortcode');
+
+// Rejestracja akcji AJAX dla zalogowanych użytkowników
+add_action('wp_ajax_save_cyber_deck', 'handle_save_cyber_deck');
+
+function handle_save_cyber_deck() {
+    // 1. Bezpieczeństwo
+    check_ajax_referer('cyber_deck_nonce', 'nonce');
+    
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        wp_send_json_error('Unauthorized access.');
+    }
+
+    // 2. Pobranie danych z POST
+    $active_ids = json_decode(stripslashes($_POST['active_ids']), true);
+    $library_ids = json_decode(stripslashes($_POST['library_ids']), true);
+
+    if (!is_array($active_ids) || !is_array($library_ids)) {
+        wp_send_json_error('Invalid data format.');
+    }
+
+    // 3. Logika aktualizacji Supabase
+    // Założenie: Masz funkcję update_supabase_card_location($instance_id, $location)
+    
+    try {
+        // Karty przeniesione do talii (Active Deck) ustawiamy na 'pile' (do dociągnięcia)
+        foreach ($active_ids as $id) {
+            cyber_update_card_location($id, 'pile');
+        }
+
+        // Karty przeniesione do repozytorium ustawiamy na 'library'
+        foreach ($library_ids as $id) {
+            cyber_update_card_location($id, 'library');
+        }
+
+        wp_send_json_success('Deck updated successfully.');
+    } catch (Exception $e) {
+        wp_send_json_error($e->getMessage());
+    }
+}
+
+// Przykładowa funkcja pomocnicza wywołująca API Supabase (musisz ją dostosować do swojej klasy API)
+function cyber_update_card_location($instance_id, $location) {
+    // Przykład użycia Twoich danych z wp-config (host, key itp.)
+    // Wykonujesz UPDATE public.cyber_character_buffer SET location = $location WHERE id = $instance_id
+    
+    /* TU TWÓJ KOD CURL LUB KLASY SUPABASE:
+       $supabase->from('cyber_character_buffer')->update(['location' => $location])->eq('id', $instance_id);
+    */
+}
+function saveDeckState() {
+    // Pobieramy kontenery
+    const activeContainer = document.getElementById('active-deck');
+    const libraryContainer = document.getElementById('library-deck');
+    const saveBtn = document.getElementById('save-deck-btn');
+
+    // Wyciągamy ID instancji (z data-instance-id)
+    const activeIds = Array.from(activeContainer.querySelectorAll('.cyber-card'))
+        .map(card => card.dataset.instanceId);
+    
+    const libraryIds = Array.from(libraryContainer.querySelectorAll('.cyber-card'))
+        .map(card => card.dataset.instanceId);
+
+    // Wizualny feedback
+    saveBtn.innerText = "UPLOADING TO TERMINAL...";
+    saveBtn.disabled = true;
+
+    // Przygotowanie danych do wysyłki
+    const formData = new FormData();
+    formData.append('action', 'save_cyber_deck'); // Nazwa akcji dla WP
+    formData.append('active_ids', JSON.stringify(activeIds));
+    formData.append('library_ids', JSON.stringify(libraryIds));
+    formData.append('nonce', '<?php echo wp_create_nonce("cyber_deck_nonce"); ?>');
+
+    // Wysyłka AJAX
+    fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("DECK SYNCED: Buffer updated successfully.");
+        } else {
+            alert("SYNC ERROR: " + (data.data || "Unknown error"));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("CRITICAL ERROR: Terminal Connection Lost.");
+    })
+    .finally(() => {
+        saveBtn.innerText = "SYNC WITH TERMINAL";
+        saveBtn.disabled = false;
+    });
+}
