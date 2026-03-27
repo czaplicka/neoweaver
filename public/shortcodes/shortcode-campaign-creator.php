@@ -2,19 +2,28 @@
 /**
  * Shortcode: [tw_create_campaign]
  *
- * Renders the 8-step deployment (campaign) creation wizard.
- * Extracted from Neoweaver_Public to keep each wizard in its own file.
+ * Renders the 7-step Deployment (Campaign) creation wizard.
+ * Self-contained — no external partial needed (same pattern as character creator).
  *
- * Dependencies (must be loaded before this file):
- *   - tw_supabase_url() / tw_supabase_anon_key()  (supabase-helpers.php)
- *   - neoweaver-campaign-creator JS/CSS            (enqueued by Neoweaver_Public::enqueue_assets)
+ * Steps:
+ *   1. Deployment Identity  — name + optional brief/notes
+ *   2. GM Style             — narrative archetype (cinematic_heroic / harsh_grounded / fast_tactical)
+ *   3. Game Mode            — solo / co-op / competitive
+ *   4. Game Length          — short / standard / epic / endless
+ *   5. Priority             — casual / standard / hardcore / nightmare
+ *   6. Node Binding         — pick one of the user's worlds
+ *   7. Agent Assignment     — pick one of the user's living characters
+ *   8. Summary              — review + deploy
  *
- * The two Supabase look-up lists (worlds, characters) are cached per user
- * with a short transient (CAMPAIGN_CACHE_TTL seconds) so a warm-cache page
- * render costs zero outbound HTTP calls. The transient key includes the user
- * ID so different operators never see each other's data.
+ * The endpoint at /wp-json/neoweaver/v1/campaign/create handles the Supabase
+ * write via Neoweaver_Deployments_Creator.
  *
- * CSS scope : .neoweaver-screen #tw-campaign-creator-container
+ * Dependencies:
+ *   - tw_supabase_url() / tw_supabase_anon_key()   (supabase-helpers.php)
+ *   - neoweaver-campaign-creator CSS/JS             (enqueued by Neoweaver_Public::enqueue_assets)
+ *   - REST route neoweaver/v1/campaign/create       (includes/api-endpoints.php)
+ *
+ * CSS scope : .neoweaver-screen #tw-campaign-creator-wrapper
  * JS file   : assets/js/tw-campaign-creator.js
  *
  * @package Neoweaver
@@ -24,77 +33,378 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/** Transient lifetime in seconds for the worlds/characters lookup lists. */
-define( 'NW_CAMPAIGN_CREATOR_CACHE_TTL', 60 );
+/** Transient lifetime (seconds) for cached Supabase look-ups. */
+if ( ! defined( 'NW_CAMPAIGN_CREATOR_CACHE_TTL' ) ) {
+	define( 'NW_CAMPAIGN_CREATOR_CACHE_TTL', 60 );
+}
 
 if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 
-	/**
-	 * [tw_create_campaign] callback.
-	 *
-	 * Intentionally a standalone function so it can be registered
-	 * independently of Neoweaver_Public.  The shortcode tag is still
-	 * registered by Neoweaver_Public::__construct() via
-	 * [ $this, 'shortcode_campaign_creator' ], which now delegates here.
-	 *
-	 * @return string  Rendered HTML wrapped in .neoweaver-screen.
-	 */
 	function neoweaver_shortcode_campaign_creator(): string {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return '<div class="neoweaver-screen"><p class="tw-error">UPLINK REQUIRED. LOG IN.</p></div>';
+			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
-		// ── Cached Supabase look-ups ──────────────────────────────────────────
-		$worlds     = neoweaver_campaign_creator_supabase_get(
-			'cyber_worlds',
-			[ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ],
-			$user_id,
-			NW_CAMPAIGN_CREATOR_CACHE_TTL
-		);
-		$characters = neoweaver_campaign_creator_supabase_get(
-			'cyber_characters',
-			[ 'wp_user_id' => 'eq.' . $user_id, 'select' => 'id,name' ],
-			$user_id,
-			NW_CAMPAIGN_CREATOR_CACHE_TTL
-		);
-
-		$campaign_nonce = wp_create_nonce( 'tw_campaign_nonce' );
+		$nonce    = wp_create_nonce( 'tw_campaign_nonce' );
+		$rest_url = home_url( '/wp-json/neoweaver/v1/campaign/create' );
 
 		wp_localize_script(
 			'neoweaver-campaign-creator',
 			'twCampaignConfig',
-			[ 'nonce' => $campaign_nonce ]
+			[
+				'nonce'       => $nonce,
+				'restNonce'   => wp_create_nonce( 'wp_rest' ),
+				'restUrl'     => $rest_url,
+				'campaignsUrl'=> home_url( '/campaigns/' ),
+				'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
+				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
+				'userId'      => $user_id,
+			]
 		);
 
-		$path = get_stylesheet_directory() . '/templates/partials/campaign-creator.php';
-		if ( ! file_exists( $path ) ) {
-			return '<!-- Neoweaver: missing partial campaign-creator.php -->';
+		// Spinner CSS — same file reused across all wizards.
+		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
+		if ( file_exists( $spinner_css ) ) {
+			wp_enqueue_style(
+				'neoweaver-node-spinner',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/tw-node-spinner.css',
+				[],
+				(string) filemtime( $spinner_css )
+			);
 		}
 
-		ob_start();
-		( static function ( $tw_data, $__path ) {
-			extract( [ 'tw_data' => $tw_data ], EXTR_SKIP );
-			include $__path;
-		} )( [ 'worlds' => $worlds, 'characters' => $characters ], $path );
-		$html = ob_get_clean() ?: '';
+		// ── Step option definitions ───────────────────────────────────────────
+		// Each entry: [ field_key, phase_label, question_text, options[] ]
+		// Options: [ value (string for gm_style / int for others), label, description, emoji ]
 
+		$gm_styles = [
+			[ 'cinematic_heroic', 'Cinematic Heroic', 'Epic, legendary tone. Actions feel like destiny. Lethal but stylish.', '🎬' ],
+			[ 'harsh_grounded',   'Harsh Grounded',   'Survival horror. Every victory costs. Descriptions are brutal.', '🩸' ],
+			[ 'fast_tactical',    'Fast Tactical',     'Board-state focus. Dry wit. Brief descriptions, max player agency.', '⚡' ],
+		];
+
+		$game_modes = [
+			[ 1, 'Solo',         'One Operator. One Agent. The Node is yours alone.',             '🕵️' ],
+			[ 2, 'Co-op',        'Multiple Operators. Shared Node, shared Entropy.',              '🤝' ],
+			[ 3, 'Competitive',  'Operators pursue conflicting objectives in the same Node.',      '⚔️' ],
+		];
+
+		$game_lengths = [
+			[ 1, 'Short Run',    '3–5 sessions. Tight objective. High stakes, fast resolution.',  '⏱️' ],
+			[ 2, 'Standard',     '6–12 sessions. Full arc with mid-game pivot.',                  '📡' ],
+			[ 3, 'Epic',         '13–25 sessions. Major faction wars. World-shaping outcomes.',   '🌐' ],
+			[ 4, 'Endless',      'No defined end. Node evolves until Hard Reset.',                '♾️' ],
+		];
+
+		$priorities = [
+			[ 1, 'Casual',       'Low stakes. Story over challenge. No permadeath pressure.',     '☕' ],
+			[ 2, 'Standard',     'Balanced risk. Protocol-default experience.',                   '🎯' ],
+			[ 3, 'Hardcore',     'Elevated lethality. Entropy rises faster.',                     '💀' ],
+			[ 4, 'Nightmare',    'Maximum entropy pressure. Time itself costs Sync.',             '☠️' ],
+		];
+
+		$total_steps = 8; // 1 identity + 1 gm_style + 1 mode + 1 length + 1 priority + 1 node + 1 agent + 1 summary
+
+		ob_start();
+		?>
+		<div id="tw-campaign-creator-wrapper" data-total-steps="<?php echo esc_attr( $total_steps ); ?>">
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     PROGRESS BAR
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-progress-bar" aria-label="Deployment configuration progress">
+				<div class="tw-progress-header">
+					<span class="tw-progress-label">DEPLOYMENT_INIT<span class="tw-blink">_</span></span>
+					<span class="tw-progress-counter">
+						<span id="tw-camp-step-current">1</span> / <?php echo esc_html( $total_steps ); ?>
+					</span>
+				</div>
+				<div class="tw-progress-track">
+					<div class="tw-progress-fill" id="tw-camp-progress-fill"
+					     style="width:<?php echo round( 100 / $total_steps ); ?>%"></div>
+					<?php for ( $i = 1; $i <= $total_steps; $i++ ) : ?>
+						<span class="tw-progress-tick<?php echo $i === 1 ? ' active' : ''; ?>"
+						      data-tick="<?php echo esc_attr( $i ); ?>"></span>
+					<?php endfor; ?>
+				</div>
+				<div class="tw-progress-phase" id="tw-camp-progress-phase">DEPLOYMENT MATRIX</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 1 — Identity
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step active" data-step="1" data-phase="DEPLOYMENT MATRIX">
+				<h2>// INITIALIZE DEPLOYMENT</h2>
+				<p class="tw-question-text">Define the operation before uplink synchronization.</p>
+
+				<label class="tw-field-label">
+					<span>Deployment Name <span class="tw-required">*</span></span>
+					<input type="text" id="tw-camp-name" name="campaign_name"
+					       placeholder="e.g. Operation Pale Signal · The Fray Protocol · Exodus Arc"
+					       maxlength="100" required />
+				</label>
+
+				<label class="tw-field-label" style="margin-top:24px;">
+					<span>Operative Brief &amp; Custom Directives</span>
+					<textarea id="tw-camp-notes" name="customize" rows="5"
+					          placeholder="Optional: lore, GM constraints, theme notes, world-specific rules…"></textarea>
+				</label>
+
+				<div class="tw-nav-row">
+					<span></span>
+					<button type="button" class="tw-btn-nav" id="tw-camp-step1-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 2 — GM Style
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="2" data-phase="GM PROTOCOL" data-field="gm_style">
+				<h2>// GM PROTOCOL</h2>
+				<p class="tw-question-text">
+					Select the AI Game Master's narrative lens for this deployment.
+					This shapes tone, description depth, and combat grittiness.
+				</p>
+
+				<div class="tw-option-grid tw-option-grid--3">
+					<?php foreach ( $gm_styles as $opt ) :
+						[ $val, $label, $desc, $emoji ] = $opt;
+						$id = 'tw-gm-' . esc_attr( $val );
+					?>
+					<label class="tw-card-label" for="<?php echo $id; ?>">
+						<input type="radio" id="<?php echo $id; ?>" name="gm_style"
+						       value="<?php echo esc_attr( $val ); ?>" required />
+						<div class="tw-card-visual">
+							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
+							<strong><?php echo esc_html( $label ); ?></strong>
+							<span><?php echo esc_html( $desc ); ?></span>
+						</div>
+					</label>
+					<?php endforeach; ?>
+				</div>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 3 — Game Mode
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="3" data-phase="OPERATIVE MODE" data-field="game_mode">
+				<h2>// OPERATIVE MODE</h2>
+				<p class="tw-question-text">How many Operators will be synchronized to this deployment?</p>
+
+				<div class="tw-option-grid tw-option-grid--3">
+					<?php foreach ( $game_modes as $opt ) :
+						[ $val, $label, $desc, $emoji ] = $opt;
+						$id = 'tw-mode-' . esc_attr( $val );
+					?>
+					<label class="tw-card-label" for="<?php echo $id; ?>">
+						<input type="radio" id="<?php echo $id; ?>" name="game_mode"
+						       value="<?php echo esc_attr( $val ); ?>" required />
+						<div class="tw-card-visual">
+							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
+							<strong><?php echo esc_html( $label ); ?></strong>
+							<span><?php echo esc_html( $desc ); ?></span>
+						</div>
+					</label>
+					<?php endforeach; ?>
+				</div>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 4 — Game Length
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="4" data-phase="OPERATION SCOPE" data-field="game_length">
+				<h2>// OPERATION SCOPE</h2>
+				<p class="tw-question-text">Define the temporal arc of this deployment.</p>
+
+				<div class="tw-option-grid tw-option-grid--4">
+					<?php foreach ( $game_lengths as $opt ) :
+						[ $val, $label, $desc, $emoji ] = $opt;
+						$id = 'tw-length-' . esc_attr( $val );
+					?>
+					<label class="tw-card-label" for="<?php echo $id; ?>">
+						<input type="radio" id="<?php echo $id; ?>" name="game_length"
+						       value="<?php echo esc_attr( $val ); ?>" required />
+						<div class="tw-card-visual">
+							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
+							<strong><?php echo esc_html( $label ); ?></strong>
+							<span><?php echo esc_html( $desc ); ?></span>
+						</div>
+					</label>
+					<?php endforeach; ?>
+				</div>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 5 — Priority / Difficulty
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="priority">
+				<h2>// THREAT CALIBRATION</h2>
+				<p class="tw-question-text">Set the lethality and entropy pressure level for this deployment.</p>
+
+				<div class="tw-option-grid tw-option-grid--4">
+					<?php foreach ( $priorities as $opt ) :
+						[ $val, $label, $desc, $emoji ] = $opt;
+						$id = 'tw-priority-' . esc_attr( $val );
+					?>
+					<label class="tw-card-label" for="<?php echo $id; ?>">
+						<input type="radio" id="<?php echo $id; ?>" name="priority"
+						       value="<?php echo esc_attr( $val ); ?>" required />
+						<div class="tw-card-visual">
+							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
+							<strong><?php echo esc_html( $label ); ?></strong>
+							<span><?php echo esc_html( $desc ); ?></span>
+						</div>
+					</label>
+					<?php endforeach; ?>
+				</div>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 6 — Node Binding
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="6" data-phase="NODE UPLINK" data-field="world_id">
+				<h2>// NODE UPLINK</h2>
+				<p class="tw-question-text">
+					Select the Node (world) this deployment will run inside.
+					All Entropy changes, Legacies and Agent deaths will affect this world permanently.
+				</p>
+
+				<div class="tw-dynamic-grid" id="tw-camp-node-grid">
+					<div class="tw-loading-state">
+						<span class="tw-loading-dot"></span>
+						SCANNING AVAILABLE NODES…
+					</div>
+				</div>
+
+				<p class="tw-helper-text">
+					No worlds yet? <a href="<?php echo esc_url( home_url( '/create-world/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a>
+				</p>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 7 — Agent Assignment
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step" data-step="7" data-phase="AGENT ASSIGNMENT" data-field="character_id">
+				<h2>// AGENT ASSIGNMENT</h2>
+				<p class="tw-question-text">
+					Assign a Field Agent to this deployment.
+					Only living agents bound to the selected Node are valid.
+				</p>
+
+				<div class="tw-dynamic-grid" id="tw-camp-agent-grid">
+					<div class="tw-loading-state">
+						<span class="tw-loading-dot"></span>
+						FETCHING AVAILABLE AGENTS…
+					</div>
+				</div>
+
+				<p class="tw-helper-text">
+					No agents yet? <a href="<?php echo esc_url( home_url( '/create-agent/' ) ); ?>" class="tw-link">Create a Field Agent first &rarr;</a>
+				</p>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-next">REVIEW &rarr;</button>
+				</div>
+			</div>
+
+			<!-- ═══════════════════════════════════════════════════════════════
+			     STEP 8 — Summary + Deploy
+			     ═══════════════════════════════════════════════════════════════ -->
+			<div class="tw-step tw-step--summary" data-step="8" data-phase="SYSTEM REVIEW">
+				<h2>// SYSTEM REVIEW</h2>
+				<p class="tw-question-text">Verify deployment parameters before uplink. Edit any field to reconfigure.</p>
+
+				<div class="tw-summary-grid">
+					<div class="tw-summary-row" data-summary-field="campaign_name">
+						<span class="tw-summary-key">DEPLOY_ID</span>
+						<span class="tw-summary-val" id="tw-summary-campaign_name">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="customize">
+						<span class="tw-summary-key">DIRECTIVES</span>
+						<span class="tw-summary-val" id="tw-summary-customize">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="gm_style">
+						<span class="tw-summary-key">GM_PROTOCOL</span>
+						<span class="tw-summary-val" id="tw-summary-gm_style">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="2">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="game_mode">
+						<span class="tw-summary-key">OP_MODE</span>
+						<span class="tw-summary-val" id="tw-summary-game_mode">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="3">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="game_length">
+						<span class="tw-summary-key">OP_SCOPE</span>
+						<span class="tw-summary-val" id="tw-summary-game_length">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="priority">
+						<span class="tw-summary-key">THREAT_LVL</span>
+						<span class="tw-summary-val" id="tw-summary-priority">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="world_id">
+						<span class="tw-summary-key">NODE</span>
+						<span class="tw-summary-val" id="tw-summary-world_id">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button>
+					</div>
+					<div class="tw-summary-row" data-summary-field="character_id">
+						<span class="tw-summary-key">AGENT</span>
+						<span class="tw-summary-val" id="tw-summary-character_id">&mdash;</span>
+						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
+					</div>
+				</div>
+
+				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-camp-submit">
+						&#9658; UPLINK DEPLOYMENT
+					</button>
+				</div>
+
+				<div class="tw-camp-status" aria-live="polite"></div>
+			</div>
+
+		</div><!-- /#tw-campaign-creator-wrapper -->
+		<?php
+		$html = ob_get_clean() ?: '';
 		return '<div class="neoweaver-screen">' . $html . '</div>';
 	}
 }
 
+// neoweaver_campaign_creator_supabase_get() helper kept for backwards compat
+// (used by nothing now but may be referenced in legacy Make.com scenarios).
 if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
 
-	/**
-	 * Thin Supabase GET helper with optional per-user transient caching.
-	 * Private to this file — other code should use tw_supabase_get() instead.
-	 *
-	 * @param string $table       Table name.
-	 * @param array  $query_args  Query-string parameters.
-	 * @param int    $user_id     Cache key component; 0 = no caching.
-	 * @param int    $ttl         Transient lifetime in seconds.
-	 * @return array
-	 */
 	function neoweaver_campaign_creator_supabase_get(
 		string $table,
 		array $query_args,
@@ -107,9 +417,7 @@ if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
 
 		if ( $cache_key ) {
 			$cached = get_transient( $cache_key );
-			if ( $cached !== false ) {
-				return $cached;
-			}
+			if ( $cached !== false ) return $cached;
 		}
 
 		$anon_key = tw_supabase_anon_key();
@@ -132,11 +440,7 @@ if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
 		}
 
 		$rows = json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
-
-		if ( $cache_key ) {
-			set_transient( $cache_key, $rows, $ttl );
-		}
-
+		if ( $cache_key ) set_transient( $cache_key, $rows, $ttl );
 		return $rows;
 	}
 }
