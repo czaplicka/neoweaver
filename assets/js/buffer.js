@@ -2,59 +2,62 @@
  * NEOWEAVE CORE INTERFACE - JS BUNDLE
  */
 
-// --- 1. INICJALIZACJA SLIDERA (HAND/BUFFER) ---
-const bufferSwiper = new Swiper('.buffer-slider', {
-    slidesPerView: 'auto',
-    centeredSlides: true,
-    spaceBetween: 20,
-    grabCursor: true,
-    pagination: { el: '.swiper-pagination', clickable: true }
-});
+// --- 1. INICJALIZACJA SLIDERA ---
+// Dodano sprawdzenie, czy kontener istnieje, by nie pluć błędami na stronach bez slidera
+const bufferSliderEl = document.querySelector('.buffer-slider');
+let bufferSwiper;
+
+if (bufferSliderEl) {
+    bufferSwiper = new Swiper('.buffer-slider', {
+        slidesPerView: 'auto',
+        centeredSlides: true,
+        spaceBetween: 20,
+        grabCursor: true,
+        pagination: { el: '.swiper-pagination', clickable: true }
+    });
+}
 
 // --- 2. LOGIKA HAND (UŻYWANIE KART I ZOOM) ---
 
 function zoomCard(el) {
     const overlay = document.getElementById('card-zoom-overlay');
     const content = document.getElementById('zoom-content');
+    if (!overlay || !content) return;
     
-    // Klonujemy zawartość karty do modala
     content.innerHTML = el.outerHTML;
     overlay.style.display = 'flex';
     
-    // Ukrywamy przycisk INJECT w podglądzie zoom, by uniknąć przypadkowego kliknięcia
     const zoomBtn = content.querySelector('.inject-btn');
     if (zoomBtn) zoomBtn.style.display = 'none';
 }
 
 function closeZoom() {
-    document.getElementById('card-zoom-overlay').style.display = 'none';
+    const overlay = document.getElementById('card-zoom-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
 
 function useBufferCard(instanceId, name, event) {
-    if (event) event.stopPropagation(); // Zapobiega otwarciu zoomu przy kliknięciu w przycisk
-    
+    if (event) event.stopPropagation();
     if(!confirm("Execute protocol: " + name + "?")) return;
 
-    // Znajdź slajd i kartę w DOM dla animacji
     const cardElement = document.querySelector(`[data-instance-id="${instanceId}"]`);
     const slideElement = cardElement ? cardElement.closest('.swiper-slide') : null;
 
     if (cardElement) {
-        // Efekt wizualny "wypalania" karty
         cardElement.style.transition = "all 0.4s ease";
         cardElement.style.filter = "brightness(3) blur(10px)";
         cardElement.style.transform = "translateY(-100px) scale(0.5)";
         cardElement.style.opacity = "0";
     }
 
-    // AJAX do Supabase (via WP)
-    fetch(ajaxurl, {
+    // POPRAWKA: Używamy nwApiData zamiast ajaxurl i config_nonces
+    fetch(nwApiData.ajaxurl, {
         method: 'POST',
-        headers: { 'Content-Type: application/x-www-form-urlencoded' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             action: 'use_buffer_card',
             instance_id: instanceId,
-            nonce: config_nonces.use_card // Zakładamy obiekt z noncami przekazany z PHP
+            nonce: nwApiData.nonces.use_card 
         })
     })
     .then(res => res.json())
@@ -62,7 +65,7 @@ function useBufferCard(instanceId, name, event) {
         if(data.success) {
             const newCard = data.data;
             
-            // Budujemy HTML nowej karty do wstrzyknięcia w slider
+            // Tutaj HTML powinien być identyczny z tym w PHP (klasa cyber-card-css)
             const newCardHTML = `
                 <div class="cyber-card-css ${newCard.category.toLowerCase()} shadow-spawn" 
                      onclick="zoomCard(this)"
@@ -84,46 +87,45 @@ function useBufferCard(instanceId, name, event) {
                 </div>
             `;
 
-            // Jeśli mamy slider, podmieniamy slajd bez przeładowania
-            if (slideElement) {
+            if (slideElement && bufferSwiper) {
                 setTimeout(() => {
                     slideElement.innerHTML = newCardHTML;
                     bufferSwiper.update();
-                    
-                    // Aktualizujemy liczniki HUD, jeśli istnieją (Punkt 4)
                     updateHUD(data.data.pile_count, data.data.discard_count);
                 }, 400);
             } else {
-                location.reload(); // Fallback
+                location.reload(); 
             }
         } else {
-            alert("UPLINK ERROR: " + data.data);
-            if (cardElement) { // Reset animacji przy błędzie
+            alert("RPC ERROR: " + data.data);
+            if (cardElement) {
                 cardElement.style.opacity = "1";
                 cardElement.style.transform = "none";
                 cardElement.style.filter = "none";
             }
         }
-    });
+    })
+    .catch(err => console.error("Buffer Uplink Lost", err));
 }
 
 function updateHUD(pile, discard) {
     const pEl = document.getElementById('count-pile');
     const dEl = document.getElementById('count-discard');
     
-    if(pEl && pile !== undefined) {
+    // Dodano rygorystyczne sprawdzanie wartości (0 jest traktowane jako false w JS)
+    if(pEl && (pile !== undefined && pile !== null)) {
         pEl.innerText = pile;
         pEl.classList.add('value-update');
         setTimeout(() => pEl.classList.remove('value-update'), 400);
     }
-    if(dEl && discard !== undefined) {
+    if(dEl && (discard !== undefined && discard !== null)) {
         dEl.innerText = discard;
         dEl.classList.add('value-update');
         setTimeout(() => dEl.classList.remove('value-update'), 400);
     }
 }
 
-// --- 3. LOGIKA DECK BUILDER (DRAG & DROP + SYNC) ---
+// --- 3. LOGIKA DECK BUILDER ---
 
 function allowDrop(ev) { ev.preventDefault(); }
 
@@ -139,30 +141,29 @@ function drop(ev) {
     
     if (dropTarget && draggedElement) {
         dropTarget.appendChild(draggedElement);
-        validateDeck(); // Automatyczna walidacja po każdym ruchu
+        validateDeck();
     }
 }
 
 function validateDeck() {
     const activeContainer = document.getElementById('active-deck');
-    if (!activeContainer) return;
-
-    const activeCount = activeContainer.querySelectorAll('.cyber-card').length;
     const saveBtn = document.getElementById('save-deck-btn');
     const warningEl = document.getElementById('deck-warning');
+    if (!activeContainer || !saveBtn) return;
 
+    const activeCount = activeContainer.querySelectorAll('.cyber-card').length;
     const MIN = 20, MAX = 50;
 
     if (activeCount < MIN) {
-        warningEl.innerText = `ERROR: BUFFER UNDERFLOW. (${activeCount}/${MIN})`;
+        if(warningEl) warningEl.innerText = `ERROR: BUFFER UNDERFLOW. (${activeCount}/${MIN})`;
         saveBtn.disabled = true;
         saveBtn.style.opacity = "0.5";
     } else if (activeCount > MAX) {
-        warningEl.innerText = `ERROR: BUFFER OVERFLOW. (${activeCount}/${MAX})`;
+        if(warningEl) warningEl.innerText = `ERROR: BUFFER OVERFLOW. (${activeCount}/${MAX})`;
         saveBtn.disabled = true;
         saveBtn.style.opacity = "0.5";
     } else {
-        warningEl.innerText = `SYSTEM STABLE: ${activeCount} CARDS READY.`;
+        if(warningEl) warningEl.innerText = `SYSTEM STABLE: ${activeCount} CARDS READY.`;
         saveBtn.disabled = false;
         saveBtn.style.opacity = "1";
     }
@@ -171,6 +172,7 @@ function validateDeck() {
 function saveDeckState() {
     const activeContainer = document.getElementById('active-deck');
     const saveBtn = document.getElementById('save-deck-btn');
+    if (!activeContainer || !saveBtn) return;
 
     const activeIds = Array.from(activeContainer.querySelectorAll('.cyber-card'))
         .map(card => card.dataset.instanceId);
@@ -181,9 +183,9 @@ function saveDeckState() {
     const formData = new FormData();
     formData.append('action', 'save_cyber_deck_rpc');
     formData.append('active_ids', JSON.stringify(activeIds));
-    formData.append('nonce', config_nonces.deck_sync);
+    formData.append('nonce', nwApiData.nonces.deck_sync); // POPRAWKA: nwApiData
 
-    fetch(ajaxurl, {
+    fetch(nwApiData.ajaxurl, { // POPRAWKA: nwApiData
         method: 'POST',
         body: formData
     })
@@ -205,45 +207,56 @@ function saveDeckState() {
 // --- 4. LOGIKA FOUNDRY (ULEPSZANIE) ---
 
 function upgradeCard(instanceId) {
-    const btn = event.target;
-    const originalText = btn.innerText;
+    // POPRAWKA: Przekazujemy 'event' bezpośrednio do funkcji, by uniknąć problemów w Firefox/Safari
+    const btn = window.event ? window.event.target : null; 
+    const originalText = btn ? btn.innerText : "UPGRADE";
 
     if(!confirm("Initialize Nano-Fusion? This consumes duplicates and credits.")) return;
 
-    btn.disabled = true;
-    btn.innerText = "FUSING...";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "FUSING...";
+    }
 
-    const formData = new URLSearchParams();
-    formData.append('action', 'foundry_upgrade');
-    formData.append('instance_id', instanceId);
-    formData.append('nonce', config_nonces.foundry);
-
-    fetch(ajaxurl, {
+    fetch(nwApiData.ajaxurl, { // POPRAWKA: nwApiData
         method: 'POST',
-        headers: { 'Content-Type: application/x-www-form-urlencoded' },
-        body: formData
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'foundry_upgrade',
+            instance_id: instanceId,
+            nonce: nwApiData.nonces.foundry // POPRAWKA: nwApiData
+        })
     })
     .then(res => res.json())
     .then(data => {
         if(data.success) {
-            btn.style.background = "#fff";
-            btn.style.color = "#000";
-            btn.innerText = "UPGRADED";
+            if (btn) {
+                btn.style.background = "#fff";
+                btn.style.color = "#000";
+                btn.innerText = "UPGRADED";
+            }
             setTimeout(() => location.reload(), 1000); 
         } else {
             alert("FUSION FAILED: " + data.data);
-            btn.disabled = false;
-            btn.innerText = originalText;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         }
     })
     .catch(() => {
         alert("CRITICAL: Foundry Power Loss.");
-        btn.disabled = false;
-        btn.innerText = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
     });
 }
 
 // --- 5. START SYSTEMU ---
 document.addEventListener('DOMContentLoaded', () => {
-    validateDeck();
+    // Odpalamy tylko jeśli jesteśmy na stronie z Deck Builderem
+    if (document.getElementById('active-deck')) {
+        validateDeck();
+    }
 });
