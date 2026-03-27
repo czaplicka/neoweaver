@@ -16,6 +16,10 @@ if (bufferSliderEl) {
         pagination: { el: '.swiper-pagination', clickable: true }
     });
 }
+// Zamknięcie zooma po kliknięciu w tło
+document.getElementById('card-zoom-overlay')?.addEventListener('click', function(e) {
+    if (e.target === this) closeZoom();
+});
 
 // --- 2. LOGIKA HAND (UŻYWANIE KART I ZOOM) ---
 
