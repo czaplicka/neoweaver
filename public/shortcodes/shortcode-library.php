@@ -1,3 +1,4 @@
+<?php
 function cyber_deck_builder_shortcode() {
     // 1. Pobierz ID gracza (zintegrowane z WP)
     $user_id = get_current_user_id();
