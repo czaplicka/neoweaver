@@ -38,6 +38,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/skills-loader.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/inventory-system.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quick-actions.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-deck-scenarios.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-buffer.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/quest-helpers.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/shortcodes-tags.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-save-player-notes.php';
@@ -62,6 +63,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-deck-panel.php'
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-fate-of-loom.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-join-terminal.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-library.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-lobby.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-map.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-neoweave_my_world_archive.php';
