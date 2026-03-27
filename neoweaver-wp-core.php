@@ -61,6 +61,7 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-compas.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-cyber-hud.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-deck-panel.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-fate-of-loom.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-foundry.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-join-terminal.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-kingdom-info.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-library.php';
@@ -93,6 +94,19 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_style( 'neoweaver',        NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css',        [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+	// DODANE: Style i JS dla Buffer/Foundry dostępne globalnie (na każdej stronie z shortcodem)
+	wp_enqueue_style( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/css/buffer.css', [], NEOWEAVER_VERSION );
+	wp_enqueue_script( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+
+	// Przekazanie zmiennych do JS (ajaxurl i nonces), aby buffer.js działał wszędzie
+	wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
+		'ajaxurl' => admin_url( 'admin-ajax.php' ),
+		'nonces'  => [
+			'use_card'  => wp_create_nonce( 'use_card_nonce' ),
+			'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
+			'foundry'   => wp_create_nonce( 'foundry_nonce' ),
+		]
+	]);
 
 	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
