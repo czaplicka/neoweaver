@@ -8,7 +8,7 @@
  * at /wp-json/neoweaver/v1/character/create handles the Supabase write.
  *
  * Steps:
- *   1. Agent Identity  — name, pronouns, backstory
+ *   1. Agent Identity  — name, pronouns (radio), backstory
  *   2. Race            — loaded dynamically from cyber_races via REST
  *   3. Class           — loaded dynamically from cyber_classes via REST
  *   4. Attributes      — Body / Reflex / Mind / Spirit (1–5 sliders)
@@ -96,6 +96,15 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			],
 		];
 
+		// Pronoun options — displayed as radio buttons.
+		$pronoun_options = [
+			'she/her'    => 'she/her',
+			'he/him'     => 'he/him',
+			'they/them'  => 'they/them',
+			'xe/xem'     => 'xe/xem',
+			'custom'     => 'custom…',
+		];
+
 		// Total attribute points the player can distribute (protocol: 12 pts, min 1 per attr).
 		$attr_pool  = 12;
 		$attr_min   = 1;
@@ -143,12 +152,28 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 					       maxlength="80" required />
 				</label>
 
-				<label class="tw-field-label" style="margin-top:24px;">
-					<span>Pronouns</span>
-					<input type="text" id="tw-char-pronouns" name="pronouns"
-					       placeholder="e.g. she/her · he/him · they/them · custom"
-					       maxlength="40" />
-				</label>
+				<fieldset class="tw-field-label tw-pronoun-fieldset" style="margin-top:24px;border:none;padding:0;">
+					<legend class="tw-field-label__legend">Pronouns</legend>
+					<div class="tw-pronoun-options">
+						<?php foreach ( $pronoun_options as $value => $label ) : ?>
+							<label class="tw-pronoun-option">
+								<input type="radio"
+								       name="pronouns"
+								       id="tw-pronoun-<?php echo esc_attr( $value ); ?>"
+								       value="<?php echo esc_attr( $value ); ?>"
+								       class="tw-pronoun-radio" />
+								<span class="tw-pronoun-label"><?php echo esc_html( $label ); ?></span>
+							</label>
+						<?php endforeach; ?>
+					</div>
+					<!-- Custom pronoun text field — shown only when "custom" radio is selected -->
+					<input type="text"
+					       id="tw-char-pronouns-custom"
+					       name="pronouns_custom"
+					       placeholder="e.g. ze/zir · fae/faer"
+					       maxlength="40"
+					       style="display:none;margin-top:10px;" />
+				</fieldset>
 
 				<label class="tw-field-label" style="margin-top:24px;">
 					<span>Backstory &amp; Operative Brief</span>
