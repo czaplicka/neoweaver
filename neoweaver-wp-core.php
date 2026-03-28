@@ -86,7 +86,6 @@ require_once NEOWEAVER_PLUGIN_DIR . 'public/class-neoweaver-public.php';
 
 // ─── REST API endpoints ───────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints.php';
-// Character data lookup endpoints (races, classes) — cached, read-only.
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints-character-data.php';
 
 // ─── Enqueue shared public assets ─────────────────────────────────────────────
@@ -94,30 +93,19 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
 	wp_enqueue_style( 'neoweaver',        NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css',        [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-	// DODANE: Style i JS dla Buffer/Foundry dostępne globalnie (na każdej stronie z shortcodem)
-	wp_enqueue_style( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/css/buffer.css', [], NEOWEAVER_VERSION );
-	wp_enqueue_script( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
-	// Przekazanie zmiennych do JS (ajaxurl i nonces), aby buffer.js działał wszędzie
+	// Buffer/Foundry — registered once, no duplicate enqueue or localize.
+	wp_enqueue_style(  'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/css/buffer.css', [], NEOWEAVER_VERSION );
+	wp_enqueue_script( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 	wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
 		'ajaxurl' => admin_url( 'admin-ajax.php' ),
 		'nonces'  => [
 			'use_card'  => wp_create_nonce( 'use_card_nonce' ),
 			'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
 			'foundry'   => wp_create_nonce( 'foundry_nonce' ),
-		]
-	]);
-wp_enqueue_script( 'neoweaver-buffer', NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js', [ 'jquery' ], '1.0.0', true );
+		],
+	] );
 
-// TEGO BRAKOWAŁO W TWOIM PLIKU PHP:
-wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
-    'ajaxurl' => admin_url( 'admin-ajax.php' ),
-    'nonces'  => [
-        'use_card'  => wp_create_nonce( 'use_card_nonce' ),
-        'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
-        'foundry'   => wp_create_nonce( 'foundry_nonce' ),
-    ]
-]);
 	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
@@ -160,44 +148,55 @@ add_action( 'plugins_loaded', function () {
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
 
-add_action( 'wp_footer', function() {
-    if ( ! is_user_logged_in() ) return;
-    $url = defined('NEOWEAVER_SUPA_URL') ? NEOWEAVER_SUPA_URL : '';
-    $key = defined('NEOWEAVER_SUPA_KEY') ? NEOWEAVER_SUPA_KEY : '';
-    if ( ! $url || ! $key ) return;
-    ?>
-    <script>
-    if (!window.twSupabase && window.supabase) {
-        window.twSupabase = window.supabase.createClient('<?= esc_js($url) ?>', '<?= esc_js($key) ?>');
-    }
-    </script>
-    <?php
-}, 5 ); // priorytet 5 — ładuje się przed wszystkimi innymi hookami wp_footer pluginu
-
-// ─── Enqueue game page CSS ────────────────────────────────────────────────────
-function neoweaver_enqueue_frontend_styles(): void {
-	if ( is_page_template( 'templates/adventure.php' ) ) {
-		$base = NEOWEAVER_PLUGIN_URL . 'assets/css/';
-		wp_enqueue_style( 'neoweaver-tw-core', $base . 'tw-core.css', [], '1.0.0' );
-		wp_enqueue_style( 'neoweaver-tw-chat', $base . 'tw-chat.css', [ 'neoweaver-tw-core' ], '1.0.0' );
-		wp_enqueue_style( 'neoweaver-tw-deck', $base . 'tw-deck.css', [ 'neoweaver-tw-core' ], '1.0.0' );
-		wp_enqueue_style(
-			'neoweaver-terminal',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-terminal.css',
-			[],
-			NEOWEAVER_VERSION
-		);
-		wp_enqueue_script(
-			'neoweaver-header-node',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-header-node.js',
-			[],
-			'1.0.0',
-			true
-		);
-		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
-			'supabaseUrl' => tw_supabase_url(),
-			'supabaseKey' => tw_supabase_anon_key(),
-		] );
+// Supabase JS client bootstrap — priority 5 so it runs before all other wp_footer hooks.
+add_action( 'wp_footer', function () {
+	if ( ! is_user_logged_in() ) return;
+	$url = defined( 'NEOWEAVER_SUPA_URL' ) ? NEOWEAVER_SUPA_URL : '';
+	$key = defined( 'NEOWEAVER_SUPA_KEY' ) ? NEOWEAVER_SUPA_KEY : '';
+	if ( ! $url || ! $key ) return;
+	?>
+	<script>
+	if (!window.twSupabase && window.supabase) {
+	    window.twSupabase = window.supabase.createClient('<?= esc_js( $url ) ?>', '<?= esc_js( $key ) ?>');
 	}
-}
-add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_frontend_styles' );
+	</script>
+	<?php
+}, 5 );
+
+// ─── Enqueue game page CSS (adventure template only) ─────────────────────────
+add_action( 'wp_enqueue_scripts', function () {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) return;
+
+	$base    = NEOWEAVER_PLUGIN_URL . 'assets/css/';
+	$dir     = NEOWEAVER_PLUGIN_DIR . 'assets/css/';
+
+	wp_enqueue_style( 'neoweaver-tw-core',      $base . 'tw-core.css',      [], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-tw-chat',      $base . 'tw-chat.css',      [ 'neoweaver-tw-core' ], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-tw-deck',      $base . 'tw-deck.css',      [ 'neoweaver-tw-core' ], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-terminal',     $base . 'neoweaver-terminal.css', [], NEOWEAVER_VERSION );
+
+	// Character panel stylesheet — provides scoped rules for all classes used
+	// in templates/parts/character-card.php, including the progress-fill
+	// colour/size variants (.rest-purple, .big-bar, .small-bar, etc.).
+	// Without this file those classes are undefined and the fill <div> renders
+	// as a full-viewport block element.
+	$char_panel_css = $dir . 'tw-char-panel.css';
+	wp_enqueue_style(
+		'neoweaver-tw-char-panel',
+		$base . 'tw-char-panel.css',
+		[ 'neoweaver-tw-core' ],
+		file_exists( $char_panel_css ) ? (string) filemtime( $char_panel_css ) : '1.0.0'
+	);
+
+	wp_enqueue_script(
+		'neoweaver-header-node',
+		NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-header-node.js',
+		[],
+		'1.0.0',
+		true
+	);
+	wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
+		'supabaseUrl' => tw_supabase_url(),
+		'supabaseKey' => tw_supabase_anon_key(),
+	] );
+} );
