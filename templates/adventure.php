@@ -124,7 +124,7 @@ if ( is_array( $grid_units ) ) {
 }
 
 // Load tactical panel template part.
-include plugin_dir_path( __FILE__ ) . 'parts/panel-tactical-left.php';
+//include plugin_dir_path( __FILE__ ) . 'parts/panel-tactical-left.php';
 
 // JS data for tactical overlay.
 echo "<script>
