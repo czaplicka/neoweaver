@@ -2,18 +2,17 @@
 /**
  * Shortcode: [tw_create_campaign]
  *
- * Renders the 9-step Deployment (Campaign) creation wizard.
+ * Renders the 8-step Deployment (Campaign) creation wizard.
  *
  * Steps:
  *   1. Deployment Identity  — name + optional brief/notes
  *   2. GM Style             — narrative archetype
  *   3. Game Mode            — solo / co-op
  *   4. Game Length          — short / medium / standard / epic / endless
- *   5. Difficulty           — easy / casual / standard / hardcore / nightmare
- *   6. Priority             — combat / wealth / lore / exploration / relations / mix
- *   7. Node Binding         — pick one of the user's worlds (required)
- *   8. Agent Assignment     — pick one of the user's living characters (OPTIONAL)
- *   9. Summary              — review + deploy
+ *   5. World Type           — easy / casual / standard / hardcore / nightmare (maps to world_type)
+ *   6. Priority             — combat / wealth / discovery / relations / mix
+ *   7. Node & Agent Binding — optional world + optional agent (single step)
+ *   8. Summary              — review + deploy
  *
  * @package Neoweaver
  */
@@ -82,7 +81,8 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			[ 5, 'Endless',  'No defined end. Node evolves until Hard Reset.',               '♾️' ],
 		];
 
-		$difficulties = [
+		// world_type = difficulty/entropy pressure of the campaign
+		$world_types = [
 			[ 1, 'Easy',      'Training protocol. Entropy is forgiving. Great for newcomers.',   '🌱' ],
 			[ 2, 'Casual',    'Low stakes. Story over challenge. No permadeath pressure.',        '☕' ],
 			[ 3, 'Standard',  'Balanced risk. Protocol-default experience.',                      '🎯' ],
@@ -90,16 +90,16 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			[ 5, 'Nightmare', 'Maximum entropy pressure. Time itself costs Sync.',               '☠️' ],
 		];
 
+		// 5 priority options — Lore + Exploration merged into Discovery
 		$priorities = [
-			[ 1, 'Combat',     'Battles, skirmishes and tactical threats dominate the arc.',       '⚔️' ],
-			[ 2, 'Wealth',     'Resources, trade routes and economic control drive the story.',    '💰' ],
-			[ 3, 'Lore',       'Ancient secrets, faction histories and hidden truths unfold.',     '📖' ],
-			[ 4, 'Exploration','Uncharted zones, anomalies and discovery shape every session.',    '🗺️' ],
-			[ 5, 'Relations',  'Alliances, betrayals and social dynamics are the main engine.',   '🤝' ],
-			[ 6, 'Mix',        'Balanced blend. The Node decides what surfaces each session.',     '🎲' ],
+			[ 1, 'Combat',    'Battles, skirmishes and tactical threats dominate the arc.',              '⚔️' ],
+			[ 2, 'Wealth',    'Resources, trade routes and economic control drive the story.',           '💰' ],
+			[ 3, 'Discovery', 'Ancient secrets, uncharted zones, lore and exploration intertwined.',     '🔍' ],
+			[ 4, 'Relations', 'Alliances, betrayals and social dynamics are the main engine.',          '🤝' ],
+			[ 5, 'Mix',       'Balanced blend. The Node decides what surfaces each session.',            '🎲' ],
 		];
 
-		$total_steps = 9;
+		$total_steps = 8;
 
 		ob_start();
 		?>
@@ -152,12 +152,9 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			<div class="tw-step" data-step="2" data-phase="GM PROTOCOL" data-field="gm_style">
 				<h2>// GM PROTOCOL</h2>
 				<p class="tw-question-text">Select the AI Game Master's narrative lens for this deployment.</p>
-
 				<div class="tw-option-grid tw-option-grid--3">
 					<?php foreach ( $gm_styles as $opt ) :
-						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-gm-' . esc_attr( $val );
-					?>
+						[ $val, $label, $desc, $emoji ] = $opt; $id = 'tw-gm-' . esc_attr( $val ); ?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
 						<input type="radio" id="<?php echo $id; ?>" name="gm_style" value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
@@ -168,7 +165,6 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					</label>
 					<?php endforeach; ?>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
@@ -179,12 +175,9 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			<div class="tw-step" data-step="3" data-phase="OPERATIVE MODE" data-field="game_mode">
 				<h2>// OPERATIVE MODE</h2>
 				<p class="tw-question-text">How many Operators will be synchronized to this deployment?</p>
-
 				<div class="tw-option-grid tw-option-grid--2">
 					<?php foreach ( $game_modes as $opt ) :
-						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-mode-' . esc_attr( $val );
-					?>
+						[ $val, $label, $desc, $emoji ] = $opt; $id = 'tw-mode-' . esc_attr( $val ); ?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
 						<input type="radio" id="<?php echo $id; ?>" name="game_mode" value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
@@ -195,7 +188,6 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					</label>
 					<?php endforeach; ?>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
@@ -206,12 +198,9 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			<div class="tw-step" data-step="4" data-phase="OPERATION SCOPE" data-field="game_length">
 				<h2>// OPERATION SCOPE</h2>
 				<p class="tw-question-text">Define the temporal arc of this deployment.</p>
-
 				<div class="tw-option-grid tw-option-grid--5">
 					<?php foreach ( $game_lengths as $opt ) :
-						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-length-' . esc_attr( $val );
-					?>
+						[ $val, $label, $desc, $emoji ] = $opt; $id = 'tw-length-' . esc_attr( $val ); ?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
 						<input type="radio" id="<?php echo $id; ?>" name="game_length" value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
@@ -222,25 +211,21 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					</label>
 					<?php endforeach; ?>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- STEP 5 — Difficulty -->
-			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="difficulty">
+			<!-- STEP 5 — World Type (difficulty/entropy pressure) -->
+			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="world_type">
 				<h2>// THREAT CALIBRATION</h2>
 				<p class="tw-question-text">Set the lethality and entropy pressure level for this deployment.</p>
-
 				<div class="tw-option-grid tw-option-grid--5">
-					<?php foreach ( $difficulties as $opt ) :
-						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-difficulty-' . esc_attr( $val );
-					?>
+					<?php foreach ( $world_types as $opt ) :
+						[ $val, $label, $desc, $emoji ] = $opt; $id = 'tw-wtype-' . esc_attr( $val ); ?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="difficulty" value="<?php echo esc_attr( $val ); ?>" required />
+						<input type="radio" id="<?php echo $id; ?>" name="world_type" value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
 							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
 							<strong><?php echo esc_html( $label ); ?></strong>
@@ -249,25 +234,21 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					</label>
 					<?php endforeach; ?>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- STEP 6 — Priority -->
+			<!-- STEP 6 — Priority (5 options) -->
 			<div class="tw-step" data-step="6" data-phase="MISSION PRIORITY" data-field="priority">
 				<h2>// MISSION PRIORITY</h2>
 				<p class="tw-question-text">
 					What drives this deployment? The GM will weight quests, rewards and encounters accordingly.
 				</p>
-
-				<div class="tw-option-grid tw-option-grid--3">
+				<div class="tw-option-grid tw-option-grid--5">
 					<?php foreach ( $priorities as $opt ) :
-						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-priority-' . esc_attr( $val );
-					?>
+						[ $val, $label, $desc, $emoji ] = $opt; $id = 'tw-priority-' . esc_attr( $val ); ?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
 						<input type="radio" id="<?php echo $id; ?>" name="priority" value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
@@ -278,56 +259,45 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					</label>
 					<?php endforeach; ?>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- STEP 7 — Node Binding -->
-			<div class="tw-step" data-step="7" data-phase="NODE UPLINK" data-field="world_id">
-				<h2>// NODE UPLINK</h2>
+			<!-- STEP 7 — Node & Agent Binding (both OPTIONAL) -->
+			<div class="tw-step" data-step="7" data-phase="NODE & AGENT BINDING" data-optional="true">
+				<h2>// NODE &amp; AGENT BINDING <span class="tw-optional-badge">OPTIONAL</span></h2>
 				<p class="tw-question-text">
-					Select the Node (world) this deployment will run inside.
-					All Entropy changes, Legacies and Agent deaths will affect this world permanently.
+					Bind a Node (world) and assign a Field Agent — or skip both and configure later.
+					You can always assign them from the Campaign dashboard.
 				</p>
 
-				<div class="tw-dynamic-grid" id="tw-camp-node-grid">
-					<div class="tw-loading-state">
-						<span class="tw-loading-dot"></span>
-						SCANNING AVAILABLE NODES…
+				<!-- Node section -->
+				<div class="tw-binding-section">
+					<h3 class="tw-binding-label">// NODE <span class="tw-optional-badge">OPTIONAL</span></h3>
+					<div class="tw-dynamic-grid" id="tw-camp-node-grid">
+						<div class="tw-loading-state">
+							<span class="tw-loading-dot"></span>
+							SCANNING AVAILABLE NODES…
+						</div>
 					</div>
+					<p class="tw-helper-text">
+						No worlds yet? <a href="<?php echo esc_url( home_url( '/create-world/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a>
+					</p>
 				</div>
 
-				<p class="tw-helper-text">
-					No worlds yet? <a href="<?php echo esc_url( home_url( '/create-world/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a>
-				</p>
-
-				<div class="tw-nav-row">
-					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
-					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
+				<!-- Agent section -->
+				<div class="tw-binding-section" style="margin-top: 40px;">
+					<h3 class="tw-binding-label">// AGENT <span class="tw-optional-badge">OPTIONAL</span></h3>
+					<p class="tw-helper-text" id="tw-agent-hint" style="margin-bottom:12px;">
+						Select a Node above to filter compatible agents.
+					</p>
+					<div class="tw-dynamic-grid" id="tw-camp-agent-grid"></div>
+					<p class="tw-helper-text">
+						No agents yet? <a href="<?php echo esc_url( home_url( '/create-agent/' ) ); ?>" class="tw-link">Create a Field Agent first &rarr;</a>
+					</p>
 				</div>
-			</div>
-
-			<!-- STEP 8 — Agent Assignment (OPTIONAL) -->
-			<div class="tw-step" data-step="8" data-phase="AGENT ASSIGNMENT" data-field="character_id" data-optional="true">
-				<h2>// AGENT ASSIGNMENT <span class="tw-optional-badge">OPTIONAL</span></h2>
-				<p class="tw-question-text">
-					Assign a Field Agent to this deployment — or skip and assign one later.
-					Only living agents compatible with the selected Node are shown.
-				</p>
-
-				<div class="tw-dynamic-grid" id="tw-camp-agent-grid">
-					<div class="tw-loading-state">
-						<span class="tw-loading-dot"></span>
-						FETCHING AVAILABLE AGENTS…
-					</div>
-				</div>
-
-				<p class="tw-helper-text">
-					No agents yet? <a href="<?php echo esc_url( home_url( '/create-agent/' ) ); ?>" class="tw-link">Create a Field Agent first &rarr;</a>
-				</p>
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
@@ -335,56 +305,56 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 				</div>
 			</div>
 
-			<!-- STEP 9 — Summary + Deploy -->
-			<div class="tw-step tw-step--summary" data-step="9" data-phase="SYSTEM REVIEW">
+			<!-- STEP 8 — Summary + Deploy -->
+			<div class="tw-step tw-step--summary" data-step="8" data-phase="SYSTEM REVIEW">
 				<h2>// SYSTEM REVIEW</h2>
 				<p class="tw-question-text">Verify deployment parameters before uplink. Edit any field to reconfigure.</p>
 
 				<div class="tw-summary-grid">
-					<div class="tw-summary-row" data-summary-field="campaign_name">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">DEPLOY_ID</span>
 						<span class="tw-summary-val" id="tw-summary-campaign_name">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="customize">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">DIRECTIVES</span>
 						<span class="tw-summary-val" id="tw-summary-customize">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="gm_style">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">GM_PROTOCOL</span>
 						<span class="tw-summary-val" id="tw-summary-gm_style">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="2">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="game_mode">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">OP_MODE</span>
 						<span class="tw-summary-val" id="tw-summary-game_mode">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="3">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="game_length">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">OP_SCOPE</span>
 						<span class="tw-summary-val" id="tw-summary-game_length">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="difficulty">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">THREAT_LVL</span>
-						<span class="tw-summary-val" id="tw-summary-difficulty">&mdash;</span>
+						<span class="tw-summary-val" id="tw-summary-world_type">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="priority">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">MISSION_PRIORITY</span>
 						<span class="tw-summary-val" id="tw-summary-priority">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="world_id">
-						<span class="tw-summary-key">NODE</span>
-						<span class="tw-summary-val" id="tw-summary-world_id">&mdash;</span>
+					<div class="tw-summary-row">
+						<span class="tw-summary-key">NODE <span class="tw-optional-badge">OPTIONAL</span></span>
+						<span class="tw-summary-val" id="tw-summary-world_id">&mdash; (unbound)</span>
 						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="character_id">
+					<div class="tw-summary-row">
 						<span class="tw-summary-key">AGENT <span class="tw-optional-badge">OPTIONAL</span></span>
 						<span class="tw-summary-val" id="tw-summary-character_id">&mdash; (unassigned)</span>
-						<button type="button" class="tw-summary-edit" data-goto="8">[ EDIT ]</button>
+						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
 					</div>
 				</div>
 
@@ -394,7 +364,6 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 						&#9658; UPLINK DEPLOYMENT
 					</button>
 				</div>
-
 				<div class="tw-camp-status" aria-live="polite"></div>
 			</div>
 
@@ -402,16 +371,13 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 
 		<style>
 		.tw-optional-badge {
-			font-size: 0.6rem;
-			font-weight: 700;
-			letter-spacing: 1px;
-			color: #000;
-			background: #adff00;
-			padding: 2px 6px;
-			vertical-align: middle;
-			margin-left: 8px;
+			font-size: 0.6rem; font-weight: 700; letter-spacing: 1px;
+			color: #000; background: #adff00; padding: 2px 6px;
+			vertical-align: middle; margin-left: 8px;
 			clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
 		}
+		.tw-binding-section { border-left: 2px solid #adff00; padding-left: 20px; }
+		.tw-binding-label { font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 16px; color: #adff00; }
 		.tw-option-grid--5 { grid-template-columns: repeat(5, 1fr); }
 		.tw-option-grid--3 { grid-template-columns: repeat(3, 1fr); }
 		.tw-option-grid--2 { grid-template-columns: repeat(2, 1fr); max-width: 600px; }
@@ -423,32 +389,15 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 }
 
 if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
-	function neoweaver_campaign_creator_supabase_get(
-		string $table,
-		array $query_args,
-		int $user_id = 0,
-		int $ttl = 0
-	): array {
-		$cache_key = ( $ttl > 0 && $user_id > 0 )
-			? 'tw_sb_' . $user_id . '_' . md5( $table . serialize( $query_args ) )
-			: '';
-		if ( $cache_key ) {
-			$cached = get_transient( $cache_key );
-			if ( $cached !== false ) return $cached;
-		}
+	function neoweaver_campaign_creator_supabase_get( string $table, array $query_args, int $user_id = 0, int $ttl = 0 ): array {
+		$cache_key = ( $ttl > 0 && $user_id > 0 ) ? 'tw_sb_' . $user_id . '_' . md5( $table . serialize( $query_args ) ) : '';
+		if ( $cache_key ) { $cached = get_transient( $cache_key ); if ( $cached !== false ) return $cached; }
 		$anon_key = tw_supabase_anon_key();
 		$response = wp_remote_get(
 			add_query_arg( $query_args, trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table ),
-			[
-				'headers' => [
-					'apikey'        => $anon_key,
-					'Authorization' => 'Bearer ' . $anon_key,
-				],
-			]
+			[ 'headers' => [ 'apikey' => $anon_key, 'Authorization' => 'Bearer ' . $anon_key ] ]
 		);
-		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-			return [];
-		}
+		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) return [];
 		$rows = json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
 		if ( $cache_key ) set_transient( $cache_key, $rows, $ttl );
 		return $rows;

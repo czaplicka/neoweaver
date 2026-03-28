@@ -1,18 +1,15 @@
 /**
- * tw-campaign-creator.js
- *
- * Drives the 9-step Deployment creation wizard.
+ * tw-campaign-creator.js  — 8-step Deployment wizard
  *
  * Steps:
- *   1. Identity     — name + custom directives
- *   2. GM Style     — cinematic_heroic / harsh_grounded / fast_tactical
- *   3. Game Mode    — solo / co-op
- *   4. Game Length  — short / medium / standard / epic / endless
- *   5. Difficulty   — easy / casual / standard / hardcore / nightmare
- *   6. Priority     — combat / wealth / lore / exploration / relations / mix
- *   7. Node Uplink  — dynamic grid (user's worlds)
- *   8. Agent Assign — dynamic grid, filtered to Node (OPTIONAL)
- *   9. Summary      — review + UPLINK DEPLOYMENT
+ *   1. Identity      — name + directives
+ *   2. GM Style      — cinematic_heroic / harsh_grounded / fast_tactical
+ *   3. Game Mode     — solo / co-op
+ *   4. Game Length   — short / medium / standard / epic / endless
+ *   5. World Type    — easy / casual / standard / hardcore / nightmare  (field: world_type)
+ *   6. Priority      — combat / wealth / discovery / relations / mix    (field: priority)
+ *   7. Node & Agent  — both optional, single screen
+ *   8. Summary       — review + UPLINK
  */
 ( function () {
 	'use strict';
@@ -40,20 +37,20 @@
 		const formState = {
 			campaign_name : '',
 			customize     : '',
-			gm_style      : null,   // { value, label }
-			game_mode     : null,   // { value, label }
-			game_length   : null,   // { value, label }
-			difficulty    : null,   // { value, label }
-			priority      : null,   // { value, label }
-			world_id      : null,   // { id, name }
-			character_id  : null,   // { id, name } — OPTIONAL
+			gm_style      : null,
+			game_mode     : null,
+			game_length   : null,
+			world_type    : null,   // difficulty / entropy pressure
+			priority      : null,   // quest/reward focus
+			world_id      : null,   // OPTIONAL { id, name }
+			character_id  : null,   // OPTIONAL { id, name }
 		};
 
 		const gmStyleLabels    = { cinematic_heroic: 'Cinematic Heroic', harsh_grounded: 'Harsh Grounded', fast_tactical: 'Fast Tactical' };
 		const gameModeLabels   = { 1: 'Solo', 2: 'Co-op' };
 		const gameLengthLabels = { 1: 'Short', 2: 'Medium', 3: 'Standard', 4: 'Epic', 5: 'Endless' };
-		const difficultyLabels = { 1: 'Easy', 2: 'Casual', 3: 'Standard', 4: 'Hardcore', 5: 'Nightmare' };
-		const priorityLabels   = { 1: 'Combat', 2: 'Wealth', 3: 'Lore', 4: 'Exploration', 5: 'Relations', 6: 'Mix' };
+		const worldTypeLabels  = { 1: 'Easy', 2: 'Casual', 3: 'Standard', 4: 'Hardcore', 5: 'Nightmare' };
+		const priorityLabels   = { 1: 'Combat', 2: 'Wealth', 3: 'Discovery', 4: 'Relations', 5: 'Mix' };
 
 		// ── Spinner ───────────────────────────────────────────────────────────
 		const spinner = document.createElement( 'div' );
@@ -95,8 +92,7 @@
 			current = idx;
 			updateProgress( idx );
 			const phase = steps[ idx ] ? steps[ idx ].dataset.phase : '';
-			if ( phase === 'NODE UPLINK'      && ! gridsLoaded.nodes  ) loadNodes();
-			if ( phase === 'AGENT ASSIGNMENT' && ! gridsLoaded.agents ) loadAgents();
+			if ( phase === 'NODE & AGENT BINDING' && ! gridsLoaded.nodes ) loadNodes();
 			if ( steps[ idx ] && steps[ idx ].classList.contains( 'tw-step--summary' ) ) populateSummary();
 			wrapper.scrollIntoView( { behavior: 'smooth', block: 'start' } );
 		}
@@ -122,7 +118,7 @@
 				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels    },
 				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels   },
 				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels },
-				'THREAT CALIBRATION' : { key: 'difficulty',  labels: difficultyLabels },
+				'THREAT CALIBRATION' : { key: 'world_type',  labels: worldTypeLabels  },
 				'MISSION PRIORITY'   : { key: 'priority',    labels: priorityLabels   },
 			};
 
@@ -137,16 +133,8 @@
 				return true;
 			}
 
-			if ( phase === 'NODE UPLINK' ) {
-				if ( ! formState.world_id ) {
-					setStatus( 'ERROR: Select a Node to bind this deployment.', true );
-					return false;
-				}
-				return true;
-			}
-
-			// AGENT ASSIGNMENT is optional — always allow proceeding.
-			if ( phase === 'AGENT ASSIGNMENT' ) return true;
+			// Step 7: NODE & AGENT BINDING — both optional, always pass
+			if ( phase === 'NODE & AGENT BINDING' ) return true;
 
 			return true;
 		}
@@ -182,7 +170,7 @@
 			return div;
 		}
 
-		const gridsLoaded = { nodes: false, agents: false };
+		const gridsLoaded = { nodes: false };
 
 		function loadNodes() {
 			gridsLoaded.nodes = true;
@@ -207,29 +195,33 @@
 							function ( id, name ) {
 								formState.world_id     = { id, name };
 								formState.character_id = null;
-								gridsLoaded.agents     = false;
 								setStatus( '', false );
+								// Load agents filtered to this world
+								loadAgents( id );
 							}
 						) );
 					} );
 					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
 						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
 					}
+					// Load agents unfiltered on initial display
+					loadAgents( null );
 				} )
 				.catch( () => { grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes.</p>'; } );
 		}
 
-		function loadAgents() {
-			gridsLoaded.agents = true;
-			const grid = document.getElementById( 'tw-camp-agent-grid' );
+		function loadAgents( worldId ) {
+			const grid    = document.getElementById( 'tw-camp-agent-grid' );
+			const hint    = document.getElementById( 'tw-agent-hint' );
 			if ( ! grid ) return;
-			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AVAILABLE AGENTS…</div>';
+			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
+			if ( hint ) hint.style.display = worldId ? 'none' : '';
 			const params = {
 				select : 'id,name,class_id,race_id,status,world_id,cyber_classes(name),cyber_races(name)',
 				status : 'neq.STATUS_DEAD',
 				order  : 'name.asc',
 			};
-			if ( formState.world_id ) params.world_id = 'eq.' + formState.world_id.id;
+			if ( worldId ) params.world_id = 'eq.' + worldId;
 			sbGet( 'cyber_characters', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
@@ -257,13 +249,13 @@
 			}
 			set( 'campaign_name', formState.campaign_name );
 			set( 'customize',     formState.customize || '—' );
-			set( 'gm_style',      formState.gm_style     ? formState.gm_style.label     : '—' );
-			set( 'game_mode',     formState.game_mode    ? formState.game_mode.label    : '—' );
-			set( 'game_length',   formState.game_length  ? formState.game_length.label  : '—' );
-			set( 'difficulty',    formState.difficulty   ? formState.difficulty.label   : '—' );
-			set( 'priority',      formState.priority     ? formState.priority.label     : '—' );
-			set( 'world_id',      formState.world_id     ? formState.world_id.name      : '—' );
-			set( 'character_id',  formState.character_id ? formState.character_id.name  : '— (unassigned)' );
+			set( 'gm_style',      formState.gm_style    ? formState.gm_style.label    : '—' );
+			set( 'game_mode',     formState.game_mode   ? formState.game_mode.label   : '—' );
+			set( 'game_length',   formState.game_length ? formState.game_length.label : '—' );
+			set( 'world_type',    formState.world_type  ? formState.world_type.label  : '—' );
+			set( 'priority',      formState.priority    ? formState.priority.label    : '—' );
+			set( 'world_id',      formState.world_id    ? formState.world_id.name     : '— (unbound)' );
+			set( 'character_id',  formState.character_id ? formState.character_id.name : '— (unassigned)' );
 		}
 
 		// ── Navigation ────────────────────────────────────────────────────────
@@ -282,8 +274,7 @@
 				return;
 			}
 			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
-				setStatus( '', false );
-				showStep( current - 1 );
+				setStatus( '', false ); showStep( current - 1 );
 				return;
 			}
 			if ( btn.classList.contains( 'tw-summary-edit' ) ) {
@@ -308,10 +299,11 @@
 				gm_style     : formState.gm_style    ? formState.gm_style.value                    : '',
 				game_mode    : formState.game_mode   ? parseInt( formState.game_mode.value,   10 ) : 0,
 				game_length  : formState.game_length ? parseInt( formState.game_length.value, 10 ) : 0,
-				difficulty   : formState.difficulty  ? parseInt( formState.difficulty.value,  10 ) : 0,
+				world_type   : formState.world_type  ? parseInt( formState.world_type.value,  10 ) : 0,
 				priority     : formState.priority    ? parseInt( formState.priority.value,    10 ) : 0,
-				world_id     : formState.world_id    ? formState.world_id.id                       : '',
-				character_id : formState.character_id ? formState.character_id.id                  : '',
+				// optional — send null if not chosen so DB accepts nullable FK
+				world_id     : formState.world_id    ? formState.world_id.id     : null,
+				character_id : formState.character_id ? formState.character_id.id : null,
 			};
 		}
 
@@ -321,10 +313,9 @@
 			if ( ! payload.gm_style )    { setStatus( 'ERROR: GM Protocol is required.', true ); return; }
 			if ( ! payload.game_mode )   { setStatus( 'ERROR: Operative mode is required.', true ); return; }
 			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); return; }
-			if ( ! payload.difficulty )  { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
+			if ( ! payload.world_type )  { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
 			if ( ! payload.priority )    { setStatus( 'ERROR: Mission priority is required.', true ); return; }
-			if ( ! payload.world_id )    { setStatus( 'ERROR: Node binding is required.', true ); return; }
-			// character_id is intentionally NOT required.
+			// world_id and character_id are intentionally NOT required.
 
 			submitBtn.disabled    = true;
 			submitBtn.textContent = 'UPLINK IN PROGRESS…';
@@ -334,10 +325,7 @@
 			const t0 = Date.now();
 			fetch( restUrl, {
 				method      : 'POST',
-				headers     : {
-					'Content-Type' : 'application/json',
-					'X-WP-Nonce'   : config.restNonce || '',
-				},
+				headers     : { 'Content-Type': 'application/json', 'X-WP-Nonce': config.restNonce || '' },
 				body        : JSON.stringify( payload ),
 				credentials : 'same-origin',
 			} )
@@ -365,7 +353,7 @@
 				} );
 		}
 
-		// ── Boot ──────────────────────────────────────────────────────────────
+		// Boot
 		wrapper.querySelectorAll( '.tw-progress-tick' ).forEach( function ( tick ) {
 			const t = parseInt( tick.dataset.tick, 10 );
 			tick.style.left = ( ( t / totalSteps ) * 100 ) + '%';
