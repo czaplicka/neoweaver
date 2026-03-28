@@ -23,10 +23,10 @@ $auth_headers = array(
 $game_data = function_exists('get_user_game_data_from_supabase')
     ? get_user_game_data_from_supabase( $userid )
     : array(
-        'active_session_id'   => 0,
-        'active_campaign_id'  => 0,
-        'active_character_id' => 0,
-        'active_world_id'     => 0,
+        'active_session_id'   => '',
+        'active_campaign_id'  => '',
+        'active_character_id' => '',
+        'active_world_id'     => '',
         'active_location_id'  => 0,
         'char_name'           => 'Unknown',
         'char_tags'           => array(),
@@ -250,6 +250,146 @@ window.twTacticalData = {
 </aside>
 
 <!-- GAME HUD (fixed position) -->
+<?php
+// =========================================================================
+// CHARACTER CARD DATA PREPARATION
+// These variables must be set before including character-card.php.
+// All undefined-variable notices on lines throughout that template (including
+// the final one near line 396) were caused by this block being absent.
+// =========================================================================
+
+// UUID-safe sanitizer — never intval() a UUID.
+$_sanitize_uuid = function( $raw ): string {
+    return preg_replace( '/[^a-f0-9\-]/i', '', (string) $raw );
+};
+
+$char_id = $_sanitize_uuid( $game_data['active_character_id'] ?? '' );
+
+// Defaults for every variable the template references.
+$char_data           = [];
+$c_hp = $m_hp        = 10;
+$c_mp = $m_mp        = 10;
+$c_satiety           = 100;
+$c_hydration         = 100;
+$c_rest              = 100;
+$sync_p              = 100;
+$hp_p = $mp_p        = 100;
+$hp_class            = 'hp-green';
+$sync_class          = 'sync-stable';
+$skills_and_abilities = [];
+$inventory           = [];
+$logs_data           = [];
+$total_mass          = 0;
+$mass_limit          = 50;
+$total_power         = 0;
+
+if ( $char_id && function_exists( 'tw_supabase_get' ) ) {
+
+    // 1. Core character row — name, race, class, bio, notes, gold, lvl, stats.
+    $char_rows = tw_supabase_get(
+        'cyber_characters',
+        [
+            'id'     => 'eq.' . $char_id,
+            'select' => 'name,race,class,bio,notes,gold,lvl,body,mind,reflex,spirit,avatar',
+            'limit'  => 1,
+        ]
+    );
+    $char_data = ( is_array( $char_rows ) && isset( $char_rows[0] ) ) ? (array) $char_rows[0] : [];
+
+    // 2. HUD state — HP, MP, satiety, hydration, rest, sync_rate.
+    $hud_rows = tw_supabase_get(
+        'cyber_state_of_the_campaign',
+        [
+            'character_id' => 'eq.' . $char_id,
+            'select'       => 'hp,hp_max,mp,mp_max,satiety,hydration,rest,sync_rate',
+            'limit'        => 1,
+        ]
+    );
+    if ( is_array( $hud_rows ) && isset( $hud_rows[0] ) ) {
+        $h          = (array) $hud_rows[0];
+        $c_hp       = max( 0, (int) ( $h['hp']       ?? 10 ) );
+        $m_hp       = max( 1, (int) ( $h['hp_max']   ?? 10 ) );
+        $c_mp       = max( 0, (int) ( $h['mp']       ?? 10 ) );
+        $m_mp       = max( 1, (int) ( $h['mp_max']   ?? 10 ) );
+        $c_satiety  = max( 0, min( 100, (int) ( $h['satiety']   ?? 100 ) ) );
+        $c_hydration= max( 0, min( 100, (int) ( $h['hydration'] ?? 100 ) ) );
+        $c_rest     = max( 0, min( 100, (int) ( $h['rest']      ?? 100 ) ) );
+        $sync_p     = max( 0, min( 100, (int) ( $h['sync_rate'] ?? 100 ) ) );
+    }
+
+    // 3. Derived bar widths (clamped 0-100).
+    $hp_p = $m_hp > 0 ? (int) min( 100, round( $c_hp / $m_hp * 100 ) ) : 0;
+    $mp_p = $m_mp > 0 ? (int) min( 100, round( $c_mp / $m_mp * 100 ) ) : 0;
+
+    // 4. CSS class helpers.
+    if ( $hp_p > 50 )      { $hp_class = 'hp-green'; }
+    elseif ( $hp_p > 25 )  { $hp_class = 'hp-yellow'; }
+    else                   { $hp_class = 'hp-red'; }
+
+    if ( $sync_p >= 80 )   { $sync_class = 'sync-stable'; }
+    elseif ( $sync_p >= 50 ){ $sync_class = 'sync-warning'; }
+    else                   { $sync_class = 'sync-critical'; }
+
+    // 5. Skills & abilities — join with cyber_actions_library for display info.
+    $skills_raw = tw_supabase_get(
+        'cyber_character_skills',
+        [
+            'character_id' => 'eq.' . $char_id,
+            'select'       => 'id,skill_id,cyber_actions_library(name,description,cost)',
+        ]
+    );
+    if ( is_array( $skills_raw ) ) {
+        foreach ( $skills_raw as $row ) {
+            $skills_and_abilities[] = [
+                'id'   => $row['id']       ?? null,
+                'info' => $row['cyber_actions_library'] ?? null,
+            ];
+        }
+    }
+
+    // 6. Inventory — unequipped items with item details.
+    $inv_raw = tw_supabase_get(
+        'cyber_character_inventory',
+        [
+            'character_id' => 'eq.' . $char_id,
+            'select'       => 'id,quantity,is_equipped,cyber_items(name,slot,mass,img_url)',
+        ]
+    );
+    if ( is_array( $inv_raw ) ) {
+        $total_mass = 0;
+        foreach ( $inv_raw as $row ) {
+            $item_info = $row['cyber_items'] ?? null;
+            $inventory[] = [
+                'id'          => $row['id']          ?? null,
+                'quantity'    => (int) ( $row['quantity']    ?? 1 ),
+                'is_equipped' => ! empty( $row['is_equipped'] ),
+                'info'        => $item_info,
+            ];
+            if ( $item_info && isset( $item_info['mass'] ) ) {
+                $total_mass += (float) $item_info['mass'] * (int) ( $row['quantity'] ?? 1 );
+            }
+        }
+        $total_mass = round( $total_mass, 2 );
+    }
+
+    // Mass limit derived from Body attribute (simple formula: 30 + body * 4).
+    $mass_limit = 30 + (int) ( $char_data['body'] ?? 0 ) * 4;
+
+    // 7. Logs — most recent 20, newest first.
+    $logs_raw = tw_supabase_get(
+        'cyber_character_logs',
+        [
+            'character_id' => 'eq.' . $char_id,
+            'select'       => 'log,created_at',
+            'order'        => 'created_at.desc',
+            'limit'        => 20,
+        ]
+    );
+    $logs_data = is_array( $logs_raw ) ? $logs_raw : [];
+}
+// End character card data preparation.
+?>
+
 <div style="position: fixed; z-index: 999; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 20px; pointer-events: none;">
     <div style="pointer-events: all; flex: 1; max-width: 400px;">
         <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php'; ?>
@@ -340,8 +480,8 @@ window.twTacticalData = {
                     const wrap = document.createElement('div');
                     wrap.className = 'scenario-image-wrap';
                     const img = document.createElement('img');
-                    img.setAttribute('src', s.img_url);      // setAttribute keeps URL as-is
-                    img.setAttribute('alt', s.name || '');   // textContent equivalent for attrs
+                    img.setAttribute('src', s.img_url);
+                    img.setAttribute('alt', s.name || '');
                     img.className = 'scenario-image';
                     wrap.appendChild(img);
                     inner.appendChild(wrap);
@@ -435,7 +575,7 @@ window.twTacticalData = {
             const params = new URLSearchParams({
                 action:     'tw_get_session_state',
                 session_id: sessionId,
-                nonce:      window.twAdventureData?.nonce ?? '', // consistent nonce usage
+                nonce:      window.twAdventureData?.nonce ?? '',
             });
             const resp = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
                 method:      'POST',
@@ -473,7 +613,7 @@ window.twTacticalData = {
                 return;
             }
             await new Promise(r => setTimeout(r, delay));
-            delay = Math.min(delay * 1.5, 8000); // backoff: 1s → 1.5s → 2.25s … capped at 8s
+            delay = Math.min(delay * 1.5, 8000);
         }
         playerChatEl.innerHTML = '<p class="empty-msg">Channel sync timeout. Try refreshing the terminal.</p>';
     }
@@ -536,7 +676,7 @@ window.twTacticalData = {
             // FIX #4: waitForChatChannel is now called only after hydration,
             // so twGameState.currentSessionId is guaranteed to be set.
             window.twGameState?.chatChannelId
-                ? Promise.resolve()           // already resolved earlier, skip
+                ? Promise.resolve()
                 : waitForChatChannel(),
             ensureWorldState(),
         ]).then(results => {
