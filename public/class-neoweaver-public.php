@@ -110,8 +110,6 @@ class Neoweaver_Public {
 				'neoweaver-char-creator',
 				'assets/css/tw-character-creator.css',
 				'assets/js/character-creator.js',
-				// FIX: pronouns CSS must be loaded before the char creator CSS
-				// so chip styles are available when the wizard renders.
 				[ 'jquery', 'neoweaver-pronouns' ],
 				true,
 			],
@@ -154,6 +152,24 @@ class Neoweaver_Public {
 				);
 			}
 		}
+
+		// ── Character creator JS config ──────────────────────────────────────
+		// wp_localize_script MUST be called here (during wp_enqueue_scripts),
+		// NOT inside the shortcode render function — by the time shortcode runs,
+		// wp_head has already fired and localize would be silently ignored.
+		wp_localize_script(
+			'neoweaver-char-creator',
+			'twCharCreatorConfig',
+			[
+				'nonce'       => wp_create_nonce( 'tw_character_nonce' ),
+				'restNonce'   => wp_create_nonce( 'wp_rest' ),
+				'restUrl'     => home_url( '/wp-json/neoweaver/v1/character/create' ),
+				'agentsUrl'   => home_url( '/agents/' ),
+				'restBase'    => home_url( '/wp-json/neoweaver/v1' ),
+				'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
+				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
+			]
+		);
 	}
 
 	// =========================================================================
