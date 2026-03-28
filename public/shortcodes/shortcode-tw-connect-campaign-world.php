@@ -1,14 +1,13 @@
 <?php
 /**
  * SHORTCODE: [tw_connect_campaign_world]
- * Wersja: v16 - added optional Agent binding
+ * Wersja: v17 - agent assignment moved to cyber_campaign_characters table
  *
- * CHANGES vs v15:
- * 1. Added optional Field Agent selector alongside Campaign + Node selectors
- * 2. Agent select loads all living characters owned by current user
- * 3. Agent assignment is OPTIONAL — form submits fine without it
- * 4. If agent selected, character_id is included in cyber_campaign_worlds payload
- * 5. Button enabled when campaign + world selected (agent not required)
+ * CHANGES vs v16:
+ * 1. Agent is no longer stored as character_id in cyber_campaign_worlds
+ * 2. If agent selected, a separate INSERT goes to cyber_campaign_characters
+ * 3. cyber_campaign_worlds payload stays clean: campaign_id, world_id, creator_wp_id only
+ * 4. Proper separation of concerns: world link vs character link in dedicated tables
  */
 function tw_connect_campaign_world_final() {
     if ( ! is_user_logged_in() ) {
@@ -100,7 +99,7 @@ function tw_connect_campaign_world_final() {
                 </div>
                 <div class="tw-sidebar-card" style="margin-top:16px;">
                     <h4><i class="dashicons dashicons-admin-users"></i> AGENT BINDING</h4>
-                    <p>Assigning a <strong>Field Agent</strong> now links them directly to this Deployment. You may also assign an Agent later from the Deployment management panel.</p>
+                    <p>Assigning a <strong>Field Agent</strong> now links them directly to this Deployment via the <code>cyber_campaign_characters</code> table. You may also assign an Agent later from the Deployment management panel.</p>
                 </div>
             </aside>
         </div>
@@ -116,7 +115,7 @@ function tw_connect_campaign_world_final() {
 
         const selC  = document.getElementById('s-camp');
         const selW  = document.getElementById('s-world');
-        const selA  = document.getElementById('s-agent'); // NEW: agent selector
+        const selA  = document.getElementById('s-agent');
         const btn   = document.getElementById('b-connect');
         const log   = document.getElementById('tw-world-console');
         const form  = document.getElementById('tw-anchor-form');
@@ -143,7 +142,6 @@ function tw_connect_campaign_world_final() {
             };
 
             try {
-                // Fetch campaigns, worlds, linked IDs and agents in parallel
                 const [rC, rW, rLinked, rA] = await Promise.all([
                     fetch(
                         cfg.url +
@@ -168,13 +166,11 @@ function tw_connect_campaign_world_final() {
                         "&creator_wp_id=eq." + cfg.uid,
                         { headers: h }
                     ),
-                    // NEW: fetch living characters owned by current user
                     fetch(
                         cfg.url +
                         "rest/v1/cyber_characters" +
                         "?select=id,name,class" +
                         "&wp_user_id=eq." + cfg.uid +
-                        "&is_alive=eq.true" +
                         "&order=created_at.desc",
                         { headers: h }
                     )
@@ -225,7 +221,6 @@ function tw_connect_campaign_world_final() {
 
             el.innerHTML = "";
 
-            // For agent: add empty "-- no agent --" option at top so it's skippable
             if (type === 'agent') {
                 el.appendChild(new Option("-- Skip / assign later --", ""));
             }
@@ -278,7 +273,6 @@ function tw_connect_campaign_world_final() {
             debounce(e => renderList('agent', dataStore.agents, e.target.value), 50)
         );
 
-        // Button enabled when campaign + world selected; agent is optional
         function updateButtonState() {
             btn.disabled = !(selC.value && selW.value);
             if (!btn.disabled) {
@@ -291,7 +285,7 @@ function tw_connect_campaign_world_final() {
         }
         selC.addEventListener('change', updateButtonState);
         selW.addEventListener('change', updateButtonState);
-        selA.addEventListener('change', updateButtonState); // update message only
+        selA.addEventListener('change', updateButtonState);
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -303,43 +297,69 @@ function tw_connect_campaign_world_final() {
             log.style.color = "#00e5ff";
             log.innerText   = "> System: Weaving Splot threads...";
 
-            const payload = {
+            // Step 1: Link campaign to world (no character_id here)
+            const worldPayload = {
                 campaign_id:   parseInt(selC.value, 10),
                 world_id:      parseInt(selW.value, 10),
                 creator_wp_id: cfg.uid
             };
 
-            // NEW: include character_id only if an agent was selected
-            if (selA.value) {
-                payload.character_id = parseInt(selA.value, 10);
-            }
+            const apiHeaders = {
+                "apikey":        cfg.key,
+                "Authorization": "Bearer " + cfg.key,
+                "Content-Type":  "application/json",
+                "Prefer":        "return=minimal"
+            };
 
             try {
                 const res = await fetch(cfg.url + "rest/v1/cyber_campaign_worlds", {
                     method:  "POST",
-                    headers: {
-                        "apikey":        cfg.key,
-                        "Authorization": "Bearer " + cfg.key,
-                        "Content-Type":  "application/json",
-                        "Prefer":        "return=minimal"
-                    },
-                    body: JSON.stringify(payload)
+                    headers: apiHeaders,
+                    body:    JSON.stringify(worldPayload)
                 });
 
-                if (res.ok) {
-                    if (audio) audio.play().catch(() => {});
-                    root.classList.add('tw-glitch-shake');
-                    log.style.color = "#adff00";
-                    log.innerText   = "> System: ANCHOR SUCCESSFUL. REALITY SYNCED.";
-
-                    setTimeout(() => {
-                        window.location.href = (window.location.origin || '') + '/deployments/';
-                    }, 1500);
-                } else {
+                if (!res.ok) {
                     const txt = await res.text();
-                    console.error('Anchor error:', res.status, txt);
-                    throw new Error("Supabase rejection: " + res.status);
+                    console.error('World anchor error:', res.status, txt);
+                    throw new Error("World link failed: " + res.status);
                 }
+
+                // Step 2: If agent selected, write to cyber_campaign_characters
+                if (selA.value) {
+                    const charPayload = {
+                        campaign_id:   parseInt(selC.value, 10),
+                        character_id:  parseInt(selA.value, 10),
+                        creator_wp_id: cfg.uid
+                    };
+
+                    const resChar = await fetch(cfg.url + "rest/v1/cyber_campaign_characters", {
+                        method:  "POST",
+                        headers: apiHeaders,
+                        body:    JSON.stringify(charPayload)
+                    });
+
+                    if (!resChar.ok) {
+                        const txt = await resChar.text();
+                        console.error('Agent link error:', resChar.status, txt);
+                        // World was linked successfully — warn but don't block
+                        log.style.color = "#ffaa00";
+                        log.innerText   = "> Warning: World anchored but Agent link failed (" + resChar.status + "). Assign Agent from Deployments panel.";
+                        setTimeout(() => {
+                            window.location.href = (window.location.origin || '') + '/deployments/';
+                        }, 2500);
+                        return;
+                    }
+                }
+
+                if (audio) audio.play().catch(() => {});
+                root.classList.add('tw-glitch-shake');
+                log.style.color = "#adff00";
+                log.innerText   = "> System: ANCHOR SUCCESSFUL. REALITY SYNCED.";
+
+                setTimeout(() => {
+                    window.location.href = (window.location.origin || '') + '/deployments/';
+                }, 1500);
+
             } catch (err) {
                 console.error('ANCHOR SUBMIT ERROR', err);
                 log.style.color = "#ff0055";
@@ -376,7 +396,6 @@ function tw_connect_campaign_world_final() {
         .n-glitch { filter: brightness(2) contrast(1.5); transform: scale(1.05); }
         .tw-deploy-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 40px; padding: 40px; }
         .tw-console-box { background: #050505; border-left: 3px solid #00e5ff; padding: 15px; font-family: monospace; font-size: 0.8rem; color: #00e5ff; margin-bottom: 30px; box-shadow: inset 0 0 10px rgba(0,229,255,0.05); }
-        /* 3-column layout for the 3 selectors */
         .tw-selection-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .tw-field-box label { display: block; color: #adff00; font-size: 0.75rem; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; }
         .tw-field-box--optional label { color: #888; }
