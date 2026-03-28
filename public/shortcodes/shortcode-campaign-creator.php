@@ -8,11 +8,11 @@
  * Steps:
  *   1. Deployment Identity  — name + optional brief/notes
  *   2. GM Style             — narrative archetype (cinematic_heroic / harsh_grounded / fast_tactical)
- *   3. Game Mode            — solo / co-op / competitive
- *   4. Game Length          — short / standard / epic / endless
- *   5. Priority             — casual / standard / hardcore / nightmare
- *   6. Node Binding         — pick one of the user's worlds
- *   7. Agent Assignment     — pick one of the user's living characters
+ *   3. Game Mode            — solo / co-op
+ *   4. Game Length          — short / medium / standard / epic / endless
+ *   5. Difficulty           — easy / casual / standard / hardcore / nightmare
+ *   6. Node Binding         — pick one of the user's worlds (required)
+ *   7. Agent Assignment     — pick one of the user's living characters (OPTIONAL)
  *   8. Summary              — review + deploy
  *
  * The endpoint at /wp-json/neoweaver/v1/campaign/create handles the Supabase
@@ -84,27 +84,31 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			[ 'fast_tactical',    'Fast Tactical',     'Board-state focus. Dry wit. Brief descriptions, max player agency.', '⚡' ],
 		];
 
+		// Competitive removed — only Solo and Co-op remain.
 		$game_modes = [
-			[ 1, 'Solo',         'One Operator. One Agent. The Node is yours alone.',             '🕵️' ],
-			[ 2, 'Co-op',        'Multiple Operators. Shared Node, shared Entropy.',              '🤝' ],
-			[ 3, 'Competitive',  'Operators pursue conflicting objectives in the same Node.',      '⚔️' ],
+			[ 1, 'Solo',  'One Operator. One Agent. The Node is yours alone.',  '🕵️' ],
+			[ 2, 'Co-op', 'Multiple Operators. Shared Node, shared Entropy.',   '🤝' ],
 		];
 
+		// 5 campaign lengths.
 		$game_lengths = [
-			[ 1, 'Short Run',    '3–5 sessions. Tight objective. High stakes, fast resolution.',  '⏱️' ],
-			[ 2, 'Standard',     '6–12 sessions. Full arc with mid-game pivot.',                  '📡' ],
-			[ 3, 'Epic',         '13–25 sessions. Major faction wars. World-shaping outcomes.',   '🌐' ],
-			[ 4, 'Endless',      'No defined end. Node evolves until Hard Reset.',                '♾️' ],
+			[ 1, 'Short',    '1–3 sessions. Tight objective, fast resolution.',              '⚡' ],
+			[ 2, 'Medium',   '4–6 sessions. Extended arc with a twist.',                     '⏱️' ],
+			[ 3, 'Standard', '7–12 sessions. Full arc with mid-game pivot.',                 '📡' ],
+			[ 4, 'Epic',     '13–25 sessions. Major faction wars. World-shaping outcomes.',  '🌐' ],
+			[ 5, 'Endless',  'No defined end. Node evolves until Hard Reset.',               '♾️' ],
 		];
 
-		$priorities = [
-			[ 1, 'Casual',       'Low stakes. Story over challenge. No permadeath pressure.',     '☕' ],
-			[ 2, 'Standard',     'Balanced risk. Protocol-default experience.',                   '🎯' ],
-			[ 3, 'Hardcore',     'Elevated lethality. Entropy rises faster.',                     '💀' ],
-			[ 4, 'Nightmare',    'Maximum entropy pressure. Time itself costs Sync.',             '☠️' ],
+		// 5 difficulty levels.
+		$difficulties = [
+			[ 1, 'Easy',      'Training protocol. Entropy is forgiving. Great for newcomers.',   '🌱' ],
+			[ 2, 'Casual',    'Low stakes. Story over challenge. No permadeath pressure.',        '☕' ],
+			[ 3, 'Standard',  'Balanced risk. Protocol-default experience.',                      '🎯' ],
+			[ 4, 'Hardcore',  'Elevated lethality. Entropy rises faster.',                        '💀' ],
+			[ 5, 'Nightmare', 'Maximum entropy pressure. Time itself costs Sync.',               '☠️' ],
 		];
 
-		$total_steps = 8; // 1 identity + 1 gm_style + 1 mode + 1 length + 1 priority + 1 node + 1 agent + 1 summary
+		$total_steps = 8; // 1 identity + 1 gm_style + 1 mode + 1 length + 1 difficulty + 1 node + 1 agent + 1 summary
 
 		ob_start();
 		?>
@@ -191,13 +195,13 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 			<!-- ═══════════════════════════════════════════════════════════════
-			     STEP 3 — Game Mode
+			     STEP 3 — Game Mode (Solo / Co-op only)
 			     ═══════════════════════════════════════════════════════════════ -->
 			<div class="tw-step" data-step="3" data-phase="OPERATIVE MODE" data-field="game_mode">
 				<h2>// OPERATIVE MODE</h2>
 				<p class="tw-question-text">How many Operators will be synchronized to this deployment?</p>
 
-				<div class="tw-option-grid tw-option-grid--3">
+				<div class="tw-option-grid tw-option-grid--2">
 					<?php foreach ( $game_modes as $opt ) :
 						[ $val, $label, $desc, $emoji ] = $opt;
 						$id = 'tw-mode-' . esc_attr( $val );
@@ -221,13 +225,13 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 			<!-- ═══════════════════════════════════════════════════════════════
-			     STEP 4 — Game Length
+			     STEP 4 — Game Length (5 options)
 			     ═══════════════════════════════════════════════════════════════ -->
 			<div class="tw-step" data-step="4" data-phase="OPERATION SCOPE" data-field="game_length">
 				<h2>// OPERATION SCOPE</h2>
 				<p class="tw-question-text">Define the temporal arc of this deployment.</p>
 
-				<div class="tw-option-grid tw-option-grid--4">
+				<div class="tw-option-grid tw-option-grid--5">
 					<?php foreach ( $game_lengths as $opt ) :
 						[ $val, $label, $desc, $emoji ] = $opt;
 						$id = 'tw-length-' . esc_attr( $val );
@@ -251,19 +255,19 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 			<!-- ═══════════════════════════════════════════════════════════════
-			     STEP 5 — Priority / Difficulty
+			     STEP 5 — Difficulty (5 options)
 			     ═══════════════════════════════════════════════════════════════ -->
-			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="priority">
+			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="difficulty">
 				<h2>// THREAT CALIBRATION</h2>
 				<p class="tw-question-text">Set the lethality and entropy pressure level for this deployment.</p>
 
-				<div class="tw-option-grid tw-option-grid--4">
-					<?php foreach ( $priorities as $opt ) :
+				<div class="tw-option-grid tw-option-grid--5">
+					<?php foreach ( $difficulties as $opt ) :
 						[ $val, $label, $desc, $emoji ] = $opt;
-						$id = 'tw-priority-' . esc_attr( $val );
+						$id = 'tw-difficulty-' . esc_attr( $val );
 					?>
 					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="priority"
+						<input type="radio" id="<?php echo $id; ?>" name="difficulty"
 						       value="<?php echo esc_attr( $val ); ?>" required />
 						<div class="tw-card-visual">
 							<span class="tw-card-emoji"><?php echo $emoji; ?></span>
@@ -281,7 +285,7 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 			<!-- ═══════════════════════════════════════════════════════════════
-			     STEP 6 — Node Binding
+			     STEP 6 — Node Binding (required)
 			     ═══════════════════════════════════════════════════════════════ -->
 			<div class="tw-step" data-step="6" data-phase="NODE UPLINK" data-field="world_id">
 				<h2>// NODE UPLINK</h2>
@@ -308,13 +312,13 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 			<!-- ═══════════════════════════════════════════════════════════════
-			     STEP 7 — Agent Assignment
+			     STEP 7 — Agent Assignment (OPTIONAL)
 			     ═══════════════════════════════════════════════════════════════ -->
-			<div class="tw-step" data-step="7" data-phase="AGENT ASSIGNMENT" data-field="character_id">
-				<h2>// AGENT ASSIGNMENT</h2>
+			<div class="tw-step" data-step="7" data-phase="AGENT ASSIGNMENT" data-field="character_id" data-optional="true">
+				<h2>// AGENT ASSIGNMENT <span class="tw-optional-badge">OPTIONAL</span></h2>
 				<p class="tw-question-text">
-					Assign a Field Agent to this deployment.
-					Only living agents bound to the selected Node are valid.
+					Assign a Field Agent to this deployment — or skip and assign one later.
+					Only living agents compatible with the selected Node are shown.
 				</p>
 
 				<div class="tw-dynamic-grid" id="tw-camp-agent-grid">
@@ -367,9 +371,9 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 						<span class="tw-summary-val" id="tw-summary-game_length">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button>
 					</div>
-					<div class="tw-summary-row" data-summary-field="priority">
+					<div class="tw-summary-row" data-summary-field="difficulty">
 						<span class="tw-summary-key">THREAT_LVL</span>
-						<span class="tw-summary-val" id="tw-summary-priority">&mdash;</span>
+						<span class="tw-summary-val" id="tw-summary-difficulty">&mdash;</span>
 						<button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button>
 					</div>
 					<div class="tw-summary-row" data-summary-field="world_id">
@@ -378,8 +382,8 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 						<button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button>
 					</div>
 					<div class="tw-summary-row" data-summary-field="character_id">
-						<span class="tw-summary-key">AGENT</span>
-						<span class="tw-summary-val" id="tw-summary-character_id">&mdash;</span>
+						<span class="tw-summary-key">AGENT <span class="tw-optional-badge">OPTIONAL</span></span>
+						<span class="tw-summary-val" id="tw-summary-character_id">— (unassigned)</span>
 						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
 					</div>
 				</div>
@@ -395,6 +399,30 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			</div>
 
 		</div><!-- /#tw-campaign-creator-wrapper -->
+
+		<style>
+		/* Optional badge styling */
+		.tw-optional-badge {
+			font-size: 0.6rem;
+			font-weight: 700;
+			letter-spacing: 1px;
+			color: #000;
+			background: #adff00;
+			padding: 2px 6px;
+			vertical-align: middle;
+			margin-left: 8px;
+			clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+		}
+		/* 5-column grid for length & difficulty */
+		.tw-option-grid--5 {
+			grid-template-columns: repeat(5, 1fr);
+		}
+		/* 2-column grid for mode */
+		.tw-option-grid--2 {
+			grid-template-columns: repeat(2, 1fr);
+			max-width: 600px;
+		}
+		</style>
 		<?php
 		$html = ob_get_clean() ?: '';
 		return '<div class="neoweaver-screen">' . $html . '</div>';
