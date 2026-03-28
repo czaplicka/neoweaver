@@ -390,11 +390,7 @@ if ( $char_id && function_exists( 'tw_supabase_get' ) ) {
 // End character card data preparation.
 ?>
 <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php'; ?>
-<div style="position: fixed; z-index: 999; bottom: 20px; left: 20px; right: 20px; display: flex; gap: 20px; pointer-events: none;">
-    <div style="pointer-events: all; flex: 1; max-width: 400px;">
-        <?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php'; ?>
-    </div>
-</div>
+<?php include NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php'; ?>
 
 <script>
 (function () {
