@@ -7,11 +7,11 @@
  * Steps:
  *   1. Identity    — name + custom directives (static inputs)
  *   2. GM Style    — radio card grid (cinematic_heroic / harsh_grounded / fast_tactical)
- *   3. Game Mode   — radio card grid (solo / co-op / competitive)
- *   4. Game Length — radio card grid (short / standard / epic / endless)
- *   5. Priority    — radio card grid (casual / standard / hardcore / nightmare)
+ *   3. Game Mode   — radio card grid (solo / co-op)
+ *   4. Game Length — radio card grid (short / medium / standard / epic / endless)
+ *   5. Difficulty  — radio card grid (easy / casual / standard / hardcore / nightmare)
  *   6. Node Uplink — dynamic grid fetched from Supabase (user's worlds)
- *   7. Agent Assign— dynamic grid, filtered to agents in selected Node
+ *   7. Agent Assign— dynamic grid, filtered to agents in selected Node (OPTIONAL)
  *   8. Summary     — review + UPLINK DEPLOYMENT
  *
  * Config (injected via wp_localize_script as twCampaignConfig):
@@ -53,16 +53,16 @@
 			gm_style      : null,   // { value, label }
 			game_mode     : null,   // { value, label }
 			game_length   : null,   // { value, label }
-			priority      : null,   // { value, label }
+			difficulty    : null,   // { value, label } — maps to 'priority' field in API
 			world_id      : null,   // { id, name }
-			character_id  : null,   // { id, name }
+			character_id  : null,   // { id, name } — OPTIONAL
 		};
 
 		// Label maps for static radio steps — mirrors PHP option arrays.
-		const gmStyleLabels   = { cinematic_heroic: 'Cinematic Heroic', harsh_grounded: 'Harsh Grounded', fast_tactical: 'Fast Tactical' };
-		const gameModeLabels  = { 1: 'Solo', 2: 'Co-op', 3: 'Competitive' };
-		const gameLengthLabels= { 1: 'Short Run', 2: 'Standard', 3: 'Epic', 4: 'Endless' };
-		const priorityLabels  = { 1: 'Casual', 2: 'Standard', 3: 'Hardcore', 4: 'Nightmare' };
+		const gmStyleLabels    = { cinematic_heroic: 'Cinematic Heroic', harsh_grounded: 'Harsh Grounded', fast_tactical: 'Fast Tactical' };
+		const gameModeLabels   = { 1: 'Solo', 2: 'Co-op' };
+		const gameLengthLabels = { 1: 'Short', 2: 'Medium', 3: 'Standard', 4: 'Epic', 5: 'Endless' };
+		const difficultyLabels = { 1: 'Easy', 2: 'Casual', 3: 'Standard', 4: 'Hardcore', 5: 'Nightmare' };
 
 		// ── Spinner ──────────────────────────────────────────────────────────
 		const spinner = document.createElement( 'div' );
@@ -144,10 +144,10 @@
 
 			// Static radio steps
 			const radioFields = {
-				'GM PROTOCOL'      : { key: 'gm_style',   labels: gmStyleLabels   },
-				'OPERATIVE MODE'   : { key: 'game_mode',  labels: gameModeLabels  },
-				'OPERATION SCOPE'  : { key: 'game_length', labels: gameLengthLabels },
-				'THREAT CALIBRATION': { key: 'priority',  labels: priorityLabels  },
+				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels    },
+				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels   },
+				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels },
+				'THREAT CALIBRATION' : { key: 'difficulty',  labels: difficultyLabels },
 			};
 
 			if ( radioFields[ phase ] ) {
@@ -169,11 +169,8 @@
 				return true;
 			}
 
+			// AGENT ASSIGNMENT is optional — always allow proceeding.
 			if ( phase === 'AGENT ASSIGNMENT' ) {
-				if ( ! formState.character_id ) {
-					setStatus( 'ERROR: Assign a Field Agent before continuing.', true );
-					return false;
-				}
 				return true;
 			}
 
@@ -265,7 +262,7 @@
 				} );
 		}
 
-		// Step 7: user's living agents, filtered to selected Node
+		// Step 7: user's living agents, filtered to selected Node (OPTIONAL step)
 		function loadAgents() {
 			gridsLoaded.agents = true;
 			const grid = document.getElementById( 'tw-camp-agent-grid' );
@@ -288,10 +285,7 @@
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! rows || ! rows.length ) {
-						const link = formState.world_id
-							? '/create-agent/'
-							: '/create-agent/';
-						grid.innerHTML = '<p class="tw-error-msg">No eligible agents found. <a href="' + link + '" class="tw-link">Create one first →</a></p>';
+						grid.innerHTML = '<p class="tw-error-msg">No eligible agents found. <a href="/create-agent/" class="tw-link">Create one first →</a></p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
@@ -319,12 +313,12 @@
 			}
 			set( 'campaign_name', formState.campaign_name );
 			set( 'customize',     formState.customize || '—' );
-			set( 'gm_style',      formState.gm_style    ? formState.gm_style.label    : '—' );
-			set( 'game_mode',     formState.game_mode   ? formState.game_mode.label   : '—' );
-			set( 'game_length',   formState.game_length ? formState.game_length.label : '—' );
-			set( 'priority',      formState.priority    ? formState.priority.label    : '—' );
-			set( 'world_id',      formState.world_id    ? formState.world_id.name     : '—' );
-			set( 'character_id',  formState.character_id ? formState.character_id.name: '—' );
+			set( 'gm_style',      formState.gm_style     ? formState.gm_style.label     : '—' );
+			set( 'game_mode',     formState.game_mode    ? formState.game_mode.label    : '—' );
+			set( 'game_length',   formState.game_length  ? formState.game_length.label  : '—' );
+			set( 'difficulty',    formState.difficulty   ? formState.difficulty.label   : '—' );
+			set( 'world_id',      formState.world_id     ? formState.world_id.name      : '—' );
+			set( 'character_id',  formState.character_id ? formState.character_id.name  : '— (unassigned)' );
 		}
 
 		// ── Navigation ────────────────────────────────────────────────────────
@@ -367,11 +361,13 @@
 				nonce        : config.nonce || '',
 				name         : formState.campaign_name,
 				customize    : formState.customize,
-				gm_style     : formState.gm_style    ? formState.gm_style.value    : '',
-				game_mode    : formState.game_mode   ? parseInt( formState.game_mode.value, 10 )   : 0,
-				game_length  : formState.game_length ? parseInt( formState.game_length.value, 10 ) : 0,
-				priority     : formState.priority    ? parseInt( formState.priority.value, 10 )    : 0,
-				world_id     : formState.world_id    ? formState.world_id.id    : '',
+				gm_style     : formState.gm_style     ? formState.gm_style.value     : '',
+				game_mode    : formState.game_mode    ? parseInt( formState.game_mode.value, 10 )    : 0,
+				game_length  : formState.game_length  ? parseInt( formState.game_length.value, 10 )  : 0,
+				// 'priority' is the API/DB field name; formState uses 'difficulty' for clarity.
+				priority     : formState.difficulty   ? parseInt( formState.difficulty.value, 10 )   : 0,
+				world_id     : formState.world_id     ? formState.world_id.id     : '',
+				// character_id is optional — send empty string if not chosen.
 				character_id : formState.character_id ? formState.character_id.id : '',
 			};
 		}
@@ -379,14 +375,14 @@
 		function doSubmit() {
 			const payload = buildPayload();
 
-			// Final guards.
+			// Final guards — only required fields block submission.
 			if ( ! payload.name )        { setStatus( 'ERROR: Deployment name is required.', true ); return; }
 			if ( ! payload.gm_style )    { setStatus( 'ERROR: GM Protocol is required.', true ); return; }
 			if ( ! payload.game_mode )   { setStatus( 'ERROR: Operative mode is required.', true ); return; }
 			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); return; }
 			if ( ! payload.priority )    { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
 			if ( ! payload.world_id )    { setStatus( 'ERROR: Node binding is required.', true ); return; }
-			if ( ! payload.character_id ){ setStatus( 'ERROR: Agent assignment is required.', true ); return; }
+			// character_id is intentionally NOT required here.
 
 			submitBtn.disabled    = true;
 			submitBtn.textContent = 'UPLINK IN PROGRESS…';
