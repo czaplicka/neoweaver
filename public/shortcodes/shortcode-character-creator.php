@@ -3,26 +3,6 @@
  * Shortcode: [tale_weaver_character_creator]
  *
  * Renders the 7-step Field Agent creation wizard.
- * Mirrors the world creator pattern: PHP prepares data, a template partial
- * renders the HTML, JS drives the multi-step UX, and the REST endpoint
- * at /wp-json/neoweaver/v1/character/create handles the Supabase write.
- *
- * Steps:
- *   1. Agent Identity  — name, pronouns (radio), backstory
- *   2. Race            — loaded dynamically from cyber_races via REST
- *   3. Class           — loaded dynamically from cyber_classes via REST
- *   4. Attributes      — Body / Reflex / Mind / Spirit (1–5 sliders)
- *   5. Node Binding    — pick one of the user's worlds (cyber_worlds)
- *   6. Avatar          — optional image upload
- *   7. Summary         — review + deploy
- *
- * Dependencies:
- *   - tw_supabase_url() / tw_supabase_anon_key()    (supabase-helpers.php)
- *   - neoweaver-char-creator CSS/JS                 (enqueued by Neoweaver_Public::enqueue_assets)
- *   - REST route neoweaver/v1/character/create      (includes/api-endpoints.php)
- *
- * CSS scope : .neoweaver-screen #tw-char-creator-wrapper
- * JS file   : assets/js/tw-character-creator.js
  *
  * @package Neoweaver
  */
@@ -38,25 +18,28 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
-		$nonce    = wp_create_nonce( 'tw_character_nonce' );
-		$rest_url = home_url( '/wp-json/neoweaver/v1/character/create' );
-		$agents_url = home_url( '/agents/' ); // redirect target after success
+		$nonce      = wp_create_nonce( 'tw_character_nonce' );
+		$rest_url   = home_url( '/wp-json/neoweaver/v1/character/create' );
+		$agents_url = home_url( '/agents/' );
 
-		// Pass config to JS — same pattern as world creator.
+		// FIX: restBase was missing from twCharCreatorConfig.
+		// JS uses wpRestBase + '/races' and + '/classes' to load dynamic grids.
+		// Without this value, fetch() received "undefined/races" and failed silently.
 		wp_localize_script(
 			'neoweaver-char-creator',
 			'twCharCreatorConfig',
 			[
-				'nonce'      => $nonce,
-				'restNonce'  => wp_create_nonce( 'wp_rest' ),
-				'restUrl'    => $rest_url,
-				'agentsUrl'  => $agents_url,
-				'supabaseUrl' => function_exists( 'tw_supabase_url' )  ? tw_supabase_url()  : '',
+				'nonce'       => $nonce,
+				'restNonce'   => wp_create_nonce( 'wp_rest' ),
+				'restUrl'     => $rest_url,
+				'agentsUrl'   => $agents_url,
+				'restBase'    => home_url( '/wp-json/neoweaver/v1' ),
+				'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
 				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			]
 		);
 
-		// Enqueue spinner CSS (same spinner used by world creator).
+		// Spinner CSS.
 		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
 		if ( file_exists( $spinner_css ) ) {
 			wp_enqueue_style(
@@ -67,59 +50,31 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			);
 		}
 
-		// Attribute definitions — server-side so the PHP array is the single
-		// source of truth for labels and descriptions.
 		$attrs = [
-			'body'   => [
-				'label' => 'BODY',
-				'sub'   => 'STR + CON',
-				'desc'  => 'Brute force, health pool, heavy lifting, physical endurance.',
-				'icon'  => '💪',
-			],
-			'reflex' => [
-				'label' => 'REFLEX',
-				'sub'   => 'DEX',
-				'desc'  => 'Speed, evasion, precision aiming, reaction time.',
-				'icon'  => '⚡',
-			],
-			'mind'   => [
-				'label' => 'MIND',
-				'sub'   => 'INT + WIS',
-				'desc'  => 'Logic, repair, investigation, hacking, situational awareness.',
-				'icon'  => '🧠',
-			],
-			'spirit' => [
-				'label' => 'SPIRIT',
-				'sub'   => 'CHA + WILL',
-				'desc'  => 'Magic power, persuasion, willpower, social influence.',
-				'icon'  => '✨',
-			],
+			'body'   => [ 'label' => 'BODY',   'sub' => 'STR + CON', 'desc' => 'Brute force, health pool, heavy lifting, physical endurance.', 'icon' => '💪' ],
+			'reflex' => [ 'label' => 'REFLEX', 'sub' => 'DEX',       'desc' => 'Speed, evasion, precision aiming, reaction time.',              'icon' => '⚡' ],
+			'mind'   => [ 'label' => 'MIND',   'sub' => 'INT + WIS', 'desc' => 'Logic, repair, investigation, hacking, situational awareness.', 'icon' => '🧠' ],
+			'spirit' => [ 'label' => 'SPIRIT', 'sub' => 'CHA + WILL','desc' => 'Magic power, persuasion, willpower, social influence.',        'icon' => '✨' ],
 		];
 
-		// Pronoun options — displayed as radio buttons.
 		$pronoun_options = [
-			'she/her'    => 'she/her',
-			'he/him'     => 'he/him',
-			'they/them'  => 'they/them',
-			'xe/xem'     => 'xe/xem',
-			'custom'     => 'custom…',
+			'she/her'   => 'she/her',
+			'he/him'    => 'he/him',
+			'they/them' => 'they/them',
+			'xe/xem'    => 'xe/xem',
+			'custom'    => 'custom…',
 		];
 
-		// Total attribute points the player can distribute (protocol: 12 pts, min 1 per attr).
-		$attr_pool  = 12;
-		$attr_min   = 1;
-		$attr_max   = 5;
-
-		// Total steps count: identity + race + class + attrs + node + avatar + summary = 7
+		$attr_pool   = 12;
+		$attr_min    = 1;
+		$attr_max    = 5;
 		$total_steps = 7;
 
 		ob_start();
 		?>
 		<div id="tw-char-creator-wrapper" data-total-steps="<?php echo esc_attr( $total_steps ); ?>">
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     PROGRESS BAR
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- PROGRESS BAR -->
 			<div class="tw-progress-bar" aria-label="Agent configuration progress">
 				<div class="tw-progress-header">
 					<span class="tw-progress-label">AGENT_INIT<span class="tw-blink">_</span></span>
@@ -138,9 +93,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				<div class="tw-progress-phase" id="tw-char-progress-phase">IDENTITY MATRIX</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 1 — Identity
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 1 — Identity -->
 			<div class="tw-step active" data-step="1" data-phase="IDENTITY MATRIX">
 				<h2>// INITIALIZE AGENT</h2>
 				<p class="tw-question-text">Define the operative's identity before synchronization.</p>
@@ -152,7 +105,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 					       maxlength="80" required />
 				</label>
 
-				<fieldset class="tw-field-label tw-pronoun-fieldset" style="margin-top:24px;border:none;padding:0;">
+				<fieldset class="tw-pronoun-fieldset">
 					<legend class="tw-field-label__legend">Pronouns</legend>
 					<div class="tw-pronoun-options">
 						<?php foreach ( $pronoun_options as $value => $label ) : ?>
@@ -166,13 +119,12 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 							</label>
 						<?php endforeach; ?>
 					</div>
-					<!-- Custom pronoun text field — shown only when "custom" radio is selected -->
 					<input type="text"
 					       id="tw-char-pronouns-custom"
 					       name="pronouns_custom"
 					       placeholder="e.g. ze/zir · fae/faer"
 					       maxlength="40"
-					       style="display:none;margin-top:10px;" />
+					       style="display:none;" />
 				</fieldset>
 
 				<label class="tw-field-label" style="margin-top:24px;">
@@ -187,49 +139,33 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 2 — Race
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 2 — Race -->
 			<div class="tw-step" data-step="2" data-phase="RACE PROTOCOL" data-field="race">
 				<h2>// RACE PROTOCOL</h2>
 				<p class="tw-question-text">Select the operative's biological or synthetic origin.</p>
-
 				<div class="tw-dynamic-grid" id="tw-race-grid">
-					<div class="tw-loading-state">
-						<span class="tw-loading-dot"></span>
-						FETCHING RACE DATA FROM NODE…
-					</div>
+					<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING RACE DATA FROM NODE…</div>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 3 — Class
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 3 — Class -->
 			<div class="tw-step" data-step="3" data-phase="CLASS MATRIX" data-field="class">
 				<h2>// CLASS MATRIX</h2>
 				<p class="tw-question-text">Select the operative's combat and skill archetype.</p>
-
 				<div class="tw-dynamic-grid" id="tw-class-grid">
-					<div class="tw-loading-state">
-						<span class="tw-loading-dot"></span>
-						FETCHING CLASS DATA FROM NODE…
-					</div>
+					<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING CLASS DATA FROM NODE…</div>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 4 — Attributes
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 4 — Attributes -->
 			<div class="tw-step" data-step="4" data-phase="BIOMETRIC CALIBRATION">
 				<h2>// BIOMETRIC CALIBRATION</h2>
 				<p class="tw-question-text">
@@ -240,7 +176,6 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 						Remaining: <span id="tw-attr-remaining"><?php echo esc_html( $attr_pool - count( $attrs ) ); ?></span>
 					</span>
 				</p>
-
 				<div class="tw-attr-grid">
 					<?php foreach ( $attrs as $key => $attr ) : ?>
 					<div class="tw-attr-row" data-attr="<?php echo esc_attr( $key ); ?>">
@@ -251,8 +186,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 						</div>
 						<div class="tw-attr-stepper">
 							<button type="button" class="tw-attr-btn tw-attr-minus" data-attr="<?php echo esc_attr( $key ); ?>" aria-label="Decrease <?php echo esc_attr( $attr['label'] ); ?>">−</button>
-							<input type="number"
-							       class="tw-attr-val"
+							<input type="number" class="tw-attr-val"
 							       name="attr_<?php echo esc_attr( $key ); ?>"
 							       id="tw-attr-<?php echo esc_attr( $key ); ?>"
 							       value="<?php echo esc_attr( $attr_min ); ?>"
@@ -262,64 +196,47 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 							       aria-label="<?php echo esc_attr( $attr['label'] ); ?> value" />
 							<button type="button" class="tw-attr-btn tw-attr-plus" data-attr="<?php echo esc_attr( $key ); ?>" aria-label="Increase <?php echo esc_attr( $attr['label'] ); ?>">+</button>
 						</div>
-						<!-- Visual pip bar -->
 						<div class="tw-attr-pips">
 							<?php for ( $p = 1; $p <= $attr_max; $p++ ) : ?>
-								<span class="tw-pip<?php echo $p <= $attr_min ? ' active' : ''; ?>"
-								      data-pip="<?php echo esc_attr( $p ); ?>"></span>
+								<span class="tw-pip<?php echo $p <= $attr_min ? ' active' : ''; ?>" data-pip="<?php echo esc_attr( $p ); ?>"></span>
 							<?php endfor; ?>
 						</div>
 					</div>
 					<?php endforeach; ?>
 				</div>
-
-				<!-- Hidden: total pool for JS validation -->
 				<input type="hidden" id="tw-attr-pool" value="<?php echo esc_attr( $attr_pool ); ?>" />
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 5 — Node Binding
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 5 — Node Binding -->
 			<div class="tw-step" data-step="5" data-phase="NODE BINDING" data-field="node_id">
 				<h2>// NODE BINDING</h2>
 				<p class="tw-question-text">
 					Select the Node (world) this agent will be permanently synchronized to.
 					<em>One agent · one world. This cannot be changed after deployment.</em>
 				</p>
-
 				<div class="tw-dynamic-grid" id="tw-node-grid">
-					<div class="tw-loading-state">
-						<span class="tw-loading-dot"></span>
-						SCANNING AVAILABLE NODES…
-					</div>
+					<div class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING AVAILABLE NODES…</div>
 				</div>
-
 				<p class="tw-helper-text">No worlds yet?
 					<a href="<?php echo esc_url( home_url( '/create-world/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a>
 				</p>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 6 — Avatar
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 6 — Avatar -->
 			<div class="tw-step" data-step="6" data-phase="VISUAL SIGNATURE">
 				<h2>// VISUAL SIGNATURE</h2>
 				<p class="tw-question-text">Upload an operative portrait. Optional — skip to continue.</p>
-
 				<div class="tw-upload-box" id="tw-avatar-drop">
 					<input type="file" id="tw-char-avatar" name="avatar"
-					       accept="image/jpeg,image/png,image/webp"
-					       style="display:none;" />
+					       accept="image/jpeg,image/png,image/webp" style="display:none;" />
 					<div class="tw-upload-preview" id="tw-avatar-preview">
 						<span class="tw-upload-icon">📷</span>
 						<p>Drag &amp; drop or <button type="button" class="tw-upload-trigger tw-link-btn">browse files</button></p>
@@ -330,70 +247,30 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 						<button type="button" class="tw-avatar-clear" id="tw-avatar-clear">✕ Remove</button>
 					</div>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">REVIEW &rarr;</button>
 				</div>
 			</div>
 
-			<!-- ═══════════════════════════════════════════════════════════════════
-			     STEP 7 — Summary + Deploy
-			     ═══════════════════════════════════════════════════════════════════ -->
+			<!-- STEP 7 — Summary -->
 			<div class="tw-step tw-step--summary" data-step="7" data-phase="SYSTEM REVIEW">
 				<h2>// SYSTEM REVIEW</h2>
-				<p class="tw-question-text">Verify operative parameters before synchronization. Edit any field to reconfigure.</p>
-
+				<p class="tw-question-text">Verify operative parameters before synchronization.</p>
 				<div class="tw-summary-grid">
-					<div class="tw-summary-row" data-summary-field="character_name">
-						<span class="tw-summary-key">AGENT_ID</span>
-						<span class="tw-summary-val" id="tw-summary-character_name">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="pronouns">
-						<span class="tw-summary-key">PRONOUNS</span>
-						<span class="tw-summary-val" id="tw-summary-pronouns">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="backstory">
-						<span class="tw-summary-key">BRIEF</span>
-						<span class="tw-summary-val" id="tw-summary-backstory">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="race">
-						<span class="tw-summary-key">RACE</span>
-						<span class="tw-summary-val" id="tw-summary-race">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="2">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="class">
-						<span class="tw-summary-key">CLASS</span>
-						<span class="tw-summary-val" id="tw-summary-class">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="3">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="attrs">
-						<span class="tw-summary-key">ATTRIBUTES</span>
-						<span class="tw-summary-val" id="tw-summary-attrs">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="node_id">
-						<span class="tw-summary-key">NODE</span>
-						<span class="tw-summary-val" id="tw-summary-node_id">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button>
-					</div>
-					<div class="tw-summary-row" data-summary-field="avatar">
-						<span class="tw-summary-key">PORTRAIT</span>
-						<span class="tw-summary-val" id="tw-summary-avatar">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button>
-					</div>
+					<div class="tw-summary-row"><span class="tw-summary-key">AGENT_ID</span><span class="tw-summary-val" id="tw-summary-character_name">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">PRONOUNS</span><span class="tw-summary-val" id="tw-summary-pronouns">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">BRIEF</span><span class="tw-summary-val" id="tw-summary-backstory">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="1">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">RACE</span><span class="tw-summary-val" id="tw-summary-race">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="2">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">CLASS</span><span class="tw-summary-val" id="tw-summary-class">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="3">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">ATTRIBUTES</span><span class="tw-summary-val" id="tw-summary-attrs">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">NODE</span><span class="tw-summary-val" id="tw-summary-node_id">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">PORTRAIT</span><span class="tw-summary-val" id="tw-summary-avatar">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button></div>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
-					<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-char-submit">
-						&#9658; SYNCHRONIZE AGENT
-					</button>
+					<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-char-submit">&#9658; SYNCHRONIZE AGENT</button>
 				</div>
-
 				<div class="tw-char-status" aria-live="polite"></div>
 			</div>
 

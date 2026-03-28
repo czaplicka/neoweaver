@@ -92,13 +92,27 @@ class Neoweaver_Public {
 		$plugin_url = NEOWEAVER_PLUGIN_URL;
 		$plugin_dir = NEOWEAVER_PLUGIN_DIR;
 
+		// ── Pronoun chip styles (character creator step 1) ──────────────────
+		// Enqueued globally so they're ready before the wizard JS fires.
+		$pronouns_css = $plugin_dir . 'assets/css/tw-pronouns.css';
+		if ( file_exists( $pronouns_css ) ) {
+			wp_enqueue_style(
+				'neoweaver-pronouns',
+				$plugin_url . 'assets/css/tw-pronouns.css',
+				[ 'neoweaver-public' ],
+				(string) filemtime( $pronouns_css )
+			);
+		}
+
 		// [ handle, css-file, js-file, js-deps, js-in-footer ]
 		$assets = [
 			[
 				'neoweaver-char-creator',
 				'assets/css/tw-character-creator.css',
 				'assets/js/tw-character-creator.js',
-				[ 'jquery' ],
+				// FIX: pronouns CSS must be loaded before the char creator CSS
+				// so chip styles are available when the wizard renders.
+				[ 'jquery', 'neoweaver-pronouns' ],
 				true,
 			],
 			[
