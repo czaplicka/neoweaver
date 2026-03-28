@@ -178,11 +178,11 @@
 			const grid = document.getElementById( 'tw-camp-node-grid' );
 			if ( ! grid ) return;
 
+			// Only fetch columns that actually exist in cyber_worlds
 			const params = {
-				select      : 'id,name,description,difficulty,entropy',
-				order       : 'name.asc',
+				select : 'id,name,description',
+				order  : 'name.asc',
 			};
-			// Filter by current user
 			if ( userId ) params.wp_user_id = 'eq.' + userId;
 
 			sbGet( 'cyber_worlds', params )
@@ -193,10 +193,9 @@
 						return;
 					}
 					rows.forEach( function ( row ) {
-						const diff = [ '', 'Coherent', 'Stable', 'Unstable', 'Critical', 'Catastrophic' ][ parseInt( row.difficulty, 10 ) ] || '—';
-						const sub  = row.description
-							? row.description.slice( 0, 72 ) + ( row.description.length > 72 ? '…' : '' )
-							: 'Diff: ' + diff + ' · Entropy: ' + ( row.entropy || 0 ) + '%';
+						const sub = row.description
+							? row.description.slice( 0, 80 ) + ( row.description.length > 80 ? '…' : '' )
+							: null;
 						grid.appendChild( makeCard(
 							row.id, row.name, sub, '🌐',
 							formState.world_id ? formState.world_id.id : null,
@@ -211,7 +210,7 @@
 					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
 						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/new-node/" class="tw-link">Deploy one first →</a></p>';
 					}
-					// Load all user's agents initially (unfiltered)
+					// Load all user agents initially (unfiltered by world)
 					loadAgents( null );
 				} )
 				.catch( function ( err ) {
@@ -232,8 +231,8 @@
 				status : 'neq.STATUS_DEAD',
 				order  : 'name.asc',
 			};
-			if ( userId   ) params.wp_user_id = 'eq.' + userId;
-			if ( worldId  ) params.world_id   = 'eq.' + worldId;
+			if ( userId  ) params.wp_user_id = 'eq.' + userId;
+			if ( worldId ) params.world_id   = 'eq.' + worldId;
 
 			sbGet( 'cyber_characters', params )
 				.then( function ( rows ) {
