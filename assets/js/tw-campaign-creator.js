@@ -43,8 +43,8 @@
 			game_length   : null,
 			world_type    : null,
 			priority      : null,
-			world_id      : null,   // OPTIONAL { id, name }
-			character_id  : null,   // OPTIONAL { id, name }
+			world_id      : null,
+			character_id  : null,
 		};
 
 		const gmStyleLabels    = { cinematic_heroic: 'Cinematic Heroic', harsh_grounded: 'Harsh Grounded', fast_tactical: 'Fast Tactical' };
@@ -66,6 +66,32 @@
 		document.body.appendChild( spinner );
 		const showSpinner = () => spinner.classList.add( 'active' );
 		const hideSpinner = () => spinner.classList.remove( 'active' );
+
+		// ── Inline error helpers ────────────────────────────────────────────────────
+		function showFieldError( stepEl, msg ) {
+			clearFieldError( stepEl );
+			const err = document.createElement( 'p' );
+			err.className = 'tw-field-error';
+			err.textContent = '⚠ ' + msg;
+			// insert before the nav-row so it appears just above the buttons
+			const nav = stepEl.querySelector( '.tw-nav-row' );
+			nav ? nav.before( err ) : stepEl.appendChild( err );
+			// shake the grid / input
+			const target = stepEl.querySelector( '.tw-option-grid, #tw-camp-name' );
+			if ( target ) {
+				target.classList.remove( 'tw-shake' );
+				void target.offsetWidth; // reflow to restart animation
+				target.classList.add( 'tw-shake' );
+				target.addEventListener( 'animationend', () => target.classList.remove( 'tw-shake' ), { once: true } );
+			}
+			// add error outline to every unselected card in this step
+			stepEl.querySelectorAll( '.tw-card-visual' ).forEach( v => v.classList.add( 'tw-card--error' ) );
+		}
+
+		function clearFieldError( stepEl ) {
+			stepEl.querySelectorAll( '.tw-field-error' ).forEach( e => e.remove() );
+			stepEl.querySelectorAll( '.tw-card--error' ).forEach( v => v.classList.remove( 'tw-card--error' ) );
+		}
 
 		function setStatus( msg, isError ) {
 			if ( ! statusEl ) return;
@@ -103,11 +129,20 @@
 			if ( ! step ) return true;
 			const phase = step.dataset.phase || '';
 
+			clearFieldError( step );
+
 			if ( idx === 0 ) {
 				const nameInput = wrapper.querySelector( '#tw-camp-name' );
 				if ( ! nameInput || ! nameInput.value.trim() ) {
 					nameInput && nameInput.focus();
-					setStatus( 'ERROR: Deployment name is required.', true );
+					showFieldError( step, 'Deployment name is required.' );
+					if ( nameInput ) {
+						nameInput.classList.add( 'tw-input--error' );
+						nameInput.addEventListener( 'input', () => {
+							nameInput.classList.remove( 'tw-input--error' );
+							clearFieldError( step );
+						}, { once: true } );
+					}
 					return false;
 				}
 				formState.campaign_name = nameInput.value.trim();
@@ -116,25 +151,27 @@
 			}
 
 			const radioFields = {
-				'GM PROTOCOL'        : { key: 'gm_style',   labels: gmStyleLabels    },
-				'OPERATIVE MODE'     : { key: 'game_mode',  labels: gameModeLabels   },
-				'OPERATION SCOPE'    : { key: 'game_length', labels: gameLengthLabels },
-				'THREAT CALIBRATION' : { key: 'world_type', labels: worldTypeLabels  },
-				'MISSION PRIORITY'   : { key: 'priority',   labels: priorityLabels   },
+				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels,    msg: 'Select a GM Protocol to continue.'       },
+				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels,   msg: 'Select an Operative Mode to continue.'   },
+				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels, msg: 'Select an Operation Scope to continue.'  },
+				'THREAT CALIBRATION' : { key: 'world_type',  labels: worldTypeLabels,  msg: 'Select a Threat Level to continue.'      },
+				'MISSION PRIORITY'   : { key: 'priority',    labels: priorityLabels,   msg: 'Select a Mission Priority to continue.'  },
 			};
 
 			if ( radioFields[ phase ] ) {
-				const { key, labels } = radioFields[ phase ];
+				const { key, labels, msg } = radioFields[ phase ];
 				const checked = step.querySelector( 'input[type="radio"]:checked' );
 				if ( ! checked ) {
-					setStatus( 'ERROR: Select an option to continue.', true );
+					showFieldError( step, msg );
+					// clear error as soon as any card is picked
+					const radios = step.querySelectorAll( 'input[type="radio"]' );
+					radios.forEach( r => r.addEventListener( 'change', () => clearFieldError( step ), { once: true } ) );
 					return false;
 				}
 				formState[ key ] = { value: checked.value, label: labels[ checked.value ] || checked.value };
 				return true;
 			}
 
-			// Step 7: both optional
 			if ( phase === 'NODE & AGENT BINDING' ) return true;
 
 			return true;
@@ -178,7 +215,6 @@
 			const grid = document.getElementById( 'tw-camp-node-grid' );
 			if ( ! grid ) return;
 
-			// Only fetch columns that actually exist in cyber_worlds
 			const params = {
 				select : 'id,name,description',
 				order  : 'name.asc',
@@ -210,7 +246,6 @@
 					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
 						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/new-node/" class="tw-link">Deploy one first →</a></p>';
 					}
-					// Load all user agents initially (unfiltered by world)
 					loadAgents( null );
 				} )
 				.catch( function ( err ) {
@@ -289,6 +324,7 @@
 				return;
 			}
 			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
+				if ( steps[ current ] ) clearFieldError( steps[ current ] );
 				setStatus( '', false ); showStep( current - 1 );
 				return;
 			}
@@ -329,7 +365,6 @@
 			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); return; }
 			if ( ! payload.world_type )  { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
 			if ( ! payload.priority )    { setStatus( 'ERROR: Mission priority is required.', true ); return; }
-			// world_id + character_id intentionally NOT required.
 
 			submitBtn.disabled    = true;
 			submitBtn.textContent = 'UPLINK IN PROGRESS…';
