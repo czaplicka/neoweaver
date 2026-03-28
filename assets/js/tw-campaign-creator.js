@@ -4,7 +4,7 @@
  * Steps:
  *   1. Identity      — name + directives
  *   2. GM Style      — cinematic_heroic / harsh_grounded / fast_tactical
- *   3. Game Mode     — solo / co-op
+ *   3. Game Mode     — solo / team
  *   4. Game Length   — short / medium / standard / epic / endless
  *   5. World Type    — easy / casual / standard / hardcore / nightmare  (field: world_type)
  *   6. Priority      — combat / wealth / discovery / relations / mix    (field: priority)
@@ -22,6 +22,7 @@
 		const config       = window.twCampaignConfig || {};
 		const sbBase       = ( config.supabaseUrl || '' ).replace( /\/$/, '' ) + '/rest/v1/';
 		const sbKey        = config.supabaseKey || '';
+		const userId       = config.userId      || 0;
 		const restUrl      = config.restUrl      || '/wp-json/neoweaver/v1/campaign/create';
 		const campaignsUrl = config.campaignsUrl || '/campaigns/';
 
@@ -40,14 +41,14 @@
 			gm_style      : null,
 			game_mode     : null,
 			game_length   : null,
-			world_type    : null,   // difficulty / entropy pressure
-			priority      : null,   // quest/reward focus
+			world_type    : null,
+			priority      : null,
 			world_id      : null,   // OPTIONAL { id, name }
 			character_id  : null,   // OPTIONAL { id, name }
 		};
 
 		const gmStyleLabels    = { cinematic_heroic: 'Cinematic Heroic', harsh_grounded: 'Harsh Grounded', fast_tactical: 'Fast Tactical' };
-		const gameModeLabels   = { 1: 'Solo', 2: 'Co-op' };
+		const gameModeLabels   = { 1: 'Solo', 2: 'Team' };
 		const gameLengthLabels = { 1: 'Short', 2: 'Medium', 3: 'Standard', 4: 'Epic', 5: 'Endless' };
 		const worldTypeLabels  = { 1: 'Easy', 2: 'Casual', 3: 'Standard', 4: 'Hardcore', 5: 'Nightmare' };
 		const priorityLabels   = { 1: 'Combat', 2: 'Wealth', 3: 'Discovery', 4: 'Relations', 5: 'Mix' };
@@ -115,11 +116,11 @@
 			}
 
 			const radioFields = {
-				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels    },
-				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels   },
-				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels },
-				'THREAT CALIBRATION' : { key: 'world_type',  labels: worldTypeLabels  },
-				'MISSION PRIORITY'   : { key: 'priority',    labels: priorityLabels   },
+				'GM PROTOCOL'        : { key: 'gm_style',   labels: gmStyleLabels    },
+				'OPERATIVE MODE'     : { key: 'game_mode',  labels: gameModeLabels   },
+				'OPERATION SCOPE'    : { key: 'game_length', labels: gameLengthLabels },
+				'THREAT CALIBRATION' : { key: 'world_type', labels: worldTypeLabels  },
+				'MISSION PRIORITY'   : { key: 'priority',   labels: priorityLabels   },
 			};
 
 			if ( radioFields[ phase ] ) {
@@ -133,7 +134,7 @@
 				return true;
 			}
 
-			// Step 7: NODE & AGENT BINDING — both optional, always pass
+			// Step 7: both optional
 			if ( phase === 'NODE & AGENT BINDING' ) return true;
 
 			return true;
@@ -176,15 +177,22 @@
 			gridsLoaded.nodes = true;
 			const grid = document.getElementById( 'tw-camp-node-grid' );
 			if ( ! grid ) return;
-			sbGet( 'cyber_worlds', { select: 'id,name,description,difficulty,entropy', order: 'name.asc' } )
+
+			const params = {
+				select      : 'id,name,description,difficulty,entropy',
+				order       : 'name.asc',
+			};
+			// Filter by current user
+			if ( userId ) params.wp_user_id = 'eq.' + userId;
+
+			sbGet( 'cyber_worlds', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! rows || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No Nodes found. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
+						grid.innerHTML = '<p class="tw-error-msg">No Nodes found. <a href="/new-node/" class="tw-link">Deploy one first →</a></p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
-						if ( parseInt( row.entropy, 10 ) >= 100 ) return;
 						const diff = [ '', 'Coherent', 'Stable', 'Unstable', 'Critical', 'Catastrophic' ][ parseInt( row.difficulty, 10 ) ] || '—';
 						const sub  = row.description
 							? row.description.slice( 0, 72 ) + ( row.description.length > 72 ? '…' : '' )
@@ -196,37 +204,42 @@
 								formState.world_id     = { id, name };
 								formState.character_id = null;
 								setStatus( '', false );
-								// Load agents filtered to this world
 								loadAgents( id );
 							}
 						) );
 					} );
 					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
-						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
+						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/new-node/" class="tw-link">Deploy one first →</a></p>';
 					}
-					// Load agents unfiltered on initial display
+					// Load all user's agents initially (unfiltered)
 					loadAgents( null );
 				} )
-				.catch( () => { grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes.</p>'; } );
+				.catch( function ( err ) {
+					console.error( 'NeoWeaver: loadNodes error', err );
+					grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes.</p>';
+				} );
 		}
 
 		function loadAgents( worldId ) {
-			const grid    = document.getElementById( 'tw-camp-agent-grid' );
-			const hint    = document.getElementById( 'tw-agent-hint' );
+			const grid = document.getElementById( 'tw-camp-agent-grid' );
+			const hint = document.getElementById( 'tw-agent-hint' );
 			if ( ! grid ) return;
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 			if ( hint ) hint.style.display = worldId ? 'none' : '';
+
 			const params = {
 				select : 'id,name,class_id,race_id,status,world_id,cyber_classes(name),cyber_races(name)',
 				status : 'neq.STATUS_DEAD',
 				order  : 'name.asc',
 			};
-			if ( worldId ) params.world_id = 'eq.' + worldId;
+			if ( userId   ) params.wp_user_id = 'eq.' + userId;
+			if ( worldId  ) params.world_id   = 'eq.' + worldId;
+
 			sbGet( 'cyber_characters', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! rows || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No eligible agents found. <a href="/create-agent/" class="tw-link">Create one first →</a></p>';
+						grid.innerHTML = '<p class="tw-error-msg">No eligible agents found. <a href="/new-agent/" class="tw-link">Create one first →</a></p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
@@ -239,7 +252,10 @@
 						) );
 					} );
 				} )
-				.catch( () => { grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>'; } );
+				.catch( function ( err ) {
+					console.error( 'NeoWeaver: loadAgents error', err );
+					grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>';
+				} );
 		}
 
 		function populateSummary() {
@@ -301,7 +317,6 @@
 				game_length  : formState.game_length ? parseInt( formState.game_length.value, 10 ) : 0,
 				world_type   : formState.world_type  ? parseInt( formState.world_type.value,  10 ) : 0,
 				priority     : formState.priority    ? parseInt( formState.priority.value,    10 ) : 0,
-				// optional — send null if not chosen so DB accepts nullable FK
 				world_id     : formState.world_id    ? formState.world_id.id     : null,
 				character_id : formState.character_id ? formState.character_id.id : null,
 			};
@@ -315,7 +330,7 @@
 			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); return; }
 			if ( ! payload.world_type )  { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
 			if ( ! payload.priority )    { setStatus( 'ERROR: Mission priority is required.', true ); return; }
-			// world_id and character_id are intentionally NOT required.
+			// world_id + character_id intentionally NOT required.
 
 			submitBtn.disabled    = true;
 			submitBtn.textContent = 'UPLINK IN PROGRESS…';
