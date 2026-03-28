@@ -109,7 +109,7 @@ class Neoweaver_Public {
 			[
 				'neoweaver-char-creator',
 				'assets/css/tw-character-creator.css',
-				'assets/js/tw-character-creator.js',
+				'assets/js/character-creator.js',
 				// FIX: pronouns CSS must be loaded before the char creator CSS
 				// so chip styles are available when the wizard renders.
 				[ 'jquery', 'neoweaver-pronouns' ],
