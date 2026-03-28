@@ -76,87 +76,34 @@ class Neoweaver_Public {
 	// ASSET REGISTRATION
 	// =========================================================================
 
-	/**
-	 * Enqueue per-wizard CSS and JS on the front-end.
-	 *
-	 * All assets live in the plugin's own assets/ directory.
-	 * Files are loaded only if they exist (file_exists check), so adding a new
-	 * wizard is as simple as dropping css/js files here and adding a row below.
-	 * Versioning via filemtime() ensures automatic cache-busting.
-	 */
 	public function enqueue_assets(): void {
 		if ( is_admin() ) {
 			return;
 		}
 
-		$plugin_url = NEOWEAVER_PLUGIN_URL;
-		$plugin_dir = NEOWEAVER_PLUGIN_DIR;
+		$url = NEOWEAVER_PLUGIN_URL;
+		$ver = NEOWEAVER_VERSION;
 
-		// ── Pronoun chip styles (character creator step 1) ──────────────────
-		// Enqueued globally so they're ready before the wizard JS fires.
-		$pronouns_css = $plugin_dir . 'assets/css/tw-pronouns.css';
-		if ( file_exists( $pronouns_css ) ) {
-			wp_enqueue_style(
-				'neoweaver-pronouns',
-				$plugin_url . 'assets/css/tw-pronouns.css',
-				[ 'neoweaver-public' ],
-				(string) filemtime( $pronouns_css )
-			);
-		}
-
-		// [ handle, css-file, js-file, js-deps, js-in-footer ]
-		$assets = [
-			[
-				'neoweaver-char-creator',
-				'assets/css/tw-character-creator.css',
-				'assets/js/character-creator.js',
-				[ 'jquery', 'neoweaver-pronouns' ],
-				true,
-			],
-			[
-				'neoweaver-campaign-creator',
-				'assets/css/tw-campaign-creator.css',
-				'assets/js/tw-campaign-creator.js',
-				[],
-				true,
-			],
-			[
-				'neoweaver-world-creator',
-				'assets/css/world-creator.css',
-				'assets/js/tw-world-creator.js',
-				[],
-				true,
-			],
-		];
-
-		foreach ( $assets as [ $handle, $css_rel, $js_rel, $deps, $in_footer ] ) {
-			$css_file = $plugin_dir . $css_rel;
-			$js_file  = $plugin_dir . $js_rel;
-
-			if ( file_exists( $css_file ) ) {
-				wp_enqueue_style(
-					$handle,
-					$plugin_url . $css_rel,
-					[ 'neoweaver-public' ],
-					(string) filemtime( $css_file )
-				);
-			}
-
-			if ( file_exists( $js_file ) ) {
-				wp_enqueue_script(
-					$handle,
-					$plugin_url . $js_rel,
-					$deps,
-					(string) filemtime( $js_file ),
-					$in_footer
-				);
-			}
-		}
-
-		// ── Character creator JS config ──────────────────────────────────────
-		// wp_localize_script MUST be called here (during wp_enqueue_scripts),
-		// NOT inside the shortcode render function — by the time shortcode runs,
-		// wp_head has already fired and localize would be silently ignored.
+		// ── Character creator ──────────────────────────────────────────────
+		wp_enqueue_style(
+			'neoweaver-pronouns',
+			$url . 'assets/css/tw-pronouns.css',
+			[ 'neoweaver-public' ],
+			$ver
+		);
+		wp_enqueue_style(
+			'neoweaver-char-creator',
+			$url . 'assets/css/tw-character-creator.css',
+			[ 'neoweaver-public', 'neoweaver-pronouns' ],
+			$ver
+		);
+		wp_enqueue_script(
+			'neoweaver-char-creator',
+			$url . 'assets/js/character-creator.js',
+			[ 'jquery' ],
+			$ver,
+			true
+		);
 		wp_localize_script(
 			'neoweaver-char-creator',
 			'twCharCreatorConfig',
@@ -170,42 +117,56 @@ class Neoweaver_Public {
 				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			]
 		);
+
+		// ── Campaign creator ─────────────────────────────────────────────
+		wp_enqueue_style(
+			'neoweaver-campaign-creator',
+			$url . 'assets/css/tw-campaign-creator.css',
+			[ 'neoweaver-public' ],
+			$ver
+		);
+		wp_enqueue_script(
+			'neoweaver-campaign-creator',
+			$url . 'assets/js/tw-campaign-creator.js',
+			[ 'jquery' ],
+			$ver,
+			true
+		);
+
+		// ── World creator ────────────────────────────────────────────────
+		wp_enqueue_style(
+			'neoweaver-world-creator',
+			$url . 'assets/css/world-creator.css',
+			[ 'neoweaver-public' ],
+			$ver
+		);
+		wp_enqueue_script(
+			'neoweaver-world-creator',
+			$url . 'assets/js/tw-world-creator.js',
+			[ 'jquery' ],
+			$ver,
+			true
+		);
 	}
 
 	// =========================================================================
 	// PRIVATE HELPERS
 	// =========================================================================
 
-	/**
-	 * Wrap any shortcode HTML in the mandatory .neoweaver-screen container.
-	 */
 	private function screen( string $html ): string {
 		return '<div class="neoweaver-screen">' . $html . '</div>';
 	}
 
-	/**
-	 * Load a template partial and capture its output.
-	 *
-	 * The partial receives a single $tw_data array in its local scope so it
-	 * never needs to reach into global state.
-	 *
-	 * @param string $partial  Relative path under templates/partials/, e.g. 'character-creator.php'.
-	 * @param array  $tw_data  Variables available inside the partial as $tw_data['key'].
-	 * @return string  Rendered HTML, or an error comment on failure.
-	 */
 	private function load_template( string $partial, array $tw_data = [] ): string {
 		$path = get_stylesheet_directory() . '/templates/partials/' . $partial;
-
 		if ( ! file_exists( $path ) ) {
 			return '<!-- Neoweaver: missing partial ' . esc_html( $partial ) . ' -->';
 		}
-
 		ob_start();
 		( static function ( $tw_data, $__path ) {
 			extract( [ 'tw_data' => $tw_data ], EXTR_SKIP );
 			include $__path;
 		} )( $tw_data, $path );
-
 		return ob_get_clean() ?: '';
 	}
 
@@ -213,10 +174,6 @@ class Neoweaver_Public {
 	// SHORTCODE: character list
 	// =========================================================================
 
-	/**
-	 * [tw_list_characters]
-	 * Renders the full agent roster for the currently logged-in Operator.
-	 */
 	public function shortcode_list_characters(): string {
 		if ( is_admin() ) {
 			return '';
