@@ -18,38 +18,6 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
-		$nonce      = wp_create_nonce( 'tw_character_nonce' );
-		$rest_url   = home_url( '/wp-json/neoweaver/v1/character/create' );
-		$agents_url = home_url( '/agents/' );
-
-		// FIX: restBase was missing from twCharCreatorConfig.
-		// JS uses wpRestBase + '/races' and + '/classes' to load dynamic grids.
-		// Without this value, fetch() received "undefined/races" and failed silently.
-		wp_localize_script(
-			'neoweaver-char-creator',
-			'twCharCreatorConfig',
-			[
-				'nonce'       => $nonce,
-				'restNonce'   => wp_create_nonce( 'wp_rest' ),
-				'restUrl'     => $rest_url,
-				'agentsUrl'   => $agents_url,
-				'restBase'    => home_url( '/wp-json/neoweaver/v1' ),
-				'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
-				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-			]
-		);
-
-		// Spinner CSS.
-		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
-		if ( file_exists( $spinner_css ) ) {
-			wp_enqueue_style(
-				'neoweaver-node-spinner',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/tw-node-spinner.css',
-				[],
-				(string) filemtime( $spinner_css )
-			);
-		}
-
 		$attrs = [
 			'body'   => [ 'label' => 'BODY',   'sub' => 'STR + CON', 'desc' => 'Brute force, health pool, heavy lifting, physical endurance.', 'icon' => '💪' ],
 			'reflex' => [ 'label' => 'REFLEX', 'sub' => 'DEX',       'desc' => 'Speed, evasion, precision aiming, reaction time.',              'icon' => '⚡' ],
@@ -140,12 +108,19 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			</div>
 
 			<!-- STEP 2 — Race -->
-			<div class="tw-step" data-step="2" data-phase="RACE PROTOCOL" data-field="race">
+			<div class="tw-step" data-step="2" data-phase="RACE PROTOCOL">
 				<h2>// RACE PROTOCOL</h2>
 				<p class="tw-question-text">Select the operative's biological or synthetic origin.</p>
-				<div class="tw-dynamic-grid" id="tw-race-grid">
-					<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING RACE DATA FROM NODE…</div>
+
+				<!-- Base races -->
+				<div class="tw-dynamic-grid tw-race-grid" id="tw-race-grid"></div>
+
+				<!-- Subraces — hidden until base race clicked -->
+				<div id="tw-subrace-section" style="display:none;">
+					<h3 class="tw-subrace-heading">// SELECT SUBRACE</h3>
+					<div class="tw-dynamic-grid tw-subrace-grid" id="tw-subrace-grid"></div>
 				</div>
+
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
