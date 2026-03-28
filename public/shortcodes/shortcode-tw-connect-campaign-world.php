@@ -1,19 +1,14 @@
 <?php
 /**
  * SHORTCODE: [tw_connect_campaign_world]
- * Wersja: v15 - bug fixes + optimizations
+ * Wersja: v16 - added optional Agent binding
  *
- * FIXES vs v14:
- * 1. cyber_campaign_worlds query now filtered by creator_wp_id (was fetching ALL links globally)
- * 2. rLinked fetch moved into Promise.all (was sequential, wasting RTT)
- * 3. HTTP status check added for rLinked (was silently swallowed)
- * 4. select change listeners moved to selC/selW directly (form.onchange unreliable for bubbling)
- * 5. "Prefer: resolution=merge-duplicates" replaced with return=representation + duplicate guard
- * 6. Redirect uses relative path via window.location.pathname prefix-awareness
- * 7. simulateLiveStats interval stored and cleared on page unload (memory leak fix)
- * 8. Filter inputs debounced (was rebuilding DOM on every keystroke)
- * 9. renderList skips full rebuild when filter unchanged
- * 10. box-sizing: border-box applied to inputs/selects
+ * CHANGES vs v15:
+ * 1. Added optional Field Agent selector alongside Campaign + Node selectors
+ * 2. Agent select loads all living characters owned by current user
+ * 3. Agent assignment is OPTIONAL — form submits fine without it
+ * 4. If agent selected, character_id is included in cyber_campaign_worlds payload
+ * 5. Button enabled when campaign + world selected (agent not required)
  */
 function tw_connect_campaign_world_final() {
     if ( ! is_user_logged_in() ) {
@@ -77,6 +72,19 @@ function tw_connect_campaign_world_final() {
                                 <select id="s-world" class="tw-select-cyber" size="6" required></select>
                             </div>
                         </div>
+
+                        <div class="tw-field-box tw-field-box--optional">
+                            <label>
+                                <i class="dashicons dashicons-admin-users"></i>
+                                ASSIGN FIELD AGENT
+                                <span class="tw-opt-badge">OPTIONAL</span>
+                            </label>
+                            <div class="tw-input-wrapper">
+                                <input type="text" id="f-agent" class="tw-input-cyber" placeholder="Search agents...">
+                                <select id="s-agent" class="tw-select-cyber" size="6"></select>
+                            </div>
+                            <p class="tw-field-hint">Leave unselected to assign an Agent later from the Deployment panel.</p>
+                        </div>
                     </div>
 
                     <button type="submit" id="b-connect" class="tw-btn-deploy" disabled>
@@ -89,6 +97,10 @@ function tw_connect_campaign_world_final() {
                 <div class="tw-sidebar-card">
                     <h4><i class="dashicons dashicons-info"></i> PROTOCOL BINDING</h4>
                     <p>Once anchored, the <strong>Deployment</strong> consumes the <strong>Node's</strong> resources. Other Field Agents can then synchronize via the Multiplayer Frequency.</p>
+                </div>
+                <div class="tw-sidebar-card" style="margin-top:16px;">
+                    <h4><i class="dashicons dashicons-admin-users"></i> AGENT BINDING</h4>
+                    <p>Assigning a <strong>Field Agent</strong> now links them directly to this Deployment. You may also assign an Agent later from the Deployment management panel.</p>
                 </div>
             </aside>
         </div>
@@ -104,17 +116,17 @@ function tw_connect_campaign_world_final() {
 
         const selC  = document.getElementById('s-camp');
         const selW  = document.getElementById('s-world');
+        const selA  = document.getElementById('s-agent'); // NEW: agent selector
         const btn   = document.getElementById('b-connect');
         const log   = document.getElementById('tw-world-console');
         const form  = document.getElementById('tw-anchor-form');
         const audio = document.getElementById('tw-glitch-sound');
         const root  = document.getElementById('tw-deployment-root');
 
-        let dataStore = { camps: [], worlds: [] };
-        let statsInterval = null; // FIX #7: store interval ref for cleanup
-        let isSubmitting = false; // FIX #5: guard against double-submit
+        let dataStore = { camps: [], worlds: [], agents: [] };
+        let statsInterval = null;
+        let isSubmitting = false;
 
-        // FIX #8: debounce helper to avoid rebuilding DOM on every keystroke
         function debounce(fn, ms) {
             let t;
             return function(...args) {
@@ -131,10 +143,8 @@ function tw_connect_campaign_world_final() {
             };
 
             try {
-                // FIX #2: all three fetches run in parallel (was: rLinked was sequential after rC+rW)
-                // FIX #1: cyber_campaign_worlds filtered by creator_wp_id so only THIS user's
-                //         linked campaigns are excluded (was: fetching ALL rows globally)
-                const [rC, rW, rLinked] = await Promise.all([
+                // Fetch campaigns, worlds, linked IDs and agents in parallel
+                const [rC, rW, rLinked, rA] = await Promise.all([
                     fetch(
                         cfg.url +
                         "rest/v1/cyber_campaign" +
@@ -155,33 +165,45 @@ function tw_connect_campaign_world_final() {
                         cfg.url +
                         "rest/v1/cyber_campaign_worlds" +
                         "?select=campaign_id" +
-                        "&creator_wp_id=eq." + cfg.uid, // FIX #1: scoped to current user
+                        "&creator_wp_id=eq." + cfg.uid,
+                        { headers: h }
+                    ),
+                    // NEW: fetch living characters owned by current user
+                    fetch(
+                        cfg.url +
+                        "rest/v1/cyber_characters" +
+                        "?select=id,name,class" +
+                        "&wp_user_id=eq." + cfg.uid +
+                        "&is_alive=eq.true" +
+                        "&order=created_at.desc",
                         { headers: h }
                     )
                 ]);
 
-                // FIX #3: check HTTP status for all three responses (rLinked was unchecked)
-                if (!rC.ok || !rW.ok || !rLinked.ok) {
-                    const statuses = [rC.status, rW.status, rLinked.status];
+                if (!rC.ok || !rW.ok || !rLinked.ok || !rA.ok) {
+                    const statuses = [rC.status, rW.status, rLinked.status, rA.status];
                     console.error('Fetch error statuses:', statuses);
                     log.innerText = "> Error: Supabase HTTP " + statuses.join(" / ");
                     log.style.color = "#ff0055";
                     return;
                 }
 
-                const [allCamps, allWorlds, linkedRows] = await Promise.all([
+                const [allCamps, allWorlds, linkedRows, allAgents] = await Promise.all([
                     rC.json(),
                     rW.json(),
-                    rLinked.json()
+                    rLinked.json(),
+                    rA.json()
                 ]);
 
                 const linkedIds = new Set(linkedRows.map(r => String(r.campaign_id)));
 
                 dataStore.camps  = allCamps.filter(c => !linkedIds.has(String(c.id)));
                 dataStore.worlds = allWorlds;
+                dataStore.agents = allAgents;
 
                 renderList('camp',  dataStore.camps);
                 renderList('world', dataStore.worlds);
+                renderList('agent', dataStore.agents);
 
                 log.innerText = "> System: Field Agent authorized. Scan complete.";
                 simulateLiveStats();
@@ -194,28 +216,33 @@ function tw_connect_campaign_world_final() {
         }
 
         function renderList(type, list, filter) {
-            const el      = (type === 'camp') ? selC : selW;
+            const el = type === 'camp' ? selC : (type === 'world' ? selW : selA);
             const filterL = (filter || "").toLowerCase().trim();
 
             const filtered = list.filter(i =>
                 (i.name || "").toLowerCase().includes(filterL)
             );
 
-            // FIX #9: bail early when result count hasn't changed and filter is empty
-            // (avoids full DOM rebuild on redundant calls)
             el.innerHTML = "";
 
-            if (filtered.length === 0) {
+            // For agent: add empty "-- no agent --" option at top so it's skippable
+            if (type === 'agent') {
+                el.appendChild(new Option("-- Skip / assign later --", ""));
+            }
+
+            if (filtered.length === 0 && type !== 'agent') {
                 el.appendChild(new Option("-- NO DATA --", ""));
                 return;
             }
 
-            // Build fragment to minimize reflows
             const frag = document.createDocumentFragment();
             filtered.forEach(i => {
                 let label = (i.name || "").toUpperCase();
                 if (type === 'camp' && i.world_type != null) {
                     label += " [TYPE " + i.world_type + "]";
+                }
+                if (type === 'agent' && i.class) {
+                    label += " [" + i.class.toUpperCase() + "]";
                 }
                 frag.appendChild(new Option(label, i.id));
             });
@@ -224,7 +251,6 @@ function tw_connect_campaign_world_final() {
 
         function simulateLiveStats() {
             const latencyEl = document.getElementById('stat-latency');
-            // FIX #7: store interval so it can be cleared
             statsInterval = setInterval(() => {
                 if (!latencyEl) return;
                 latencyEl.innerText = (0.020 + Math.random() * 0.01).toFixed(3);
@@ -235,12 +261,10 @@ function tw_connect_campaign_world_final() {
             }, 1200);
         }
 
-        // FIX #7: clean up interval when user navigates away
         window.addEventListener('beforeunload', () => {
             if (statsInterval) clearInterval(statsInterval);
         });
 
-        // FIX #8: debounced filter handlers (50ms is imperceptible but collapses rapid keystrokes)
         document.getElementById('f-camp').addEventListener(
             'input',
             debounce(e => renderList('camp',  dataStore.camps,  e.target.value), 50)
@@ -249,24 +273,29 @@ function tw_connect_campaign_world_final() {
             'input',
             debounce(e => renderList('world', dataStore.worlds, e.target.value), 50)
         );
+        document.getElementById('f-agent').addEventListener(
+            'input',
+            debounce(e => renderList('agent', dataStore.agents, e.target.value), 50)
+        );
 
-        // FIX #4: listen directly on selC and selW instead of form.onchange
-        //         form.onchange doesn't reliably bubble select events in all browsers
+        // Button enabled when campaign + world selected; agent is optional
         function updateButtonState() {
             btn.disabled = !(selC.value && selW.value);
             if (!btn.disabled) {
                 log.style.color = "#00e5ff";
-                log.innerText = "> System: Link established. Ready for Anchor.";
+                const agentMsg = selA.value
+                    ? " Agent: " + (selA.options[selA.selectedIndex]?.text || selA.value) + "."
+                    : " No Agent assigned (optional).";
+                log.innerText = "> System: Link established. Ready for Anchor." + agentMsg;
             }
         }
         selC.addEventListener('change', updateButtonState);
         selW.addEventListener('change', updateButtonState);
+        selA.addEventListener('change', updateButtonState); // update message only
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // FIX #5: guard against double-submit (button re-enable on error doesn't help
-            //         if the user double-clicks before the first response arrives)
             if (isSubmitting) return;
             isSubmitting = true;
             btn.disabled = true;
@@ -280,28 +309,29 @@ function tw_connect_campaign_world_final() {
                 creator_wp_id: cfg.uid
             };
 
+            // NEW: include character_id only if an agent was selected
+            if (selA.value) {
+                payload.character_id = parseInt(selA.value, 10);
+            }
+
             try {
                 const res = await fetch(cfg.url + "rest/v1/cyber_campaign_worlds", {
                     method:  "POST",
                     headers: {
-                        "apikey":         cfg.key,
-                        "Authorization":  "Bearer " + cfg.key,
-                        "Content-Type":   "application/json",
-                        // FIX #5: removed "resolution=merge-duplicates" — it silently overwrites
-                        //         duplicates instead of surfacing them as errors.
-                        //         If idempotent upsert is intentional, add it back deliberately.
-                        "Prefer":         "return=minimal"
+                        "apikey":        cfg.key,
+                        "Authorization": "Bearer " + cfg.key,
+                        "Content-Type":  "application/json",
+                        "Prefer":        "return=minimal"
                     },
                     body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
-                    if (audio) audio.play().catch(() => {}); // catch autoplay policy errors
+                    if (audio) audio.play().catch(() => {});
                     root.classList.add('tw-glitch-shake');
                     log.style.color = "#adff00";
                     log.innerText   = "> System: ANCHOR SUCCESSFUL. REALITY SYNCED.";
 
-                    // FIX #6: use relative redirect so it works on any WP base path
                     setTimeout(() => {
                         window.location.href = (window.location.origin || '') + '/deployments/';
                     }, 1500);
@@ -315,7 +345,7 @@ function tw_connect_campaign_world_final() {
                 log.style.color = "#ff0055";
                 log.innerText   = "> Error: Deployment failed. " + err.message;
                 btn.disabled    = false;
-                isSubmitting    = false; // FIX #5: allow retry after error
+                isSubmitting    = false;
             }
         });
 
@@ -324,7 +354,6 @@ function tw_connect_campaign_world_final() {
     </script>
 
     <style>
-        /* FIX #10: box-sizing so padding doesn't blow out input/select widths on some themes */
         .tw-deployment-main-container *,
         .tw-deployment-main-container *::before,
         .tw-deployment-main-container *::after {
@@ -347,11 +376,18 @@ function tw_connect_campaign_world_final() {
         .n-glitch { filter: brightness(2) contrast(1.5); transform: scale(1.05); }
         .tw-deploy-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 40px; padding: 40px; }
         .tw-console-box { background: #050505; border-left: 3px solid #00e5ff; padding: 15px; font-family: monospace; font-size: 0.8rem; color: #00e5ff; margin-bottom: 30px; box-shadow: inset 0 0 10px rgba(0,229,255,0.05); }
-        .tw-selection-group { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        /* 3-column layout for the 3 selectors */
+        .tw-selection-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .tw-field-box label { display: block; color: #adff00; font-size: 0.75rem; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; }
+        .tw-field-box--optional label { color: #888; }
+        .tw-opt-badge { font-size: 0.6rem; background: #1a1a1a; color: #adff00; border: 1px solid #adff00; padding: 1px 5px; margin-left: 6px; vertical-align: middle; letter-spacing: 1px; }
+        .tw-field-hint { color: #444; font-size: 0.72rem; margin-top: 6px; font-style: italic; }
         .tw-input-cyber { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px; font-size: 0.8rem; margin-bottom: 5px; border-radius: 0; outline: none; }
         .tw-input-cyber:focus { border-color: #adff00; }
         .tw-select-cyber { width: 100%; background: #080808; border: 1px solid #222; color: #00e5ff; padding: 10px; font-size: 0.9rem; outline: none; border-radius: 0; cursor: pointer; }
+        .tw-field-box--optional .tw-select-cyber { color: #666; border-color: #1a1a1a; }
+        .tw-field-box--optional .tw-select-cyber:focus,
+        .tw-field-box--optional .tw-select-cyber option:checked { color: #adff00; }
         .tw-select-cyber option { padding: 8px; }
         .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; font-size: 1rem; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: 0.3s; letter-spacing: 2px; }
         .tw-btn-deploy:hover:not(:disabled) { background: #fff; transform: translateY(-2px); }
@@ -366,6 +402,9 @@ function tw_connect_campaign_world_final() {
             20%, 80% { transform: translate3d(2px, 0, 0); }
             30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
             40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @media (max-width: 900px) {
+            .tw-selection-group { grid-template-columns: 1fr; }
         }
     </style>
     <?php
