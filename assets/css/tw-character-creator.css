@@ -274,6 +274,7 @@
 	50%      { opacity: 1;   transform: scale(1.2); }
 }
 
+/* ── .tw-dyn-card — original grid card (kept for backwards compat) ─────────── */
 .neoweaver-screen #tw-char-creator-wrapper .tw-dyn-card {
 	background     : rgba(255,255,255,0.02);
 	border         : 1px solid rgba(255,255,255,0.12);
@@ -341,6 +342,152 @@
 	color      : var(--red-err);
 	font-size  : 0.85rem;
 	padding    : 20px;
+}
+
+/* ── .tw-grid-card — JS-created cards (races / classes / nodes) ─────────────── */
+/* Full alias of .tw-dyn-card so both class names work identically             */
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card {
+	background     : rgba(255,255,255,0.02);
+	border         : 1px solid rgba(255,255,255,0.12);
+	cursor         : pointer;
+	transition     : all 0.25s ease;
+	display        : flex;
+	flex-direction : column;
+	position       : relative;
+	overflow       : hidden;
+	z-index        : 4;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card:hover {
+	border-color: rgba(173,255,0,0.5);
+	background  : rgba(255,255,255,0.05);
+	transform   : translateY(-3px);
+	box-shadow  : 0 6px 24px rgba(0,0,0,0.4);
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected {
+	border-color: var(--neon-green);
+	background  : rgba(173,255,0,0.09);
+	box-shadow  : 0 0 28px rgba(173,255,0,0.18) inset, 0 0 14px rgba(173,255,0,0.22);
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected strong,
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-name {
+	color      : var(--neon-green);
+	text-shadow: 0 0 8px var(--neon-green);
+}
+
+/* ── Race card image ─────────────────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-img {
+	width           : 100%;
+	height          : 120px;
+	overflow        : hidden;
+	background      : rgba(0,0,0,0.4);
+	display         : flex;
+	align-items     : center;
+	justify-content : center;
+	border-bottom   : 1px solid rgba(173,255,0,0.15);
+	flexshrink      : 0;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-img img {
+	width      : 100%;
+	height     : 100%;
+	object-fit : contain;
+	opacity    : 0.85;
+	filter     : drop-shadow(0 0 6px rgba(173,255,0,0.3));
+	transition : opacity 0.3s, filter 0.3s;
+	display    : block;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card:hover .tw-race-img img,
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-img img {
+	opacity: 1;
+	filter : drop-shadow(0 0 12px rgba(173,255,0,0.7)) brightness(1.15);
+}
+
+/* ── Race card body ─────────────────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-body {
+	padding   : 12px 14px;
+	display   : flex;
+	flex-direction: column;
+	gap       : 6px;
+	flex      : 1;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-name {
+	font-size     : 0.95rem;
+	color         : #fff;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	margin        : 0;
+	line-height   : 1.2;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-desc {
+	font-size  : 0.75rem;
+	color      : #999;
+	line-height: 1.4;
+	margin     : 0;
+	display    : -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow   : hidden;
+}
+
+/* ── Race tags (keyword chips) ───────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-tags {
+	display  : flex;
+	flex-wrap: wrap;
+	gap      : 4px;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-tag {
+	display       : inline-block;
+	background    : rgba(173,255,0,0.08);
+	border        : 1px solid rgba(173,255,0,0.3);
+	color         : var(--neon-green);
+	font-size     : 0.6rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	padding       : 2px 7px;
+	border-radius : 2px;
+	white-space   : nowrap;
+}
+
+/* ── Select hint ─────────────────────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-select-hint {
+	font-size     : 0.65rem;
+	color         : rgba(173,255,0,0.4);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	margin-top    : auto;
+	padding-top   : 4px;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card:hover .tw-race-select-hint {
+	color: rgba(173,255,0,0.8);
+}
+
+/* ── Subrace section ─────────────────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-section {
+	margin-top   : 28px;
+	border-top   : 1px solid rgba(173,255,0,0.2);
+	padding-top  : 20px;
+	animation    : tw-char-fadein 0.4s ease both;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-heading {
+	color         : var(--cyan);
+	font-size     : 1rem;
+	letter-spacing: 3px;
+	text-transform: uppercase;
+	margin        : 0 0 14px 0;
+	text-shadow   : 0 0 8px rgba(0,229,255,0.4);
+}
+
+/* ── Empty / none state ──────────────────────────────────────────────────────── */
+.neoweaver-screen #tw-char-creator-wrapper .tw-empty-state {
+	grid-column  : 1 / -1;
+	padding      : 20px;
+	color        : #666;
+	font-size    : 0.8rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-none {
+	color: var(--neon-green);
+	opacity: 0.7;
 }
 
 /* ── Attribute stepper (Step 4) ─────────────────────────────────────────────── */
@@ -669,7 +816,6 @@
 }
 
 /* ── Spinner overlay (reuses structure from tw-node-spinner.css) ─────────────── */
-/* Scoped separately so it covers the full viewport */
 #tw-char-spinner {
 	display        : none;
 	position       : fixed;
