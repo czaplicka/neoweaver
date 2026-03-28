@@ -1,15 +1,5 @@
 /**
  * tw-campaign-creator.js  — 8-step Deployment wizard
- *
- * Steps:
- *   1. Identity      — name + directives
- *   2. GM Style      — cinematic_heroic / harsh_grounded / fast_tactical
- *   3. Game Mode     — solo / team
- *   4. Game Length   — short / medium / standard / epic / endless
- *   5. World Type    — easy / casual / standard / hardcore / nightmare  (field: world_type)
- *   6. Priority      — combat / wealth / discovery / relations / mix    (field: priority)
- *   7. Node & Agent  — both optional, single screen
- *   8. Summary       — review + UPLINK
  */
 ( function () {
 	'use strict';
@@ -67,24 +57,21 @@
 		const showSpinner = () => spinner.classList.add( 'active' );
 		const hideSpinner = () => spinner.classList.remove( 'active' );
 
-		// ── Inline error helpers ────────────────────────────────────────────────────
+		// ── Inline error helpers ──────────────────────────────────────────────
 		function showFieldError( stepEl, msg ) {
 			clearFieldError( stepEl );
 			const err = document.createElement( 'p' );
 			err.className = 'tw-field-error';
 			err.textContent = '⚠ ' + msg;
-			// insert before the nav-row so it appears just above the buttons
 			const nav = stepEl.querySelector( '.tw-nav-row' );
 			nav ? nav.before( err ) : stepEl.appendChild( err );
-			// shake the grid / input
 			const target = stepEl.querySelector( '.tw-option-grid, #tw-camp-name' );
 			if ( target ) {
 				target.classList.remove( 'tw-shake' );
-				void target.offsetWidth; // reflow to restart animation
+				void target.offsetWidth;
 				target.classList.add( 'tw-shake' );
 				target.addEventListener( 'animationend', () => target.classList.remove( 'tw-shake' ), { once: true } );
 			}
-			// add error outline to every unselected card in this step
 			stepEl.querySelectorAll( '.tw-card-visual' ).forEach( v => v.classList.add( 'tw-card--error' ) );
 		}
 
@@ -100,10 +87,10 @@
 		}
 
 		function updateProgress( idx ) {
-			const num   = idx + 1;
-			const pct   = Math.round( ( num / totalSteps ) * 100 );
+			const num  = idx + 1;
+			const pct  = Math.round( ( num / totalSteps ) * 100 );
 			const phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
-			if ( progressFill )    progressFill.style.width   = pct + '%';
+			if ( progressFill )    progressFill.style.width    = pct + '%';
 			if ( progressCurrent ) progressCurrent.textContent = num;
 			if ( progressPhase )   progressPhase.textContent   = phase;
 			wrapper.querySelectorAll( '.tw-progress-tick' ).forEach( function ( tick ) {
@@ -127,14 +114,15 @@
 		function validateStep( idx ) {
 			const step = steps[ idx ];
 			if ( ! step ) return true;
-			const phase = step.dataset.phase || '';
+			const phase = ( step.dataset.phase || '' ).trim();
 
 			clearFieldError( step );
 
+			// Step 0: name required
 			if ( idx === 0 ) {
 				const nameInput = wrapper.querySelector( '#tw-camp-name' );
 				if ( ! nameInput || ! nameInput.value.trim() ) {
-					nameInput && nameInput.focus();
+					if ( nameInput ) nameInput.focus();
 					showFieldError( step, 'Deployment name is required.' );
 					if ( nameInput ) {
 						nameInput.classList.add( 'tw-input--error' );
@@ -150,12 +138,13 @@
 				return true;
 			}
 
+			// Steps with radio cards
 			const radioFields = {
-				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels,    msg: 'Select a GM Protocol to continue.'       },
-				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels,   msg: 'Select an Operative Mode to continue.'   },
-				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels, msg: 'Select an Operation Scope to continue.'  },
-				'THREAT CALIBRATION' : { key: 'world_type',  labels: worldTypeLabels,  msg: 'Select a Threat Level to continue.'      },
-				'MISSION PRIORITY'   : { key: 'priority',    labels: priorityLabels,   msg: 'Select a Mission Priority to continue.'  },
+				'GM PROTOCOL'        : { key: 'gm_style',   labels: gmStyleLabels,    msg: 'Select a GM Protocol to continue.'      },
+				'OPERATIVE MODE'     : { key: 'game_mode',  labels: gameModeLabels,   msg: 'Select an Operative Mode to continue.'  },
+				'OPERATION SCOPE'    : { key: 'game_length', labels: gameLengthLabels, msg: 'Select an Operation Scope to continue.' },
+				'THREAT CALIBRATION' : { key: 'world_type', labels: worldTypeLabels,  msg: 'Select a Threat Level to continue.'     },
+				'MISSION PRIORITY'   : { key: 'priority',   labels: priorityLabels,   msg: 'Select a Mission Priority to continue.' },
 			};
 
 			if ( radioFields[ phase ] ) {
@@ -163,20 +152,20 @@
 				const checked = step.querySelector( 'input[type="radio"]:checked' );
 				if ( ! checked ) {
 					showFieldError( step, msg );
-					// clear error as soon as any card is picked
-					const radios = step.querySelectorAll( 'input[type="radio"]' );
-					radios.forEach( r => r.addEventListener( 'change', () => clearFieldError( step ), { once: true } ) );
+					step.querySelectorAll( 'input[type="radio"]' ).forEach(
+						r => r.addEventListener( 'change', () => clearFieldError( step ), { once: true } )
+					);
 					return false;
 				}
 				formState[ key ] = { value: checked.value, label: labels[ checked.value ] || checked.value };
 				return true;
 			}
 
-			if ( phase === 'NODE & AGENT BINDING' ) return true;
-
+			// NODE & AGENT — optional, always pass
 			return true;
 		}
 
+		// ── Supabase helper ───────────────────────────────────────────────────
 		function sbGet( table, params ) {
 			if ( ! sbBase || ! sbKey ) return Promise.resolve( [] );
 			const url = new URL( sbBase + table );
@@ -214,13 +203,8 @@
 			gridsLoaded.nodes = true;
 			const grid = document.getElementById( 'tw-camp-node-grid' );
 			if ( ! grid ) return;
-
-			const params = {
-				select : 'id,name,description',
-				order  : 'name.asc',
-			};
+			const params = { select: 'id,name,description', order: 'name.asc' };
 			if ( userId ) params.wp_user_id = 'eq.' + userId;
-
 			sbGet( 'cyber_worlds', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
@@ -229,23 +213,18 @@
 						return;
 					}
 					rows.forEach( function ( row ) {
-						const sub = row.description
-							? row.description.slice( 0, 80 ) + ( row.description.length > 80 ? '…' : '' )
-							: null;
+						const sub = row.description ? row.description.slice( 0, 80 ) + ( row.description.length > 80 ? '…' : '' ) : null;
 						grid.appendChild( makeCard(
 							row.id, row.name, sub, '🌐',
 							formState.world_id ? formState.world_id.id : null,
 							function ( id, name ) {
-								formState.world_id     = { id, name };
+								formState.world_id    = { id, name };
 								formState.character_id = null;
 								setStatus( '', false );
 								loadAgents( id );
 							}
 						) );
 					} );
-					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
-						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes. <a href="/new-node/" class="tw-link">Deploy one first →</a></p>';
-					}
 					loadAgents( null );
 				} )
 				.catch( function ( err ) {
@@ -260,7 +239,6 @@
 			if ( ! grid ) return;
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 			if ( hint ) hint.style.display = worldId ? 'none' : '';
-
 			const params = {
 				select : 'id,name,class_id,race_id,status,world_id,cyber_classes(name),cyber_races(name)',
 				status : 'neq.STATUS_DEAD',
@@ -268,7 +246,6 @@
 			};
 			if ( userId  ) params.wp_user_id = 'eq.' + userId;
 			if ( worldId ) params.world_id   = 'eq.' + worldId;
-
 			sbGet( 'cyber_characters', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
@@ -308,24 +285,21 @@
 			set( 'character_id',  formState.character_id ? formState.character_id.name : '— (unassigned)' );
 		}
 
-		// ── Navigation ────────────────────────────────────────────────────────
-		const firstNext = wrapper.querySelector( '#tw-camp-step1-next' );
-		if ( firstNext ) {
-			firstNext.addEventListener( 'click', function () {
-				if ( validateStep( 0 ) ) { setStatus( '', false ); showStep( 1 ); }
-			} );
-		}
-
+		// ── Single delegated click handler ────────────────────────────────────
 		wrapper.addEventListener( 'click', function ( e ) {
 			const btn = e.target.closest( 'button' );
 			if ( ! btn ) return;
-			if ( btn.classList.contains( 'tw-btn-next' ) ) {
+
+			if ( btn.classList.contains( 'tw-btn-next' ) || btn.id === 'tw-camp-step1-next' ) {
+				e.preventDefault();
 				if ( validateStep( current ) ) { setStatus( '', false ); showStep( current + 1 ); }
 				return;
 			}
 			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
+				e.preventDefault();
 				if ( steps[ current ] ) clearFieldError( steps[ current ] );
-				setStatus( '', false ); showStep( current - 1 );
+				setStatus( '', false );
+				showStep( current - 1 );
 				return;
 			}
 			if ( btn.classList.contains( 'tw-summary-edit' ) ) {
