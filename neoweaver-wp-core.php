@@ -109,13 +109,20 @@ add_action( 'wp_enqueue_scripts', function () {
 	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
-	if ( is_page_template( 'templates/adventure.php' ) ) {
-		wp_enqueue_script( 'nw-panel-tactical-left', NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js', [], '1.0.0', true );
-		wp_enqueue_script( 'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-interference.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-		wp_enqueue_style(  'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [], NEOWEAVER_VERSION );
-		wp_enqueue_style(  'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css', [], NEOWEAVER_VERSION );
-		wp_enqueue_script( 'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-	}
+if ( is_page_template( 'templates/adventure.php' ) ) {
+    // już istniejące
+    wp_enqueue_script( 'nw-panel-tactical-left',    NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js',    [],           '1.0.0',          true );
+    wp_enqueue_script( 'neoweaver-interference',     NEOWEAVER_PLUGIN_URL . 'assets/js/neoweave-interference.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
+    wp_enqueue_style(  'neoweaver-interference',     NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [],         NEOWEAVER_VERSION );
+    wp_enqueue_style(  'world-news',                 NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css',           [],           NEOWEAVER_VERSION );
+    wp_enqueue_script( 'world-news',                 NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js',             [ 'jquery' ], NEOWEAVER_VERSION, true );
+
+    // ← DODAJ TO — brakujące pliki z public/assets/js/
+    wp_enqueue_script( 'nw-deck-panel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/deck-panel.js',    [ 'jquery' ], NEOWEAVER_VERSION, true );
+    wp_enqueue_script( 'nw-vehicle-panel', NEOWEAVER_PLUGIN_URL . 'public/assets/js/vehicle-panel.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+    wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',      [ 'jquery' ], NEOWEAVER_VERSION, true );
+    wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+    wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js',[ 'jquery' ], NEOWEAVER_VERSION, true );
 } );
 
 // ─── Register plugin page templates ──────────────────────────────────────────
