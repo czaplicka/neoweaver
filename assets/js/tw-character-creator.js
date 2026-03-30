@@ -1,542 +1,352 @@
 /**
- * tw-character-creator.js
- *
- * Drives the 7-step Field Agent creation wizard rendered by
- * [tale_weaver_character_creator] shortcode.
- *
- * Races and classes are fetched from the WP REST proxy endpoints
- * (/wp-json/neoweaver/v1/races and /wp-json/neoweaver/v1/classes)
- * which call Supabase server-side, bypassing any RLS restrictions
- * that would block direct browser → Supabase queries.
- *
- * Config (injected via wp_localize_script as twCharCreatorConfig):
- *   nonce      — tw_character_nonce for the body JSON
- *   restNonce  — wp_rest nonce for X-WP-Nonce header
- *   restUrl    — full URL to character/create endpoint
- *   agentsUrl  — redirect target after success
- *   supabaseUrl — Supabase project URL (still used for Node BINDING)
- *   supabaseKey — anon key (still used for cyber_worlds)
+ * NeoWeaver — Character Creator
+ * Unified file (merged from character-creator.js + tw-character-creator.js)
+ * Includes inline step error validation handler.
  */
+
 ( function () {
-	'use strict';
+    'use strict';
 
-	document.addEventListener( 'DOMContentLoaded', function () {
+    // ── Constants ─────────────────────────────────────────────────────────────
+    var ATTR_KEYS = [ 'strength', 'agility', 'intellect', 'charisma', 'endurance', 'perception' ];
+    var ATTR_MIN  = 1;
+    var ATTR_MAX  = 10;
+    var ATTR_POOL = 30;
 
-		const wrapper = document.getElementById( 'tw-char-creator-wrapper' );
-		if ( ! wrapper ) return;
+    // ── State ─────────────────────────────────────────────────────────────────
+    var formState = {
+        character_name : '',
+        pronouns       : '',
+        backstory      : '',
+        race           : '',
+        class          : '',
+        node_id        : '',
+        strength       : ATTR_MIN,
+        agility        : ATTR_MIN,
+        intellect      : ATTR_MIN,
+        charisma       : ATTR_MIN,
+        endurance      : ATTR_MIN,
+        perception     : ATTR_MIN,
+    };
 
-		const config       = window.twCharCreatorConfig || {};
-		const sbUrl        = ( config.supabaseUrl || '' ).replace( /\/$/, '' ) + '/rest/v1/';
-		const sbKey        = config.supabaseKey || '';
-		const restUrl      = config.restUrl || '/wp-json/neoweaver/v1/character/create';
-		const agentsUrl    = config.agentsUrl || '/agents/';
-		// WP REST proxy base — same origin, no CORS issues, no RLS.
-		const wpRestBase   = ( config.restBase || '/wp-json/neoweaver/v1' ).replace( /\/$/, '' );
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function esc( str ) {
+        return String( str )
+            .replace( /&/g, '&amp;' )
+            .replace( /</g, '&lt;' )
+            .replace( />/g, '&gt;' )
+            .replace( /"/g, '&quot;' );
+    }
 
-		const steps          = Array.from( wrapper.querySelectorAll( '.tw-step' ) );
-		const totalSteps     = parseInt( wrapper.dataset.totalSteps, 10 ) || steps.length;
-		const progressFill   = document.getElementById( 'tw-char-progress-fill' );
-		const progressCurrent= document.getElementById( 'tw-char-step-current' );
-		const progressPhase  = document.getElementById( 'tw-char-progress-phase' );
-		const statusEl       = wrapper.querySelector( '.tw-char-status' );
+    function setStatus( msg, isError ) {
+        var el = document.getElementById( 'tw-char-status' );
+        if ( ! el ) return;
+        el.textContent  = msg;
+        el.className    = 'tw-char-status' + ( isError ? ' tw-char-status--error' : '' );
+    }
 
-		let current     = 0;
-		let avatarFile  = null;
+    // ── Inline step error helpers ─────────────────────────────────────────────
+    function showStepError( stepEl, msg ) {
+        var errEl = stepEl.querySelector( '.tw-step-error' );
+        if ( ! errEl ) {
+            errEl           = document.createElement( 'div' );
+            errEl.className = 'tw-step-error';
+            var navRow = stepEl.querySelector( '.tw-nav-row' );
+            if ( navRow ) {
+                stepEl.insertBefore( errEl, navRow );
+            } else {
+                stepEl.appendChild( errEl );
+            }
+        }
+        errEl.innerHTML =
+            '<span class="tw-step-error__icon">&#9888;</span>' +
+            '<span class="tw-step-error__msg">' + esc( msg ) + '</span>';
+        errEl.classList.add( 'visible' );
+        errEl.classList.remove( 'tw-step-error--shake' );
+        void errEl.offsetWidth; // reflow to restart animation
+        errEl.classList.add( 'tw-step-error--shake' );
+        errEl.scrollIntoView( { behavior: 'smooth', block: 'nearest' } );
+    }
 
-		const formState = {
-			character_name : '',
-			pronouns       : '',
-			backstory      : '',
-			race           : null,
-			class          : null,
-			attr_body      : 1,
-			attr_reflex    : 1,
-			attr_mind      : 1,
-			attr_spirit    : 1,
-			node_id        : null,
-		};
+    function clearStepError( stepEl ) {
+        if ( ! stepEl ) return;
+        var errEl = stepEl.querySelector( '.tw-step-error' );
+        if ( errEl ) {
+            errEl.classList.remove( 'visible', 'tw-step-error--shake' );
+        }
+    }
 
-		const ATTR_POOL = parseInt( ( document.getElementById( 'tw-attr-pool' ) || {} ).value || '12', 10 );
-		const ATTR_MIN  = 1;
-		const ATTR_MAX  = 5;
-		const ATTR_KEYS = [ 'body', 'reflex', 'mind', 'spirit' ];
+    // ── Init ──────────────────────────────────────────────────────────────────
+    function init() {
+        var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
+        if ( ! wrapper ) return;
 
-		// ── Pronouns: radio chip + custom field ──────────────────────────────
-		( function initPronouns() {
-			const radios      = wrapper.querySelectorAll( '.tw-pronoun-radio' );
-			const customInput = document.getElementById( 'tw-char-pronouns-custom' );
-			if ( ! radios.length ) return;
+        var steps   = wrapper.querySelectorAll( '.tw-step' );
+        var current = 0;
 
-			function syncPronouns() {
-				const checked = wrapper.querySelector( '.tw-pronoun-radio:checked' );
-				if ( ! checked ) return;
-				if ( checked.value === 'custom' ) {
-					if ( customInput ) customInput.style.display = '';
-					formState.pronouns = ( customInput ? customInput.value.trim() : '' ) || 'custom';
-				} else {
-					if ( customInput ) customInput.style.display = 'none';
-					formState.pronouns = checked.value;
-				}
-			}
+        if ( ! steps.length ) return;
 
-			radios.forEach( r => r.addEventListener( 'change', syncPronouns ) );
-			if ( customInput ) customInput.addEventListener( 'input', syncPronouns );
-		} )();
+        // ── Show step ─────────────────────────────────────────────────────────
+        function showStep( idx ) {
+            steps.forEach( function ( s, i ) {
+                s.classList.toggle( 'active', i === idx );
+            } );
+            current = idx;
+            setStatus( '', false );
+        }
 
-		// ── Spinner ──────────────────────────────────────────────────────────
-		const spinner = document.createElement( 'div' );
-		spinner.id = 'tw-char-spinner';
-		spinner.innerHTML =
-			'<div class="tw-spinner-inner">' +
-				'<div class="tw-spinner-ring"></div>' +
-				'<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
-				'<p class="tw-spinner-text">// SYNCHRONIZING AGENT…</p>' +
-				'<p class="tw-spinner-sub">Writing to the NeoWeave grid.</p>' +
-			'</div>';
-		document.body.appendChild( spinner );
-		const showSpinner = () => spinner.classList.add( 'active' );
-		const hideSpinner = () => spinner.classList.remove( 'active' );
+        // ── Validation ────────────────────────────────────────────────────────
+        function validateStep( idx ) {
+            var step = steps[ idx ];
+            if ( ! step ) return true;
 
-		// ── Status helper ─────────────────────────────────────────────────────
-		function setStatus( msg, isError ) {
-			if ( ! statusEl ) return;
-			statusEl.textContent = msg;
-			statusEl.style.color = isError ? '#ff4444' : 'var(--neon-green)';
-		}
+            clearStepError( step );
 
-		// ── Progress bar ──────────────────────────────────────────────────────
-		function updateProgress( idx ) {
-			const num   = idx + 1;
-			const pct   = Math.round( ( num / totalSteps ) * 100 );
-			const phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
+            // Step 0 — identity
+            if ( idx === 0 ) {
+                var nameInput = wrapper.querySelector( '#tw-char-name' );
+                if ( ! nameInput || ! nameInput.value.trim() ) {
+                    if ( nameInput ) {
+                        nameInput.focus();
+                        nameInput.classList.add( 'tw-input--error' );
+                        nameInput.addEventListener( 'input', function onFix() {
+                            nameInput.classList.remove( 'tw-input--error' );
+                            clearStepError( step );
+                            nameInput.removeEventListener( 'input', onFix );
+                        } );
+                    }
+                    showStepError( step, 'ERROR: Agent designation is required. Enter a name to proceed.' );
+                    setStatus( 'ERROR: Agent designation is required.', true );
+                    return false;
+                }
+                formState.character_name = nameInput.value.trim();
 
-			if ( progressFill )    progressFill.style.width    = pct + '%';
-			if ( progressCurrent ) progressCurrent.textContent  = num;
-			if ( progressPhase )   progressPhase.textContent    = phase;
+                var checkedRadio = wrapper.querySelector( '.tw-pronoun-radio:checked' );
+                if ( checkedRadio ) {
+                    if ( checkedRadio.value === 'custom' ) {
+                        var customEl     = document.getElementById( 'tw-char-pronouns-custom' );
+                        formState.pronouns = ( customEl ? customEl.value.trim() : '' ) || 'custom';
+                    } else {
+                        formState.pronouns = checkedRadio.value;
+                    }
+                }
 
-			wrapper.querySelectorAll( '.tw-progress-tick' ).forEach( function ( tick ) {
-				const t = parseInt( tick.dataset.tick, 10 );
-				tick.classList.toggle( 'active',  t <= num );
-				tick.classList.toggle( 'current', t === num );
-			} );
-		}
+                formState.backstory = ( wrapper.querySelector( '#tw-char-backstory' ) || {} ).value || '';
+                return true;
+            }
 
-		// ── Show step ─────────────────────────────────────────────────────────
-		function showStep( idx ) {
-			idx = Math.max( 0, Math.min( steps.length - 1, idx ) );
-			steps.forEach( ( s, i ) => s.classList.toggle( 'active', i === idx ) );
-			current = idx;
-			updateProgress( idx );
+            // Race step
+            if ( step.dataset.phase === 'RACE PROTOCOL' ) {
+                if ( ! formState.race ) {
+                    showStepError( step, 'ERROR: Select a race to continue. Click a race card above.' );
+                    setStatus( 'ERROR: Select a race to continue.', true );
+                    return false;
+                }
+                return true;
+            }
 
-			if ( steps[ idx ] && steps[ idx ].classList.contains( 'tw-step--summary' ) ) {
-				populateSummary();
-			}
+            // Class step
+            if ( step.dataset.phase === 'CLASS MATRIX' ) {
+                if ( ! formState.class ) {
+                    showStepError( step, 'ERROR: Select a class to continue. Click a class card above.' );
+                    setStatus( 'ERROR: Select a class to continue.', true );
+                    return false;
+                }
+                return true;
+            }
 
-			const phase = steps[ idx ] ? steps[ idx ].dataset.phase : '';
-			if ( phase === 'RACE PROTOCOL'   && ! gridsLoaded.race   ) loadRaces();
-			if ( phase === 'CLASS MATRIX'    && ! gridsLoaded.class  ) loadClasses();
-			if ( phase === 'NODE BINDING'    && ! gridsLoaded.nodes  ) loadNodes();
+            // Attributes step
+            if ( step.dataset.phase === 'BIOMETRIC CALIBRATION' ) {
+                var used = ATTR_KEYS.reduce( function ( sum, k ) {
+                    return sum + ( formState[ 'attr_' + k ] || ATTR_MIN );
+                }, 0 );
+                if ( used !== ATTR_POOL ) {
+                    showStepError( step,
+                        'ERROR: Distribute all ' + ATTR_POOL + ' attribute points (' +
+                        used + '/' + ATTR_POOL + ' used).'
+                    );
+                    setStatus( 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true );
+                    return false;
+                }
+                return true;
+            }
 
-			wrapper.scrollIntoView( { behavior: 'smooth', block: 'start' } );
-		}
+            // Node binding step
+            if ( step.dataset.phase === 'NODE BINDING' ) {
+                if ( ! formState.node_id ) {
+                    showStepError( step, 'ERROR: Bind the agent to a Node before continuing. Select a Node above.' );
+                    setStatus( 'ERROR: Bind the agent to a Node before continuing.', true );
+                    return false;
+                }
+                return true;
+            }
 
-		// ── Validation ────────────────────────────────────────────────────────
-		function validateStep( idx ) {
-			const step = steps[ idx ];
-			if ( ! step ) return true;
+            return true;
+        }
 
-			if ( idx === 0 ) {
-				const nameInput = wrapper.querySelector( '#tw-char-name' );
-				if ( ! nameInput || ! nameInput.value.trim() ) {
-					nameInput && nameInput.focus();
-					setStatus( 'ERROR: Agent designation is required.', true );
-					return false;
-				}
-				formState.character_name = nameInput.value.trim();
+        // ── Navigation buttons ────────────────────────────────────────────────
+        wrapper.addEventListener( 'click', function ( e ) {
+            var btn = e.target.closest( 'button[data-action]' );
+            if ( ! btn ) return;
 
-				const checkedRadio = wrapper.querySelector( '.tw-pronoun-radio:checked' );
-				if ( checkedRadio ) {
-					if ( checkedRadio.value === 'custom' ) {
-						const customEl = document.getElementById( 'tw-char-pronouns-custom' );
-						formState.pronouns = ( customEl ? customEl.value.trim() : '' ) || 'custom';
-					} else {
-						formState.pronouns = checkedRadio.value;
-					}
-				}
+            var action = btn.dataset.action;
 
-				formState.backstory = ( wrapper.querySelector( '#tw-char-backstory' ) || {} ).value || '';
-				return true;
-			}
+            if ( action === 'prev' ) {
+                clearStepError( steps[ current ] );
+                setStatus( '', false );
+                if ( current > 0 ) showStep( current - 1 );
+                return;
+            }
 
-			if ( step.dataset.phase === 'RACE PROTOCOL' ) {
-				if ( ! formState.race ) { setStatus( 'ERROR: Select a race to continue.', true ); return false; }
-				return true;
-			}
-			if ( step.dataset.phase === 'CLASS MATRIX' ) {
-				if ( ! formState.class ) { setStatus( 'ERROR: Select a class to continue.', true ); return false; }
-				return true;
-			}
-			if ( step.dataset.phase === 'BIOMETRIC CALIBRATION' ) {
-				const used = ATTR_KEYS.reduce( ( sum, k ) => sum + ( formState[ 'attr_' + k ] || ATTR_MIN ), 0 );
-				if ( used !== ATTR_POOL ) {
-					setStatus( 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points (' + used + '/' + ATTR_POOL + ' used).', true );
-					return false;
-				}
-				return true;
-			}
-			if ( step.dataset.phase === 'NODE BINDING' ) {
-				if ( ! formState.node_id ) { setStatus( 'ERROR: Bind the agent to a Node before continuing.', true ); return false; }
-				return true;
-			}
-			return true;
-		}
+            if ( action === 'next' ) {
+                if ( validateStep( current ) ) {
+                    clearStepError( steps[ current ] );
+                    setStatus( '', false );
+                    if ( current < steps.length - 1 ) showStep( current + 1 );
+                }
+                return;
+            }
 
-		// ── Dynamic grid state ────────────────────────────────────────────────
-		const gridsLoaded = { race: false, class: false, nodes: false };
+            if ( action === 'submit' ) {
+                if ( validateStep( current ) ) {
+                    submitCharacter();
+                }
+            }
+        } );
 
-		// Fetch via WP REST proxy (server-side Supabase call, no RLS issues).
-		function wpGet( path ) {
-			return fetch( wpRestBase + path, {
-				credentials : 'same-origin',
-				headers     : { 'X-WP-Nonce': config.restNonce || '' },
-			} ).then( r => r.json() );
-		}
+        // ── Race card selection ───────────────────────────────────────────────
+        wrapper.addEventListener( 'click', function ( e ) {
+            var card = e.target.closest( '.tw-race-card' );
+            if ( ! card ) return;
+            wrapper.querySelectorAll( '.tw-race-card' ).forEach( function ( c ) {
+                c.classList.remove( 'selected' );
+            } );
+            card.classList.add( 'selected' );
+            formState.race = card.dataset.race || '';
+            var step = steps[ current ];
+            if ( step ) clearStepError( step );
+        } );
 
-		// Direct Supabase fetch (still used for cyber_worlds — user-scoped via RLS).
-		function sbGet( table, params ) {
-			const url = new URL( sbUrl + table );
-			Object.entries( params || {} ).forEach( ( [ k, v ] ) => url.searchParams.set( k, v ) );
-			return fetch( url.toString(), {
-				headers: {
-					'apikey'        : sbKey,
-					'Authorization' : 'Bearer ' + sbKey,
-				},
-			} ).then( r => r.json() );
-		}
+        // ── Class card selection ──────────────────────────────────────────────
+        wrapper.addEventListener( 'click', function ( e ) {
+            var card = e.target.closest( '.tw-class-card' );
+            if ( ! card ) return;
+            wrapper.querySelectorAll( '.tw-class-card' ).forEach( function ( c ) {
+                c.classList.remove( 'selected' );
+            } );
+            card.classList.add( 'selected' );
+            formState.class = card.dataset.charClass || card.dataset.class || '';
+            var step = steps[ current ];
+            if ( step ) clearStepError( step );
+        } );
 
-		function makeCard( id, name, desc, emoji, selectedId, onSelect ) {
-			const div  = document.createElement( 'div' );
-			div.className = 'tw-dyn-card' + ( selectedId === id ? ' selected' : '' );
-			div.dataset.id = id;
-			div.innerHTML =
-				'<span class="tw-dyn-icon">' + ( emoji || '◈' ) + '</span>' +
-				'<strong>' + esc( name ) + '</strong>' +
-				( desc ? '<span>' + esc( desc ) + '</span>' : '' );
-			div.addEventListener( 'click', function () {
-				div.closest( '.tw-dynamic-grid' ).querySelectorAll( '.tw-dyn-card' ).forEach( c => c.classList.remove( 'selected' ) );
-				div.classList.add( 'selected' );
-				onSelect( id, name );
-			} );
-			return div;
-		}
+        // ── Node selection ────────────────────────────────────────────────────
+        wrapper.addEventListener( 'change', function ( e ) {
+            if ( e.target && e.target.id === 'tw-node-select' ) {
+                formState.node_id = e.target.value || '';
+                var step = steps[ current ];
+                if ( step && formState.node_id ) clearStepError( step );
+            }
+        } );
 
-		function esc( str ) {
-			return String( str || '' )
-				.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
-				.replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
-		}
+        // ── Attribute controls ────────────────────────────────────────────────
+        wrapper.addEventListener( 'click', function ( e ) {
+            var btn  = e.target.closest( '.tw-attr-btn' );
+            if ( ! btn ) return;
+            var key  = btn.dataset.attr;
+            var dir  = btn.dataset.dir; // 'up' | 'down'
+            if ( ! key || ! dir ) return;
 
-		// ── Step 2: Races — via WP REST proxy ────────────────────────────────
-		function loadRaces() {
-			gridsLoaded.race = true;
-			const grid = document.getElementById( 'tw-race-grid' );
-			if ( ! grid ) return;
+            var stateKey = 'attr_' + key;
+            var val      = formState[ stateKey ] || ATTR_MIN;
+            var used     = ATTR_KEYS.reduce( function ( s, k ) {
+                return s + ( formState[ 'attr_' + k ] || ATTR_MIN );
+            }, 0 );
 
-			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING RACE DATA FROM NODE…</div>';
+            if ( dir === 'up' && val < ATTR_MAX && used < ATTR_POOL ) {
+                formState[ stateKey ] = val + 1;
+            } else if ( dir === 'down' && val > ATTR_MIN ) {
+                formState[ stateKey ] = val - 1;
+            }
 
-			wpGet( '/races' )
-				.then( function ( rows ) {
-					grid.innerHTML = '';
-					if ( ! Array.isArray( rows ) || ! rows.length ) {
-						const msg = ( rows && rows.error ) ? rows.error : 'No race data available.';
-						grid.innerHTML = '<p class="tw-error-msg">' + esc( msg ) + '</p>';
-						return;
-					}
-					rows.forEach( function ( row ) {
-						grid.appendChild( makeCard(
-							row.id, row.name, row.description, '👤',
-							formState.race ? formState.race.id : null,
-							function ( id, name ) { formState.race = { id, name }; setStatus( '', false ); }
-						) );
-					} );
-				} )
-				.catch( function ( err ) {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load races: ' + esc( err.message ) + '</p>';
-				} );
-		}
+            renderAttrDisplay( wrapper );
+        } );
 
-		// ── Step 3: Classes — via WP REST proxy ──────────────────────────────
-		function loadClasses() {
-			gridsLoaded.class = true;
-			const grid = document.getElementById( 'tw-class-grid' );
-			if ( ! grid ) return;
+        // ── Submit ────────────────────────────────────────────────────────────
+        function submitCharacter() {
+            setStatus( 'Uploading agent profile…', false );
 
-			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING CLASS DATA FROM NODE…</div>';
+            var data = new FormData();
+            data.append( 'action',         'neoweaver_create_character' );
+            data.append( 'nonce',          ( window.neoweaver_ajax || {} ).nonce || '' );
+            data.append( 'character_name', formState.character_name );
+            data.append( 'pronouns',       formState.pronouns );
+            data.append( 'backstory',      formState.backstory );
+            data.append( 'race',           formState.race );
+            data.append( 'char_class',     formState.class );
+            data.append( 'node_id',        formState.node_id );
 
-			wpGet( '/classes' )
-				.then( function ( rows ) {
-					grid.innerHTML = '';
-					if ( ! Array.isArray( rows ) || ! rows.length ) {
-						const msg = ( rows && rows.error ) ? rows.error : 'No class data available.';
-						grid.innerHTML = '<p class="tw-error-msg">' + esc( msg ) + '</p>';
-						return;
-					}
-					rows.forEach( function ( row ) {
-						grid.appendChild( makeCard(
-							row.id, row.name, row.description, '⚡',
-							formState.class ? formState.class.id : null,
-							function ( id, name ) { formState.class = { id, name }; setStatus( '', false ); }
-						) );
-					} );
-				} )
-				.catch( function ( err ) {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load classes: ' + esc( err.message ) + '</p>';
-				} );
-		}
+            ATTR_KEYS.forEach( function ( k ) {
+                data.append( 'attr_' + k, formState[ 'attr_' + k ] || ATTR_MIN );
+            } );
 
-		// ── Step 5: Nodes — still direct Supabase (user-scoped via RLS) ──────
-		function loadNodes() {
-			gridsLoaded.nodes = true;
-			const grid = document.getElementById( 'tw-node-grid' );
-			if ( ! grid || ! sbUrl || ! sbKey ) return;
+            fetch( ( window.neoweaver_ajax || {} ).ajax_url || '/wp-admin/admin-ajax.php', {
+                method      : 'POST',
+                credentials : 'same-origin',
+                body        : data,
+            } )
+            .then( function ( r ) { return r.json(); } )
+            .then( function ( res ) {
+                if ( res.success ) {
+                    setStatus( 'Agent profile created. Welcome to the Grid.', false );
+                    wrapper.innerHTML = '<div class="tw-success">' +
+                        '<p class="tw-success__msg">&#10003; ' + esc( res.data && res.data.message ? res.data.message : 'Character created!' ) + '</p>' +
+                        ( res.data && res.data.redirect
+                            ? '<a href="' + esc( res.data.redirect ) + '" class="tw-btn tw-btn--primary">Enter the Grid</a>'
+                            : '' ) +
+                        '</div>';
+                } else {
+                    var errMsg = res.data && res.data.message ? res.data.message : 'Submission failed. Retry.';
+                    setStatus( 'ERROR: ' + errMsg, true );
+                    var step = steps[ current ];
+                    if ( step ) showStepError( step, errMsg );
+                }
+            } )
+            .catch( function () {
+                setStatus( 'ERROR: Connection lost. Check your link and retry.', true );
+                var step = steps[ current ];
+                if ( step ) showStepError( step, 'Connection lost. Check your link and retry.' );
+            } );
+        }
 
-			sbGet( 'cyber_worlds', { select: 'id,name,description,difficulty,entropy', order: 'name.asc' } )
-				.then( function ( rows ) {
-					grid.innerHTML = '';
-					if ( ! Array.isArray( rows ) || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No Nodes found. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
-						return;
-					}
-					rows.forEach( function ( row ) {
-						if ( parseInt( row.entropy, 10 ) >= 100 ) return;
-						const entropy   = parseInt( row.entropy, 10 ) || 0;
-						const diffLabel = [ '', 'Coherent', 'Stable', 'Unstable', 'Critical', 'Catastrophic' ][ parseInt( row.difficulty, 10 ) ] || '—';
-						const desc = 'Diff: ' + diffLabel + ' · Entropy: ' + entropy + '%';
-						grid.appendChild( makeCard(
-							row.id, row.name, row.description || desc, '🌐',
-							formState.node_id ? formState.node_id.id : null,
-							function ( id, name ) { formState.node_id = { id, name }; setStatus( '', false ); }
-						) );
-					} );
-					if ( ! grid.querySelector( '.tw-dyn-card' ) ) {
-						grid.innerHTML = '<p class="tw-error-msg">No playable Nodes found. <a href="/create-world/" class="tw-link">Deploy one first →</a></p>';
-					}
-				} )
-				.catch( function ( err ) {
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load Nodes: ' + esc( err.message ) + '</p>';
-				} );
-		}
+        // ── Init display ──────────────────────────────────────────────────────
+        renderAttrDisplay( wrapper );
+        showStep( 0 );
+    }
 
-		// ── Attribute steppers ────────────────────────────────────────────────
-		( function initAttrSteppers() {
-			ATTR_KEYS.forEach( function ( k ) {
-				const inp = document.getElementById( 'tw-attr-' + k );
-				formState[ 'attr_' + k ] = inp ? parseInt( inp.value, 10 ) : ATTR_MIN;
-			} );
+    // ── Attribute display renderer ────────────────────────────────────────────
+    function renderAttrDisplay( wrapper ) {
+        ATTR_KEYS.forEach( function ( key ) {
+            var stateKey = 'attr_' + key;
+            var val      = ( window._nwFormState && window._nwFormState[ stateKey ] ) || 1;
+            var valEl    = wrapper.querySelector( '[data-attr-val="' + key + '"]' );
+            if ( valEl ) valEl.textContent = val;
+        } );
 
-			function usedPoints() {
-				return ATTR_KEYS.reduce( ( s, k ) => s + ( formState[ 'attr_' + k ] || ATTR_MIN ), 0 );
-			}
-			function updateRemainingLabel() {
-				const el = document.getElementById( 'tw-attr-remaining' );
-				if ( el ) el.textContent = ATTR_POOL - usedPoints();
-			}
-			function updatePips( key, val ) {
-				const row = wrapper.querySelector( '.tw-attr-row[data-attr="' + key + '"]' );
-				if ( ! row ) return;
-				row.querySelectorAll( '.tw-pip' ).forEach( function ( pip ) {
-					pip.classList.toggle( 'active', parseInt( pip.dataset.pip, 10 ) <= val );
-				} );
-			}
-			function applyChange( key, delta ) {
-				const cur  = formState[ 'attr_' + key ] || ATTR_MIN;
-				const next = cur + delta;
-				if ( next < ATTR_MIN || next > ATTR_MAX ) return;
-				if ( delta > 0 && usedPoints() >= ATTR_POOL ) {
-					setStatus( 'ERROR: No attribute points remaining.', true );
-					return;
-				}
-				formState[ 'attr_' + key ] = next;
-				const inp = document.getElementById( 'tw-attr-' + key );
-				if ( inp ) inp.value = next;
-				updatePips( key, next );
-				updateRemainingLabel();
-				setStatus( '', false );
-			}
-			wrapper.addEventListener( 'click', function ( e ) {
-				const btn = e.target.closest( '.tw-attr-btn' );
-				if ( ! btn ) return;
-				const key   = btn.dataset.attr;
-				const delta = btn.classList.contains( 'tw-attr-plus' ) ? 1 : -1;
-				if ( key ) applyChange( key, delta );
-			} );
-			updateRemainingLabel();
-		} )();
+        // Pool remaining
+        var used = ATTR_KEYS.reduce( function ( s, k ) {
+            var v = ( window._nwFormState && window._nwFormState[ 'attr_' + k ] ) || 1;
+            return s + v;
+        }, 0 );
+        var poolEl = wrapper.querySelector( '[data-attr-pool]' );
+        if ( poolEl ) poolEl.textContent = ATTR_POOL - used;
+    }
 
-		// ── Avatar ────────────────────────────────────────────────────────────
-		( function initAvatar() {
-			const dropZone  = document.getElementById( 'tw-avatar-drop' );
-			const fileInput = document.getElementById( 'tw-char-avatar' );
-			const preview   = document.getElementById( 'tw-avatar-preview' );
-			const selected  = document.getElementById( 'tw-avatar-selected' );
-			const img       = document.getElementById( 'tw-avatar-img' );
-			const clearBtn  = document.getElementById( 'tw-avatar-clear' );
-			const trigger   = wrapper.querySelector( '.tw-upload-trigger' );
-			if ( ! dropZone || ! fileInput ) return;
+    // ── Boot ──────────────────────────────────────────────────────────────────
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', init );
+    } else {
+        init();
+    }
 
-			function showFile( file ) {
-				if ( file && file.type.startsWith( 'image/' ) ) {
-					avatarFile = file;
-					const reader = new FileReader();
-					reader.onload = ev => {
-						if ( img )      img.src = ev.target.result;
-						if ( preview )  preview.style.display  = 'none';
-						if ( selected ) selected.style.display = '';
-					};
-					reader.readAsDataURL( file );
-				}
-			}
-			function clearFile() {
-				avatarFile = null;
-				if ( fileInput ) fileInput.value = '';
-				if ( img )      img.src = '';
-				if ( selected ) selected.style.display = 'none';
-				if ( preview )  preview.style.display  = '';
-			}
-			if ( trigger )  trigger.addEventListener( 'click', () => fileInput.click() );
-			if ( clearBtn ) clearBtn.addEventListener( 'click', clearFile );
-			fileInput.addEventListener( 'change', function () { showFile( this.files[0] || null ); } );
-			dropZone.addEventListener( 'dragover',  e => { e.preventDefault(); dropZone.classList.add( 'drag-over' ); } );
-			dropZone.addEventListener( 'dragleave', () => dropZone.classList.remove( 'drag-over' ) );
-			dropZone.addEventListener( 'drop', function ( e ) {
-				e.preventDefault(); dropZone.classList.remove( 'drag-over' );
-				showFile( e.dataTransfer.files[0] || null );
-			} );
-		} )();
-
-		// ── Summary ───────────────────────────────────────────────────────────
-		function populateSummary() {
-			function set( field, val ) {
-				const el = document.getElementById( 'tw-summary-' + field );
-				if ( el ) el.textContent = val || '—';
-			}
-			set( 'character_name', formState.character_name );
-			set( 'pronouns',       formState.pronouns || '—' );
-			set( 'backstory',      formState.backstory || '—' );
-			set( 'race',           formState.race  ? formState.race.name  : '—' );
-			set( 'class',          formState.class ? formState.class.name : '—' );
-			const attrStr = ATTR_KEYS.map( k =>
-				k.toUpperCase().slice( 0, 3 ) + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN )
-			).join( ' · ' );
-			set( 'attrs',   attrStr );
-			set( 'node_id', formState.node_id ? formState.node_id.name : '—' );
-			set( 'avatar',  avatarFile ? avatarFile.name : 'None' );
-		}
-
-		// ── Navigation ────────────────────────────────────────────────────────
-		const firstNext = wrapper.querySelector( '#tw-char-step1-next' );
-		if ( firstNext ) {
-			firstNext.addEventListener( 'click', function () {
-				if ( validateStep( 0 ) ) { setStatus( '', false ); showStep( 1 ); }
-			} );
-		}
-
-		wrapper.addEventListener( 'click', function ( e ) {
-			const btn = e.target.closest( 'button' );
-			if ( ! btn ) return;
-			if ( btn.classList.contains( 'tw-btn-next' ) ) {
-				if ( validateStep( current ) ) { setStatus( '', false ); showStep( current + 1 ); }
-				return;
-			}
-			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
-				setStatus( '', false ); showStep( current - 1 ); return;
-			}
-			if ( btn.classList.contains( 'tw-summary-edit' ) ) {
-				const goto = parseInt( btn.dataset.goto, 10 );
-				if ( ! isNaN( goto ) ) {
-					const idx = steps.findIndex( s => parseInt( s.dataset.step, 10 ) === goto );
-					if ( idx >= 0 ) { setStatus( '', false ); showStep( idx ); }
-				}
-				return;
-			}
-		} );
-
-		// ── Submit ────────────────────────────────────────────────────────────
-		const submitBtn = wrapper.querySelector( '#tw-char-submit' );
-		if ( submitBtn ) submitBtn.addEventListener( 'click', doSubmit );
-
-		function buildPayload() {
-			return {
-				nonce          : config.nonce || '',
-				character_name : formState.character_name,
-				pronouns       : formState.pronouns,
-				backstory      : formState.backstory,
-				race           : formState.race  ? formState.race.id  : '',
-				class          : formState.class ? formState.class.id : '',
-				node_id        : formState.node_id ? formState.node_id.id : '',
-				attr_body      : formState.attr_body   || ATTR_MIN,
-				attr_reflex    : formState.attr_reflex || ATTR_MIN,
-				attr_mind      : formState.attr_mind   || ATTR_MIN,
-				attr_spirit    : formState.attr_spirit || ATTR_MIN,
-			};
-		}
-
-		function doSubmit() {
-			const payload = buildPayload();
-			if ( ! payload.character_name ) { setStatus( 'ERROR: Agent name is required.', true ); return; }
-			if ( ! payload.race )           { setStatus( 'ERROR: Race selection is required.', true ); return; }
-			if ( ! payload.class )          { setStatus( 'ERROR: Class selection is required.', true ); return; }
-			if ( ! payload.node_id )        { setStatus( 'ERROR: Node binding is required.', true ); return; }
-
-			submitBtn.disabled    = true;
-			submitBtn.textContent = 'SYNCHRONIZING…';
-			setStatus( '', false );
-			showSpinner();
-			const t0 = Date.now();
-
-			let fetchOptions;
-			if ( avatarFile ) {
-				const fd = new FormData();
-				Object.entries( payload ).forEach( ( [ k, v ] ) => fd.append( k, v ) );
-				fd.append( 'avatar', avatarFile, avatarFile.name );
-				fetchOptions = { method: 'POST', headers: { 'X-WP-Nonce': config.restNonce || '' }, body: fd, credentials: 'same-origin' };
-			} else {
-				fetchOptions = { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.restNonce || '' }, body: JSON.stringify( payload ), credentials: 'same-origin' };
-			}
-
-			fetch( restUrl, fetchOptions )
-				.then( r => r.json() )
-				.then( function ( json ) {
-					const wait = Math.max( 0, 2500 - ( Date.now() - t0 ) );
-					setTimeout( function () {
-						hideSpinner();
-						if ( json.success ) {
-							setStatus( '// AGENT SYNCHRONIZED: ' + ( json.data.agent_id || '' ), false );
-							setTimeout( () => { window.location.href = agentsUrl; }, 1800 );
-						} else {
-							const msg = ( json.data && json.data.message ) || json.message || 'Unknown error';
-							setStatus( 'ERROR: ' + msg, true );
-							submitBtn.disabled    = false;
-							submitBtn.textContent = '▶ SYNCHRONIZE AGENT';
-						}
-					}, wait );
-				} )
-				.catch( function ( err ) {
-					hideSpinner();
-					setStatus( 'ERROR: Network failure — ' + err.message, true );
-					submitBtn.disabled    = false;
-					submitBtn.textContent = '▶ SYNCHRONIZE AGENT';
-				} );
-		}
-
-		// ── Boot ──────────────────────────────────────────────────────────────
-		wrapper.querySelectorAll( '.tw-progress-tick' ).forEach( function ( tick ) {
-			const t = parseInt( tick.dataset.tick, 10 );
-			tick.style.left = ( ( t / totalSteps ) * 100 ) + '%';
-		} );
-		updateProgress( 0 );
-		// Pre-load races since step 2 is immediately next.
-		loadRaces();
-
-	} );
 } )();
