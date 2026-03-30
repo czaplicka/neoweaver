@@ -99,7 +99,7 @@ class Neoweaver_Public {
 		);
 		wp_enqueue_script(
 			'neoweaver-char-creator',
-			$url . 'assets/js/character-creator.js',
+			$url . 'assets/js/tw-character-creator.js',
 			[ 'jquery' ],
 			$ver,
 			true
