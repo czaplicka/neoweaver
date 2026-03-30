@@ -171,7 +171,11 @@ class Neoweaver_Agents_List {
 				$world_name = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
 				$is_public  = ! empty( $char['is_public'] );
 				$views      = isset( $char['view_count'] ) ? (int) $char['view_count'] : 0;
-				$legend_url = add_query_arg( 'char_id', (int) $char['id'], home_url( '/legend/' ) );
+				// BUG-FIX: $char['id'] is a UUID string — (int) cast collapses it to 0,
+				// producing a broken /legend/?char_id=0 URL for every character.
+				// Use the UUID string directly; esc_attr / urlencode handle output safety.
+				$char_id_safe = esc_attr( (string) $char['id'] );
+				$legend_url = add_query_arg( 'char_id', $char_id_safe, home_url( '/legend/' ) );
 			?>
 				<div class="tw-card">
 					<div class="tw-top-meta">
@@ -196,7 +200,10 @@ class Neoweaver_Agents_List {
 							</div>
 							<div style="margin-top:8px; font-size:11px; color:#aaa;">
 								<label class="tw-toggle-label">
-									<input type="checkbox" class="tw-toggle-public" data-char-id="<?php echo (int) $char['id']; ?>" <?php checked( $is_public ); ?>>
+									<?php // BUG-FIX: data-char-id was (int) $char['id'] — UUID → 0,
+									// so the toggle-public AJAX sent char_id=0 for every character.
+									// Emit as string with esc_attr. ?>
+									<input type="checkbox" class="tw-toggle-public" data-char-id="<?php echo $char_id_safe; ?>" <?php checked( $is_public ); ?>>
 									<span>Public on /legend</span>
 								</label>
 							</div>
@@ -206,7 +213,10 @@ class Neoweaver_Agents_List {
 						<button class="tw-btn" data-char="<?php echo esc_attr( wp_json_encode( $char ) ); ?>" onclick="twOpenModal(this)">
 							Agent Dossier
 						</button>
-						<button class="tw-btn tw-btn-danger" onclick="twConfirmDeleteCharacter(<?php echo (int) $char['id']; ?>, this)">
+						<?php // BUG-FIX: inline (int) $char['id'] collapsed UUID → 0, so every
+						// delete button called twConfirmDeleteCharacter(0, this).
+						// Pass as a JSON-encoded string so the UUID reaches JS intact. ?>
+						<button class="tw-btn tw-btn-danger" onclick="twConfirmDeleteCharacter(<?php echo wp_json_encode( (string) $char['id'] ); ?>, this)">
 							Delete Operative
 						</button>
 					</div>

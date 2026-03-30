@@ -13,16 +13,15 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
     function tw_handle_toggle_char_public() {
         check_ajax_referer( 'tw_char_nonce', 'nonce' );
 
-        $char_id    = isset( $_POST['char_id'] ) ? intval( $_POST['char_id'] ) : 0;
+        // BUG-FIX: char_id is a UUID — intval() collapses it to 0, causing the
+        // PATCH to match no rows. Sanitize with UUID-safe stripping instead.
+        $char_id    = isset( $_POST['char_id'] )
+            ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['char_id'] )
+            : '';
         $is_public  = filter_var( $_POST['is_public'] ?? false, FILTER_VALIDATE_BOOLEAN );
         $wp_user_id = get_current_user_id();
 
-        if ( ! $char_id || ! $wp_user_id ) {
-            // BUG-FIX 2: Added return after wp_send_json_error. Although
-            // wp_send_json_error() calls wp_die() internally, relying on that
-            // is fragile (wp_die can be filtered in tests). Without the explicit
-            // return, execution could fall through to the Supabase PATCH with
-            // char_id=0 and wp_user_id=0, potentially mutating unintended rows.
+        if ( empty( $char_id ) || ! $wp_user_id ) {
             wp_send_json_error( 'Unauthorized' );
             return;
         }
@@ -40,6 +39,7 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 
         if ( ! $result['ok'] ) {
             wp_send_json_error( 'Database Error' );
+            return;
         }
 
         wp_send_json_success();

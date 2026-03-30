@@ -40,7 +40,23 @@ class NeoWeaver_Core {
 
 	/** Register all front-end hooks. */
 	private function define_public_hooks(): void {
-		$front = new NeoWeaver_Public( $this->plugin_slug, $this->version );
+		// BUG-FIX: NeoWeaver_Public constructor requires four typed objects:
+		//   Neoweaver_Agents_List, Neoweaver_Agents_Creator,
+		//   Neoweaver_Deployments_Creator, Neoweaver_Nodes_Creator.
+		// The previous code passed ( $this->plugin_slug, $this->version ) —
+		// two plain strings — which caused a fatal TypeError on every page load.
+		$repository          = new Neoweaver_Agents_Repository();
+		$agents_list         = new Neoweaver_Agents_List( $repository );
+		$agents_creator      = new Neoweaver_Agents_Creator();
+		$deployments_creator = new Neoweaver_Deployments_Creator();
+		$nodes_creator       = new Neoweaver_Nodes_Creator();
+
+		$front = new NeoWeaver_Public(
+			$agents_list,
+			$agents_creator,
+			$deployments_creator,
+			$nodes_creator
+		);
 
 		$this->loader->add_action( 'wp_enqueue_scripts', $front, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $front, 'enqueue_scripts' );

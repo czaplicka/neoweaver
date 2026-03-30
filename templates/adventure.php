@@ -35,17 +35,24 @@ $game_data = function_exists('get_user_game_data_from_supabase')
 // FIX #8: Generate nonce here so it's available for JS and server-side verification.
 $adventure_nonce = wp_create_nonce( 'tw_adventure_nonce' );
 
+// BUG-FIX: active_session_id, active_campaign_id, active_character_id, and
+// active_world_id are UUID strings in Supabase. Casting them with (int) collapses
+// every UUID to 0, breaking all JS-side Supabase queries that filter on these IDs.
+// Use json_encode() to emit them as JS strings; active_location_id is a true
+// integer FK and keeps its (int) cast.
 echo "<script>
 window.twAdventureData = window.twAdventureData || {};
-window.twAdventureData.active_session_id   = ".(int)$game_data['active_session_id'].";
-window.twAdventureData.active_campaign_id  = ".(int)$game_data['active_campaign_id'].";
-window.twAdventureData.active_character_id = ".(int)$game_data['active_character_id'].";
-window.twAdventureData.active_world_id     = ".(int)$game_data['active_world_id'].";
+window.twAdventureData.active_session_id   = ".json_encode( (string) ( $game_data['active_session_id']   ?? '' ) ).";
+window.twAdventureData.active_campaign_id  = ".json_encode( (string) ( $game_data['active_campaign_id']  ?? '' ) ).";
+window.twAdventureData.active_character_id = ".json_encode( (string) ( $game_data['active_character_id'] ?? '' ) ).";
+window.twAdventureData.active_world_id     = ".json_encode( (string) ( $game_data['active_world_id']     ?? '' ) ).";
 window.twAdventureData.active_location_id  = ".(int)$game_data['active_location_id'].";
 window.twAdventureData.char_name           = ".json_encode($game_data['char_name']).";
 window.twAdventureData.char_tags           = ".json_encode($game_data['char_tags']).";
 window.twAdventureData.nonce               = ".json_encode( $adventure_nonce ).";
 window.twAdventureData.ajax_url            = ".json_encode( admin_url( 'admin-ajax.php' ) ).";
+window.twAdventureData.supabase_url        = ".json_encode( function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '' ).";
+window.twAdventureData.supabase_anon_key   = ".json_encode( function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '' ).";
 </script>";
 
 $activecampaignid  = get_user_meta( $userid, 'active_campaign_id', true );
