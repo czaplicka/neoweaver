@@ -1,6 +1,34 @@
-/* TALE WEAVER – DECK & TABS */
+/* ============================================================
+   NEOWEAVER – TW DECK
+   Panel kart (bottom HUD) i system tabów.
+   Wymaga tw-core.css.
+   ============================================================ */
 
-/* 1. SCENARIO CARDS */
+/* 1. ANIMACJE */
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+@keyframes glitch-anim {
+  0%   { transform: translate(0);         filter: hue-rotate(0deg);   clip-path: inset(0); }
+  20%  { transform: translate(-3px, 2px); filter: hue-rotate(90deg);  clip-path: inset(10% 0 30% 0); }
+  40%  { transform: translate(3px, -1px); filter: hue-rotate(180deg); clip-path: inset(40% 0 10% 0); }
+  60%  { transform: translate(-1px, 3px); filter: hue-rotate(270deg); clip-path: inset(20% 0 50% 0); }
+  100% { transform: translate(0);         filter: hue-rotate(360deg); clip-path: inset(0); }
+}
+
+@keyframes pulseSelect {
+  0%,100% { transform: scale(1.6); }
+  50%     { transform: scale(1.5); }
+}
+
+@keyframes pulse-cost {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.1); }
+}
+
+/* 2. SCENARIO CARD */
 .scenario-card {
   transition: all 0.3s ease;
   cursor: pointer;
@@ -12,53 +40,30 @@
   animation: pulse 1.5s infinite;
 }
 
-/* 2. ANIMATIONS */
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-@keyframes glitch-anim {
-  0%   { transform: translate(0);        filter: hue-rotate(0deg);   clip-path: inset(0); }
-  20%  { transform: translate(-3px, 2px); filter: hue-rotate(90deg);  clip-path: inset(10% 0 30% 0); }
-  40%  { transform: translate(3px, -1px); filter: hue-rotate(180deg); clip-path: inset(40% 0 10% 0); }
-  60%  { transform: translate(-1px, 3px); filter: hue-rotate(270deg); clip-path: inset(20% 0 50% 0); }
-  100% { transform: translate(0);        filter: hue-rotate(360deg); clip-path: inset(0); }
-}
-
-@keyframes pulseSelect {
-  0% { transform: scale(1.6); }
-  50% { transform: scale(1.5); }
-  100% { transform: scale(1.6); }
-}
-
-@keyframes pulse-cost {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-/* 3. DECK PANEL (MONITOR) */
+/* 3. DECK PANEL */
 #deck-panel {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  border-top: 1px solid rgba(173, 255, 0, 0.5) !important;
-  box-shadow:
-    0 -10px 30px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(173, 255, 0, 0.1) !important;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
-  z-index: 1000;
+  overflow: visible;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: visible !important;
-  background: rgba(3, 7, 18, 0.15) !important;
-  backdrop-filter: blur(4px) !important;
+
+  /* Tło */
+  background: rgba(3, 7, 18, 0.15);
+  backdrop-filter: blur(4px);
+
+  /* Obramowanie i cień */
+  border-top: 1px solid rgba(173, 255, 0, 0.5);
+  box-shadow:
+    0 -10px 30px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(173, 255, 0, 0.1);
 }
-#deck-panel.is-collapsed {
-  transform: translateY(calc(100% - 42px));
-}
+
+/* Efekt scanlines */
 #deck-panel::before {
   content: "";
   position: absolute;
@@ -75,22 +80,28 @@
   opacity: 0.25;
 }
 
-/* Inner background */
-#deck-container {
-  background: radial-gradient(circle at top,
-    rgba(15, 23, 42, 0.06),
-    rgba(15, 23, 42, 0.25)) !important;
+#deck-panel.is-collapsed {
+  transform: translateY(calc(100% - 42px));
 }
 
-/* 4. DECK TABS */
+/* Inner tło */
+#deck-container {
+  background: radial-gradient(
+    circle at top,
+    rgba(15, 23, 42, 0.06),
+    rgba(15, 23, 42, 0.25)
+  );
+}
+
+/* 4. PASEK TABÓW */
 .deck-tabs-wrapper {
   height: 42px;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 20px;
   background: #05080f;
   border-bottom: 1px solid rgba(173, 255, 0, 0.1);
-  gap: 8px;
   cursor: pointer;
   position: relative;
   z-index: 1001;
@@ -102,12 +113,12 @@
   color: #94a3b8;
   font-family: 'Chakra Petch', sans-serif;
   font-size: 0.75rem;
+  font-weight: 600;
   padding: 6px 16px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 1px;
   transition: all 0.3s;
-  font-weight: 600;
   position: relative;
 }
 .panel-tab.is-active {
@@ -129,12 +140,12 @@
   color: #ff4b4b;
 }
 
-/* 5. TAB CONTENT */
+/* 5. ZAWARTOŚĆ TABÓW */
 .deck-tab-content {
   display: none;
   padding: 20px;
   max-height: 520px;
-  overflow: visible !important;
+  overflow: visible;
 }
 .deck-tab-content.is-active {
   display: block;
