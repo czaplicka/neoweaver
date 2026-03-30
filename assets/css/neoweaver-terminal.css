@@ -3,7 +3,12 @@
   --tw-bg-ghost: rgba(3, 7, 18, 0.12); /* jeszcze lżejsze */
   --tw-blur: 12px; /* wyższy blur dla frosted glass */
 }
-
+#hud-wrapper {
+    pointer-events: none;  /* wrapper nie łapie kliknięć */
+}
+#hud-wrapper > * {
+    pointer-events: all;   /* tylko bezpośrednie dzieci klikalne */
+}
 /* HUD WRAPPER – ultra ghost jak chat */
 .cyber-hud-wrapper {
     position: fixed; top: 0; left: 0; width: 100%; z-index: 100001;
