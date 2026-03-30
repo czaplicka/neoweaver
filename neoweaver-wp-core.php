@@ -123,6 +123,7 @@ if ( is_page_template( 'templates/adventure.php' ) ) {
     wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',      [ 'jquery' ], NEOWEAVER_VERSION, true );
     wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
     wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js',[ 'jquery' ], NEOWEAVER_VERSION, true );
+}
 } );
 
 // ─── Register plugin page templates ──────────────────────────────────────────
