@@ -1,297 +1,98 @@
 /* ============================================================
-   TALE WEAVER - ULTIMATE ADVENTURE STYLES (FINAL VERSION)
+   NEOWEAVER – TW CORE
+   Zmienne, reset, body, utility. Ładowany globalnie.
    ============================================================ */
 
-/* --- 1. FONTS & ICONS --- */
+/* 1. FONT */
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700;800&display=swap');
 
-.icon {
-    font-size: 34px;
-    color: #fff;
-}
-
-/* --- 2. GLOBAL VARIABLES --- */
+/* 2. ZMIENNE */
 :root {
-  /* Colors */
-  --tw-accent: #adff00;            /* Główny neon (zielony) */
-  --tw-accent-glow: rgba(173, 255, 0, 0.5);
-  --tw-bg-deep: #020617;           /* Tło strony (bardzo ciemny granat) */
-  --tw-bg-card: linear-gradient(135deg, #050714 0%, #0f172a 100%);
-  --tw-border: rgba(148, 163, 184, 0.2);
-  --tw-text-main: #f9fafb;
-  --tw-text-muted: #9ca3af;
+  --tw-accent:       #adff00;
+  --tw-accent-glow:  rgba(173, 255, 0, 0.5);
+  --tw-bg-deep:      #020617;
+  --tw-bg-card:      linear-gradient(135deg, #050714 0%, #0f172a 100%);
+  --tw-border:       rgba(148, 163, 184, 0.2);
+  --tw-text-main:    #f9fafb;
+  --tw-text-muted:   #9ca3af;
 
-  /* Chat Specifics */
-  --chat-bg: rgba(15, 23, 42, 0.85); /* Tło chatu (mniej przezroczyste = lepszy kontrast) */
-  --bubble-player: rgba(173, 255, 0, 0.9);
-  --text-player: #051000;
-  --bubble-gm: rgba(30, 41, 59, 0.9);
-  --text-gm: #e2e8f0;
-  
-  /* Avatars */
+  /* Chat */
+  --chat-bg:         rgba(15, 23, 42, 0.85);
+  --bubble-player:   rgba(173, 255, 0, 0.9);
+  --text-player:     #051000;
+  --bubble-gm:       rgba(30, 41, 59, 0.9);
+  --text-gm:         #e2e8f0;
+
+  /* Avatary */
   --av-size: clamp(48px, 5.5vw, 56px);
 }
 
-/* --- 3. CORE RESET & BODY --- */
+/* 3. RESET */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 4. BODY */
 body.page-template-adventure {
-    background-color: var(--tw-bg-deep);
-    background-image: 
-        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1), transparent 70%),
-        linear-gradient(180deg, var(--tw-bg-deep) 0%, #0f172a 100%);
-    color: var(--tw-text-main);
-    font-family: 'Chakra Petch', monospace;
-    min-height: 100vh;
+  background-color: var(--tw-bg-deep);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1), transparent 70%),
+    linear-gradient(180deg, var(--tw-bg-deep) 0%, #0f172a 100%);
+  color: var(--tw-text-main);
+  font-family: 'Chakra Petch', monospace;
+  min-height: 100vh;
 }
 
-/* --- 4. LAYOUT SHELL --- */
+/* 5. LAYOUT SHELL */
 .adventure-shell {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
 }
-
 .adventure-shell.chat-only {
-    padding-top: 20px;
-    padding-bottom: 120px;
+  padding-top: 20px;
+  padding-bottom: 120px;
 }
 
-/* --- 5. CHAT HEADER --- */
-.chat-header {
-    text-align: center;
-    margin-bottom: 25px;
-}
-.chat-title {
-    font-size: 26px;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 4px;
-    font-weight: 700;
-}
-.chat-title span {
-    color: #38bdf8;
-    text-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
-}
-.chat-subtitle {
-    font-size: 12px;
-    color: var(--tw-text-muted);
-    letter-spacing: 1px;
-    margin-top: 5px;
-    text-transform: uppercase;
-}
+/* 6. SCROLLBARY */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(173, 255, 0, 0.3); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--tw-accent); }
 
-/* --- 6. CHAT TABS --- */
-.chat-tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    justify-content: center;
-}
-.chat-tab {
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid var(--tw-border);
-    color: var(--tw-text-muted);
-    padding: 8px 20px;
-    border-radius: 99px;
-    cursor: pointer;
-    font-family: 'Chakra Petch', monospace;
-    text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 1px;
-    transition: all 0.2s;
-}
-.chat-tab.is-active {
-    background: rgba(56, 189, 248, 0.2);
-    border-color: #38bdf8;
-    color: #fff;
-    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
-}
+/* 7. UTILITY */
+.icon   { font-size: 34px; color: #fff; }
+.hidden { display: none !important; }
 
-/* --- 7. CHAT CONTAINER (The Monitor) --- */
-#adventure-chat {
-    background: var(--chat-bg);
-    border: 1px solid var(--tw-border);
-    border-radius: 20px;
-    backdrop-filter: blur(10px); /* Glass effect */
-    padding: 20px;
-    position: relative;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+.tw-btn-action {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--tw-accent);
+  background: transparent;
+  color: var(--tw-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: 0.2s;
 }
+.tw-btn-action:hover { background: var(--tw-accent); color: #000; }
 
-/* --- 8. CHAT WINDOW (Messages Area) --- */
-.chat-window {
-    height: 550px; /* Wysokość obszaru chatu */
-    overflow-y: auto;
-    padding-right: 12px;
-}
-
-/* --- 9. MESSAGE ROWS --- */
-.tw-msg-row {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 18px;
-    align-items: flex-start;
-    width: 100%;
-}
-
-/* Player Right, GM Left */
-.tw-msg-row.is-player { flex-direction: row-reverse; }
-.tw-msg-row.is-gm { flex-direction: row; }
-
-/* Avatars */
-.tw-msg-avatar {
-    width: var(--av-size);
-    height: var(--av-size);
-    flex-shrink: 0;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid var(--tw-accent);
-    box-shadow: 0 0 12px var(--tw-accent-glow);
-    background: #000;
-}
-.tw-msg-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-/* Message Body Wrapper */
-.tw-msg-body {
-    max-width: 75%;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Bubbles */
-.tw-msg-bubble {
-    padding: 12px 18px;
-    border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.5;
-    position: relative;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-}
-
-/* Player Bubble Styles */
-.tw-msg-row.is-player .tw-msg-bubble {
-    background: var(--bubble-player);
-    color: var(--text-player);
-    border-top-right-radius: 4px; /* Notch */
-    border: 1px solid rgba(0,0,0,0.1);
-}
-
-/* GM Bubble Styles */
-.tw-msg-row.is-gm .tw-msg-bubble {
-    background: var(--bubble-gm);
-    color: var(--text-gm);
-    border-top-left-radius: 4px; /* Notch */
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-/* Meta Data (Name & Time) */
-.tw-msg-meta {
-    margin-top: 5px;
-    font-size: 11px;
-    color: rgba(255,255,255,0.4);
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-.tw-msg-row.is-player .tw-msg-meta { justify-content: flex-end; text-align: right; }
-.tw-msg-name { font-weight: 700; color: rgba(255,255,255,0.7); text-transform: uppercase; }
-.tw-msg-row.is-player .tw-msg-name { color: var(--tw-accent); }
-
-/* --- 10. INPUT AREA --- */
-.chat-input-wrapper {
-    margin-top: 20px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    padding-top: 15px;
-    background: rgba(2, 6, 23, 0.4);
-    border-radius: 12px;
-    padding: 12px;
-}
-
-.chat-input-inner {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-}
-
-#chat-input {
-    width: 100%;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--tw-border);
-    color: #fff;
-    padding: 12px 16px;
-    border-radius: 12px;
-    outline: none;
-    font-family: 'Chakra Petch', monospace;
-    font-size: 14px;
-    resize: none;
-    min-height: 50px;
-    max-height: 120px;
-    transition: border-color 0.2s;
-}
-#chat-input:focus {
-    border-color: var(--tw-accent);
-    background: rgba(15, 23, 42, 0.9);
-}
-
-.chat-action-row {
-    /* Optional: if you want button separate */
-}
-
-.btn-send {
-    background: var(--tw-accent);
-    color: #000;
-    border: none;
-    padding: 0 28px;
-    height: 50px; /* Matches input min-height */
-    border-radius: 12px;
-    font-weight: 700;
-    font-family: 'Chakra Petch', monospace;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-.btn-send:hover {
-    background: #ccff00;
-    box-shadow: 0 0 15px var(--tw-accent-glow);
-    transform: translateY(-1px);
-}
-
-/* --- 11. QUICK ACTIONS BAR --- */
-#quick-actions-container {
-    margin: 15px 0;
-}
-#quick-actions-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-/* --- 12. PROGRESS BARS (HP/MP) --- */
+/* 8. PROGRESS BARS */
 .tw-progress-bg {
-    width: 100%;
-    height: 8px;
-    background: rgba(0,0,0,0.5);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 5px;
+  width: 100%;
+  height: 8px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 5px;
 }
-.tw-progress-fill {
-    height: 100%;
-    transition: width 0.6s ease;
-}
+.tw-progress-fill { height: 100%; transition: width 0.6s ease; }
 .tw-fill-hp { background: linear-gradient(90deg, #ff4444, #cc0000); }
 .tw-fill-mp { background: linear-gradient(90deg, #00aaff, #0044ff); }
 
-/* --- 13. NARRATIVE TAGS (Echo Tags & Cyber Tags) --- */
-.tw-tag, .cyber-tag {
+/* 9. NARRATIVE TAGS */
+.tw-tag,
+.cyber-tag {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
@@ -304,19 +105,18 @@ body.page-template-adventure {
   text-decoration: none;
   margin: 0 2px;
   transition: all 0.2s;
+  position: relative; /* potrzebne dla tooltip */
 }
-
-.tw-tag:hover, .cyber-tag:hover {
+.tw-tag:hover,
+.cyber-tag:hover {
   background: rgba(173, 255, 0, 0.2);
   border-color: var(--tw-accent);
   box-shadow: 0 0 8px var(--tw-accent-glow);
   transform: translateY(-1px);
 }
-
 .cyber-tag::before { content: '['; opacity: 0.5; margin-right: 2px; }
-.cyber-tag::after { content: ']'; opacity: 0.5; margin-left: 2px; }
+.cyber-tag::after  { content: ']'; opacity: 0.5; margin-left:  2px; }
 
-/* Tooltips */
 .tw-tooltip {
   visibility: hidden;
   position: absolute;
@@ -337,26 +137,5 @@ body.page-template-adventure {
   pointer-events: none;
   box-shadow: 0 5px 15px rgba(0,0,0,0.5);
 }
-.tw-tag:hover .tw-tooltip { visibility: visible; opacity: 1; }
-
-/* --- 14. SCROLLBARS --- */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-::-webkit-scrollbar-thumb { background: rgba(173, 255, 0, 0.3); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--tw-accent); }
-
-/* --- 15. SYSTEM UI UTILS --- */
-.tw-btn-action {
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--tw-accent);
-  background: transparent;
-  color: var(--tw-accent);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.tw-btn-action:hover { background: var(--tw-accent); color: #000; }
-.hidden { display: none !important; }
+.tw-tag:hover .tw-tooltip,
+.cyber-tag:hover .tw-tooltip { visibility: visible; opacity: 1; }
