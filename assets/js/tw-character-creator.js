@@ -352,9 +352,19 @@ wrapper.addEventListener( 'click', function ( e ) {
 
     // ── Boot ──────────────────────────────────────────────────────────────────
     if ( document.readyState === 'loading' ) {
-        document.addEventListener( 'DOMContentLoaded', init );
-    } else {
-        init();
-    }
+    document.addEventListener( 'DOMContentLoaded', init );
+} else if ( document.readyState === 'interactive' || document.readyState === 'complete' ) {
+    // Shortcode ładuje się po skrypcie — czekamy na wrapper
+    var _nwRetry = 0;
+    var _nwPoll = setInterval( function () {
+        _nwRetry++;
+        if ( document.getElementById( 'tw-char-creator-wrapper' ) ) {
+            clearInterval( _nwPoll );
+            init();
+        } else if ( _nwRetry > 50 ) {
+            clearInterval( _nwPoll );
+        }
+    }, 100 );
+}
 
 } )();
