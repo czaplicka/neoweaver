@@ -91,7 +91,6 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/api-endpoints-character-data.php';
 // ─── Enqueue shared public assets ─────────────────────────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
-	wp_enqueue_style( 'neoweaver',        NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver.css',        [], NEOWEAVER_VERSION );
 	wp_enqueue_script( 'neoweaver-public', NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 
 	// Buffer/Foundry — registered once, no duplicate enqueue or localize.
