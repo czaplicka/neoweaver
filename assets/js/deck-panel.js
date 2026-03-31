@@ -1,8 +1,11 @@
 (function () {
-    const sounds = {
-        tab: new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3'),
-        glitch: new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3'),
-    };
+const SOUNDS_BASE = window.twNeoWeaverData?.soundsUrl
+    ?? 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
+
+const sounds = {
+    tab:    new Audio(SOUNDS_BASE + 'ui-click.mp3'),
+    glitch: new Audio(SOUNDS_BASE + 'glitch.mp3'),
+};
 
     function playSound(name) {
         const sound = sounds[name];
