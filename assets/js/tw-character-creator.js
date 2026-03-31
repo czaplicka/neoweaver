@@ -185,11 +185,19 @@
         }
 
         // ── Navigation buttons ────────────────────────────────────────────────
-        wrapper.addEventListener( 'click', function ( e ) {
-            var btn = e.target.closest( 'button[data-action]' );
-            if ( ! btn ) return;
+wrapper.addEventListener( 'click', function ( e ) {
+    var btn = e.target.closest( 'button' );
+    if ( ! btn ) return;
 
-            var action = btn.dataset.action;
+    var action = btn.dataset.action;
+
+    if ( ! action ) {
+        if ( btn.classList.contains( 'tw-btn-nav' ) )    action = 'next';
+        if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
+        if ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
+    }
+
+    if ( ! action ) return;
 
             if ( action === 'prev' ) {
                 clearStepError( steps[ current ] );
