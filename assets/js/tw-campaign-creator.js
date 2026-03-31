@@ -3,7 +3,47 @@
  */
 ( function () {
 	'use strict';
+// ── Sounds (identical to world-creator) ─────────────────────────────────────
+const NW_SFX = (() => {
+  let ctx = null;
+  const get = () => ctx || (ctx = new (window.AudioContext || window.webkitAudioContext)());
 
+  function beep(freq = 440, type = 'square', duration = 0.08, vol = 0.18) {
+    try {
+      const ac = get(), o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+      o.connect(g); g.connect(ac.destination);
+      o.start(); o.stop(ac.currentTime + duration);
+    } catch(e) {}
+  }
+
+  return {
+    nav:    () => beep(660, 'square',   0.06, 0.15),
+    select: () => beep(880, 'sine',     0.10, 0.20),
+    back:   () => beep(330, 'sawtooth', 0.08, 0.12),
+    deploy: () => { beep(440,'square',0.1,0.2); setTimeout(()=>beep(660,'sine',0.15,0.25),120); },
+    error:  () => beep(180, 'sawtooth', 0.18, 0.20),
+  };
+})();
+	// NEXT buttons
+wrapper.querySelectorAll('.tw-btn-next, #tw-camp-step1-next').forEach(btn =>
+  btn.addEventListener('click', () => NW_SFX.nav()));
+
+// BACK buttons
+wrapper.querySelectorAll('.tw-btn-prev').forEach(btn =>
+  btn.addEventListener('click', () => NW_SFX.back()));
+
+// Radio card selection
+wrapper.querySelectorAll('.tw-card-label input[type="radio"]').forEach(r =>
+  r.addEventListener('change', () => NW_SFX.select()));
+
+// Deploy button
+document.getElementById('tw-camp-submit')
+  ?.addEventListener('click', () => NW_SFX.deploy());
+
+// Error (wywołaj NW_SFX.error() w miejscu gdzie pokazujesz błąd walidacji)
 	document.addEventListener( 'DOMContentLoaded', function () {
 
 		const wrapper = document.getElementById( 'tw-campaign-creator-wrapper' );
