@@ -14,6 +14,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+define( 'NW_UPLOADS_BASE', 'https://neoweaver.nieodparady.pl/wp-content/uploads/' );
+
+/**
+ * Prepends uploads base URL to img_url if it's a relative filename.
+ */
+function nw_resolve_img_urls( array $rows ): array {
+	return array_map( function ( $row ) {
+		if ( ! empty( $row['img_url'] ) && strpos( $row['img_url'], 'http' ) !== 0 ) {
+			$row['img_url'] = NW_UPLOADS_BASE . $row['img_url'];
+		}
+		return $row;
+	}, $rows );
+}
+
 /**
  * Fetch rows from a cyber_ lookup table with transient caching.
  */
@@ -75,6 +89,8 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
 	}
 
+	$data = nw_resolve_img_urls( $data );
+
 	if ( ! empty( $data ) ) {
 		set_transient( $cache_key, $data, 300 );
 	}
@@ -115,6 +131,8 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 	if ( ! is_array( $data ) ) {
 		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
 	}
+
+	$data = nw_resolve_img_urls( $data );
 
 	if ( ! empty( $data ) ) {
 		set_transient( $cache_key, $data, 300 );
