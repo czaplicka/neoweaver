@@ -40,6 +40,7 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			'supabaseUrl'  => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
 			'supabaseKey'  => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			'userId'       => $user_id,
+						   'uploadsUrl'   => wp_upload_dir()['baseurl'],
 		] );
 
 		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
