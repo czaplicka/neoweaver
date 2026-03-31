@@ -1,0 +1,95 @@
+(function () {
+    const sounds = {
+        tab: new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/ui-click.mp3'),
+        glitch: new Audio('https://cyber.nieodparady.pl/wp-content/uploads/sounds/glitch-static.mp3'),
+    };
+
+    function playSound(name) {
+        const sound = sounds[name];
+        if (!sound) return;
+        sound.currentTime = 0;
+        sound.volume = 0.2;
+        sound.play().catch(() => {});
+    }
+
+    function initDeckPanel() {
+        console.log('initDeckPanel CALLED');
+        const deckPanel = document.getElementById('deck-panel');
+        if (!deckPanel) return;
+
+        deckPanel.addEventListener('click', (e) => e.stopPropagation());
+
+        const panelTabs = document.querySelectorAll('.panel-tab');
+        const toggleBtn = document.getElementById('toggle-deck');
+        const deckTabsWrapper = document.querySelector('.deck-tabs-wrapper');
+
+        function switchTab(targetId) {
+            const tabContents = document.querySelectorAll('.deck-tab-content');
+            const tabs = document.querySelectorAll('.panel-tab');
+
+            playSound('tab');
+            playSound('glitch');
+
+            if (deckPanel.classList.contains('is-collapsed')) {
+                deckPanel.classList.remove('is-collapsed');
+                deckPanel.classList.add('is-open');
+            }
+
+            tabContents.forEach((content) => {
+                content.classList.toggle('is-active', content.id === targetId);
+            });
+
+            tabs.forEach((btn) => {
+                btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId);
+            });
+
+            if (targetId === 'tab-skills' && typeof window.twLoadSkillsAndAbilities === 'function') {
+                window.twLoadSkillsAndAbilities();
+            }
+        }
+
+        panelTabs.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetId = btn.getAttribute('data-tab');
+                if (targetId && btn.id !== 'toggle-deck') {
+                    switchTab(targetId);
+                }
+            });
+        });
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = deckPanel.classList.contains('is-open');
+                deckPanel.classList.toggle('is-open', !isOpen);
+                deckPanel.classList.toggle('is-collapsed', isOpen);
+            });
+        }
+
+        if (deckTabsWrapper) {
+            deckTabsWrapper.addEventListener('click', (e) => {
+                if (e.target === deckTabsWrapper) {
+                    const isOpen = deckPanel.classList.contains('is-open');
+                    deckPanel.classList.toggle('is-open', !isOpen);
+                    deckPanel.classList.toggle('is-collapsed', isOpen);
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && deckPanel.classList.contains('is-open')) {
+                deckPanel.classList.add('is-collapsed');
+                deckPanel.classList.remove('is-open');
+            }
+        });
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initDeckPanel();
+    } else {
+        document.addEventListener('DOMContentLoaded', initDeckPanel);
+    }
+
+    window.twInitDeckPanel = initDeckPanel;
+})();
