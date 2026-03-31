@@ -203,8 +203,10 @@ add_action( 'wp_enqueue_scripts', function () {
 		'1.0.0',
 		true
 	);
-	wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
-		'supabaseUrl' => tw_supabase_url(),
-		'supabaseKey' => tw_supabase_anon_key(),
-	] );
+$uploads = wp_upload_dir();
+wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
+    'supabaseUrl' => tw_supabase_url(),
+    'supabaseKey' => tw_supabase_anon_key(),
+    'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
+] );
 } );
