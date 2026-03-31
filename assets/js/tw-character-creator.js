@@ -14,10 +14,12 @@
     var ATTR_POOL = 12;
 
     // ── Race data ────────────────────────────────────────────────────────────
-    // Jeśli neoweaver_ajax.races jest wstrzyknione przez PHP, używamy tego.
-    // Fallback: wbudowane dane z NeoWeaver SRD.
-    var RACES = ( window.neoweaver_ajax && window.neoweaver_ajax.races )
-        ? window.neoweaver_ajax.races
+    // BUG-FIX: PHP localizes the config as window.twCharCreatorConfig, not
+    // window.neoweaver_ajax. Fall back to the correct variable name.
+    var _cfg  = window.twCharCreatorConfig || window.neoweaver_ajax || {};
+
+    var RACES = _cfg.races
+        ? _cfg.races
         : [
             {
                 key      : 'human',
@@ -101,14 +103,14 @@
             .replace( /"/g, '&quot;' );
     }
 
+    // BUG-FIX: was reading from window.neoweaver_ajax which doesn't exist;
+    // PHP localizes the config object as window.twCharCreatorConfig.
     function ajaxUrl() {
-        return ( window.neoweaver_ajax && window.neoweaver_ajax.ajax_url )
-            ? window.neoweaver_ajax.ajax_url
-            : '/wp-admin/admin-ajax.php';
+        return _cfg.ajax_url || _cfg.ajaxurl || '/wp-admin/admin-ajax.php';
     }
 
     function nonce() {
-        return ( window.neoweaver_ajax && window.neoweaver_ajax.nonce ) || '';
+        return _cfg.nonce || '';
     }
 
     function setStatus( msg, isError ) {
@@ -146,7 +148,7 @@
     // ── Race grid renderer ──────────────────────────────────────────────────
     function buildRaceCard( race ) {
         var imgHtml = '';
-        var imgSrc  = race.img || ( window.neoweaver_ajax && window.neoweaver_ajax.race_images && window.neoweaver_ajax.race_images[ race.key ] ) || '';
+        var imgSrc  = race.img || ( _cfg.race_images && _cfg.race_images[ race.key ] ) || '';
         if ( imgSrc ) {
             imgHtml = '<div class="tw-race-card__img-wrap"><img class="tw-race-card__img" src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="220" height="220" loading="lazy" /></div>';
         } else {
@@ -402,22 +404,30 @@
         }
 
         // ── Navigation ─────────────────────────────────────────────────────────
+        // BUG-FIX: The original handler resolved action by checking tw-btn-nav
+        // BEFORE tw-btn-prev. Since all buttons (including BACK) carry the
+        // tw-btn-nav class, every BACK button was classified as 'next', making
+        // navigation go forward on both NEXT and BACK clicks.
+        // Fix: check the more-specific classes (tw-btn-prev, tw-btn-next,
+        // tw-btn-deploy) first, and only fall back to tw-btn-nav last.
         wrapper.addEventListener( 'click', function ( e ) {
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
-            var action = btn.dataset.action || '';
-            if ( ! action ) {
-                if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
-                else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
-                else if ( btn.classList.contains( 'tw-btn-nav' ) )    action = 'next';
-                else if ( btn.classList.contains( 'tw-btn-next' ) )   action = 'next';
-            }
 
-            // Summary edit buttons
+            // Summary edit buttons — handled separately, always first.
             if ( btn.classList.contains( 'tw-summary-edit' ) ) {
                 var goTo = parseInt( btn.dataset.goto, 10 );
                 if ( ! isNaN( goTo ) ) showStep( goTo - 1 );
                 return;
+            }
+
+            var action = btn.dataset.action || '';
+            if ( ! action ) {
+                // Check specific classes before the generic tw-btn-nav fallback.
+                if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
+                else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
+                else if ( btn.classList.contains( 'tw-btn-next' ) )   action = 'next';
+                else if ( btn.classList.contains( 'tw-btn-nav' ) )    action = 'next';
             }
 
             if ( ! action ) return;
@@ -482,8 +492,13 @@
             if ( ! card ) return;
             wrapper.querySelectorAll( '.tw-class-card' ).forEach( function ( c ) { c.classList.remove( 'selected' ); } );
             card.classList.add( 'selected' );
-            formState.class       = card.dataset.charClass || card.dataset.class || '';
-            formState.class_label = card.dataset.label || card.querySelector( '.tw-class-card__name' ) ? ( card.dataset.label || card.querySelector( '.tw-class-card__name' ).textContent ) : formState.class;
+            formState.class = card.dataset.charClass || card.dataset.class || '';
+            // BUG-FIX: operator precedence caused `||` to bind tighter than `?:`,
+            // so the ternary always evaluated the truthy branch (the querySelector
+            // object itself), never falling back to formState.class. Use explicit
+            // intermediate variable to make the intent clear and safe.
+            var nameEl = card.querySelector( '.tw-class-card__name' );
+            formState.class_label = card.dataset.label || ( nameEl ? nameEl.textContent : formState.class );
             clearStepError( steps[ current ] );
         } );
 
