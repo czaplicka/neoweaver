@@ -21,12 +21,12 @@
         race           : '',
         class          : '',
         node_id        : '',
-        strength       : ATTR_MIN,
-        agility        : ATTR_MIN,
-        intellect      : ATTR_MIN,
-        charisma       : ATTR_MIN,
-        endurance      : ATTR_MIN,
-        perception     : ATTR_MIN,
+        attr_strength  : ATTR_MIN,
+        attr_agility   : ATTR_MIN,
+        attr_intellect : ATTR_MIN,
+        attr_charisma  : ATTR_MIN,
+        attr_endurance : ATTR_MIN,
+        attr_perception: ATTR_MIN,
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -39,10 +39,12 @@
     }
 
     function setStatus( msg, isError ) {
-        var el = document.getElementById( 'tw-char-status' );
+        // obsługuje zarówno id="tw-char-status" jak i class="tw-char-status"
+        var el = document.getElementById( 'tw-char-status' )
+               || document.querySelector( '.tw-char-status' );
         if ( ! el ) return;
-        el.textContent  = msg;
-        el.className    = 'tw-char-status' + ( isError ? ' tw-char-status--error' : '' );
+        el.textContent = msg;
+        el.className   = 'tw-char-status' + ( isError ? ' tw-char-status--error' : '' );
     }
 
     // ── Inline step error helpers ─────────────────────────────────────────────
@@ -185,19 +187,26 @@
         }
 
         // ── Navigation buttons ────────────────────────────────────────────────
-wrapper.addEventListener( 'click', function ( e ) {
-    var btn = e.target.closest( 'button' );
-    if ( ! btn ) return;
+        wrapper.addEventListener( 'click', function ( e ) {
+            var btn = e.target.closest( 'button' );
+            if ( ! btn ) return;
 
-    var action = btn.dataset.action;
+            // Resolve action — data-action ma pierwszeństwo,
+            // potem klasy CSS. Kolejność: deploy > prev > next
+            // (bardziej specyficzne klasy nadpisują tw-btn-nav)
+            var action = btn.dataset.action || '';
 
-    if ( ! action ) {
-        if ( btn.classList.contains( 'tw-btn-nav' ) )    action = 'next';
-        if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
-        if ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
-    }
+            if ( ! action ) {
+                if ( btn.classList.contains( 'tw-btn-deploy' ) ) {
+                    action = 'submit';
+                } else if ( btn.classList.contains( 'tw-btn-prev' ) ) {
+                    action = 'prev';
+                } else if ( btn.classList.contains( 'tw-btn-nav' ) ) {
+                    action = 'next';
+                }
+            }
 
-    if ( ! action ) return;
+            if ( ! action ) return;
 
             if ( action === 'prev' ) {
                 clearStepError( steps[ current ] );
@@ -257,12 +266,32 @@ wrapper.addEventListener( 'click', function ( e ) {
             }
         } );
 
+        // Obsługa kliknięcia karty node (grid zamiast select)
+        wrapper.addEventListener( 'click', function ( e ) {
+            var card = e.target.closest( '.tw-node-card' );
+            if ( ! card ) return;
+            wrapper.querySelectorAll( '.tw-node-card' ).forEach( function ( c ) {
+                c.classList.remove( 'selected' );
+            } );
+            card.classList.add( 'selected' );
+            formState.node_id = card.dataset.nodeId || '';
+            var step = steps[ current ];
+            if ( step && formState.node_id ) clearStepError( step );
+        } );
+
         // ── Attribute controls ────────────────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
             var btn  = e.target.closest( '.tw-attr-btn' );
             if ( ! btn ) return;
             var key  = btn.dataset.attr;
             var dir  = btn.dataset.dir; // 'up' | 'down'
+
+            // Obsługa klas tw-attr-plus / tw-attr-minus jeśli brak data-dir
+            if ( ! dir ) {
+                if ( btn.classList.contains( 'tw-attr-plus' ) )  dir = 'up';
+                if ( btn.classList.contains( 'tw-attr-minus' ) ) dir = 'down';
+            }
+
             if ( ! key || ! dir ) return;
 
             var stateKey = 'attr_' + key;
@@ -336,35 +365,48 @@ wrapper.addEventListener( 'click', function ( e ) {
     function renderAttrDisplay( wrapper ) {
         ATTR_KEYS.forEach( function ( key ) {
             var stateKey = 'attr_' + key;
-            var val      = ( window._nwFormState && window._nwFormState[ stateKey ] ) || 1;
+            // używamy lokalnego formState, nie window._nwFormState
+            var val      = formState[ stateKey ] || ATTR_MIN;
             var valEl    = wrapper.querySelector( '[data-attr-val="' + key + '"]' );
             if ( valEl ) valEl.textContent = val;
+
+            // input number
+            var inputEl = wrapper.querySelector( '#tw-attr-' + key );
+            if ( inputEl ) inputEl.value = val;
+
+            // pips
+            wrapper.querySelectorAll( '[data-attr="' + key + '"] .tw-pip' ).forEach( function ( pip ) {
+                var n = parseInt( pip.dataset.pip, 10 );
+                pip.classList.toggle( 'active', n <= val );
+            } );
         } );
 
         // Pool remaining
         var used = ATTR_KEYS.reduce( function ( s, k ) {
-            var v = ( window._nwFormState && window._nwFormState[ 'attr_' + k ] ) || 1;
-            return s + v;
+            return s + ( formState[ 'attr_' + k ] || ATTR_MIN );
         }, 0 );
         var poolEl = wrapper.querySelector( '[data-attr-pool]' );
         if ( poolEl ) poolEl.textContent = ATTR_POOL - used;
+
+        var remainEl = document.getElementById( 'tw-attr-remaining' );
+        if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
     // ── Boot ──────────────────────────────────────────────────────────────────
     if ( document.readyState === 'loading' ) {
-    document.addEventListener( 'DOMContentLoaded', init );
-} else if ( document.readyState === 'interactive' || document.readyState === 'complete' ) {
-    // Shortcode ładuje się po skrypcie — czekamy na wrapper
-    var _nwRetry = 0;
-    var _nwPoll = setInterval( function () {
-        _nwRetry++;
-        if ( document.getElementById( 'tw-char-creator-wrapper' ) ) {
-            clearInterval( _nwPoll );
-            init();
-        } else if ( _nwRetry > 50 ) {
-            clearInterval( _nwPoll );
-        }
-    }, 100 );
-}
+        document.addEventListener( 'DOMContentLoaded', init );
+    } else if ( document.readyState === 'interactive' || document.readyState === 'complete' ) {
+        // Shortcode może ładować się po skrypcie — polling na wrapper
+        var _nwRetry = 0;
+        var _nwPoll = setInterval( function () {
+            _nwRetry++;
+            if ( document.getElementById( 'tw-char-creator-wrapper' ) ) {
+                clearInterval( _nwPoll );
+                init();
+            } else if ( _nwRetry > 50 ) {
+                clearInterval( _nwPoll );
+            }
+        }, 100 );
+    }
 
 } )();
