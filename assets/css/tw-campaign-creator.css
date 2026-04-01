@@ -2,6 +2,9 @@
  * tw-campaign-creator.css
  *
  * Scoped to: .neoweaver-screen #tw-campaign-creator-wrapper
+ *
+ * Spinner: #tw-camp-spinner reuses tw-node-spinner.css rules via ID alias below.
+ * No bespoke ring/text/keyframe rules needed here.
  */
 
 /* ── Variables ─────────────────────────────────────────────────────────── */
@@ -555,58 +558,25 @@
 	color         : var(--neon-green);
 }
 
-/* ── Spinner overlay ──────────────────────────────────────────────────────────────── */
+/* ── Spinner — ID alias for tw-node-spinner.css ──────────────────────────────
+   tw-campaign-creator.js creates #tw-camp-spinner with the same inner HTML
+   structure as #tw-node-spinner. The rules below make it behave identically
+   to the world-creator spinner without duplicating any animation keyframes. */
 #tw-camp-spinner {
-	display        : none;
 	position       : fixed;
 	inset          : 0;
-	background     : rgba(0, 0, 0, 0.88);
-	z-index        : 9999;
+	background     : radial-gradient(circle at center, rgba(0, 20, 0, 0.97), rgba(0, 0, 0, 0.99));
+	display        : flex;
 	align-items    : center;
 	justify-content: center;
-	backdrop-filter: blur(4px);
+	z-index        : 99999;
+	opacity        : 0;
+	pointer-events : none;
+	transition     : opacity 0.35s ease;
 }
-#tw-camp-spinner.active { display: flex; }
-#tw-camp-spinner .tw-spinner-inner {
-	text-align: center;
-	position  : relative;
-}
-#tw-camp-spinner .tw-spinner-ring {
-	width        : 80px;
-	height       : 80px;
-	border-radius: 50%;
-	border       : 3px solid transparent;
-	border-top-color: #adff00;
-	animation    : tw-camp-spin 1.1s linear infinite;
-	margin       : 0 auto 30px auto;
-}
-#tw-camp-spinner .tw-spinner-ring--2 {
-	position : absolute;
-	top      : 0;
-	left     : 50%;
-	transform: translateX(-50%);
-	width    : 60px;
-	height   : 60px;
-	margin   : 10px 0 0 0;
-	border-top-color  : #00e5ff;
-	animation-duration: 0.75s;
-	animation-direction: reverse;
-}
-@keyframes tw-camp-spin { to { transform: rotate(360deg); } }
-#tw-camp-spinner .tw-spinner-text {
-	color         : #adff00;
-	font-family   : 'Chakra Petch', sans-serif;
-	font-size     : 1rem;
-	letter-spacing: 0.2em;
-	text-transform: uppercase;
-	text-shadow   : 0 0 16px #adff00;
-	margin        : 0 0 8px 0;
-}
-#tw-camp-spinner .tw-spinner-sub {
-	color     : #666;
-	font-family: 'Chakra Petch', sans-serif;
-	font-size : 0.75rem;
-	margin    : 0;
+#tw-camp-spinner.active {
+	opacity        : 1;
+	pointer-events : all;
 }
 
 /* ── Responsive: tablet ≤ 900px ────────────────────────────────────────────── */
@@ -664,7 +634,6 @@
 		grid-template-columns: 1fr;
 		max-width: 100%;
 	}
-	/* Buttony w pionie — NEXT na górze, BACK na dole */
 	.neoweaver-screen #tw-campaign-creator-wrapper .tw-nav-row {
 		flex-direction: column-reverse;
 		gap           : 12px;

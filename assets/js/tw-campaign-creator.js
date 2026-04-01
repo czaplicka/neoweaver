@@ -3,47 +3,54 @@
  */
 ( function () {
 	'use strict';
-// ── Sounds (identical to world-creator) ─────────────────────────────────────
-const NW_SFX = (() => {
-  let ctx = null;
-  const get = () => ctx || (ctx = new (window.AudioContext || window.webkitAudioContext)());
 
-  function beep(freq = 440, type = 'square', duration = 0.08, vol = 0.18) {
-    try {
-      const ac = get(), o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.value = freq;
-      g.gain.setValueAtTime(vol, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
-      o.connect(g); g.connect(ac.destination);
-      o.start(); o.stop(ac.currentTime + duration);
-    } catch(e) {}
-  }
+	// ── Shared audio engine (Web Audio API — no external files needed) ────────
+	// Identical to the NW_SFX module used in tw-character-creator.js.
+	const NW_SFX = ( () => {
+		let ctx = null;
+		const get = () => ctx || ( ctx = new ( window.AudioContext || window.webkitAudioContext )() );
 
-  return {
-    nav:    () => beep(660, 'square',   0.06, 0.15),
-    select: () => beep(880, 'sine',     0.10, 0.20),
-    back:   () => beep(330, 'sawtooth', 0.08, 0.12),
-    deploy: () => { beep(440,'square',0.1,0.2); setTimeout(()=>beep(660,'sine',0.15,0.25),120); },
-    error:  () => beep(180, 'sawtooth', 0.18, 0.20),
-  };
-})();
-	// NEXT buttons
-wrapper.querySelectorAll('.tw-btn-next, #tw-camp-step1-next').forEach(btn =>
-  btn.addEventListener('click', () => NW_SFX.nav()));
+		function beep( freq = 440, type = 'square', duration = 0.08, vol = 0.18 ) {
+			try {
+				const ac = get(), o = ac.createOscillator(), g = ac.createGain();
+				o.type = type;
+				o.frequency.value = freq;
+				g.gain.setValueAtTime( vol, ac.currentTime );
+				g.gain.exponentialRampToValueAtTime( 0.001, ac.currentTime + duration );
+				o.connect( g ); g.connect( ac.destination );
+				o.start(); o.stop( ac.currentTime + duration );
+			} catch ( e ) {}
+		}
 
-// BACK buttons
-wrapper.querySelectorAll('.tw-btn-prev').forEach(btn =>
-  btn.addEventListener('click', () => NW_SFX.back()));
+		return {
+			nav:    () => beep( 660, 'square',   0.06, 0.15 ),
+			select: () => beep( 880, 'sine',     0.10, 0.20 ),
+			back:   () => beep( 330, 'sawtooth', 0.08, 0.12 ),
+			deploy: () => { beep( 440, 'square', 0.1, 0.2 ); setTimeout( () => beep( 660, 'sine', 0.15, 0.25 ), 120 ); },
+			error:  () => beep( 180, 'sawtooth', 0.18, 0.20 ),
+		};
+	} )();
 
-// Radio card selection
-wrapper.querySelectorAll('.tw-card-label input[type="radio"]').forEach(r =>
-  r.addEventListener('change', () => NW_SFX.select()));
+	// ── Shared spinner factory ────────────────────────────────────────────────
+	// Returns { show, hide }. Appends a single overlay to <body> on first call,
+	// matching the structure and CSS of #tw-node-spinner from world creator.
+	function makeSpinner( id, title, subtitle ) {
+		const el = document.createElement( 'div' );
+		el.id = id;
+		el.innerHTML =
+			'<div class="tw-spinner-inner">' +
+				'<div class="tw-spinner-ring"></div>' +
+				'<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
+				'<p class="tw-spinner-text">' + title + '</p>' +
+				'<p class="tw-spinner-sub">' + subtitle + '</p>' +
+			'</div>';
+		document.body.appendChild( el );
+		return {
+			show: () => el.classList.add( 'active' ),
+			hide: () => el.classList.remove( 'active' ),
+		};
+	}
 
-// Deploy button
-document.getElementById('tw-camp-submit')
-  ?.addEventListener('click', () => NW_SFX.deploy());
-
-// Error (wywołaj NW_SFX.error() w miejscu gdzie pokazujesz błąd walidacji)
 	document.addEventListener( 'DOMContentLoaded', function () {
 
 		const wrapper = document.getElementById( 'tw-campaign-creator-wrapper' );
@@ -84,18 +91,11 @@ document.getElementById('tw-camp-submit')
 		const priorityLabels   = { 1: 'Combat', 2: 'Wealth', 3: 'Discovery', 4: 'Relations', 5: 'Mix' };
 
 		// ── Spinner ───────────────────────────────────────────────────────────
-		const spinner = document.createElement( 'div' );
-		spinner.id = 'tw-camp-spinner';
-		spinner.innerHTML =
-			'<div class="tw-spinner-inner">' +
-				'<div class="tw-spinner-ring"></div>' +
-				'<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
-				'<p class="tw-spinner-text">// UPLINK IN PROGRESS…</p>' +
-				'<p class="tw-spinner-sub">Binding deployment to the NeoWeave grid.</p>' +
-			'</div>';
-		document.body.appendChild( spinner );
-		const showSpinner = () => spinner.classList.add( 'active' );
-		const hideSpinner = () => spinner.classList.remove( 'active' );
+		const spinner = makeSpinner(
+			'tw-camp-spinner',
+			'// UPLINK IN PROGRESS…',
+			'Binding deployment to the NeoWeave grid.'
+		);
 
 		// ── Inline error helpers ──────────────────────────────────────────────
 		function showFieldError( stepEl, msg ) {
@@ -113,6 +113,7 @@ document.getElementById('tw-camp-submit')
 				target.addEventListener( 'animationend', () => target.classList.remove( 'tw-shake' ), { once: true } );
 			}
 			stepEl.querySelectorAll( '.tw-card-visual' ).forEach( v => v.classList.add( 'tw-card--error' ) );
+			NW_SFX.error();
 		}
 
 		function clearFieldError( stepEl ) {
@@ -158,7 +159,6 @@ document.getElementById('tw-camp-submit')
 
 			clearFieldError( step );
 
-			// Step 0: name required
 			if ( idx === 0 ) {
 				const nameInput = wrapper.querySelector( '#tw-camp-name' );
 				if ( ! nameInput || ! nameInput.value.trim() ) {
@@ -178,13 +178,12 @@ document.getElementById('tw-camp-submit')
 				return true;
 			}
 
-			// Steps with radio cards
 			const radioFields = {
-				'GM PROTOCOL'        : { key: 'gm_style',   labels: gmStyleLabels,    msg: 'Select a GM Protocol to continue.'      },
-				'OPERATIVE MODE'     : { key: 'game_mode',  labels: gameModeLabels,   msg: 'Select an Operative Mode to continue.'  },
-				'OPERATION SCOPE'    : { key: 'game_length', labels: gameLengthLabels, msg: 'Select an Operation Scope to continue.' },
-				'THREAT CALIBRATION' : { key: 'world_type', labels: worldTypeLabels,  msg: 'Select a Threat Level to continue.'     },
-				'MISSION PRIORITY'   : { key: 'priority',   labels: priorityLabels,   msg: 'Select a Mission Priority to continue.' },
+				'GM PROTOCOL'        : { key: 'gm_style',    labels: gmStyleLabels,    msg: 'Select a GM Protocol to continue.'      },
+				'OPERATIVE MODE'     : { key: 'game_mode',   labels: gameModeLabels,   msg: 'Select an Operative Mode to continue.'  },
+				'OPERATION SCOPE'    : { key: 'game_length',  labels: gameLengthLabels, msg: 'Select an Operation Scope to continue.' },
+				'THREAT CALIBRATION' : { key: 'world_type',  labels: worldTypeLabels,  msg: 'Select a Threat Level to continue.'     },
+				'MISSION PRIORITY'   : { key: 'priority',    labels: priorityLabels,   msg: 'Select a Mission Priority to continue.' },
 			};
 
 			if ( radioFields[ phase ] ) {
@@ -201,7 +200,6 @@ document.getElementById('tw-camp-submit')
 				return true;
 			}
 
-			// NODE & AGENT — optional, always pass
 			return true;
 		}
 
@@ -232,6 +230,7 @@ document.getElementById('tw-camp-submit')
 			div.addEventListener( 'click', function () {
 				div.closest( '.tw-dynamic-grid' ).querySelectorAll( '.tw-dyn-card' ).forEach( c => c.classList.remove( 'selected' ) );
 				div.classList.add( 'selected' );
+				NW_SFX.select();
 				onSelect( id, name );
 			} );
 			return div;
@@ -258,7 +257,7 @@ document.getElementById('tw-camp-submit')
 							row.id, row.name, sub, '🌐',
 							formState.world_id ? formState.world_id.id : null,
 							function ( id, name ) {
-								formState.world_id    = { id, name };
+								formState.world_id     = { id, name };
 								formState.character_id = null;
 								setStatus( '', false );
 								loadAgents( id );
@@ -332,13 +331,18 @@ document.getElementById('tw-camp-submit')
 
 			if ( btn.classList.contains( 'tw-btn-next' ) || btn.id === 'tw-camp-step1-next' ) {
 				e.preventDefault();
-				if ( validateStep( current ) ) { setStatus( '', false ); showStep( current + 1 ); }
+				if ( validateStep( current ) ) {
+					setStatus( '', false );
+					NW_SFX.nav();
+					showStep( current + 1 );
+				}
 				return;
 			}
 			if ( btn.classList.contains( 'tw-btn-prev' ) ) {
 				e.preventDefault();
 				if ( steps[ current ] ) clearFieldError( steps[ current ] );
 				setStatus( '', false );
+				NW_SFX.back();
 				showStep( current - 1 );
 				return;
 			}
@@ -346,10 +350,15 @@ document.getElementById('tw-camp-submit')
 				const goto = parseInt( btn.dataset.goto, 10 );
 				if ( ! isNaN( goto ) ) {
 					const idx = steps.findIndex( s => parseInt( s.dataset.step, 10 ) === goto );
-					if ( idx >= 0 ) { setStatus( '', false ); showStep( idx ); }
+					if ( idx >= 0 ) { setStatus( '', false ); NW_SFX.nav(); showStep( idx ); }
 				}
 				return;
 			}
+		} );
+
+		// Radio card selection sound
+		wrapper.addEventListener( 'change', function ( e ) {
+			if ( e.target && e.target.type === 'radio' ) NW_SFX.select();
 		} );
 
 		// ── Submit ────────────────────────────────────────────────────────────
@@ -373,17 +382,18 @@ document.getElementById('tw-camp-submit')
 
 		function doSubmit() {
 			const payload = buildPayload();
-			if ( ! payload.name )        { setStatus( 'ERROR: Deployment name is required.', true ); return; }
-			if ( ! payload.gm_style )    { setStatus( 'ERROR: GM Protocol is required.', true ); return; }
-			if ( ! payload.game_mode )   { setStatus( 'ERROR: Operative mode is required.', true ); return; }
-			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); return; }
-			if ( ! payload.world_type )  { setStatus( 'ERROR: Threat calibration is required.', true ); return; }
-			if ( ! payload.priority )    { setStatus( 'ERROR: Mission priority is required.', true ); return; }
+			if ( ! payload.name )        { setStatus( 'ERROR: Deployment name is required.', true ); NW_SFX.error(); return; }
+			if ( ! payload.gm_style )    { setStatus( 'ERROR: GM Protocol is required.', true );     NW_SFX.error(); return; }
+			if ( ! payload.game_mode )   { setStatus( 'ERROR: Operative mode is required.', true );  NW_SFX.error(); return; }
+			if ( ! payload.game_length ) { setStatus( 'ERROR: Operation scope is required.', true ); NW_SFX.error(); return; }
+			if ( ! payload.world_type )  { setStatus( 'ERROR: Threat calibration is required.', true ); NW_SFX.error(); return; }
+			if ( ! payload.priority )    { setStatus( 'ERROR: Mission priority is required.', true ); NW_SFX.error(); return; }
 
 			submitBtn.disabled    = true;
 			submitBtn.textContent = 'UPLINK IN PROGRESS…';
 			setStatus( '', false );
-			showSpinner();
+			NW_SFX.deploy();
+			spinner.show();
 
 			const t0 = Date.now();
 			fetch( restUrl, {
@@ -396,21 +406,23 @@ document.getElementById('tw-camp-submit')
 				.then( function ( json ) {
 					const wait = Math.max( 0, 2500 - ( Date.now() - t0 ) );
 					setTimeout( function () {
-						hideSpinner();
+						spinner.hide();
 						if ( json.success ) {
 							setStatus( '// DEPLOYMENT ONLINE: ' + ( json.data.campaign_id || '' ), false );
 							setTimeout( () => { window.location.href = campaignsUrl; }, 1800 );
 						} else {
 							const msg = ( json.data && json.data.message ) || json.message || 'Unknown error';
 							setStatus( 'ERROR: ' + msg, true );
+							NW_SFX.error();
 							submitBtn.disabled    = false;
 							submitBtn.textContent = '▶ UPLINK DEPLOYMENT';
 						}
 					}, wait );
 				} )
 				.catch( function ( err ) {
-					hideSpinner();
+					spinner.hide();
 					setStatus( 'ERROR: Network failure — ' + err.message, true );
+					NW_SFX.error();
 					submitBtn.disabled    = false;
 					submitBtn.textContent = '▶ UPLINK DEPLOYMENT';
 				} );
