@@ -18,6 +18,17 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
+		// Enqueue tw-node-spinner.css so #tw-char-spinner gets the shared ring/animation rules.
+		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
+		if ( file_exists( $spinner_css ) ) {
+			wp_enqueue_style(
+				'neoweaver-node-spinner',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/tw-node-spinner.css',
+				[],
+				(string) filemtime( $spinner_css )
+			);
+		}
+
 		$attrs = [
 			'body'   => [ 'label' => 'BODY',   'sub' => 'STR + CON', 'desc' => 'Brute force, health pool, heavy lifting, physical endurance.', 'icon' => '💪' ],
 			'reflex' => [ 'label' => 'REFLEX', 'sub' => 'DEX',       'desc' => 'Speed, evasion, precision aiming, reaction time.',              'icon' => '⚡' ],
@@ -111,16 +122,11 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			<div class="tw-step" data-step="2" data-phase="RACE PROTOCOL">
 				<h2>// RACE PROTOCOL</h2>
 				<p class="tw-question-text">Select the operative's biological or synthetic origin.</p>
-
-				<!-- Base races -->
 				<div class="tw-dynamic-grid tw-race-grid" id="tw-race-grid"></div>
-
-				<!-- Subraces — hidden until base race clicked -->
 				<div id="tw-subrace-section" style="display:none;">
 					<h3 class="tw-subrace-heading">// SELECT SUBRACE</h3>
 					<div class="tw-dynamic-grid tw-subrace-grid" id="tw-subrace-grid"></div>
 				</div>
-
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
