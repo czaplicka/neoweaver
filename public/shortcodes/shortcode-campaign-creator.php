@@ -36,7 +36,7 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			'nonce'        => $nonce,
 			'restNonce'    => wp_create_nonce( 'wp_rest' ),
 			'restUrl'      => $rest_url,
-			'campaignsUrl' => home_url( '/campaigns/' ),
+			'campaignsUrl' => home_url( '/deployments/' ),
 			'supabaseUrl'  => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
 			'supabaseKey'  => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			'userId'       => $user_id,
