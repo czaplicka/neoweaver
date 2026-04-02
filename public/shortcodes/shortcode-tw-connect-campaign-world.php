@@ -6,19 +6,20 @@
  */
 function tw_deployment_enqueue_assets() {
 
-wp_register_style(
-    'tw-deployment',
-    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-deployment.css',
-    [],
-    '1.0.0'
-);
-wp_register_script(
-    'tw-deployment',
-    $NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-deployment.js'
-    [],
-    '1.0.0',
-    true
-);
+    wp_register_style(
+        'tw-deployment',
+        NEOWEAVER_PLUGIN_URL . 'public/assets/css/tw-deployment.css',
+        [],
+        '1.0.0'
+    );
+
+    wp_register_script(
+        'tw-deployment',
+        NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-deployment.js',
+        [],
+        '1.0.0',
+        true
+    );
 }
 add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
 
