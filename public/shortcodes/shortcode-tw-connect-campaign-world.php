@@ -7,21 +7,20 @@
 function tw_deployment_enqueue_assets() {
     wp_register_style(
         'tw-deployment',
-        get_stylesheet_directory_uri() . '/public/assets/css/tw-deployment.css',
+        plugin_dir_url( __FILE__ ) . 'public/assets/css/tw-deployment.css',
         [],
         '1.0.0'
     );
 
     wp_register_script(
         'tw-deployment',
-        get_stylesheet_directory_uri() . '/public/assets/js/tw-deployment.js',
+        plugin_dir_url( __FILE__ ) . 'public/assets/js/tw-deployment.js',
         [],
         '1.0.0',
-        true // footer
+        true
     );
 }
 add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
-
 
 /**
  * SHORTCODE: [tw_connect_campaign_world]
