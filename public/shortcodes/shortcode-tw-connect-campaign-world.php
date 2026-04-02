@@ -5,21 +5,21 @@
  * JS  → public/assets/js/tw-deployment.js
  */
 function tw_deployment_enqueue_assets() {
-    wp_register_style(
-        'tw-deployment',
-        plugin_dir_url( __FILE__ ) . 'public/assets/css/tw-deployment.css',
-        [],
-        '1.0.0'
-    );
+$plugin_url = plugin_dir_url( dirname( dirname( __FILE__ ) ) );
 
-    wp_register_script(
-        'tw-deployment',
-        plugin_dir_url( __FILE__ ) . 'public/assets/js/tw-deployment.js',
-        [],
-        '1.0.0',
-        true
-    );
-}
+wp_register_style(
+    'tw-deployment',
+    $plugin_url . 'public/assets/css/tw-deployment.css',
+    [],
+    '1.0.0'
+);
+wp_register_script(
+    'tw-deployment',
+    $plugin_url . 'public/assets/js/tw-deployment.js',
+    [],
+    '1.0.0',
+    true
+);
 add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
 
 /**
