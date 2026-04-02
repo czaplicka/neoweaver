@@ -108,7 +108,8 @@ class Neoweaver_Public {
 			'neoweaver-char-creator',
 			'twCharCreatorConfig',
 			[
-				'nonce'       => wp_create_nonce( 'tw_character_nonce' ),
+				'nonce'       => wp_create_nonce( 'neoweaver_nonce' ), // must match check_ajax_referer() in api-endpoints-character-data.php
+				'ajax_url'    => admin_url( 'admin-ajax.php' ),
 				'restNonce'   => wp_create_nonce( 'wp_rest' ),
 				'restUrl'     => home_url( '/wp-json/neoweaver/v1/character/create' ),
 				'agentsUrl'   => home_url( '/agents/' ),
