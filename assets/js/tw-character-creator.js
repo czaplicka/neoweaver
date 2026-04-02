@@ -69,7 +69,8 @@
     // ── Config ────────────────────────────────────────────────────────────────
     var _cfg = window.twCharCreatorConfig || window.neoweaver_ajax || {};
 
-    var RACES = _cfg.races || [
+    // Hardcoded races kept ONLY as emergency offline fallback.
+    var RACES_FALLBACK = [
         {
             key: 'human', label: 'Human', icon: '&#128100;', img: '',
             desc: 'Adaptable generalists. Bonus feat at character creation.', bonus: '+1 to any attribute',
@@ -82,29 +83,17 @@
         {
             key: 'beastman', label: 'Beastman', icon: '&#128060;', img: '',
             desc: 'Hybrid of human and animal genetics. Enhanced senses and raw power.', bonus: '+1 BODY, darkvision',
-            subraces: [
-                { key: 'beastman_felid',  label: 'Felid',  desc: 'Cat-based hybrid. High agility, retractable claws.' },
-                { key: 'beastman_ursine', label: 'Ursine', desc: 'Bear-based hybrid. High body, resistance to cold.' },
-                { key: 'beastman_lupine', label: 'Lupine', desc: 'Wolf-based hybrid. Pack tactics bonus in group combat.' },
-            ],
+            subraces: [],
         },
         {
             key: 'synth', label: 'Synth', icon: '&#129302;', img: '',
             desc: 'Fully synthetic android. Immune to bio-hazards, requires maintenance.', bonus: '+1 MIND, no sleep needed',
-            subraces: [
-                { key: 'synth_mk1',   label: 'Mark I',   desc: 'Early model. Rugged but archaic firmware.' },
-                { key: 'synth_mk3',   label: 'Mark III', desc: 'Military chassis. Combat subroutines pre-loaded.' },
-                { key: 'synth_ghost', label: 'Ghost',    desc: 'Stealth model. Can disable digital signature.' },
-            ],
+            subraces: [],
         },
         {
             key: 'weaver', label: 'Weaver', icon: '&#10024;', img: '',
             desc: 'Born with innate connection to the NeoWeave. Arcane conduit in human form.', bonus: '+1 SPIRIT, mana sense',
-            subraces: [
-                { key: 'weaver_bright', label: 'Bright', desc: 'Light-aspected. Healing and barrier spells enhanced.' },
-                { key: 'weaver_void',   label: 'Void',   desc: 'Entropy-aspected. Curses and drain spells enhanced.' },
-                { key: 'weaver_echo',   label: 'Echo',   desc: 'Memory-aspected. Can replay seen spells once per session.' },
-            ],
+            subraces: [],
         },
     ];
 
@@ -160,9 +149,11 @@
         if ( errEl ) { errEl.classList.remove( 'visible', 'tw-step-error--shake' ); }
     }
 
-    // ── Race grid ─────────────────────────────────────────────────────────────
+    // ── Card builders ───────────────────────────────────────────────────────────
+
+    // Accepts a row in the JS card shape: { key, label, desc, img, bonus? }
     function buildRaceCard( race ) {
-        var imgSrc  = race.img || ( _cfg.race_images && _cfg.race_images[ race.key ] ) || '';
+        var imgSrc  = race.img || '';
         var imgHtml = imgSrc
             ? '<div class="tw-race-card__img-wrap"><img class="tw-race-card__img" src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="220" height="220" loading="lazy" /></div>'
             : '<div class="tw-race-card__img-wrap tw-race-card__img-wrap--placeholder"><span class="tw-race-card__icon">' + ( race.icon || '&#10067;' ) + '</span></div>';
@@ -183,27 +174,62 @@
             '</div></div>';
     }
 
-    function renderRaceGrid( wrapper ) {
+    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────────
+    function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
-        grid.innerHTML = RACES.map( buildRaceCard ).join( '' );
-        grid.dataset.rendered = '1';
+
+        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE…</p>';
+
+        var fd = new FormData();
+        fd.append( 'action', 'neoweaver_get_races' );
+        fd.append( 'nonce',  nonce() );
+
+        fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
+            .then( function ( r ) { return r.json(); } )
+            .then( function ( res ) {
+                if ( res.success && res.data && res.data.length ) {
+                    grid.innerHTML = res.data.map( buildRaceCard ).join( '' );
+                    grid.dataset.rendered = '1';
+                } else {
+                    // Fallback to hardcoded races
+                    grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
+                    grid.dataset.rendered = '1';
+                }
+            } )
+            .catch( function () {
+                grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
+                grid.dataset.rendered = '1';
+            } );
     }
 
-    function showSubraces( wrapper, raceKey ) {
-        var raceData = null;
-        for ( var i = 0; i < RACES.length; i++ ) {
-            if ( RACES[ i ].key === raceKey ) { raceData = RACES[ i ]; break; }
-        }
+    // ── Subrace grid: fetch from AJAX ───────────────────────────────────────────
+    function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
         if ( ! section || ! grid ) return;
-        if ( ! raceData || ! raceData.subraces || ! raceData.subraces.length ) {
-            section.style.display = 'none';
-            return;
-        }
-        grid.innerHTML = raceData.subraces.map( buildSubraceCard ).join( '' );
+
         section.style.display = '';
+        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA…</p>';
+
+        var fd = new FormData();
+        fd.append( 'action', 'neoweaver_get_subraces' );
+        fd.append( 'nonce',  nonce() );
+        fd.append( 'parent', raceKey );
+
+        fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
+            .then( function ( r ) { return r.json(); } )
+            .then( function ( res ) {
+                if ( res.success && res.data && res.data.length ) {
+                    grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
+                } else {
+                    // No subraces — hide section
+                    section.style.display = 'none';
+                }
+            } )
+            .catch( function () {
+                section.style.display = 'none';
+            } );
     }
 
     // ── Class grid (AJAX) ─────────────────────────────────────────────────────
@@ -382,7 +408,7 @@
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
 
-        // ── GUARD: prevent double-init ─────────────────────────────────────
+        // GUARD: prevent double-init
         if ( wrapper.dataset.nwInit ) return;
         wrapper.dataset.nwInit = '1';
 
@@ -396,7 +422,8 @@
             'Writing operative data to the NeoWeave grid.'
         );
 
-        renderRaceGrid( wrapper );
+        // Fetch races from DB immediately
+        fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
         // ── showStep ──────────────────────────────────────────────────────────
@@ -505,7 +532,7 @@
             return true;
         }
 
-        // ── goNext / goPrev — standalone functions used by both listener paths ─
+        // ── goNext / goPrev ────────────────────────────────────────────────────────────
         function goNext() {
             if ( validateStep( current ) ) {
                 clearStepError( steps[ current ] );
@@ -552,9 +579,11 @@
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-card__name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
+                // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) allSubReset[ sr ].classList.remove( 'selected' );
-                showSubraces( wrapper, formState.race );
+                // Fetch subraces from DB
+                fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
                 return;
@@ -706,13 +735,12 @@
         showStep( 0 );
     }
 
-    // ── Boot — single clean entry point ───────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────────
     function boot() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( wrapper ) {
             init();
         } else {
-            // Shortcode rendered after DOMContentLoaded (e.g. AJAX page builder)
             var _retry = 0;
             var _poll  = setInterval( function () {
                 _retry++;
