@@ -37,6 +37,13 @@
 
     // ── Spinner factory ───────────────────────────────────────────────────────
     function makeSpinner( id, title, subtitle ) {
+        var existing = document.getElementById( id );
+        if ( existing ) {
+            return {
+                show: function () { existing.classList.add( 'active' ); },
+                hide: function () { existing.classList.remove( 'active' ); },
+            };
+        }
         var el = document.createElement( 'div' );
         el.id = id;
         el.innerHTML =
@@ -141,7 +148,7 @@
             '<span class="tw-step-error__msg">' + esc( msg ) + '</span>';
         errEl.classList.add( 'visible' );
         errEl.classList.remove( 'tw-step-error--shake' );
-        void errEl.offsetWidth; // reflow to restart animation
+        void errEl.offsetWidth;
         errEl.classList.add( 'tw-step-error--shake' );
         errEl.scrollIntoView( { behavior: 'smooth', block: 'nearest' } );
         NW_SFX.error();
@@ -375,7 +382,10 @@
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
 
-        // Convert NodeList to Array so we can use array methods safely.
+        // ── GUARD: prevent double-init ─────────────────────────────────────
+        if ( wrapper.dataset.nwInit ) return;
+        wrapper.dataset.nwInit = '1';
+
         var steps   = Array.prototype.slice.call( wrapper.querySelectorAll( '.tw-step' ) );
         var current = 0;
         if ( ! steps.length ) return;
@@ -495,10 +505,31 @@
             return true;
         }
 
-        // ── Single delegated click handler (mirrors campaign creator pattern) ─
-        wrapper.addEventListener( 'click', function ( e ) {
+        // ── goNext / goPrev — standalone functions used by both listener paths ─
+        function goNext() {
+            if ( validateStep( current ) ) {
+                clearStepError( steps[ current ] );
+                setStatus( '', false );
+                if ( current < steps.length - 1 ) { NW_SFX.nav(); showStep( current + 1 ); }
+            }
+        }
+        function goPrev() {
+            clearStepError( steps[ current ] );
+            setStatus( '', false );
+            if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
+        }
 
-            // ── Card selections (non-button elements) ─────────────────────────
+        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
+        var step1Next = document.getElementById( 'tw-char-step1-next' );
+        if ( step1Next ) {
+            step1Next.addEventListener( 'click', function ( e ) {
+                e.stopPropagation();
+                goNext();
+            } );
+        }
+
+        // ── Single delegated click handler ────────────────────────────────────
+        wrapper.addEventListener( 'click', function ( e ) {
 
             // Subrace card
             var subCard = e.target.closest( '.tw-subrace-card' );
@@ -512,7 +543,7 @@
                 return;
             }
 
-            // Base race card (not a subrace card, not a button)
+            // Base race card
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -556,7 +587,6 @@
                 return;
             }
 
-            // ── Button actions ────────────────────────────────────────────────
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
 
@@ -606,29 +636,15 @@
                 return;
             }
 
-            // Navigation: resolve action — specific classes before generic tw-btn-nav
+            // Navigation
             var action = '';
             if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
             else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
             else if ( btn.classList.contains( 'tw-btn-next' ) )   action = 'next';
             else if ( btn.classList.contains( 'tw-btn-nav' ) )    action = 'next';
 
-            if ( action === 'prev' ) {
-                clearStepError( steps[ current ] );
-                setStatus( '', false );
-                if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
-                return;
-            }
-
-            if ( action === 'next' ) {
-                if ( validateStep( current ) ) {
-                    clearStepError( steps[ current ] );
-                    setStatus( '', false );
-                    if ( current < steps.length - 1 ) { NW_SFX.nav(); showStep( current + 1 ); }
-                }
-                return;
-            }
-
+            if ( action === 'prev' )   { goPrev(); return; }
+            if ( action === 'next' )   { goNext(); return; }
             if ( action === 'submit' ) {
                 if ( validateStep( current ) ) {
                     submitCharacter( wrapper, steps, current, spinner );
@@ -636,9 +652,8 @@
             }
         } );
 
-        // ── Change events (pronouns, node select fallback) ────────────────────
+        // ── Change events ─────────────────────────────────────────────────────
         wrapper.addEventListener( 'change', function ( e ) {
-            // Custom pronouns toggle
             if ( e.target && e.target.classList.contains( 'tw-pronoun-radio' ) ) {
                 var customInput = document.getElementById( 'tw-char-pronouns-custom' );
                 if ( customInput ) {
@@ -647,7 +662,6 @@
                 }
                 return;
             }
-            // Node <select> fallback
             if ( e.target && e.target.id === 'tw-node-select' ) {
                 formState.node_id    = e.target.value || '';
                 formState.node_label = e.target.options[ e.target.selectedIndex ]
@@ -656,7 +670,7 @@
             }
         } );
 
-        // ── Keyboard: Enter/Space on card elements ────────────────────────────
+        // ── Keyboard: Enter/Space on cards ────────────────────────────────────
         wrapper.addEventListener( 'keydown', function ( e ) {
             if ( e.key !== 'Enter' && e.key !== ' ' ) return;
             var card = e.target.closest( '.tw-race-card, .tw-class-card, .tw-node-card' );
@@ -689,25 +703,33 @@
             } );
         }
 
-        // Boot to step 0
         showStep( 0 );
     }
 
-    // ── Boot ──────────────────────────────────────────────────────────────────
+    // ── Boot — single clean entry point ───────────────────────────────────────
+    function boot() {
+        var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
+        if ( wrapper ) {
+            init();
+        } else {
+            // Shortcode rendered after DOMContentLoaded (e.g. AJAX page builder)
+            var _retry = 0;
+            var _poll  = setInterval( function () {
+                _retry++;
+                if ( document.getElementById( 'tw-char-creator-wrapper' ) ) {
+                    clearInterval( _poll );
+                    init();
+                } else if ( _retry > 50 ) {
+                    clearInterval( _poll );
+                }
+            }, 100 );
+        }
+    }
+
     if ( document.readyState === 'loading' ) {
-        document.addEventListener( 'DOMContentLoaded', init );
+        document.addEventListener( 'DOMContentLoaded', boot );
     } else {
-        // DOM already ready — poll briefly in case shortcode renders late.
-        var _retry = 0;
-        var _poll  = setInterval( function () {
-            _retry++;
-            if ( document.getElementById( 'tw-char-creator-wrapper' ) ) {
-                clearInterval( _poll );
-                init();
-            } else if ( _retry > 50 ) {
-                clearInterval( _poll );
-            }
-        }, 100 );
+        boot();
     }
 
 } )();
