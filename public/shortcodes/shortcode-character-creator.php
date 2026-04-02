@@ -114,7 +114,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<span></span>
-					<button type="button" class="tw-btn-nav" id="tw-char-step1-next">NEXT &rarr;</button>
+					<button type="button" class="tw-btn-nav tw-btn-next" id="tw-char-step1-next">NEXT &rarr;</button>
 				</div>
 			</div>
 
