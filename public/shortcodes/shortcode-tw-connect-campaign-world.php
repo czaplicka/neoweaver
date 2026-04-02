@@ -19,6 +19,7 @@ wp_register_script(
     '1.0.0',
     true
 );
+}
 add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
 
 /**
