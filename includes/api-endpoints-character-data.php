@@ -135,7 +135,7 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 	$data = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url,bonus',
+			'select'      => 'id,name,description,tags,img_url',
 			'parent_race' => 'is.null',
 			'order'       => 'name.asc',
 		]
