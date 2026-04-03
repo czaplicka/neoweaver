@@ -15,11 +15,16 @@
  *
  * No namespaces. No Supabase direct calls — the endpoint owns that contract.
  *
- * BUG-FIX 4: create_via_rest_api() previously used wp_remote_post() to call
- * its own REST endpoint, which arrived unauthenticated (no session cookies on
- * loopback) and always triggered a 401 from neoweaver_user_can_play().
+ * BUG-FIX (loopback auth): create_via_rest_api() previously used wp_remote_post()
+ * to call its own REST endpoint, which arrived unauthenticated (no session cookies
+ * on loopback) and always triggered a 401 from neoweaver_user_can_play().
  * Fixed by calling neoweaver_create_world() directly via a synthetic
  * WP_REST_Request — no HTTP round-trip, no auth problem.
+ *
+ * BUG-FIX (PHP 7.x fatal): validate() previously declared a PHP 8.0 union return
+ * type `true|WP_Error`. This causes a fatal parse error on PHP 7.x (Hostinger
+ * may run 7.4). Fixed by removing the union type and using a plain PHPDoc
+ * @return annotation instead, which is compatible with all PHP versions.
  *
  * @package Neoweaver
  */
@@ -60,7 +65,7 @@ class Neoweaver_Nodes_Creator {
 	 * @param  array $data  Raw form fields (mirrors what the JS FormData posts).
 	 * @return true|WP_Error
 	 */
-	public function validate( array $data ): true|WP_Error {
+	public function validate( array $data ) {
 		// Auth check.
 		if ( ! get_current_user_id() ) {
 			return new WP_Error(
@@ -112,7 +117,7 @@ class Neoweaver_Nodes_Creator {
 	/**
 	 * Call neoweaver_create_world() directly via a synthetic WP_REST_Request.
 	 *
-	 * BUG-FIX 4: The previous implementation used wp_remote_post() to hit the
+	 * BUG-FIX: The previous implementation used wp_remote_post() to hit the
 	 * plugin's own REST endpoint. Loopback requests carry no session cookies, so
 	 * is_user_logged_in() returned false and every call got a 401.
 	 *
@@ -179,8 +184,8 @@ class Neoweaver_Nodes_Creator {
 			];
 		}
 
-		$payload  = $this->build_payload( $data );
-		$result   = $this->create_via_rest_api( $payload );
+		$payload = $this->build_payload( $data );
+		$result  = $this->create_via_rest_api( $payload );
 
 		if ( $result['success'] ) {
 			/**

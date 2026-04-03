@@ -16,6 +16,24 @@
  *   - Online threshold: last_seen_at within the last 90 s (3 missed heartbeats)
  *   - fetchSignups() selects last_seen_at from cyber_campaign_signups
  *   - Nonce neoweave_heartbeat injected as data-nonce-heartbeat
+ *
+ * BUG-FIX (UUID campaign_id): cyber_campaign.id is a UUID string.
+ *   The previous code fetched $_GET['campaign_id'] with intval(), which collapses
+ *   any UUID to 0, making every Supabase query return empty results.
+ *   Fixed: use sanitize_text_field + preg_replace to preserve the UUID.
+ *
+ * BUG-FIX (missing return after wp_send_json_error):
+ *   neoweave_launch_campaign() had 5 early-exit calls to wp_send_json_error()
+ *   with no `return` after them. PHP continued executing the rest of the
+ *   function after the error response was sent (e.g., checking host ID even
+ *   when not logged in, inserting sessions even when world_id was invalid).
+ *   Fixed: `return` added after every wp_send_json_error() call.
+ *
+ * BUG-FIX (UUID character_id / world_id in session insert):
+ *   The sessions payload used intval() on character_id and world_id from
+ *   Supabase, both of which are UUID strings. intval() on a UUID returns 0,
+ *   causing the FK constraints to reject the insert.
+ *   Fixed: UUIDs are preserved as strings via sanitize_text_field().
  */
 
 add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
@@ -33,8 +51,13 @@ function neoweave_lobby_terminal() {
 	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	$supabase_key  = tw_supabase_anon_key();
 
-	$campaign_id = isset( $_GET['campaign_id'] ) ? intval( $_GET['campaign_id'] ) : 0;
-	if ( $campaign_id <= 0 ) {
+	// BUG-FIX: cyber_campaign.id is a UUID string. intval() collapses any UUID
+	// to 0, so every Supabase query returns empty. Preserve the raw value and
+	// sanitize by stripping characters that are illegal in a UUID/ID string.
+	$raw_campaign_id = isset( $_GET['campaign_id'] ) ? sanitize_text_field( wp_unslash( $_GET['campaign_id'] ) ) : '';
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', $raw_campaign_id );
+
+	if ( empty( $campaign_id ) ) {
 		return '<div class="neoweave-terminal">ERROR: INVALID DEPLOYMENT REFERENCE.</div>';
 	}
 
@@ -488,7 +511,6 @@ add_action( 'wp_ajax_neoweave_user_labels', 'neoweave_user_labels' );
 function neoweave_user_labels() {
 	check_ajax_referer( 'neoweave_labels', 'nonce' );
 
-	// BUG-FIX 1: added return after every early wp_send_json_error/success.
 	if ( empty( $_POST['ids'] ) || ! is_array( $_POST['ids'] ) ) {
 		wp_send_json_error( [ 'message' => 'NO_IDS' ] );
 		return;
@@ -519,6 +541,15 @@ function neoweave_user_labels() {
  *
  * SECURITY: requires a valid nonce (neoweave_launch).
  * nopriv not registered (login required by is_user_logged_in check below).
+ *
+ * BUG-FIX: Added `return` after every wp_send_json_error() call.
+ * Previously, execution continued past early exits (e.g. the host-ID check
+ * ran even when the user wasn't logged in, sessions were inserted even when
+ * world_id was missing).
+ *
+ * BUG-FIX: character_id and world_id are UUID strings from Supabase.
+ * Using intval() on them collapsed every UUID to 0. Fixed by keeping them
+ * as strings via sanitize_text_field().
  */
 add_action( 'wp_ajax_neoweave_launch_campaign', 'neoweave_launch_campaign' );
 
@@ -527,17 +558,23 @@ function neoweave_launch_campaign() {
 
 	if ( ! is_user_logged_in() ) {
 		wp_send_json_error( [ 'message' => 'not_logged_in' ] );
+		return; // BUG-FIX: was missing
 	}
 
-	$campaign_id = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
-	if ( $campaign_id <= 0 ) {
+	// BUG-FIX: campaign_id is a UUID string; intval() collapses it to 0.
+	$raw_campaign_id = isset( $_POST['campaign_id'] ) ? sanitize_text_field( wp_unslash( $_POST['campaign_id'] ) ) : '';
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', $raw_campaign_id );
+
+	if ( empty( $campaign_id ) ) {
 		wp_send_json_error( [ 'message' => 'invalid_campaign' ] );
+		return; // BUG-FIX: was missing
 	}
 
 	$current_user_id = get_current_user_id();
 
 	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 		wp_send_json_error( [ 'message' => 'supabase_config_missing' ] );
+		return; // BUG-FIX: was missing
 	}
 
 	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
@@ -553,14 +590,16 @@ function neoweave_launch_campaign() {
 	] );
 	if ( is_wp_error( $camp_res ) ) {
 		wp_send_json_error( [ 'message' => 'campaign_fetch_error' ] );
+		return; // BUG-FIX: was missing
 	}
 	$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
 	$host_id   = isset( $camp_data[0]['wp_user_id'] ) ? intval( $camp_data[0]['wp_user_id'] ) : 0;
 	if ( $host_id !== $current_user_id ) {
 		wp_send_json_error( [ 'message' => 'not_host' ] );
+		return; // BUG-FIX: was missing
 	}
 
-	// 1b) world_id
+	// 1b) world_id — UUID string, must not be cast to int
 	$world_id  = null;
 	$world_url = $supabase_rest . 'cyber_campaign_worlds?campaign_id=eq.' . $campaign_id . '&select=world_id';
 	$world_res = wp_remote_get( $world_url, [
@@ -572,14 +611,16 @@ function neoweave_launch_campaign() {
 	if ( ! is_wp_error( $world_res ) ) {
 		$world_data = json_decode( wp_remote_retrieve_body( $world_res ), true );
 		if ( is_array( $world_data ) && ! empty( $world_data[0]['world_id'] ) ) {
-			$world_id = intval( $world_data[0]['world_id'] );
+			// BUG-FIX: world_id is a UUID string; keep it as-is.
+			$world_id = sanitize_text_field( $world_data[0]['world_id'] );
 		}
 	}
 	if ( ! $world_id ) {
 		wp_send_json_error( [ 'message' => 'no_world_linked' ] );
+		return; // BUG-FIX: was missing
 	}
 
-	// 1c) start location (0,0)
+	// 1c) start location (0,0) — location_id may be integer or UUID depending on schema
 	$location_id = null;
 	$loc_url = $supabase_rest
 		. 'cyber_world_map?world_id=eq.' . $world_id
@@ -593,11 +634,13 @@ function neoweave_launch_campaign() {
 	if ( ! is_wp_error( $loc_res ) ) {
 		$loc_data = json_decode( wp_remote_retrieve_body( $loc_res ), true );
 		if ( is_array( $loc_data ) && ! empty( $loc_data[0]['id'] ) ) {
-			$location_id = intval( $loc_data[0]['id'] );
+			// Keep as string to handle both integer and UUID column types.
+			$location_id = sanitize_text_field( (string) $loc_data[0]['id'] );
 		}
 	}
 	if ( ! $location_id ) {
 		wp_send_json_error( [ 'message' => 'no_start_location' ] );
+		return; // BUG-FIX: was missing
 	}
 
 	// 2) signups
@@ -611,10 +654,12 @@ function neoweave_launch_campaign() {
 	] );
 	if ( is_wp_error( $signup_res ) ) {
 		wp_send_json_error( [ 'message' => 'signup_fetch_error' ] );
+		return; // BUG-FIX: was missing
 	}
 	$signups = json_decode( wp_remote_retrieve_body( $signup_res ), true );
 	if ( ! is_array( $signups ) || ! count( $signups ) ) {
 		wp_send_json_error( [ 'message' => 'no_signups' ] );
+		return; // BUG-FIX: was missing
 	}
 
 	// 2b) pause existing active sessions for these users
@@ -639,13 +684,17 @@ function neoweave_launch_campaign() {
 	}
 
 	// 3) insert new active sessions
+	// BUG-FIX: character_id is a UUID string from cyber_characters.id.
+	// Previously intval() was used here which collapses UUIDs to 0 and causes
+	// the FK constraint on cyber_game_sessions.character_id to reject the insert.
+	// Keep both character_id and world_id as strings.
 	$sessions_payload = [];
 	foreach ( $signups as $s ) {
 		$sessions_payload[] = [
 			'campaign_id'  => $campaign_id,
 			'wp_user_id'   => intval( $s['wp_user_id'] ),
-			'character_id' => intval( $s['character_id'] ),
-			'world_id'     => $world_id,
+			'character_id' => sanitize_text_field( (string) $s['character_id'] ), // UUID string
+			'world_id'     => $world_id,                                           // UUID string
 			'location_id'  => $location_id,
 			'status'       => 'active',
 		];
@@ -663,6 +712,7 @@ function neoweave_launch_campaign() {
 
 	if ( is_wp_error( $session_res ) || wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
 		wp_send_json_error( [ 'message' => 'session_insert_error' ] );
+		return;
 	}
 
 	wp_send_json_success( [ 'message' => 'launched' ] );

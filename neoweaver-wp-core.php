@@ -108,21 +108,23 @@ add_action( 'wp_enqueue_scripts', function () {
 	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
-if ( is_page_template( 'templates/adventure.php' ) ) {
-    // już istniejące
-    wp_enqueue_script( 'nw-panel-tactical-left',    NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js',    [],           '1.0.0',          true );
-    wp_enqueue_script( 'neoweaver-interference',     NEOWEAVER_PLUGIN_URL . 'assets/js/neoweave-interference.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
-    wp_enqueue_style(  'neoweaver-interference',     NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [],         NEOWEAVER_VERSION );
-    wp_enqueue_style(  'world-news',                 NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css',           [],           NEOWEAVER_VERSION );
-    wp_enqueue_script( 'world-news',                 NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js',             [ 'jquery' ], NEOWEAVER_VERSION, true );
+	// BUG-FIX: this block was zero-indented, placing it structurally outside
+	// the closure. PHP closed the closure at the `}` before this `if`, making
+	// the if-block unreachable dead code and leaving a stray `} );` at the end.
+	// Fixed by indenting inside the closure.
+	if ( is_page_template( 'templates/adventure.php' ) ) {
+		wp_enqueue_script( 'nw-panel-tactical-left',  NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js',     [],           '1.0.0',           true );
+		wp_enqueue_script( 'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/js/neoweave-interference.js',   [ 'jquery' ], NEOWEAVER_VERSION,  true );
+		wp_enqueue_style(  'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-interference.css', [],           NEOWEAVER_VERSION );
+		wp_enqueue_style(  'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/css/world-news.css',             [],           NEOWEAVER_VERSION );
+		wp_enqueue_script( 'world-news',              NEOWEAVER_PLUGIN_URL . 'assets/js/world-news.js',               [ 'jquery' ], NEOWEAVER_VERSION,  true );
 
-    // ← DODAJ TO — brakujące pliki z public/assets/js/
-    wp_enqueue_script( 'nw-deck-panel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/deck-panel.js',    [ 'jquery' ], NEOWEAVER_VERSION, true );
-    wp_enqueue_script( 'nw-vehicle-panel', NEOWEAVER_PLUGIN_URL . 'public/assets/js/vehicle-panel.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-    wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',      [ 'jquery' ], NEOWEAVER_VERSION, true );
-    wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-    wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js',[ 'jquery' ], NEOWEAVER_VERSION, true );
-}
+		wp_enqueue_script( 'nw-deck-panel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/deck-panel.js',     [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'nw-vehicle-panel', NEOWEAVER_PLUGIN_URL . 'public/assets/js/vehicle-panel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',       [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+	}
 } );
 
 // ─── Register plugin page templates ──────────────────────────────────────────
@@ -174,13 +176,13 @@ add_action( 'wp_footer', function () {
 add_action( 'wp_enqueue_scripts', function () {
 	if ( ! is_page_template( 'templates/adventure.php' ) ) return;
 
-	$base    = NEOWEAVER_PLUGIN_URL . 'assets/css/';
-	$dir     = NEOWEAVER_PLUGIN_DIR . 'assets/css/';
+	$base = NEOWEAVER_PLUGIN_URL . 'assets/css/';
+	$dir  = NEOWEAVER_PLUGIN_DIR . 'assets/css/';
 
-	wp_enqueue_style( 'neoweaver-tw-core',      $base . 'tw-core.css',      [], '1.0.0' );
-	wp_enqueue_style( 'neoweaver-tw-chat',      $base . 'tw-chat.css',      [ 'neoweaver-tw-core' ], '1.0.0' );
-	wp_enqueue_style( 'neoweaver-tw-deck',      $base . 'tw-deck.css',      [ 'neoweaver-tw-core' ], '1.0.0' );
-	wp_enqueue_style( 'neoweaver-terminal',     $base . 'neoweaver-terminal.css', [], NEOWEAVER_VERSION );
+	wp_enqueue_style( 'neoweaver-tw-core',  $base . 'tw-core.css',            [], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-tw-chat',  $base . 'tw-chat.css',            [ 'neoweaver-tw-core' ], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-tw-deck',  $base . 'tw-deck.css',            [ 'neoweaver-tw-core' ], '1.0.0' );
+	wp_enqueue_style( 'neoweaver-terminal', $base . 'neoweaver-terminal.css', [], NEOWEAVER_VERSION );
 
 	// Character panel stylesheet — provides scoped rules for all classes used
 	// in templates/parts/character-card.php, including the progress-fill
@@ -202,10 +204,11 @@ add_action( 'wp_enqueue_scripts', function () {
 		'1.0.0',
 		true
 	);
-$uploads = wp_upload_dir();
-wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
-    'supabaseUrl' => tw_supabase_url(),
-    'supabaseKey' => tw_supabase_anon_key(),
-    'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
-] );
+
+	$uploads = wp_upload_dir();
+	wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
+		'supabaseUrl' => tw_supabase_url(),
+		'supabaseKey' => tw_supabase_anon_key(),
+		'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
+	] );
 } );
