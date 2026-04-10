@@ -7,14 +7,19 @@ add_action( 'wp_ajax_tw_get_session_state', 'tw_get_session_state_handler' );
 add_action( 'wp_ajax_nopriv_tw_get_session_state', 'tw_get_session_state_handler' );
 
 function tw_get_session_state_handler() {
+	// BUG-FIX: missing return after wp_send_json_error() calls — execution
+	// fell through to subsequent blocks.
 	if ( empty( $_POST['session_id'] ) ) {
 		wp_send_json_error( [ 'message' => 'Missing session_id' ] );
+		return;
 	}
 
-	$session_id = (int) $_POST['session_id'];
+	// BUG-FIX: session_id is a UUID. intval() collapses any UUID to 0.
+	$session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['session_id'] );
 
 	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 		wp_send_json_error( [ 'message' => 'Supabase config missing' ] );
+		return;
 	}
 
 	$supabase_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
@@ -39,16 +44,19 @@ function tw_get_session_state_handler() {
 
 	if ( is_wp_error( $resp ) ) {
 		wp_send_json_error( [ 'message' => 'Supabase error', 'error' => $resp->get_error_message() ] );
+		return;
 	}
 
 	$code = wp_remote_retrieve_response_code( $resp );
 	if ( $code < 200 || $code >= 300 ) {
 		wp_send_json_error( [ 'message' => 'Supabase HTTP ' . $code, 'body' => wp_remote_retrieve_body( $resp ) ] );
+		return;
 	}
 
 	$rows = json_decode( wp_remote_retrieve_body( $resp ), true ) ?: [];
 	if ( empty( $rows[0] ) ) {
 		wp_send_json_error( [ 'message' => 'Session not found' ] );
+		return;
 	}
 
 	wp_send_json_success( $rows[0] );

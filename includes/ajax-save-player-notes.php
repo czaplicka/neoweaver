@@ -13,8 +13,7 @@
  * different char_id. Fixed by:
  *   1. Sanitizing char_id as a UUID-safe string instead of (int).
  *   2. Adding wp_user_id=eq.{current_user} to the PATCH filter so Supabase
- *      only matches rows the current user owns. An attacker supplying another
- *      character's ID will match zero rows and write nothing.
+ *      only matches rows the current user owns.
  *
  * Actions registered:
  *   wp_ajax_save_player_notes  (logged-in users only; nopriv variant removed)
@@ -31,7 +30,6 @@ function tw_save_player_notes() {
         return;
     }
 
-    // Nonce verification.
     if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => 'Security check failed' ], 403 );
         return;
@@ -63,9 +61,8 @@ function tw_save_player_notes() {
     $anon_key     = tw_supabase_anon_key();
     $supabase_url = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 
-    // Ownership guard: include wp_user_id=eq.{current_user} in the filter so
-    // the PATCH only matches a row the current user actually owns. An attacker
-    // supplying a foreign char_id will match zero rows and change nothing.
+    // Ownership guard: include wp_user_id=eq.{current_user} so the PATCH only
+    // matches a row the current user actually owns.
     $url = add_query_arg(
         [
             'id'         => 'eq.' . $char_id,

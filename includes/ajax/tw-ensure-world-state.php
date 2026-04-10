@@ -7,10 +7,15 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
     add_action( 'wp_ajax_tw_ensure_world_state', 'tw_ensure_world_state' );
 
     function tw_ensure_world_state() {
-        // 1. Bezpieczeństwo
+        // 1. Security
         check_ajax_referer( 'tw_nonce', 'nonce' );
 
-        $campaign_id = isset( $_POST['campaign_id'] ) ? intval( $_POST['campaign_id'] ) : 0;
+        // BUG-FIX: campaign_id is a UUID, not an int. intval() collapses any
+        // UUID to 0, making the Supabase filter match nothing. Use string sanitize.
+        $campaign_id = isset( $_POST['campaign_id'] )
+            ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['campaign_id'] )
+            : '';
+
         if ( ! $campaign_id ) {
             wp_send_json_error( 'Missing campaign_id' );
             return;
@@ -26,7 +31,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
         $base = trailingslashit( $supabase_url ) . 'rest/v1/cyber_world_state';
 
-        // 2. Sprawdzamy, czy wiersz już istnieje
+        // 2. Check if row already exists
         $check_url = add_query_arg( [
             'campaign_id' => 'eq.' . $campaign_id,
             'select'      => 'campaign_id',
@@ -52,12 +57,11 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
         $rows = json_decode( $body, true );
 
         if ( $code === 200 && is_array( $rows ) && ! empty( $rows ) ) {
-            // Już istnieje – nic nie rób
             wp_send_json_success( [ 'status' => 'exists' ] );
             return;
         }
 
-        // 3. Utwórz domyślny wpis
+        // 3. Create default row
         $payload = [
             'campaign_id'     => $campaign_id,
             'current_hour'    => 8,
