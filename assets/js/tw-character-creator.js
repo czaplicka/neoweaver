@@ -75,9 +75,9 @@
             key: 'human', label: 'Human', icon: '&#128100;', img: '',
             desc: 'Adaptable generalists. Bonus feat at character creation.', bonus: '+1 to any attribute',
             subraces: [
-                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.' },
-                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.' },
-                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.' },
+                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.', img: '', tags: [] },
+                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.', img: '', tags: [] },
+                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.', img: '', tags: [] },
             ],
         },
         {
@@ -111,7 +111,7 @@
     function esc( str ) {
         return String( str )
             .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
-            .replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
+            .replace( />/g, '&gt;' ).replace( /\"/g, '&quot;' );
     }
     function ajaxUrl() { return _cfg.ajax_url || _cfg.ajaxurl || '/wp-admin/admin-ajax.php'; }
     function nonce()   { return _cfg.nonce || ''; }
@@ -149,28 +149,51 @@
         if ( errEl ) { errEl.classList.remove( 'visible', 'tw-step-error--shake' ); }
     }
 
+    // ── Tag renderer ──────────────────────────────────────────────────────────
+    // tags may be an array of strings or objects {name, slug, ...}
+    function buildTagsHtml( tags ) {
+        if ( ! tags || ! tags.length ) return '';
+        var items = tags.slice( 0, 4 ).map( function ( t ) {
+            var label = ( typeof t === 'string' ) ? t : ( t.name || t.slug || t );
+            return '<span class="tw-race-tag">' + esc( label ) + '</span>';
+        } );
+        return '<div class="tw-race-tags">' + items.join( '' ) + '</div>';
+    }
+
     // ── Card builders ───────────────────────────────────────────────────────────
 
-    // Accepts a row in the JS card shape: { key, label, desc, img, bonus? }
+    // Accepts a row in the JS card shape: { key, label, desc, img, bonus?, tags? }
     function buildRaceCard( race ) {
         var imgSrc  = race.img || '';
         var imgHtml = imgSrc
-            ? '<div class="tw-race-card__img-wrap"><img class="tw-race-card__img" src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="220" height="220" loading="lazy" /></div>'
-            : '<div class="tw-race-card__img-wrap tw-race-card__img-wrap--placeholder"><span class="tw-race-card__icon">' + ( race.icon || '&#10067;' ) + '</span></div>';
-        return '<div class="tw-race-card" data-race="' + esc( race.key ) + '" role="button" tabindex="0">' +
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="220" height="220" loading="lazy" /></div>'
+            : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">' + ( race.icon || '&#10067;' ) + '</span></div>';
+        var tagsHtml = buildTagsHtml( race.tags );
+        return '<div class="tw-grid-card tw-race-card" data-race="' + esc( race.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
-            '<div class="tw-race-card__body">' +
-                '<h4 class="tw-race-card__name">' + esc( race.label ) + '</h4>' +
-                '<p class="tw-race-card__desc">' + esc( race.desc ) + '</p>' +
-                '<span class="tw-race-card__bonus">' + esc( race.bonus || '' ) + '</span>' +
+            '<div class="tw-race-body">' +
+                '<h4 class="tw-race-name">' + esc( race.label ) + '</h4>' +
+                '<p class="tw-race-desc">' + esc( race.desc ) + '</p>' +
+                ( race.bonus ? '<span class="tw-race-bonus">' + esc( race.bonus ) + '</span>' : '' ) +
+                tagsHtml +
+                '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
+    // FIX: subrace card now includes image + tags, matching race card structure
     function buildSubraceCard( sub ) {
-        return '<div class="tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0">' +
-            '<div class="tw-race-card__body">' +
-                '<h4 class="tw-race-card__name">' + esc( sub.label ) + '</h4>' +
-                '<p class="tw-race-card__desc">' + esc( sub.desc ) + '</p>' +
+        var imgSrc  = sub.img || '';
+        var imgHtml = imgSrc
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
+            : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
+        var tagsHtml = buildTagsHtml( sub.tags );
+        return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
+            imgHtml +
+            '<div class="tw-race-body">' +
+                '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
+                '<p class="tw-race-desc">' + esc( sub.desc ) + '</p>' +
+                tagsHtml +
+                '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
@@ -192,7 +215,6 @@
                     grid.innerHTML = res.data.map( buildRaceCard ).join( '' );
                     grid.dataset.rendered = '1';
                 } else {
-                    // Fallback to hardcoded races
                     grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
                     grid.dataset.rendered = '1';
                 }
@@ -223,7 +245,6 @@
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
                 } else {
-                    // No subraces — hide section
                     section.style.display = 'none';
                 }
             } )
@@ -562,8 +583,12 @@
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
                 var allSub = wrapper.querySelectorAll( '.tw-subrace-card' );
-                for ( var s = 0; s < allSub.length; s++ ) allSub[ s ].classList.remove( 'selected' );
+                for ( var s = 0; s < allSub.length; s++ ) {
+                    allSub[ s ].classList.remove( 'selected' );
+                    allSub[ s ].setAttribute( 'aria-pressed', 'false' );
+                }
                 subCard.classList.add( 'selected' );
+                subCard.setAttribute( 'aria-pressed', 'true' );
                 formState.subrace = subCard.dataset.subrace || '';
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
@@ -574,14 +599,21 @@
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
-                for ( var r = 0; r < allRace.length; r++ ) allRace[ r ].classList.remove( 'selected' );
+                for ( var r = 0; r < allRace.length; r++ ) {
+                    allRace[ r ].classList.remove( 'selected' );
+                    allRace[ r ].setAttribute( 'aria-pressed', 'false' );
+                }
                 raceCard.classList.add( 'selected' );
+                raceCard.setAttribute( 'aria-pressed', 'true' );
                 formState.race       = raceCard.dataset.race || '';
-                formState.race_label = ( raceCard.querySelector( '.tw-race-card__name' ) || {} ).textContent || formState.race;
+                formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
                 // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
-                for ( var sr = 0; sr < allSubReset.length; sr++ ) allSubReset[ sr ].classList.remove( 'selected' );
+                for ( var sr = 0; sr < allSubReset.length; sr++ ) {
+                    allSubReset[ sr ].classList.remove( 'selected' );
+                    allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
+                }
                 // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
