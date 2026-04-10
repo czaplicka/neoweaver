@@ -173,10 +173,10 @@
             setLog('> System: Weaving Splot threads...');
 
             const payload = {
-                campaign_id:   parseInt(selC.value, 10),
-                world_id:      parseInt(selW.value, 10),
-                creator_wp_id: parseInt(cfg.uid, 10)
-            };
+    campaign_id:   selC.value,               
+    world_id:      selW.value,               
+    creator_wp_id: parseInt(cfg.uid, 10)     
+};
 
             const apiHeaders = {
                 'apikey':        cfg.key,
