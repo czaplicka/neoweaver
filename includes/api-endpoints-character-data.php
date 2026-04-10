@@ -30,7 +30,7 @@ define( 'NW_UPLOADS_BASE', 'https://neoweaver.nieodparady.pl/wp-content/uploads/
 // ---------------------------------------------------------------------------
 
 /**
- * Prepends uploads base URL to img_url if it’s a relative filename.
+ * Prepends uploads base URL to img_url if it's a relative filename.
  *
  * @param array $rows
  * @return array
@@ -42,6 +42,23 @@ function nw_resolve_img_urls( array $rows ): array {
 		}
 		return $row;
 	}, $rows );
+}
+
+/**
+ * Build a human-readable bonus string from the tags JSONB column.
+ * cyber_races has no dedicated 'bonus' column — tags hold that data.
+ *
+ * @param mixed $tags  Raw value from Supabase (JSON string or already-decoded array).
+ * @return string
+ */
+function nw_bonus_from_tags( $tags ): string {
+	if ( is_string( $tags ) ) {
+		$tags = json_decode( $tags, true );
+	}
+	if ( ! is_array( $tags ) || empty( $tags ) ) {
+		return '';
+	}
+	return implode( ' · ', array_map( 'sanitize_text_field', $tags ) );
 }
 
 /**
@@ -97,7 +114,7 @@ function nw_fetch_lookup_table(
  * JS expects: { key, label, desc, img, bonus? }
  *
  * @param array  $rows
- * @param string $key_field   Supabase column that becomes ‘key’
+ * @param string $key_field   Supabase column that becomes 'key'
  * @param array  $extra_map   additional key => column mappings
  * @return array
  */
@@ -117,6 +134,25 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 	}, $rows );
 }
 
+/**
+ * Map race rows to JS card shape, deriving 'bonus' from the tags JSONB column.
+ *
+ * @param array $rows  Raw rows from cyber_races (must include 'tags').
+ * @return array
+ */
+function nw_map_race_card_shape( array $rows ): array {
+	return array_map( function ( $row ) {
+		return [
+			'id'    => $row['id']          ?? null,
+			'key'   => $row['name']        ?? $row['id'],
+			'label' => $row['name']        ?? '',
+			'desc'  => $row['description'] ?? '',
+			'img'   => $row['img_url']     ?? '',
+			'bonus' => nw_bonus_from_tags( $row['tags'] ?? [] ),
+		];
+	}, $rows );
+}
+
 // ---------------------------------------------------------------------------
 // REST: GET /wp-json/neoweaver/v1/races
 // ---------------------------------------------------------------------------
@@ -126,7 +162,7 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 		return new WP_Error( 'config_missing', 'Supabase helpers not loaded.', [ 'status' => 500 ] );
 	}
 
-	$cache_key = 'nw_base_races_v2';
+	$cache_key = 'nw_base_races_v3';
 	$cached    = get_transient( $cache_key );
 	if ( $cached !== false ) {
 		return rest_ensure_response( $cached );
@@ -146,6 +182,7 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 	}
 
 	$data = nw_resolve_img_urls( $data );
+	$data = nw_map_race_card_shape( $data );
 
 	if ( ! empty( $data ) ) {
 		set_transient( $cache_key, $data, 300 );
@@ -169,7 +206,7 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 		return new WP_Error( 'config_missing', 'Supabase helpers not loaded.', [ 'status' => 500 ] );
 	}
 
-	$cache_key = 'nw_subraces_' . md5( $parent );
+	$cache_key = 'nw_subraces_v2_' . md5( $parent );
 	$cached    = get_transient( $cache_key );
 	if ( $cached !== false ) {
 		return rest_ensure_response( $cached );
@@ -178,7 +215,7 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 	$data = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url,bonus',
+			'select'      => 'id,name,description,tags,img_url',
 			'parent_race' => 'eq.' . $parent,
 			'order'       => 'name.asc',
 		]
@@ -189,6 +226,7 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 	}
 
 	$data = nw_resolve_img_urls( $data );
+	$data = nw_map_race_card_shape( $data );
 
 	if ( ! empty( $data ) ) {
 		set_transient( $cache_key, $data, 300 );
@@ -210,7 +248,7 @@ function neoweaver_get_classes_rest( WP_REST_Request $request ): WP_REST_Respons
 }
 
 // ---------------------------------------------------------------------------
-// REST: GET /wp-json/neoweaver/v1/nodes  (NEW)
+// REST: GET /wp-json/neoweaver/v1/nodes
 // ---------------------------------------------------------------------------
 
 function neoweaver_get_nodes_rest( WP_REST_Request $request ): WP_REST_Response|WP_Error {
@@ -229,36 +267,41 @@ function neoweaver_get_nodes_rest( WP_REST_Request $request ): WP_REST_Response|
 function neoweaver_ajax_get_races(): void {
 	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
 
-	$cache_key = 'nw_base_races_v2';
+	$cache_key = 'nw_base_races_v3';
 	$cached    = get_transient( $cache_key );
 
 	if ( $cached !== false ) {
-		$rows = $cached;
-	} else {
-		if ( ! function_exists( 'tw_supabase_get' ) ) {
-			wp_send_json_error( [ 'message' => 'Supabase helpers not loaded.' ] );
-			return;
-		}
-		$rows = tw_supabase_get(
-			'cyber_races',
-			[
-				'select'      => 'id,name,description,tags,img_url,bonus',
-				'parent_race' => 'is.null',
-				'order'       => 'name.asc',
-			]
-		);
-		if ( ! is_array( $rows ) ) {
-			wp_send_json_error( [ 'message' => 'Database error fetching races.' ] );
-			return;
-		}
-		$rows = nw_resolve_img_urls( $rows );
-		if ( ! empty( $rows ) ) {
-			set_transient( $cache_key, $rows, 300 );
-		}
+		wp_send_json_success( $cached );
+		return;
 	}
 
-	// Map to JS card shape: key, label, desc, img, bonus
-	wp_send_json_success( nw_map_card_shape( $rows, 'name', [ 'bonus' => 'bonus', 'tags' => 'tags' ] ) );
+	if ( ! function_exists( 'tw_supabase_get' ) ) {
+		wp_send_json_error( [ 'message' => 'Supabase helpers not loaded.' ] );
+		return;
+	}
+
+	$rows = tw_supabase_get(
+		'cyber_races',
+		[
+			'select'      => 'id,name,description,tags,img_url',
+			'parent_race' => 'is.null',
+			'order'       => 'name.asc',
+		]
+	);
+
+	if ( ! is_array( $rows ) ) {
+		wp_send_json_error( [ 'message' => 'Database error fetching races.' ] );
+		return;
+	}
+
+	$rows = nw_resolve_img_urls( $rows );
+	$rows = nw_map_race_card_shape( $rows );
+
+	if ( ! empty( $rows ) ) {
+		set_transient( $cache_key, $rows, 300 );
+	}
+
+	wp_send_json_success( $rows );
 }
 add_action( 'wp_ajax_neoweaver_get_races',        'neoweaver_ajax_get_races' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_races', 'neoweaver_ajax_get_races' );
@@ -276,35 +319,41 @@ function neoweaver_ajax_get_subraces(): void {
 		return;
 	}
 
-	$cache_key = 'nw_subraces_' . md5( $parent );
+	$cache_key = 'nw_subraces_v2_' . md5( $parent );
 	$cached    = get_transient( $cache_key );
 
 	if ( $cached !== false ) {
-		$rows = $cached;
-	} else {
-		if ( ! function_exists( 'tw_supabase_get' ) ) {
-			wp_send_json_error( [ 'message' => 'Supabase helpers not loaded.' ] );
-			return;
-		}
-		$rows = tw_supabase_get(
-			'cyber_races',
-			[
-				'select'      => 'id,name,description,tags,img_url,bonus',
-				'parent_race' => 'eq.' . $parent,
-				'order'       => 'name.asc',
-			]
-		);
-		if ( ! is_array( $rows ) ) {
-			wp_send_json_error( [ 'message' => 'Database error fetching subraces.' ] );
-			return;
-		}
-		$rows = nw_resolve_img_urls( $rows );
-		if ( ! empty( $rows ) ) {
-			set_transient( $cache_key, $rows, 300 );
-		}
+		wp_send_json_success( $cached );
+		return;
 	}
 
-	wp_send_json_success( nw_map_card_shape( $rows, 'name', [ 'bonus' => 'bonus' ] ) );
+	if ( ! function_exists( 'tw_supabase_get' ) ) {
+		wp_send_json_error( [ 'message' => 'Supabase helpers not loaded.' ] );
+		return;
+	}
+
+	$rows = tw_supabase_get(
+		'cyber_races',
+		[
+			'select'      => 'id,name,description,tags,img_url',
+			'parent_race' => 'eq.' . $parent,
+			'order'       => 'name.asc',
+		]
+	);
+
+	if ( ! is_array( $rows ) ) {
+		wp_send_json_error( [ 'message' => 'Database error fetching subraces.' ] );
+		return;
+	}
+
+	$rows = nw_resolve_img_urls( $rows );
+	$rows = nw_map_race_card_shape( $rows );
+
+	if ( ! empty( $rows ) ) {
+		set_transient( $cache_key, $rows, 300 );
+	}
+
+	wp_send_json_success( $rows );
 }
 add_action( 'wp_ajax_neoweaver_get_subraces',        'neoweaver_ajax_get_subraces' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'neoweaver_ajax_get_subraces' );
@@ -328,7 +377,7 @@ add_action( 'wp_ajax_neoweaver_get_classes',        'neoweaver_ajax_get_classes'
 add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
 
 // ---------------------------------------------------------------------------
-// wp_ajax: neoweaver_get_nodes  (NEW)
+// wp_ajax: neoweaver_get_nodes
 // ---------------------------------------------------------------------------
 
 function neoweaver_ajax_get_nodes(): void {
@@ -340,7 +389,7 @@ function neoweaver_ajax_get_nodes(): void {
 		return;
 	}
 	$rows = nw_resolve_img_urls( $rows );
-	// Nodes need ‘id’ as key (not name) because node_id is stored as integer FK
+	// Nodes need 'id' as key (not name) because node_id is stored as integer FK
 	wp_send_json_success( nw_map_card_shape( $rows, 'id' ) );
 }
 add_action( 'wp_ajax_neoweaver_get_nodes',        'neoweaver_ajax_get_nodes' );
