@@ -2,6 +2,7 @@
  * NeoWeaver — Character Creator
  * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
  * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags
+ * v2: remove desc + bonus from cards, enlarge img to 320px, keep only green tw-race-tags
  */
 
 ( function () {
@@ -150,7 +151,7 @@
         if ( errEl ) { errEl.classList.remove( 'visible', 'tw-step-error--shake' ); }
     }
 
-    // ── Tag renderer ──────────────────────────────────────────────────────────
+    // ── Tag renderer ─────────────────────────────────────────────────────────
     // tags may be an array of strings or objects {name, slug, ...}
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
@@ -161,50 +162,52 @@
         return '<div class="tw-race-tags">' + items.join( '' ) + '</div>';
     }
 
-    // ── Card builders ─────────────────────────────────────────────────────────
+    // ── Card builders ────────────────────────────────────────────────────────
+    // CHANGE: removed <p class="tw-race-desc"> and <span class="tw-race-bonus"> from both card types
+    //         to eliminate duplicate content (desc shown elsewhere, bonus duplicated tags visually).
+    //         Image size increased to 320x320 for better visual weight.
 
     function buildRaceCard( race ) {
         var imgSrc  = race.img || '';
+        // CHANGE: img enlarged to 320x320
         var imgHtml = imgSrc
-            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="220" height="220" loading="lazy" /></div>'
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="320" height="320" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">' + ( race.icon || '&#10067;' ) + '</span></div>';
+        // CHANGE: only green tw-race-tags rendered — no desc, no bonus
         var tagsHtml = buildTagsHtml( race.tags );
         return '<div class="tw-grid-card tw-race-card" data-race="' + esc( race.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( race.label ) + '</h4>' +
-                '<p class="tw-race-desc">' + esc( race.desc ) + '</p>' +
-                ( race.bonus ? '<span class="tw-race-bonus">' + esc( race.bonus ) + '</span>' : '' ) +
                 tagsHtml +
                 '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
-    // FIX 1 + FIX 4: subrace card now includes image (fix 1) and tags (fix 4), matching race card structure.
-    // FIX 1: img field supports img / image / thumbnail fallbacks from API response.
     function buildSubraceCard( sub ) {
+        // img supports img / image / thumbnail fallbacks from API response
         var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
+        // CHANGE: img enlarged to 320x320
         var imgHtml = imgSrc
-            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="320" height="320" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
-        // FIX 4: tags rendered the same way as in buildRaceCard
+        // CHANGE: only green tw-race-tags rendered — no desc
         var tagsHtml = buildTagsHtml( sub.tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
-                '<p class="tw-race-desc">' + esc( sub.desc ) + '</p>' +
                 tagsHtml +
                 '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
-    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────
+    // ── Race grid: fetch from AJAX, fallback to hardcoded ────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
 
-        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE…</p>';
+        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE\u2026</p>';
 
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_races' );
@@ -227,14 +230,14 @@
             } );
     }
 
-    // ── Subrace grid: fetch from AJAX ─────────────────────────────────────────
+    // ── Subrace grid: fetch from AJAX ────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
         if ( ! section || ! grid ) return;
 
         section.style.display = '';
-        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA…</p>';
+        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA\u2026</p>';
 
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_subraces' );
@@ -245,7 +248,6 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
-                    // FIX 1: buildSubraceCard now correctly handles img and tags from API
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
                 } else {
                     section.style.display = 'none';
@@ -256,7 +258,7 @@
             } );
     }
 
-    // ── Class grid (AJAX) ─────────────────────────────────────────────────────
+    // ── Class grid (AJAX) ────────────────────────────────────────────────────
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -284,7 +286,7 @@
             } );
     }
 
-    // ── Node grid (AJAX) ──────────────────────────────────────────────────────
+    // ── Node grid (AJAX) ─────────────────────────────────────────────────────
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -313,22 +315,22 @@
     function updateSummary( wrapper ) {
         function set( id, val ) {
             var el = wrapper.querySelector( '#tw-summary-' + id );
-            if ( el ) el.textContent = val || '—';
+            if ( el ) el.textContent = val || '\u2014';
         }
         set( 'character_name', formState.character_name );
         set( 'pronouns',       formState.pronouns );
         set( 'backstory',      formState.backstory
-            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '…' : '' )
+            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '\u2026' : '' )
             : '' );
         set( 'race',    formState.race_label  || formState.race );
         set( 'class',   formState.class_label || formState[ 'class' ] );
         set( 'node_id', formState.node_label  || formState.node_id );
         var attrsStr = ATTR_KEYS.map( function ( k ) {
             return k.toUpperCase() + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN );
-        } ).join( ' · ' );
+        } ).join( ' \u00b7 ' );
         set( 'attrs', attrsStr );
         var avatarEl = wrapper.querySelector( '#tw-summary-avatar' );
-        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
+        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '\u2014';
     }
 
     // ── Attribute display ─────────────────────────────────────────────────────
@@ -373,9 +375,9 @@
 
     // ── Submit ────────────────────────────────────────────────────────────────
     function submitCharacter( wrapper, steps, current, spinner ) {
-        setStatus( 'Uploading agent profile…', false );
+        setStatus( 'Uploading agent profile\u2026', false );
         var submitBtn = wrapper.querySelector( '#tw-char-submit' );
-        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING…'; }
+        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING\u2026'; }
         NW_SFX.deploy();
         spinner.show();
 
@@ -442,7 +444,7 @@
 
         var spinner = makeSpinner(
             'tw-char-spinner',
-            '// SYNCHRONIZING AGENT…',
+            '// SYNCHRONIZING AGENT\u2026',
             'Writing operative data to the NeoWeave grid.'
         );
 
@@ -598,8 +600,7 @@
                 return;
             }
 
-            // FIX 3: base race card — .selected class toggled here;
-            // visual highlight is handled via CSS .tw-race-card.selected { ... }
+            // Base race card — .selected drives CSS highlight
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
