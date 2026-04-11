@@ -122,7 +122,8 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 	return array_map( function ( $row ) use ( $key_field, $extra_map ) {
 		$item = [
 			'id'    => $row['id']    ?? null,
-			'key'   => $row[ $key_field ] ?? $row['id'],
+			// FIX: cast to string — dataset zawsze zwraca string, porównanie === musi działać
+			'key'   => (string) ( $row[ $key_field ] ?? $row['id'] ),
 			'label' => $row['name']  ?? '',
 			'desc'  => $row['description'] ?? '',
 			'img'   => $row['img_url']     ?? '',
@@ -136,19 +137,36 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 
 /**
  * Map race rows to JS card shape, deriving 'bonus' from the tags JSONB column.
+ * FIX: zwracamy też 'tags' jako tablicę [{name}] — wymagane przez JS buildTagsHtml().
  *
  * @param array $rows  Raw rows from cyber_races (must include 'tags').
  * @return array
  */
 function nw_map_race_card_shape( array $rows ): array {
 	return array_map( function ( $row ) {
+
+		// Dekoduj tags jeśli Supabase zwróci JSON string zamiast tablicy
+		$raw_tags = $row['tags'] ?? [];
+		if ( is_string( $raw_tags ) ) {
+			$raw_tags = json_decode( $raw_tags, true ) ?? [];
+		}
+		if ( ! is_array( $raw_tags ) ) {
+			$raw_tags = [];
+		}
+
 		return [
 			'id'    => $row['id']          ?? null,
 			'key'   => $row['name']        ?? $row['id'],
 			'label' => $row['name']        ?? '',
 			'desc'  => $row['description'] ?? '',
 			'img'   => $row['img_url']     ?? '',
-			'bonus' => nw_bonus_from_tags( $row['tags'] ?? [] ),
+			// bonus jako czytelny string (wyświetlany w .tw-race-bonus)
+			'bonus' => implode( ' · ', array_map( 'sanitize_text_field', $raw_tags ) ),
+			// FIX: tags jako tablica [{name: '...'}] — format oczekiwany przez buildTagsHtml()
+			// subrace tags użyją cyan accent dzięki .tw-subrace-card .tw-race-tag w CSS
+			'tags'  => array_map( function ( $t ) {
+				return [ 'name' => sanitize_text_field( (string) $t ) ];
+			}, $raw_tags ),
 		];
 	}, $rows );
 }
