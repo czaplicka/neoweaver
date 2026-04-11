@@ -75,9 +75,9 @@
             key: 'human', label: 'Human', icon: '&#128100;', img: '',
             desc: 'Adaptable generalists. Bonus feat at character creation.', bonus: '+1 to any attribute',
             subraces: [
-                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.', img: '', tags: [] },
-                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.', img: '', tags: [] },
-                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.', img: '', tags: [] },
+                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.', img: '', tags: [ 'Corporate', 'Credits' ] },
+                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.', img: '', tags: [ 'Stealth', 'Survival' ] },
+                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.', img: '', tags: [ 'Nomad', 'Reflex' ] },
             ],
         },
         {
@@ -154,7 +154,7 @@
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
         var items = tags.slice( 0, 4 ).map( function ( t ) {
-            var label = ( typeof t === 'string' ) ? t : ( t.name || t.slug || t );
+            var label = ( typeof t === 'string' ) ? t : ( t.name || t.slug || String( t ) );
             return '<span class="tw-race-tag">' + esc( label ) + '</span>';
         } );
         return '<div class="tw-race-tags">' + items.join( '' ) + '</div>';
@@ -180,20 +180,24 @@
             '</div></div>';
     }
 
-    // FIX: subrace card now includes image + tags, matching race card structure
+    // FIX #1: subrace card uses tw-grid-card + tw-race-img structure (same as race cards)
+    // FIX #4: buildTagsHtml(sub.tags) renders tags; safe fallback for missing tags field from AJAX
     function buildSubraceCard( sub ) {
         var imgSrc  = sub.img || '';
+        // FIX #1: use identical image block structure as buildRaceCard
         var imgHtml = imgSrc
             ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
-        var tagsHtml = buildTagsHtml( sub.tags );
+        // FIX #4: sub.tags may be undefined when coming from AJAX — normalise to array first
+        var tags     = Array.isArray( sub.tags ) ? sub.tags : [];
+        var tagsHtml = buildTagsHtml( tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
                 '<p class="tw-race-desc">' + esc( sub.desc ) + '</p>' +
                 tagsHtml +
-                '<span class="tw-race-select-hint">[ select ]</span>' +
+                '<span class="tw-race-select-hint">[ select variant ]</span>' +
             '</div></div>';
     }
 
@@ -217,6 +221,14 @@
                 } else {
                     grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
                     grid.dataset.rendered = '1';
+                }
+                // FIX #3: restore selected state after re-render
+                if ( formState.race ) {
+                    var prev = grid.querySelector( '[data-race="' + formState.race + '"]' );
+                    if ( prev ) {
+                        prev.classList.add( 'selected' );
+                        prev.setAttribute( 'aria-pressed', 'true' );
+                    }
                 }
             } )
             .catch( function () {
@@ -243,7 +255,16 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
+                    // FIX #1 & #4: buildSubraceCard now includes image block and tags
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
+                    // FIX #3: restore selected subrace state if navigating back
+                    if ( formState.subrace ) {
+                        var prev = grid.querySelector( '[data-subrace="' + formState.subrace + '"]' );
+                        if ( prev ) {
+                            prev.classList.add( 'selected' );
+                            prev.setAttribute( 'aria-pressed', 'true' );
+                        }
+                    }
                 } else {
                     section.style.display = 'none';
                 }
@@ -579,7 +600,7 @@
         // ── Single delegated click handler ────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
-            // Subrace card
+            // Subrace card — must check BEFORE base race card
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
                 var allSub = wrapper.querySelectorAll( '.tw-subrace-card' );
@@ -595,7 +616,7 @@
                 return;
             }
 
-            // Base race card
+            // Base race card (exclude subrace cards handled above)
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -603,12 +624,13 @@
                     allRace[ r ].classList.remove( 'selected' );
                     allRace[ r ].setAttribute( 'aria-pressed', 'false' );
                 }
+                // FIX #3: add selected class + aria-pressed to clicked card
                 raceCard.classList.add( 'selected' );
                 raceCard.setAttribute( 'aria-pressed', 'true' );
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
-                // Reset previously selected subrace cards
+                // Reset any previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );

@@ -244,7 +244,52 @@
 	gap                  : 16px;
 	max-height           : 460px;
 	overflow-y           : auto;
-	padding              : 4px 2px 4px 2px;
+	padding              : 4px 8px 4px 2px;
+	/* FIX #2: styled scrollbar — no ugly browser default */
+	scrollbar-gutter     : stable;
+	scrollbar-width      : thin;
+	scrollbar-color      : rgba(173,255,0,0.4) rgba(0,0,0,0.25);
+}
+/* FIX #2: WebKit scrollbar styling for race/class/node grids */
+.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid::-webkit-scrollbar {
+	width: 4px;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid::-webkit-scrollbar-track {
+	background   : rgba(0,0,0,0.25);
+	border-radius: 0;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid::-webkit-scrollbar-thumb {
+	background   : rgba(173,255,0,0.35);
+	border-radius: 0;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid::-webkit-scrollbar-thumb:hover {
+	background: rgba(173,255,0,0.7);
+	box-shadow: 0 0 6px rgba(173,255,0,0.5);
+}
+
+/* FIX #2: subrace grid — same scroll behaviour as race grid */
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid {
+	display              : grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap                  : 16px;
+	max-height           : 360px;
+	overflow-y           : auto;
+	padding              : 4px 8px 4px 2px;
+	scrollbar-gutter     : stable;
+	scrollbar-width      : thin;
+	scrollbar-color      : rgba(0,229,255,0.4) rgba(0,0,0,0.25);
+}
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid::-webkit-scrollbar {
+	width: 4px;
+}
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid::-webkit-scrollbar-track {
+	background: rgba(0,0,0,0.25);
+}
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid::-webkit-scrollbar-thumb {
+	background: rgba(0,229,255,0.35);
+}
+.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid::-webkit-scrollbar-thumb:hover {
+	background: rgba(0,229,255,0.7);
 }
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-loading-state {
@@ -339,7 +384,7 @@
 	padding    : 20px;
 }
 
-/* ── .tw-grid-card ─────────────────────────────────────────────────────────── */
+/* ── .tw-grid-card — race / subrace cards ──────────────────────────────────── */
 .neoweaver-screen #tw-char-creator-wrapper .tw-grid-card {
 	background     : rgba(255,255,255,0.02);
 	border         : 1px solid rgba(255,255,255,0.12);
@@ -357,15 +402,39 @@
 	transform   : translateY(-3px);
 	box-shadow  : 0 6px 24px rgba(0,0,0,0.4);
 }
-.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected {
-	border-color: var(--neon-green);
-	background  : rgba(173,255,0,0.09);
-	box-shadow  : 0 0 28px rgba(173,255,0,0.18) inset, 0 0 14px rgba(173,255,0,0.22);
+
+/* FIX #3: explicit .selected rules with high specificity to survive WP theme CSS */
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected,
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-card.selected,
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card.selected {
+	border-color: var(--neon-green) !important;
+	background  : rgba(173,255,0,0.09) !important;
+	box-shadow  : 0 0 28px rgba(173,255,0,0.18) inset, 0 0 14px rgba(173,255,0,0.22) !important;
+	outline     : none;
 }
+/* FIX #3: name highlight when selected */
 .neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected strong,
-.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-name {
-	color      : var(--neon-green);
-	text-shadow: 0 0 8px var(--neon-green);
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-name,
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-card.selected .tw-race-name,
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card.selected .tw-race-name {
+	color      : var(--neon-green) !important;
+	text-shadow: 0 0 8px var(--neon-green) !important;
+}
+/* FIX #3: select hint visibility when selected */
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-select-hint,
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-card.selected .tw-race-select-hint,
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card.selected .tw-race-select-hint {
+	color: rgba(173,255,0,0.9);
+}
+/* FIX #3: glowing border-overlay pseudo-element */
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected::after,
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-card.selected::after {
+	content    : '';
+	position   : absolute;
+	inset      : 0;
+	border     : 2px solid var(--neon-green);
+	pointer-events: none;
+	z-index    : 10;
 }
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-img {
@@ -377,7 +446,7 @@
 	align-items     : center;
 	justify-content : center;
 	border-bottom   : 1px solid rgba(173,255,0,0.15);
-	flexshrink      : 0;
+	flex-shrink     : 0;
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-img img {
 	width      : 100%;
@@ -392,6 +461,25 @@
 .neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-img img {
 	opacity: 1;
 	filter : drop-shadow(0 0 12px rgba(173,255,0,0.7)) brightness(1.15);
+}
+
+/* FIX #1: placeholder block for race/subrace cards without an image */
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-img--placeholder {
+	background : rgba(0,0,0,0.3);
+	border-bottom: 1px solid rgba(173,255,0,0.1);
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-img--placeholder .tw-race-card__icon {
+	font-size  : 2.6rem;
+	line-height: 1;
+	opacity    : 0.45;
+	filter     : drop-shadow(0 0 4px rgba(173,255,0,0.3));
+	display    : block;
+	text-align : center;
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card:hover .tw-race-img--placeholder .tw-race-card__icon,
+.neoweaver-screen #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-img--placeholder .tw-race-card__icon {
+	opacity: 0.8;
+	filter : drop-shadow(0 0 10px rgba(173,255,0,0.6));
 }
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-body {
@@ -419,11 +507,20 @@
 	-webkit-box-orient: vertical;
 	overflow   : hidden;
 }
+.neoweaver-screen #tw-char-creator-wrapper .tw-race-bonus {
+	font-size     : 0.68rem;
+	color         : var(--neon-green);
+	opacity       : 0.75;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	margin-top    : 2px;
+}
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-tags {
 	display  : flex;
 	flex-wrap: wrap;
 	gap      : 4px;
+	margin-top: 4px;
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-tag {
 	display       : inline-block;
@@ -437,6 +534,12 @@
 	border-radius : 2px;
 	white-space   : nowrap;
 }
+/* FIX #4: subrace tags use cyan accent to distinguish from race tags */
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card .tw-race-tag {
+	background : rgba(0,229,255,0.07);
+	border-color: rgba(0,229,255,0.3);
+	color      : var(--cyan);
+}
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-race-select-hint {
 	font-size     : 0.65rem;
@@ -448,6 +551,13 @@
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-grid-card:hover .tw-race-select-hint {
 	color: rgba(173,255,0,0.8);
+}
+/* FIX: subrace select hint uses cyan */
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card .tw-race-select-hint {
+	color: rgba(0,229,255,0.4);
+}
+.neoweaver-screen #tw-char-creator-wrapper .tw-subrace-card:hover .tw-race-select-hint {
+	color: rgba(0,229,255,0.9);
 }
 
 .neoweaver-screen #tw-char-creator-wrapper #tw-subrace-section {
@@ -887,7 +997,8 @@
 		font-size: 1.5rem;
 	}
 
-	.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid {
+	.neoweaver-screen #tw-char-creator-wrapper .tw-dynamic-grid,
+	.neoweaver-screen #tw-char-creator-wrapper #tw-subrace-grid {
 		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 	}
 
