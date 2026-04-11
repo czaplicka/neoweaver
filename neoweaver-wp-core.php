@@ -105,13 +105,8 @@ add_action( 'wp_enqueue_scripts', function () {
 		],
 	] );
 
-	// Chart.js — enqueued once globally so shortcodes don't double-load it.
 	wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true );
 
-	// BUG-FIX: this block was zero-indented, placing it structurally outside
-	// the closure. PHP closed the closure at the `}` before this `if`, making
-	// the if-block unreachable dead code and leaving a stray `} );` at the end.
-	// Fixed by indenting inside the closure.
 	if ( is_page_template( 'templates/adventure.php' ) ) {
 		wp_enqueue_script( 'nw-panel-tactical-left',  NEOWEAVER_PLUGIN_URL . 'assets/js/panel-tactical-left.js',     [],           '1.0.0',           true );
 		wp_enqueue_script( 'neoweaver-interference',  NEOWEAVER_PLUGIN_URL . 'assets/js/neoweave-interference.js',   [ 'jquery' ], NEOWEAVER_VERSION,  true );
@@ -184,11 +179,6 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'neoweaver-tw-deck',  $base . 'tw-deck.css',            [ 'neoweaver-tw-core' ], '1.0.0' );
 	wp_enqueue_style( 'neoweaver-terminal', $base . 'neoweaver-terminal.css', [], NEOWEAVER_VERSION );
 
-	// Character panel stylesheet — provides scoped rules for all classes used
-	// in templates/parts/character-card.php, including the progress-fill
-	// colour/size variants (.rest-purple, .big-bar, .small-bar, etc.).
-	// Without this file those classes are undefined and the fill <div> renders
-	// as a full-viewport block element.
 	$char_panel_css = $dir . 'tw-char-panel.css';
 	wp_enqueue_style(
 		'neoweaver-tw-char-panel',
