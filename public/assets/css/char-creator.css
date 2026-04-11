@@ -1,0 +1,140 @@
+/*
+ * NeoWeaver — Character Creator styles
+ * Cards: big image · name · green tags only
+ * No desc · no scrollbars · selected highlight
+ */
+
+/* ── Grid layout for race / subrace / class cards ─────────────────────────── */
+#tw-race-grid,
+#tw-subrace-grid,
+#tw-class-grid {
+    display: grid;
+    grid-template-columns: repeat( auto-fill, minmax( 200px, 1fr ) );
+    gap: 1.25rem;
+}
+
+/* ── Base card ────────────────────────────────────────────────────────────── */
+.tw-grid-card,
+.tw-race-card,
+.tw-class-card {
+    display: flex;
+    flex-direction: column;
+    background: #0d0d0d;
+    border: 1px solid rgba(173, 255, 0, 0.18);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+    /* FIX 2: no scrollbars */
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tw-grid-card:hover,
+.tw-race-card:hover,
+.tw-class-card:hover {
+    border-color: rgba(173, 255, 0, 0.55);
+    box-shadow: 0 0 14px rgba(173, 255, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* FIX 3: selected highlight */
+.tw-race-card.selected,
+.tw-subrace-card.selected,
+.tw-class-card.selected {
+    border-color: #adff00;
+    box-shadow: 0 0 0 2px #adff00, 0 0 20px rgba(173, 255, 0, 0.30);
+    transform: translateY(-2px);
+}
+
+/* ── Big image area ───────────────────────────────────────────────────────── */
+.tw-race-img,
+.tw-class-card__img-wrap {
+    width: 100%;
+    /* Taller image — fills most of the card */
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #111;
+}
+
+.tw-race-img img,
+.tw-class-card__img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    /* no scroll possible when image fills container */
+}
+
+/* Placeholder (no image) */
+.tw-race-img--placeholder,
+.tw-class-card__img-wrap--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #111;
+    aspect-ratio: 1 / 1;
+}
+
+.tw-race-img--placeholder .tw-race-card__icon,
+.tw-class-card__img-wrap--placeholder span {
+    font-size: 3.5rem;
+    opacity: 0.45;
+    line-height: 1;
+}
+
+/* ── Card body: name + tags only ──────────────────────────────────────────── */
+.tw-race-body,
+.tw-class-card__body {
+    padding: 0.6rem 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.tw-race-name,
+.tw-class-card__name {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e8e8e8;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    margin: 0;
+    /* single line, clip with ellipsis if too long */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Green tags ───────────────────────────────────────────────────────────── */
+.tw-race-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.tw-race-tag {
+    font-family: 'Chakra Petch', monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #adff00;
+    border: 1px solid rgba(173, 255, 0, 0.45);
+    border-radius: 2px;
+    padding: 0.1rem 0.4rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+/* ── Remove anything that was white / old style ───────────────────────────── */
+/* Hide old desc, bonus, select-hint if they still appear in cached HTML */
+.tw-race-desc,
+.tw-race-bonus,
+.tw-race-select-hint,
+.tw-class-card__desc {
+    display: none !important;
+}

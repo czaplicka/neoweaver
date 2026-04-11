@@ -1,8 +1,7 @@
 /**
  * NeoWeaver — Character Creator
  * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
- * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags
- * v2: remove desc + bonus from cards, enlarge img to 320px, keep only green tw-race-tags
+ * v2: big image · name · green tags only · no desc · no scrollbars · selected highlight
  */
 
 ( function () {
@@ -71,7 +70,6 @@
     // ── Config ────────────────────────────────────────────────────────────────
     var _cfg = window.twCharCreatorConfig || window.neoweaver_ajax || {};
 
-    // Hardcoded races kept ONLY as emergency offline fallback.
     var RACES_FALLBACK = [
         {
             key: 'human', label: 'Human', icon: '&#128100;', img: '',
@@ -152,7 +150,7 @@
     }
 
     // ── Tag renderer ─────────────────────────────────────────────────────────
-    // tags may be an array of strings or objects {name, slug, ...}
+    // Renders up to 4 tags; returns empty string if no tags.
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
         var items = tags.slice( 0, 4 ).map( function ( t ) {
@@ -162,67 +160,54 @@
         return '<div class="tw-race-tags">' + items.join( '' ) + '</div>';
     }
 
-    // ── Card builders ────────────────────────────────────────────────────────
-    // CHANGE: removed <p class="tw-race-desc"> and <span class="tw-race-bonus"> from both card types
-    //         to eliminate duplicate content (desc shown elsewhere, bonus duplicated tags visually).
-    //         Image size increased to 320x320 for better visual weight.
+    // ── Card builders ─────────────────────────────────────────────────────────
+    // Layout: big image → name → green tags only (no desc, no bonus, no hint)
 
     function buildRaceCard( race ) {
         var imgSrc  = race.img || '';
-        // CHANGE: img enlarged to 320x320
         var imgHtml = imgSrc
-            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="320" height="320" loading="lazy" /></div>'
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( race.label ) + '" width="300" height="300" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">' + ( race.icon || '&#10067;' ) + '</span></div>';
-        // CHANGE: only green tw-race-tags rendered — no desc, no bonus
         var tagsHtml = buildTagsHtml( race.tags );
         return '<div class="tw-grid-card tw-race-card" data-race="' + esc( race.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( race.label ) + '</h4>' +
                 tagsHtml +
-                '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
     function buildSubraceCard( sub ) {
-        // img supports img / image / thumbnail fallbacks from API response
         var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
-        // CHANGE: img enlarged to 320x320
         var imgHtml = imgSrc
-            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="320" height="320" loading="lazy" /></div>'
+            ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="300" height="300" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
-        // CHANGE: only green tw-race-tags rendered — no desc
         var tagsHtml = buildTagsHtml( sub.tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
                 tagsHtml +
-                '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
-    // ── Race grid: fetch from AJAX, fallback to hardcoded ────────────────────
+    // ── Race grid ─────────────────────────────────────────────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
-
-        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE\u2026</p>';
-
+        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE…</p>';
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_races' );
         fd.append( 'nonce',  nonce() );
-
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( buildRaceCard ).join( '' );
-                    grid.dataset.rendered = '1';
                 } else {
                     grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
-                    grid.dataset.rendered = '1';
                 }
+                grid.dataset.rendered = '1';
             } )
             .catch( function () {
                 grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
@@ -230,20 +215,17 @@
             } );
     }
 
-    // ── Subrace grid: fetch from AJAX ────────────────────────────────────────
+    // ── Subrace grid ──────────────────────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
         if ( ! section || ! grid ) return;
-
         section.style.display = '';
-        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA\u2026</p>';
-
+        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA…</p>';
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_subraces' );
         fd.append( 'nonce',  nonce() );
         fd.append( 'parent', raceKey );
-
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
@@ -258,7 +240,7 @@
             } );
     }
 
-    // ── Class grid (AJAX) ────────────────────────────────────────────────────
+    // ── Class grid ────────────────────────────────────────────────────────────
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -270,11 +252,17 @@
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( function ( cls ) {
+                        // Layout: big image → name → green tags only (no desc)
                         var imgH = cls.img
-                            ? '<div class="tw-class-card__img-wrap"><img src="' + esc( cls.img ) + '" alt="' + esc( cls.label ) + '" width="220" height="220" loading="lazy"/></div>'
+                            ? '<div class="tw-class-card__img-wrap"><img src="' + esc( cls.img ) + '" alt="' + esc( cls.label ) + '" width="300" height="300" loading="lazy"/></div>'
                             : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + ( cls.icon || '&#128100;' ) + '</span></div>';
+                        var tagsHtml = buildTagsHtml( cls.tags );
                         return '<div class="tw-class-card" data-char-class="' + esc( cls.key ) + '" data-label="' + esc( cls.label ) + '" role="button" tabindex="0">' +
-                            imgH + '<div class="tw-class-card__body"><h4 class="tw-class-card__name">' + esc( cls.label ) + '</h4><p class="tw-class-card__desc">' + esc( cls.desc || '' ) + '</p></div></div>';
+                            imgH +
+                            '<div class="tw-class-card__body">' +
+                                '<h4 class="tw-class-card__name">' + esc( cls.label ) + '</h4>' +
+                                tagsHtml +
+                            '</div></div>';
                     } ).join( '' );
                     grid.dataset.rendered = '1';
                 } else {
@@ -286,7 +274,7 @@
             } );
     }
 
-    // ── Node grid (AJAX) ─────────────────────────────────────────────────────
+    // ── Node grid ─────────────────────────────────────────────────────────────
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -315,22 +303,22 @@
     function updateSummary( wrapper ) {
         function set( id, val ) {
             var el = wrapper.querySelector( '#tw-summary-' + id );
-            if ( el ) el.textContent = val || '\u2014';
+            if ( el ) el.textContent = val || '—';
         }
         set( 'character_name', formState.character_name );
         set( 'pronouns',       formState.pronouns );
         set( 'backstory',      formState.backstory
-            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '\u2026' : '' )
+            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '…' : '' )
             : '' );
         set( 'race',    formState.race_label  || formState.race );
         set( 'class',   formState.class_label || formState[ 'class' ] );
         set( 'node_id', formState.node_label  || formState.node_id );
         var attrsStr = ATTR_KEYS.map( function ( k ) {
             return k.toUpperCase() + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN );
-        } ).join( ' \u00b7 ' );
+        } ).join( ' · ' );
         set( 'attrs', attrsStr );
         var avatarEl = wrapper.querySelector( '#tw-summary-avatar' );
-        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '\u2014';
+        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
     }
 
     // ── Attribute display ─────────────────────────────────────────────────────
@@ -351,7 +339,7 @@
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
-    // ── Avatar file handler ───────────────────────────────────────────────────
+    // ── Avatar ────────────────────────────────────────────────────────────────
     function handleAvatarFile( wrapper, file ) {
         var allowed = [ 'image/jpeg', 'image/png', 'image/webp' ];
         if ( ! file || allowed.indexOf( file.type ) === -1 || file.size > 2 * 1024 * 1024 ) {
@@ -375,12 +363,11 @@
 
     // ── Submit ────────────────────────────────────────────────────────────────
     function submitCharacter( wrapper, steps, current, spinner ) {
-        setStatus( 'Uploading agent profile\u2026', false );
+        setStatus( 'Uploading agent profile…', false );
         var submitBtn = wrapper.querySelector( '#tw-char-submit' );
-        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING\u2026'; }
+        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING…'; }
         NW_SFX.deploy();
         spinner.show();
-
         var data = new FormData();
         data.append( 'action',         'neoweaver_create_character' );
         data.append( 'nonce',          nonce() );
@@ -395,7 +382,6 @@
         ATTR_KEYS.forEach( function ( k ) {
             data.append( 'attr_' + k, formState[ 'attr_' + k ] || ATTR_MIN );
         } );
-
         var t0 = Date.now();
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: data } )
             .then( function ( r ) { return r.json(); } )
@@ -433,8 +419,6 @@
     function init() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
-
-        // GUARD: prevent double-init
         if ( wrapper.dataset.nwInit ) return;
         wrapper.dataset.nwInit = '1';
 
@@ -444,11 +428,10 @@
 
         var spinner = makeSpinner(
             'tw-char-spinner',
-            '// SYNCHRONIZING AGENT\u2026',
+            '// SYNCHRONIZING AGENT…',
             'Writing operative data to the NeoWeave grid.'
         );
 
-        // Fetch races from DB immediately
         fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
@@ -459,19 +442,16 @@
             } );
             current = idx;
             setStatus( '', false );
-
             var phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
             if ( phase === 'CLASS MATRIX' )  fetchClassGrid( wrapper );
             if ( phase === 'NODE BINDING' )  fetchNodeGrid( wrapper );
             if ( phase === 'SYSTEM REVIEW' ) updateSummary( wrapper );
-
             var fillEl  = document.getElementById( 'tw-char-progress-fill' );
             var stepEl  = document.getElementById( 'tw-char-step-current' );
             var phaseEl = document.getElementById( 'tw-char-progress-phase' );
             if ( fillEl )  fillEl.style.width = Math.round( ( ( idx + 1 ) / steps.length ) * 100 ) + '%';
             if ( stepEl )  stepEl.textContent  = idx + 1;
             if ( phaseEl ) phaseEl.textContent = phase;
-
             var ticks = wrapper.querySelectorAll( '.tw-progress-tick' );
             for ( var t = 0; t < ticks.length; t++ ) {
                 var n = parseInt( ticks[ t ].dataset.tick, 10 );
@@ -572,7 +552,6 @@
             if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
         }
 
-        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
         var step1Next = document.getElementById( 'tw-char-step1-next' );
         if ( step1Next ) {
             step1Next.addEventListener( 'click', function ( e ) {
@@ -581,10 +560,9 @@
             } );
         }
 
-        // ── Single delegated click handler ────────────────────────────────────
+        // ── Delegated click handler ───────────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
-            // Subrace card
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
                 var allSub = wrapper.querySelectorAll( '.tw-subrace-card' );
@@ -600,7 +578,6 @@
                 return;
             }
 
-            // Base race card — .selected drives CSS highlight
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -613,20 +590,17 @@
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
-                // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );
                     allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
                 }
-                // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
                 return;
             }
 
-            // Class card
             var classCard = e.target.closest( '.tw-class-card' );
             if ( classCard && ! e.target.closest( 'button' ) ) {
                 var allClass = wrapper.querySelectorAll( '.tw-class-card' );
@@ -640,7 +614,6 @@
                 return;
             }
 
-            // Node card
             var nodeCard = e.target.closest( '.tw-node-card' );
             if ( nodeCard && ! e.target.closest( 'button' ) ) {
                 var allNode = wrapper.querySelectorAll( '.tw-node-card' );
@@ -656,7 +629,6 @@
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
 
-            // Avatar clear
             if ( btn.id === 'tw-avatar-clear' ) {
                 formState.avatar_file = null;
                 var fileInput = wrapper.querySelector( '#tw-char-avatar' );
@@ -668,21 +640,18 @@
                 return;
             }
 
-            // File browse trigger
             if ( btn.classList.contains( 'tw-upload-trigger' ) ) {
                 var fi = wrapper.querySelector( '#tw-char-avatar' );
                 if ( fi ) fi.click();
                 return;
             }
 
-            // Summary edit
             if ( btn.classList.contains( 'tw-summary-edit' ) ) {
                 var goTo = parseInt( btn.dataset.goto, 10 );
                 if ( ! isNaN( goTo ) ) { NW_SFX.nav(); showStep( goTo - 1 ); }
                 return;
             }
 
-            // Attribute stepper
             if ( btn.classList.contains( 'tw-attr-btn' ) ) {
                 var attrKey = btn.dataset.attr;
                 var dir     = btn.classList.contains( 'tw-attr-plus' ) ? 'up' : 'down';
@@ -702,7 +671,6 @@
                 return;
             }
 
-            // Navigation
             var action = '';
             if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
             else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
@@ -736,7 +704,7 @@
             }
         } );
 
-        // ── Keyboard: Enter/Space on cards ────────────────────────────────────
+        // ── Keyboard ──────────────────────────────────────────────────────────
         wrapper.addEventListener( 'keydown', function ( e ) {
             if ( e.key !== 'Enter' && e.key !== ' ' ) return;
             var card = e.target.closest( '.tw-race-card, .tw-class-card, .tw-node-card' );
