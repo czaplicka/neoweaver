@@ -320,6 +320,7 @@ function tw_list_worlds_v14() {
 
 					$field_agent_name = 'NO AGENT';
 					$world_status     = 'NOT DEPLOYED';
+					$has_agent        = false;
 
 					if ( $active_campaign_id ) {
 						$world_status = 'WAITING';
@@ -333,6 +334,7 @@ function tw_list_worlds_v14() {
 								$field_agent_name = $agent['char_name']
 									?? ( $char_names[ $char_id ] ?? 'AGENT #' . $char_id );
 								$world_status = 'READY';
+								$has_agent    = true;
 							}
 						}
 
@@ -344,6 +346,7 @@ function tw_list_worlds_v14() {
 
 							if ( $sess_char_id ) {
 								$field_agent_name = $char_names[ $sess_char_id ] ?? 'AGENT #' . $sess_char_id;
+								$has_agent        = true;
 							}
 							// Session status always wins over campaign-agent status.
 							if ( ! empty( $sess_status ) ) {
@@ -426,10 +429,17 @@ function tw_list_worlds_v14() {
 
 							<div class="tw-card-footer">
 								<?php if ( $active_campaign_id ) : ?>
-									<button class="tw-btn-sync"
-											onclick="event.stopPropagation(); window.location.href='/game/?world_id=<?php echo esc_attr( $world_id ); ?>'">
-										ENTER SPLOT
-									</button>
+									<?php if ( $has_agent ) : ?>
+										<button class="tw-btn-sync"
+												onclick="event.stopPropagation(); window.location.href='/game/?world_id=<?php echo esc_attr( $world_id ); ?>'">
+											ENTER THE NODE
+										</button>
+									<?php else : ?>
+										<button class="tw-btn-setup"
+												onclick="event.stopPropagation(); window.location.href='/agents/?world_id=<?php echo esc_attr( $world_id ); ?>&campaign_id=<?php echo esc_attr( $active_campaign_id ); ?>'">
+											ASSIGN FIELD AGENT
+										</button>
+									<?php endif; ?>
 								<?php else : ?>
 									<button class="tw-btn-setup"
 											onclick="event.stopPropagation(); window.location.href='#connector'">
