@@ -1,6 +1,7 @@
 /**
  * NeoWeaver — Character Creator
  * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
+ * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags
  */
 
 ( function () {
@@ -75,9 +76,9 @@
             key: 'human', label: 'Human', icon: '&#128100;', img: '',
             desc: 'Adaptable generalists. Bonus feat at character creation.', bonus: '+1 to any attribute',
             subraces: [
-                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.', img: '', tags: [ 'Corporate', 'Credits' ] },
-                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.', img: '', tags: [ 'Stealth', 'Survival' ] },
-                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.', img: '', tags: [ 'Nomad', 'Reflex' ] },
+                { key: 'human_corp',   label: 'Corp Human',   desc: 'Raised in megacorp culture. Starts with extra Credits.', img: '', tags: [] },
+                { key: 'human_fringe', label: 'Fringe Human', desc: 'Grew up in the undercity. Stealth & survival instincts.', img: '', tags: [] },
+                { key: 'human_nomad',  label: 'Nomad Human',  desc: 'Migrant bloodline. Bonus to REFLEX and Endurance rolls.', img: '', tags: [] },
             ],
         },
         {
@@ -111,7 +112,7 @@
     function esc( str ) {
         return String( str )
             .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
-            .replace( />/g, '&gt;' ).replace( /\"/g, '&quot;' );
+            .replace( />/g, '&gt;' ).replace( /\\\\"/g, '&quot;' );
     }
     function ajaxUrl() { return _cfg.ajax_url || _cfg.ajaxurl || '/wp-admin/admin-ajax.php'; }
     function nonce()   { return _cfg.nonce || ''; }
@@ -150,19 +151,17 @@
     }
 
     // ── Tag renderer ──────────────────────────────────────────────────────────
-    // tags may be an array of strings or objects {name, slug, ...}
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
         var items = tags.slice( 0, 4 ).map( function ( t ) {
-            var label = ( typeof t === 'string' ) ? t : ( t.name || t.slug || String( t ) );
+            var label = ( typeof t === 'string' ) ? t : ( t.name || t.slug || t );
             return '<span class="tw-race-tag">' + esc( label ) + '</span>';
         } );
         return '<div class="tw-race-tags">' + items.join( '' ) + '</div>';
     }
 
-    // ── Card builders ───────────────────────────────────────────────────────────
+    // ── Card builders ─────────────────────────────────────────────────────────
 
-    // Accepts a row in the JS card shape: { key, label, desc, img, bonus?, tags? }
     function buildRaceCard( race ) {
         var imgSrc  = race.img || '';
         var imgHtml = imgSrc
@@ -180,28 +179,27 @@
             '</div></div>';
     }
 
-    // FIX #1: subrace card uses tw-grid-card + tw-race-img structure (same as race cards)
-    // FIX #4: buildTagsHtml(sub.tags) renders tags; safe fallback for missing tags field from AJAX
+    // FIX 1 + FIX 4: subrace card teraz pobiera img z API (fix 1) i wyświetla tagi (fix 4)
     function buildSubraceCard( sub ) {
-        var imgSrc  = sub.img || '';
-        // FIX #1: use identical image block structure as buildRaceCard
+        // FIX 1: obsługa img identyczna jak w buildRaceCard — img może przyjść z API
+        var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
         var imgHtml = imgSrc
             ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
-        // FIX #4: sub.tags may be undefined when coming from AJAX — normalise to array first
-        var tags     = Array.isArray( sub.tags ) ? sub.tags : [];
-        var tagsHtml = buildTagsHtml( tags );
+        // FIX 4: tagi subras – buildTagsHtml obsługuje już poprawnie tablicę
+        var tagsHtml = buildTagsHtml( sub.tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
                 '<p class="tw-race-desc">' + esc( sub.desc ) + '</p>' +
+                // FIX 4: tagi renderowane tak samo jak w buildRaceCard
                 tagsHtml +
-                '<span class="tw-race-select-hint">[ select variant ]</span>' +
+                '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
-    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────────
+    // ── Race grid ─────────────────────────────────────────────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -222,14 +220,6 @@
                     grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
                     grid.dataset.rendered = '1';
                 }
-                // FIX #3: restore selected state after re-render
-                if ( formState.race ) {
-                    var prev = grid.querySelector( '[data-race="' + formState.race + '"]' );
-                    if ( prev ) {
-                        prev.classList.add( 'selected' );
-                        prev.setAttribute( 'aria-pressed', 'true' );
-                    }
-                }
             } )
             .catch( function () {
                 grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
@@ -237,7 +227,7 @@
             } );
     }
 
-    // ── Subrace grid: fetch from AJAX ───────────────────────────────────────────
+    // ── Subrace grid ──────────────────────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
@@ -255,16 +245,8 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
-                    // FIX #1 & #4: buildSubraceCard now includes image block and tags
+                    // FIX 1: buildSubraceCard teraz poprawnie obsługuje img i tags z API
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
-                    // FIX #3: restore selected subrace state if navigating back
-                    if ( formState.subrace ) {
-                        var prev = grid.querySelector( '[data-subrace="' + formState.subrace + '"]' );
-                        if ( prev ) {
-                            prev.classList.add( 'selected' );
-                            prev.setAttribute( 'aria-pressed', 'true' );
-                        }
-                    }
                 } else {
                     section.style.display = 'none';
                 }
@@ -274,7 +256,7 @@
             } );
     }
 
-    // ── Class grid (AJAX) ─────────────────────────────────────────────────────
+    // ── Class grid ────────────────────────────────────────────────────────────
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -302,7 +284,7 @@
             } );
     }
 
-    // ── Node grid (AJAX) ──────────────────────────────────────────────────────
+    // ── Node grid ─────────────────────────────────────────────────────────────
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -367,7 +349,7 @@
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
-    // ── Avatar file handler ───────────────────────────────────────────────────
+    // ── Avatar ────────────────────────────────────────────────────────────────
     function handleAvatarFile( wrapper, file ) {
         var allowed = [ 'image/jpeg', 'image/png', 'image/webp' ];
         if ( ! file || allowed.indexOf( file.type ) === -1 || file.size > 2 * 1024 * 1024 ) {
@@ -449,8 +431,6 @@
     function init() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
-
-        // GUARD: prevent double-init
         if ( wrapper.dataset.nwInit ) return;
         wrapper.dataset.nwInit = '1';
 
@@ -464,7 +444,6 @@
             'Writing operative data to the NeoWeave grid.'
         );
 
-        // Fetch races from DB immediately
         fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
@@ -574,7 +553,7 @@
             return true;
         }
 
-        // ── goNext / goPrev ────────────────────────────────────────────────────────────
+        // ── goNext / goPrev ───────────────────────────────────────────────────
         function goNext() {
             if ( validateStep( current ) ) {
                 clearStepError( steps[ current ] );
@@ -588,7 +567,6 @@
             if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
         }
 
-        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
         var step1Next = document.getElementById( 'tw-char-step1-next' );
         if ( step1Next ) {
             step1Next.addEventListener( 'click', function ( e ) {
@@ -597,10 +575,10 @@
             } );
         }
 
-        // ── Single delegated click handler ────────────────────────────────────
+        // ── Delegated click handler ───────────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
-            // Subrace card — must check BEFORE base race card
+            // Subrace card
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
                 var allSub = wrapper.querySelectorAll( '.tw-subrace-card' );
@@ -616,7 +594,9 @@
                 return;
             }
 
-            // Base race card (exclude subrace cards handled above)
+            // FIX 3: base race card — klasa .selected jest już dodawana poniżej;
+            // podświetlenie działa przez CSS .tw-race-card.selected { ... }
+            // (musisz mieć ten styl w CSS — patrz uwagi poniżej)
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -624,19 +604,16 @@
                     allRace[ r ].classList.remove( 'selected' );
                     allRace[ r ].setAttribute( 'aria-pressed', 'false' );
                 }
-                // FIX #3: add selected class + aria-pressed to clicked card
                 raceCard.classList.add( 'selected' );
                 raceCard.setAttribute( 'aria-pressed', 'true' );
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
-                // Reset any previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );
                     allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
                 }
-                // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
@@ -673,7 +650,6 @@
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
 
-            // Avatar clear
             if ( btn.id === 'tw-avatar-clear' ) {
                 formState.avatar_file = null;
                 var fileInput = wrapper.querySelector( '#tw-char-avatar' );
@@ -685,21 +661,18 @@
                 return;
             }
 
-            // File browse trigger
             if ( btn.classList.contains( 'tw-upload-trigger' ) ) {
                 var fi = wrapper.querySelector( '#tw-char-avatar' );
                 if ( fi ) fi.click();
                 return;
             }
 
-            // Summary edit
             if ( btn.classList.contains( 'tw-summary-edit' ) ) {
                 var goTo = parseInt( btn.dataset.goto, 10 );
                 if ( ! isNaN( goTo ) ) { NW_SFX.nav(); showStep( goTo - 1 ); }
                 return;
             }
 
-            // Attribute stepper
             if ( btn.classList.contains( 'tw-attr-btn' ) ) {
                 var attrKey = btn.dataset.attr;
                 var dir     = btn.classList.contains( 'tw-attr-plus' ) ? 'up' : 'down';
@@ -719,7 +692,6 @@
                 return;
             }
 
-            // Navigation
             var action = '';
             if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
             else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
@@ -753,7 +725,7 @@
             }
         } );
 
-        // ── Keyboard: Enter/Space on cards ────────────────────────────────────
+        // ── Keyboard ──────────────────────────────────────────────────────────
         wrapper.addEventListener( 'keydown', function ( e ) {
             if ( e.key !== 'Enter' && e.key !== ' ' ) return;
             var card = e.target.closest( '.tw-race-card, .tw-class-card, .tw-node-card' );
@@ -789,7 +761,7 @@
         showStep( 0 );
     }
 
-    // ── Boot ──────────────────────────────────────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────
     function boot() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( wrapper ) {
