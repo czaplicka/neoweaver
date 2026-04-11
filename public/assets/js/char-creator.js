@@ -112,7 +112,7 @@
     function esc( str ) {
         return String( str )
             .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
-            .replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
+            .replace( />/g, '&gt;' ).replace( /\\"/g, '&quot;' );
     }
     function ajaxUrl() { return _cfg.ajax_url || _cfg.ajaxurl || '/wp-admin/admin-ajax.php'; }
     function nonce()   { return _cfg.nonce || ''; }
@@ -180,16 +180,14 @@
             '</div></div>';
     }
 
-    /**
-     * FIX 1: img fallback checks sub.img, sub.image, sub.thumbnail
-     *         — handles different field names returned by the PHP AJAX handler.
-     * FIX 4: buildTagsHtml() is now called, matching buildRaceCard behaviour.
-     */
+    // FIX 1 + FIX 4: subrace card now includes image (fix 1) and tags (fix 4), matching race card structure.
+    // FIX 1: img field supports img / image / thumbnail fallbacks from API response.
     function buildSubraceCard( sub ) {
         var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
         var imgHtml = imgSrc
             ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
+        // FIX 4: tags rendered the same way as in buildRaceCard
         var tagsHtml = buildTagsHtml( sub.tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
@@ -201,7 +199,7 @@
             '</div></div>';
     }
 
-    // ── Race grid: fetch from AJAX, fallback to hardcoded ────────────────────
+    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -229,7 +227,7 @@
             } );
     }
 
-    // ── Subrace grid: fetch from AJAX ────────────────────────────────────────
+    // ── Subrace grid: fetch from AJAX ─────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
@@ -247,6 +245,7 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
+                    // FIX 1: buildSubraceCard now correctly handles img and tags from API
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
                 } else {
                     section.style.display = 'none';
@@ -447,6 +446,7 @@
             'Writing operative data to the NeoWeave grid.'
         );
 
+        // Fetch races from DB immediately
         fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
@@ -570,7 +570,7 @@
             if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
         }
 
-        // ── Direct listener on Step 1 NEXT button ─────────────────────────────
+        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
         var step1Next = document.getElementById( 'tw-char-step1-next' );
         if ( step1Next ) {
             step1Next.addEventListener( 'click', function ( e ) {
@@ -598,19 +598,8 @@
                 return;
             }
 
-            /**
-             * FIX 3: .selected is toggled here — visual highlight is handled in CSS:
-             *
-             *   .tw-race-card.selected,
-             *   .tw-subrace-card.selected {
-             *     outline: 2px solid #adff00;
-             *     outline-offset: -2px;
-             *     background-color: rgba(173,255,0,0.08);
-             *     box-shadow: 0 0 12px rgba(173,255,0,0.25);
-             *   }
-             *
-             * Add this block to public/assets/css/char-creator.css (or neoweaver-public.css).
-             */
+            // FIX 3: base race card — .selected class toggled here;
+            // visual highlight is handled via CSS .tw-race-card.selected { ... }
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -623,11 +612,13 @@
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
+                // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );
                     allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
                 }
+                // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
