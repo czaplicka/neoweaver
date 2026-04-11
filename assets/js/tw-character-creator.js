@@ -112,7 +112,7 @@
     function esc( str ) {
         return String( str )
             .replace( /&/g, '&amp;' ).replace( /</g, '&lt;' )
-            .replace( />/g, '&gt;' ).replace( /\\\\"/g, '&quot;' );
+            .replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
     }
     function ajaxUrl() { return _cfg.ajax_url || _cfg.ajaxurl || '/wp-admin/admin-ajax.php'; }
     function nonce()   { return _cfg.nonce || ''; }
@@ -151,6 +151,7 @@
     }
 
     // ── Tag renderer ──────────────────────────────────────────────────────────
+    // tags may be an array of strings or objects {name, slug, ...}
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
         var items = tags.slice( 0, 4 ).map( function ( t ) {
@@ -179,27 +180,25 @@
             '</div></div>';
     }
 
-    // FIX 1 + FIX 4: subrace card teraz pobiera img z API (fix 1) i wyświetla tagi (fix 4)
+    // FIX 1: subrace card teraz obsługuje img z API (sub.img || sub.image || sub.thumbnail)
+    // FIX 4: subrace card teraz renderuje tagi identycznie jak karta rasy
     function buildSubraceCard( sub ) {
-        // FIX 1: obsługa img identyczna jak w buildRaceCard — img może przyjść z API
         var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
         var imgHtml = imgSrc
             ? '<div class="tw-race-img"><img src="' + esc( imgSrc ) + '" alt="' + esc( sub.label ) + '" width="220" height="220" loading="lazy" /></div>'
             : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">&#10022;</span></div>';
-        // FIX 4: tagi subras – buildTagsHtml obsługuje już poprawnie tablicę
         var tagsHtml = buildTagsHtml( sub.tags );
         return '<div class="tw-grid-card tw-race-card tw-subrace-card" data-subrace="' + esc( sub.key ) + '" role="button" tabindex="0" aria-pressed="false">' +
             imgHtml +
             '<div class="tw-race-body">' +
                 '<h4 class="tw-race-name">' + esc( sub.label ) + '</h4>' +
                 '<p class="tw-race-desc">' + esc( sub.desc ) + '</p>' +
-                // FIX 4: tagi renderowane tak samo jak w buildRaceCard
                 tagsHtml +
                 '<span class="tw-race-select-hint">[ select ]</span>' +
             '</div></div>';
     }
 
-    // ── Race grid ─────────────────────────────────────────────────────────────
+    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -227,7 +226,7 @@
             } );
     }
 
-    // ── Subrace grid ──────────────────────────────────────────────────────────
+    // ── Subrace grid: fetch from AJAX ───────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
@@ -245,7 +244,7 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
-                    // FIX 1: buildSubraceCard teraz poprawnie obsługuje img i tags z API
+                    // FIX 1 + FIX 4: buildSubraceCard obsługuje teraz img i tags z API
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
                 } else {
                     section.style.display = 'none';
@@ -256,7 +255,7 @@
             } );
     }
 
-    // ── Class grid ────────────────────────────────────────────────────────────
+    // ── Class grid (AJAX) ─────────────────────────────────────────────────────
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -284,7 +283,7 @@
             } );
     }
 
-    // ── Node grid ─────────────────────────────────────────────────────────────
+    // ── Node grid (AJAX) ──────────────────────────────────────────────────────
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
@@ -313,22 +312,22 @@
     function updateSummary( wrapper ) {
         function set( id, val ) {
             var el = wrapper.querySelector( '#tw-summary-' + id );
-            if ( el ) el.textContent = val || '—';
+            if ( el ) el.textContent = val || '\u2014';
         }
         set( 'character_name', formState.character_name );
         set( 'pronouns',       formState.pronouns );
         set( 'backstory',      formState.backstory
-            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '…' : '' )
+            ? formState.backstory.substring( 0, 80 ) + ( formState.backstory.length > 80 ? '\u2026' : '' )
             : '' );
         set( 'race',    formState.race_label  || formState.race );
         set( 'class',   formState.class_label || formState[ 'class' ] );
         set( 'node_id', formState.node_label  || formState.node_id );
         var attrsStr = ATTR_KEYS.map( function ( k ) {
             return k.toUpperCase() + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN );
-        } ).join( ' · ' );
+        } ).join( ' \u00b7 ' );
         set( 'attrs', attrsStr );
         var avatarEl = wrapper.querySelector( '#tw-summary-avatar' );
-        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
+        if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '\u2014';
     }
 
     // ── Attribute display ─────────────────────────────────────────────────────
@@ -349,7 +348,7 @@
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
-    // ── Avatar ────────────────────────────────────────────────────────────────
+    // ── Avatar file handler ───────────────────────────────────────────────────
     function handleAvatarFile( wrapper, file ) {
         var allowed = [ 'image/jpeg', 'image/png', 'image/webp' ];
         if ( ! file || allowed.indexOf( file.type ) === -1 || file.size > 2 * 1024 * 1024 ) {
@@ -373,9 +372,9 @@
 
     // ── Submit ────────────────────────────────────────────────────────────────
     function submitCharacter( wrapper, steps, current, spinner ) {
-        setStatus( 'Uploading agent profile…', false );
+        setStatus( 'Uploading agent profile\u2026', false );
         var submitBtn = wrapper.querySelector( '#tw-char-submit' );
-        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING…'; }
+        if ( submitBtn ) { submitBtn.disabled = true; submitBtn.textContent = 'SYNCHRONIZING\u2026'; }
         NW_SFX.deploy();
         spinner.show();
 
@@ -431,6 +430,8 @@
     function init() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
+
+        // GUARD: prevent double-init
         if ( wrapper.dataset.nwInit ) return;
         wrapper.dataset.nwInit = '1';
 
@@ -440,10 +441,11 @@
 
         var spinner = makeSpinner(
             'tw-char-spinner',
-            '// SYNCHRONIZING AGENT…',
+            '// SYNCHRONIZING AGENT\u2026',
             'Writing operative data to the NeoWeave grid.'
         );
 
+        // Fetch races from DB immediately
         fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
@@ -553,7 +555,7 @@
             return true;
         }
 
-        // ── goNext / goPrev ───────────────────────────────────────────────────
+        // ── goNext / goPrev ────────────────────────────────────────────────────────────
         function goNext() {
             if ( validateStep( current ) ) {
                 clearStepError( steps[ current ] );
@@ -567,6 +569,7 @@
             if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
         }
 
+        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
         var step1Next = document.getElementById( 'tw-char-step1-next' );
         if ( step1Next ) {
             step1Next.addEventListener( 'click', function ( e ) {
@@ -575,7 +578,7 @@
             } );
         }
 
-        // ── Delegated click handler ───────────────────────────────────────────
+        // ── Single delegated click handler ────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
             // Subrace card
@@ -594,9 +597,7 @@
                 return;
             }
 
-            // FIX 3: base race card — klasa .selected jest już dodawana poniżej;
-            // podświetlenie działa przez CSS .tw-race-card.selected { ... }
-            // (musisz mieć ten styl w CSS — patrz uwagi poniżej)
+            // FIX 3: base race card — .selected dodawane poniżej; podświetlenie przez CSS .tw-race-card.selected
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -609,11 +610,13 @@
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
+                // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );
                     allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
                 }
+                // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
@@ -650,6 +653,7 @@
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
 
+            // Avatar clear
             if ( btn.id === 'tw-avatar-clear' ) {
                 formState.avatar_file = null;
                 var fileInput = wrapper.querySelector( '#tw-char-avatar' );
@@ -661,18 +665,21 @@
                 return;
             }
 
+            // File browse trigger
             if ( btn.classList.contains( 'tw-upload-trigger' ) ) {
                 var fi = wrapper.querySelector( '#tw-char-avatar' );
                 if ( fi ) fi.click();
                 return;
             }
 
+            // Summary edit
             if ( btn.classList.contains( 'tw-summary-edit' ) ) {
                 var goTo = parseInt( btn.dataset.goto, 10 );
                 if ( ! isNaN( goTo ) ) { NW_SFX.nav(); showStep( goTo - 1 ); }
                 return;
             }
 
+            // Attribute stepper
             if ( btn.classList.contains( 'tw-attr-btn' ) ) {
                 var attrKey = btn.dataset.attr;
                 var dir     = btn.classList.contains( 'tw-attr-plus' ) ? 'up' : 'down';
@@ -692,6 +699,7 @@
                 return;
             }
 
+            // Navigation
             var action = '';
             if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
             else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
@@ -725,7 +733,7 @@
             }
         } );
 
-        // ── Keyboard ──────────────────────────────────────────────────────────
+        // ── Keyboard: Enter/Space on cards ────────────────────────────────────
         wrapper.addEventListener( 'keydown', function ( e ) {
             if ( e.key !== 'Enter' && e.key !== ' ' ) return;
             var card = e.target.closest( '.tw-race-card, .tw-class-card, .tw-node-card' );
@@ -761,7 +769,7 @@
         showStep( 0 );
     }
 
-    // ── Boot ──────────────────────────────────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────────
     function boot() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( wrapper ) {
