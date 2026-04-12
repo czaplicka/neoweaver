@@ -123,9 +123,18 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',       [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-		wp_enqueue_script( 'nw-checkout',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/checkout-block.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 	}
 } );
+add_action( 'wp_enqueue_scripts', function() {
+    if ( ! is_checkout() ) return;
+
+    wp_enqueue_script(
+        'neoweaver-checkout-block',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
+        [ 'wp-plugins', 'wp-element', 'wp-components', 'wc-blocks-checkout' ],
+        NEOWEAVER_VERSION,
+        true
+    );
 
 // ─── Register plugin page templates ──────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
