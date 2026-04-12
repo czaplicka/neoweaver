@@ -1,3 +1,4 @@
+console.log('[NeoWeaver] checkout-block.js loaded', window.wc);
 const { registerCheckoutBlock, extensionCartUpdate } = window.wc.blocksCheckout;
 const { useState, useEffect }                        = window.wp.element;
 const { SelectControl, Notice }                      = window.wp.components;
