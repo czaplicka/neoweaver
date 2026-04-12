@@ -3,11 +3,6 @@
  * Template Name: Public Character Profile
  */
 
-// ── B1/S1 FIX: Validate $char_id and resolve all data BEFORE calling get_header().
-// Calling get_header() first causes the HTML <head> and partial <body> to be
-// sent before an early return is possible, resulting in a broken page and
-// potential information leakage in HTTP headers/output.
-
 $char_id = isset( $_GET['char_id'] ) ? intval( $_GET['char_id'] ) : 0;
 
 if ( ! $char_id ) {
