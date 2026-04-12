@@ -184,8 +184,6 @@ add_action( 'plugins_loaded', function () {
 	$nodes_creator       = new Neoweaver_Nodes_Creator();
 	new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
 } );
-
-// Supabase JS client bootstrap — priority 5 so it runs before all other wp_footer hooks.
 add_action( 'wp_footer', function () {
 	if ( ! is_user_logged_in() ) return;
 	$url = defined( 'NEOWEAVER_SUPA_URL' ) ? NEOWEAVER_SUPA_URL : '';
