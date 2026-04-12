@@ -45,20 +45,20 @@ function nw_resolve_img_urls( array $rows ): array {
 }
 
 /**
- * Build a human-readable bonus string from the tags JSONB column.
- * cyber_races has no dedicated 'bonus' column — tags hold that data.
+ * Decode a JSONB column that Supabase may return as a JSON string or already-decoded array.
+ * Returns a flat array of sanitized strings.
  *
- * @param mixed $tags  Raw value from Supabase (JSON string or already-decoded array).
- * @return string
+ * @param mixed $value  Raw value from Supabase row.
+ * @return array
  */
-function nw_bonus_from_tags( $tags ): string {
-	if ( is_string( $tags ) ) {
-		$tags = json_decode( $tags, true );
+function nw_decode_jsonb_array( $value ): array {
+	if ( is_string( $value ) ) {
+		$value = json_decode( $value, true );
 	}
-	if ( ! is_array( $tags ) || empty( $tags ) ) {
-		return '';
+	if ( ! is_array( $value ) ) {
+		return [];
 	}
-	return implode( ' · ', array_map( 'sanitize_text_field', $tags ) );
+	return array_map( 'sanitize_text_field', array_filter( $value, 'is_scalar' ) );
 }
 
 /**
@@ -122,9 +122,8 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 	return array_map( function ( $row ) use ( $key_field, $extra_map ) {
 		$item = [
 			'id'    => $row['id']    ?? null,
-			// FIX: cast to string — dataset zawsze zwraca string, porównanie === musi działać
 			'key'   => (string) ( $row[ $key_field ] ?? $row['id'] ),
-			'label' => $row['name']  ?? '',
+			'label' => $row['name']        ?? '',
 			'desc'  => $row['description'] ?? '',
 			'img'   => $row['img_url']     ?? '',
 		];
@@ -136,37 +135,38 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 }
 
 /**
- * Map race rows to JS card shape, deriving 'bonus' from the tags JSONB column.
- * FIX: zwracamy też 'tags' jako tablicę [{name}] — wymagane przez JS buildTagsHtml().
+ * Map race/subrace rows to JS card shape.
  *
- * @param array $rows  Raw rows from cyber_races (must include 'tags').
+ * cyber_races columns used:
+ *   - tags  (JSONB)  → visual chip tags displayed via buildTagsHtml()
+ *   - bonus (JSONB)  → flat string displayed in .tw-race-bonus span
+ *
+ * Both are separate columns — no duplication.
+ *
+ * @param array $rows  Raw rows from cyber_races (must include tags, bonus, img_url).
  * @return array
  */
 function nw_map_race_card_shape( array $rows ): array {
 	return array_map( function ( $row ) {
 
-		// Dekoduj tags jeśli Supabase zwróci JSON string zamiast tablicy
-		$raw_tags = $row['tags'] ?? [];
-		if ( is_string( $raw_tags ) ) {
-			$raw_tags = json_decode( $raw_tags, true ) ?? [];
-		}
-		if ( ! is_array( $raw_tags ) ) {
-			$raw_tags = [];
-		}
+		// tags — visual chips [{name: '...'}]
+		$raw_tags  = nw_decode_jsonb_array( $row['tags'] ?? [] );
+		$tags_out  = array_map( function ( $t ) {
+			return [ 'name' => $t ];
+		}, $raw_tags );
+
+		// bonus — separate JSONB column, rendered as plain string
+		$raw_bonus = nw_decode_jsonb_array( $row['bonus'] ?? [] );
+		$bonus_str = implode( ' · ', $raw_bonus );
 
 		return [
 			'id'    => $row['id']          ?? null,
-			'key'   => $row['name']        ?? $row['id'],
+			'key'   => (string) ( $row['name'] ?? $row['id'] ),
 			'label' => $row['name']        ?? '',
 			'desc'  => $row['description'] ?? '',
 			'img'   => $row['img_url']     ?? '',
-			// bonus jako czytelny string (wyświetlany w .tw-race-bonus)
-			'bonus' => implode( ' · ', array_map( 'sanitize_text_field', $raw_tags ) ),
-			// FIX: tags jako tablica [{name: '...'}] — format oczekiwany przez buildTagsHtml()
-			// subrace tags użyją cyan accent dzięki .tw-subrace-card .tw-race-tag w CSS
-			'tags'  => array_map( function ( $t ) {
-				return [ 'name' => sanitize_text_field( (string) $t ) ];
-			}, $raw_tags ),
+			'bonus' => $bonus_str,
+			'tags'  => $tags_out,
 		];
 	}, $rows );
 }
@@ -180,7 +180,7 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 		return new WP_Error( 'config_missing', 'Supabase helpers not loaded.', [ 'status' => 500 ] );
 	}
 
-	$cache_key = 'nw_base_races_v3';
+	$cache_key = 'nw_base_races_v4';
 	$cached    = get_transient( $cache_key );
 	if ( $cached !== false ) {
 		return rest_ensure_response( $cached );
@@ -189,7 +189,7 @@ function neoweaver_get_races( WP_REST_Request $request ): WP_REST_Response|WP_Er
 	$data = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url',
+			'select'      => 'id,name,description,tags,bonus,img_url',
 			'parent_race' => 'is.null',
 			'order'       => 'name.asc',
 		]
@@ -224,7 +224,7 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 		return new WP_Error( 'config_missing', 'Supabase helpers not loaded.', [ 'status' => 500 ] );
 	}
 
-	$cache_key = 'nw_subraces_v2_' . md5( $parent );
+	$cache_key = 'nw_subraces_v3_' . md5( $parent );
 	$cached    = get_transient( $cache_key );
 	if ( $cached !== false ) {
 		return rest_ensure_response( $cached );
@@ -233,7 +233,7 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 	$data = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url',
+			'select'      => 'id,name,description,tags,bonus,img_url',
 			'parent_race' => 'eq.' . $parent,
 			'order'       => 'name.asc',
 		]
@@ -279,13 +279,13 @@ function neoweaver_get_nodes_rest( WP_REST_Request $request ): WP_REST_Response|
 }
 
 // ---------------------------------------------------------------------------
-// wp_ajax: neoweaver_get_races  (used by character creator JS)
+// wp_ajax: neoweaver_get_races
 // ---------------------------------------------------------------------------
 
 function neoweaver_ajax_get_races(): void {
 	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
 
-	$cache_key = 'nw_base_races_v3';
+	$cache_key = 'nw_base_races_v4';
 	$cached    = get_transient( $cache_key );
 
 	if ( $cached !== false ) {
@@ -301,7 +301,7 @@ function neoweaver_ajax_get_races(): void {
 	$rows = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url',
+			'select'      => 'id,name,description,tags,bonus,img_url',
 			'parent_race' => 'is.null',
 			'order'       => 'name.asc',
 		]
@@ -337,7 +337,7 @@ function neoweaver_ajax_get_subraces(): void {
 		return;
 	}
 
-	$cache_key = 'nw_subraces_v2_' . md5( $parent );
+	$cache_key = 'nw_subraces_v3_' . md5( $parent );
 	$cached    = get_transient( $cache_key );
 
 	if ( $cached !== false ) {
@@ -353,7 +353,7 @@ function neoweaver_ajax_get_subraces(): void {
 	$rows = tw_supabase_get(
 		'cyber_races',
 		[
-			'select'      => 'id,name,description,tags,img_url',
+			'select'      => 'id,name,description,tags,bonus,img_url',
 			'parent_race' => 'eq.' . $parent,
 			'order'       => 'name.asc',
 		]
