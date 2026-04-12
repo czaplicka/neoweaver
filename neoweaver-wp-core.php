@@ -136,6 +136,25 @@ add_action( 'wp_enqueue_scripts', function() {
         true
     );
 
+    $characters    = neoweaver_get_player_characters( get_current_user_id() );
+    $has_neoweaver = false;
+
+    if ( WC()->cart ) {
+        foreach ( WC()->cart->get_cart() as $cart_item ) {
+            if ( $cart_item['data']->get_attribute( 'neoweaver_item_id' ) ) {
+                $has_neoweaver = true;
+                break;
+            }
+        }
+    }
+
+    wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
+        'characters'   => $characters ?: [],
+        'hasNeoweaver' => $has_neoweaver,
+        'createUrl'    => '/new-agent/',
+    ] );
+}, 20 );
+
 // ─── Register plugin page templates ──────────────────────────────────────────
 add_action( 'plugins_loaded', function () {
 	add_filter( 'theme_page_templates', function ( $templates ) {
