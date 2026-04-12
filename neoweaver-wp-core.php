@@ -44,12 +44,16 @@ require_once NEOWEAVER_PLUGIN_DIR . 'includes/shortcodes-tags.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax-save-player-notes.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/ajax/tw-update-vehicle-module.php';
 
+// ─── Other ───────────────────────────────────────────────────────────
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/checkout-block.php';
+
 // ─── Class autoload ───────────────────────────────────────────────────────────
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-repository.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-list.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-agents-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-deployments-creator.php';
 require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-nodes-creator.php';
+require_once NEOWEAVER_PLUGIN_DIR . 'includes/classes/class-neoweaver-checkout-block.php';
 
 // ─── Wizard shortcode functions (must load before class-neoweaver-public.php)
 require_once NEOWEAVER_PLUGIN_DIR . 'public/shortcodes/shortcode-achivments.php';
@@ -119,6 +123,7 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',       [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+		wp_enqueue_script( 'nw-checkout',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/checkout-block.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 	}
 } );
 
