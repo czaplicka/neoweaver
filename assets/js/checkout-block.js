@@ -21,7 +21,7 @@ console.log('[NeoWeaver] checkout-block.js loaded', window.wc);
     const NeoWeaverAgentSelect = () => {
         const [ characterId, setCharacterId ] = useState( '' );
 
-        if ( ! hasNeoweaver ) return null;
+       if ( hasNeoweaver !== '1' ) return null;
 
         if ( ! characters || characters.length === 0 ) {
             return el( 'div', { className: 'neoweaver-no-agent', style: { margin: '16px 0' } },
