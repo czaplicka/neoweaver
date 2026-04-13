@@ -2,7 +2,7 @@
 /**
  * Shortcode: [tale_weaver_character_creator]
  *
- * Renders the 7-step Field Agent creation wizard.
+ * Renders the 6-step Field Agent creation wizard.
  *
  * @package Neoweaver
  */
@@ -47,7 +47,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 		$attr_pool   = 12;
 		$attr_min    = 1;
 		$attr_max    = 5;
-		$total_steps = 7;
+		$total_steps = 6;
 
 		// Preset builds: body, reflex, mind, spirit
 		$attr_presets = [
@@ -220,27 +220,8 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				</div>
 			</div>
 
-			<!-- STEP 5 — Node Binding -->
-			<div class="tw-step" data-step="5" data-phase="NODE BINDING" data-field="node_id">
-				<h2>// NODE BINDING</h2>
-				<p class="tw-question-text">
-					Select the Node (world) this agent will be permanently synchronized to.
-					<em>One agent · one world. This cannot be changed after deployment.</em>
-				</p>
-				<div class="tw-dynamic-grid" id="tw-node-grid">
-					<div class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING AVAILABLE NODES…</div>
-				</div>
-				<p class="tw-helper-text">No worlds yet?
-					<a href="<?php echo esc_url( home_url( '/create-world/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a>
-				</p>
-				<div class="tw-nav-row">
-					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
-					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
-				</div>
-			</div>
-
-			<!-- STEP 6 — Avatar -->
-			<div class="tw-step" data-step="6" data-phase="VISUAL SIGNATURE">
+			<!-- STEP 5 — Avatar -->
+			<div class="tw-step" data-step="5" data-phase="VISUAL SIGNATURE">
 				<h2>// VISUAL SIGNATURE</h2>
 				<p class="tw-question-text">Upload an operative portrait. Optional — skip to continue.</p>
 				<div class="tw-upload-box" id="tw-avatar-drop">
@@ -262,8 +243,8 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				</div>
 			</div>
 
-			<!-- STEP 7 — Summary -->
-			<div class="tw-step tw-step--summary" data-step="7" data-phase="SYSTEM REVIEW">
+			<!-- STEP 6 — Summary -->
+			<div class="tw-step tw-step--summary" data-step="6" data-phase="SYSTEM REVIEW">
 				<h2>// SYSTEM REVIEW</h2>
 				<p class="tw-question-text">Verify operative parameters before synchronization.</p>
 				<div class="tw-summary-grid">
@@ -273,8 +254,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 					<div class="tw-summary-row"><span class="tw-summary-key">RACE</span><span class="tw-summary-val" id="tw-summary-race">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="2">[ EDIT ]</button></div>
 					<div class="tw-summary-row"><span class="tw-summary-key">CLASS</span><span class="tw-summary-val" id="tw-summary-class">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="3">[ EDIT ]</button></div>
 					<div class="tw-summary-row"><span class="tw-summary-key">ATTRIBUTES</span><span class="tw-summary-val" id="tw-summary-attrs">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="4">[ EDIT ]</button></div>
-					<div class="tw-summary-row"><span class="tw-summary-key">NODE</span><span class="tw-summary-val" id="tw-summary-node_id">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button></div>
-					<div class="tw-summary-row"><span class="tw-summary-key">PORTRAIT</span><span class="tw-summary-val" id="tw-summary-avatar">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button></div>
+					<div class="tw-summary-row"><span class="tw-summary-key">PORTRAIT</span><span class="tw-summary-val" id="tw-summary-avatar">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button></div>
 				</div>
 				<div id="tw-char-status-msg" class="tw-char-status"></div>
 				<div class="tw-nav-row">
