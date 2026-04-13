@@ -1210,3 +1210,41 @@
         padding: 12px 28px;
     }
 }
+.tw-attr-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.tw-attr-presets__label {
+    font-size: 0.75rem;
+    letter-spacing: .1em;
+    color: var(--tw-muted, #888);
+    margin-right: 4px;
+}
+.tw-attr-preset-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 14px;
+    border: 1px solid #adff0055;
+    background: transparent;
+    color: #adff00;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: .08em;
+    cursor: pointer;
+    transition: background 150ms, border-color 150ms;
+}
+.tw-attr-preset-btn:hover,
+.tw-attr-preset-btn.active {
+    background: #adff0022;
+    border-color: #adff00;
+}
+.tw-attr-preset-vals {
+    font-size: 0.65rem;
+    opacity: .7;
+    letter-spacing: .05em;
+}
