@@ -49,6 +49,15 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 		$attr_max    = 5;
 		$total_steps = 7;
 
+		// Preset builds: body, reflex, mind, spirit
+		$attr_presets = [
+			[ 'key' => 'body_builder', 'label' => 'BODY BUILDER', 'values' => [ 5, 3, 2, 2 ] ],
+			[ 'key' => 'gunslinger',   'label' => 'GUNSLINGER',   'values' => [ 2, 5, 2, 3 ] ],
+			[ 'key' => 'genius',       'label' => 'GENIUS',       'values' => [ 2, 2, 5, 3 ] ],
+			[ 'key' => 'warlock',      'label' => 'WARLOCK',      'values' => [ 2, 2, 3, 5 ] ],
+			[ 'key' => 'balanced',     'label' => 'BALANCED',     'values' => [ 3, 3, 3, 3 ] ],
+		];
+
 		ob_start();
 		?>
 		<div id="tw-char-creator-wrapper" data-total-steps="<?php echo esc_attr( $total_steps ); ?>">
@@ -157,6 +166,25 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 						Remaining: <span id="tw-attr-remaining"><?php echo esc_html( $attr_pool - count( $attrs ) ); ?></span>
 					</span>
 				</p>
+
+				<!-- Quick-build presets -->
+				<div class="tw-attr-presets" aria-label="Quick-build presets">
+					<span class="tw-attr-presets__label">QUICK BUILD:</span>
+					<?php foreach ( $attr_presets as $preset ) : ?>
+						<button type="button"
+						        class="tw-attr-preset-btn"
+						        data-preset="<?php echo esc_attr( $preset['key'] ); ?>"
+						        data-body="<?php echo esc_attr( $preset['values'][0] ); ?>"
+						        data-reflex="<?php echo esc_attr( $preset['values'][1] ); ?>"
+						        data-mind="<?php echo esc_attr( $preset['values'][2] ); ?>"
+						        data-spirit="<?php echo esc_attr( $preset['values'][3] ); ?>"
+						        aria-label="<?php echo esc_attr( $preset['label'] ); ?>: BODY <?php echo esc_attr( $preset['values'][0] ); ?> · REFLEX <?php echo esc_attr( $preset['values'][1] ); ?> · MIND <?php echo esc_attr( $preset['values'][2] ); ?> · SPIRIT <?php echo esc_attr( $preset['values'][3] ); ?>">
+							<?php echo esc_html( $preset['label'] ); ?>
+							<span class="tw-attr-preset-vals"><?php echo esc_html( implode( ' · ', $preset['values'] ) ); ?></span>
+						</button>
+					<?php endforeach; ?>
+				</div>
+
 				<div class="tw-attr-grid">
 					<?php foreach ( $attrs as $key => $attr ) : ?>
 					<div class="tw-attr-row" data-attr="<?php echo esc_attr( $key ); ?>">
@@ -248,16 +276,17 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 					<div class="tw-summary-row"><span class="tw-summary-key">NODE</span><span class="tw-summary-val" id="tw-summary-node_id">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="5">[ EDIT ]</button></div>
 					<div class="tw-summary-row"><span class="tw-summary-key">PORTRAIT</span><span class="tw-summary-val" id="tw-summary-avatar">&mdash;</span><button type="button" class="tw-summary-edit" data-goto="6">[ EDIT ]</button></div>
 				</div>
+				<div id="tw-char-status-msg" class="tw-char-status"></div>
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
-					<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-char-submit">&#9658; SYNCHRONIZE AGENT</button>
+					<button type="button" class="tw-btn tw-btn--primary tw-btn-deploy" id="tw-char-submit">&#9658; SYNCHRONIZE AGENT</button>
 				</div>
-				<div class="tw-char-status" aria-live="polite"></div>
 			</div>
 
-		</div><!-- /#tw-char-creator-wrapper -->
+		</div><!-- #tw-char-creator-wrapper -->
 		<?php
-		$html = ob_get_clean() ?: '';
-		return '<div class="neoweaver-screen">' . $html . '</div>';
+		return ob_get_clean();
 	}
+
+	add_shortcode( 'tale_weaver_character_creator', 'neoweaver_shortcode_character_creator' );
 }
