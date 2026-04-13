@@ -1,7 +1,8 @@
 /**
  * NeoWeaver — Character Creator
  * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
- * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags
+ * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags,
+ *        class cards mapped to cyber_classes columns (id/name/img_url/icon_slug/description/tags)
  */
 
 ( function () {
@@ -255,23 +256,46 @@
             } );
     }
 
-    // ── Class grid (AJAX) ─────────────────────────────────────────────────────
+    // ── Class grid (AJAX) — mapped to cyber_classes columns ──────────────────
+    // cyber_classes: id, name, description, tags (jsonb), img_url, icon_slug
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
+
+        grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>// SCANNING CLASS MATRIX…</div>';
+
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_classes' );
         fd.append( 'nonce',  nonce() );
+
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( function ( cls ) {
-                        var imgH = cls.img
-                            ? '<div class="tw-class-card__img-wrap"><img src="' + esc( cls.img ) + '" alt="' + esc( cls.label ) + '" width="220" height="220" loading="lazy"/></div>'
-                            : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + ( cls.icon || '&#128100;' ) + '</span></div>';
-                        return '<div class="tw-class-card" data-char-class="' + esc( cls.key ) + '" data-label="' + esc( cls.label ) + '" role="button" tabindex="0">' +
-                            imgH + '<div class="tw-class-card__body"><h4 class="tw-class-card__name">' + esc( cls.label ) + '</h4><p class="tw-class-card__desc">' + esc( cls.desc || '' ) + '</p></div></div>';
+                        // cyber_classes columns: id, name, img_url, icon_slug, description, tags
+                        var imgSrc  = cls.img_url || '';
+                        var icon    = cls.icon_slug || '&#128100;';
+                        var name    = cls.name || '';
+                        var desc    = cls.description || '';
+                        var tags    = cls.tags || [];
+                        var id      = cls.id || '';
+
+                        var imgHtml = imgSrc
+                            ? '<div class="tw-class-card__img-wrap"><img src="' + esc( imgSrc ) + '" alt="' + esc( name ) + '" width="220" height="220" loading="lazy"/></div>'
+                            : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + icon + '</span></div>';
+
+                        var tagsHtml = buildTagsHtml( tags );
+
+                        return '<div class="tw-class-card" data-char-class="' + esc( id ) + '" data-label="' + esc( name ) + '" role="button" tabindex="0">' +
+                            imgHtml +
+                            '<div class="tw-class-card__body">' +
+                                '<h4 class="tw-class-card__name">' + esc( name ) + '</h4>' +
+                                ( desc ? '<p class="tw-class-card__desc">' + esc( desc ) + '</p>' : '' ) +
+                                tagsHtml +
+                                '<span class="tw-race-select-hint">[ select ]</span>' +
+                            '</div>' +
+                        '</div>';
                     } ).join( '' );
                     grid.dataset.rendered = '1';
                 } else {
@@ -279,7 +303,7 @@
                 }
             } )
             .catch( function () {
-                grid.innerHTML = '<p class="tw-error">ERROR: Class data unavailable.</p>';
+                grid.innerHTML = '<p class="tw-error-msg">ERROR: Class data unavailable.</p>';
             } );
     }
 
@@ -304,7 +328,7 @@
                 }
             } )
             .catch( function () {
-                grid.innerHTML = '<p class="tw-error">ERROR: Node scan failed.</p>';
+                grid.innerHTML = '<p class="tw-error-msg">ERROR: Node scan failed.</p>';
             } );
     }
 
