@@ -1,9 +1,3 @@
-/**
- * NeoWeaver — Character Creator
- * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
- * v2: big image · name · green tags only · no desc · no scrollbars · selected highlight
- */
-
 ( function () {
     'use strict';
 
