@@ -1,5 +1,13 @@
 console.log('[NeoWeaver] checkout-block.js loaded', window.wc);
-
+( function() {
+    if ( ! window.wc?.blocksCheckout ) {
+        console.error( '[NeoWeaver] wc.blocksCheckout not available' );
+        return;
+    }
+    if ( ! window.wp?.plugins ) {
+        console.error( '[NeoWeaver] wp.plugins not available' );
+        return;
+    }
 const { registerPlugin }        = window.wp.plugins;
 const { extensionCartUpdate }   = window.wc.blocksCheckout;
 const { useState }              = window.wp.element;
@@ -47,4 +55,4 @@ const NeoWeaverAgentSelect = () => {
 registerPlugin( 'neoweaver-agent-select', {
     render: NeoWeaverAgentSelect,
     scope:  'woocommerce-checkout',
-} );
+} )();
