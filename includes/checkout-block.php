@@ -1,4 +1,28 @@
 <?php
+function neoweaver_get_player_characters( $wp_user_id ) {
+    if ( ! $wp_user_id ) return [];
+
+    $supa_url = defined('NEOWEAVER_SUPA_URL') ? NEOWEAVER_SUPA_URL : '';
+    $supa_key = defined('NEOWEAVER_SUPA_ANON_KEY') ? NEOWEAVER_SUPA_ANON_KEY : '';
+
+    if ( ! $supa_url || ! $supa_key ) return [];
+
+    $response = wp_remote_get(
+        $supa_url . '/rest/v1/cyber_characters?wp_user_id=eq.' . intval( $wp_user_id ) . '&is_active=eq.true&select=id,name',
+        [
+            'headers' => [
+                'apikey'        => $supa_key,
+                'Authorization' => 'Bearer ' . $supa_key,
+            ],
+        ]
+    );
+
+    if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+        return [];
+    }
+
+    return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
+}
 add_action( 'woocommerce_blocks_loaded', function() {
     if ( ! class_exists( 'Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface' ) ) return;
 
