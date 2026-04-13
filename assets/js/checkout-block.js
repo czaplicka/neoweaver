@@ -55,4 +55,6 @@ const NeoWeaverAgentSelect = () => {
 registerPlugin( 'neoweaver-agent-select', {
     render: NeoWeaverAgentSelect,
     scope:  'woocommerce-checkout',
+    } );
+
 } )();
