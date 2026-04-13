@@ -47,7 +47,6 @@ const NeoWeaverAgentSelect = () => {
                 value={ characterId }
                 options={ options }
                 onChange={ handleChange }
-            />
         </div>
     );
 };
