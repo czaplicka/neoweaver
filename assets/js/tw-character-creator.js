@@ -3,6 +3,7 @@
  * Unified file: identity • race (+ subrace) • class • attributes • node • avatar • summary
  * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags,
  *        class cards mapped to cyber_classes columns (id/name/img_url/icon_slug/description/tags)
+ * v2: preset quick-build buttons in BIOMETRIC CALIBRATION (step 4)
  */
 
 ( function () {
@@ -34,6 +35,7 @@
                 setTimeout( function () { beep( 660, 'sine', 0.15, 0.25 ); }, 120 );
             },
             error:  function () { beep( 180, 'sawtooth', 0.18, 0.20 ); },
+            preset: function () { beep( 740, 'sine', 0.12, 0.22 ); },
         };
     } )();
 
@@ -372,6 +374,31 @@
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
+    // ── Apply preset to formState ─────────────────────────────────────────────
+    // presetBtn: the button element with data-body / data-reflex / data-mind / data-spirit
+    function applyAttrPreset( wrapper, presetBtn ) {
+        var keys = ATTR_KEYS;
+        var valid = true;
+        keys.forEach( function ( k ) {
+            var v = parseInt( presetBtn.dataset[ k ], 10 );
+            if ( isNaN( v ) || v < ATTR_MIN || v > ATTR_MAX ) { valid = false; }
+        } );
+        if ( ! valid ) return;
+
+        keys.forEach( function ( k ) {
+            formState[ 'attr_' + k ] = parseInt( presetBtn.dataset[ k ], 10 );
+        } );
+
+        // Highlight active preset button, clear others
+        var allPresets = wrapper.querySelectorAll( '.tw-attr-preset-btn' );
+        for ( var i = 0; i < allPresets.length; i++ ) {
+            allPresets[ i ].classList.toggle( 'active', allPresets[ i ] === presetBtn );
+        }
+
+        renderAttrDisplay( wrapper );
+        NW_SFX.preset();
+    }
+
     // ── Avatar file handler ───────────────────────────────────────────────────
     function handleAvatarFile( wrapper, file ) {
         var allowed = [ 'image/jpeg', 'image/png', 'image/webp' ];
@@ -605,6 +632,14 @@
         // ── Single delegated click handler ────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
+            // ── Preset quick-build button ──────────────────────────────────────
+            var presetBtn = e.target.closest( '.tw-attr-preset-btn' );
+            if ( presetBtn ) {
+                applyAttrPreset( wrapper, presetBtn );
+                clearStepError( steps[ current ] );
+                return;
+            }
+
             // Subrace card
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
@@ -717,6 +752,11 @@
                     } else if ( dir === 'down' && val > ATTR_MIN ) {
                         formState[ stateKey ] = val - 1;
                         NW_SFX.back();
+                    }
+                    // Stepper use de-activates preset highlight
+                    var allPresetBtns = wrapper.querySelectorAll( '.tw-attr-preset-btn' );
+                    for ( var pb = 0; pb < allPresetBtns.length; pb++ ) {
+                        allPresetBtns[ pb ].classList.remove( 'active' );
                     }
                     renderAttrDisplay( wrapper );
                 }
