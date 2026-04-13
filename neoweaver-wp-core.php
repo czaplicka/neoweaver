@@ -122,9 +122,10 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_script( 'nw-vehicle-panel', NEOWEAVER_PLUGIN_URL . 'public/assets/js/vehicle-panel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-services',      NEOWEAVER_PLUGIN_URL . 'public/assets/js/services.js',       [ 'jquery' ], NEOWEAVER_VERSION, true );
 		wp_enqueue_script( 'nw-time-wheel',    NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-time-wheel.js',  [ 'jquery' ], NEOWEAVER_VERSION, true );
-		wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
 	}
 } );
+wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
+wp_enqueue_style( 'nw-character-css',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-character-creator.css', [], NEOWEAVER_VERSION, true );
 add_action( 'wp_enqueue_scripts', function() {
     if ( ! is_checkout() ) return;
 
