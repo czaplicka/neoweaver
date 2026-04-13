@@ -125,7 +125,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	}
 } );
 wp_enqueue_script( 'nw-list-worlds',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js', [ 'jquery' ], NEOWEAVER_VERSION, true );
-wp_enqueue_style( 'nw-character-css',   NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-character-creator.css', [], NEOWEAVER_VERSION, true );
+wp_enqueue_style( 'nw-character-css',   NEOWEAVER_PLUGIN_URL . 'assets/js/tw-character-creator.css', [], NEOWEAVER_VERSION, true );
 add_action( 'wp_enqueue_scripts', function() {
     if ( ! is_checkout() ) return;
 
