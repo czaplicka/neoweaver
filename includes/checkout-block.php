@@ -2,8 +2,8 @@
 function neoweaver_get_player_characters( $wp_user_id ) {
     if ( ! $wp_user_id ) return [];
 
-    $supa_url = defined('NEOWEAVER_SUPA_URL') ? NEOWEAVER_SUPA_URL : '';
-    $supa_key = defined('NEOWEAVER_SUPA_ANON_KEY') ? NEOWEAVER_SUPA_ANON_KEY : '';
+    $supa_url = tw_supabase_url();
+    $supa_key = tw_supabase_service_key(); // service key bo czytamy dane usera po stronie serwera
 
     if ( ! $supa_url || ! $supa_key ) return [];
 
@@ -18,6 +18,7 @@ function neoweaver_get_player_characters( $wp_user_id ) {
     );
 
     if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+        error_log( '[NeoWeaver] get_player_characters error: ' . wp_remote_retrieve_body( $response ) );
         return [];
     }
 
