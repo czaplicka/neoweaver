@@ -294,7 +294,7 @@ final class NeoWeaver_Core {
 
 		wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
 			'characters'   => $characters ?: [],
-			'hasNeoweaver' => $has_neoweaver,
+			'hasNeoweaver' => $has_neoweaver ? '1' : '0',
 			'createUrl'    => home_url( '/new-agent/' ),
 		] );
 	}
