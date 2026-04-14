@@ -270,22 +270,25 @@ public static function enqueue_checkout_assets() {
         return;
     }
 
-    // Standardowy enqueue
-    wp_enqueue_script(
-        'neoweaver-checkout-block',
-        NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
-        [ 
-            'wp-plugins',
-            'wp-element', 
-            'wp-components',
-            'wc-blocks-checkout',
-            'wc-blocks-registry',
-            'wc-blocks-data',
-            'wc-settings',
-        ],
-        NEOWEAVER_VERSION,
-        true
-    );
+wp_enqueue_script(
+    'neoweaver-checkout-block',
+    NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
+    [
+        'wp-plugins',
+        'wp-element',
+        'wp-components',
+        'wc-blocks-checkout',
+        'wc-blocks-registry',
+        'wc-blocks-data-store',      // ← było: wc-blocks-data
+        'wc-settings',
+        'wc-blocks-checkout-events', // ← dodaj
+        'wc-blocks-components',      // ← dodaj
+        'wc-sanitize',               // ← dodaj
+        'wc-types',                  // ← dodaj
+    ],
+    NEOWEAVER_VERSION,
+    true
+);
 
     // Dane PHP → JS
     $characters    = function_exists( 'neoweaver_get_player_characters' )
