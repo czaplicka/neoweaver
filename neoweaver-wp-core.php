@@ -23,11 +23,8 @@ final class NeoWeaver_Core {
 
 		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
-
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
-		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_assets' ], 99 );
-
 		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
 
@@ -270,27 +267,7 @@ public static function enqueue_checkout_assets() {
         return;
     }
 
-wp_enqueue_script(
-    'neoweaver-checkout-block',
-    NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
-    [
-        'wp-plugins',
-        'wp-element',
-        'wp-components',
-        'wc-blocks-checkout',
-        'wc-blocks-registry',
-        'wc-blocks-data-store',      // ← było: wc-blocks-data
-        'wc-settings',
-        'wc-blocks-checkout-events', // ← dodaj
-        'wc-blocks-components',      // ← dodaj
-        'wc-sanitize',               // ← dodaj
-        'wc-types',                  // ← dodaj
-    ],
-    NEOWEAVER_VERSION,
-    true
-);
-
-    // Dane PHP → JS
+	// Dane PHP → JS
     $characters    = function_exists( 'neoweaver_get_player_characters' )
         ? neoweaver_get_player_characters( get_current_user_id() )
         : [];
