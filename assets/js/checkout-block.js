@@ -53,10 +53,8 @@ console.log('[NeoWeaver] checkout-block.js loaded', window.wc);
             } )
         );
     };
-
     registerPlugin( 'neoweaver-agent-select', {
         render: NeoWeaverAgentSelect,
         scope:  'woocommerce-checkout',
     } );
-
 } )();
