@@ -32,14 +32,8 @@ $game_data = function_exists('get_user_game_data_from_supabase')
         'char_tags'           => array(),
     );
 
-// FIX #8: Generate nonce here so it's available for JS and server-side verification.
 $adventure_nonce = wp_create_nonce( 'tw_adventure_nonce' );
 
-// BUG-FIX: active_session_id, active_campaign_id, active_character_id, and
-// active_world_id are UUID strings in Supabase. Casting them with (int) collapses
-// every UUID to 0, breaking all JS-side Supabase queries that filter on these IDs.
-// Use json_encode() to emit them as JS strings; active_location_id is a true
-// integer FK and keeps its (int) cast.
 echo "<script>
 window.twAdventureData = window.twAdventureData || {};
 window.twAdventureData.active_session_id   = ".json_encode( (string) ( $game_data['active_session_id']   ?? '' ) ).";
