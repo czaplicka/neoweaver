@@ -265,18 +265,26 @@ final class NeoWeaver_Core {
 		] );
 	}
 
-	public static function enqueue_checkout_assets() {
-		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
-			return;
-		}
+public static function enqueue_checkout_assets() {
+    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+        return;
+    }
 
-		wp_enqueue_script(
-			'neoweaver-checkout-block',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
-			[ 'wp-plugins', 'wp-element', 'wp-components', 'wc-blocks-checkout' ],
-			NEOWEAVER_VERSION,
-			true
-		);
+    wp_enqueue_script(
+        'neoweaver-checkout-block',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
+        [ 
+            'wp-plugins',
+            'wp-element',
+            'wp-components',
+            'wc-blocks-checkout',
+            'wc-blocks-registry',  // ← dodaj
+            'wc-blocks-data',      // ← dodaj
+            'wc-settings',         // ← dodaj
+        ],
+        NEOWEAVER_VERSION,
+        true
+    );
 
 		$characters    = function_exists( 'neoweaver_get_player_characters' ) ? neoweaver_get_player_characters( get_current_user_id() ) : [];
 		$has_neoweaver = false;
