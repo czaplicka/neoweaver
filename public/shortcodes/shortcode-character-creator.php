@@ -10,14 +10,16 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 	function neoweaver_shortcode_character_creator(): string {
 		if ( ! is_user_logged_in() ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
-
+add_filter('body_class', function($classes) {
+    $classes[] = 'neoweaver-screen';
+    return $classes;
+});
 		// Enqueue tw-node-spinner.css so #tw-char-spinner gets the shared ring/animation rules.
 		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
 		if ( file_exists( $spinner_css ) ) {
