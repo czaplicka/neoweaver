@@ -311,27 +311,6 @@ public static function enqueue_checkout_assets() {
     ] );
 }
 
-		$characters    = function_exists( 'neoweaver_get_player_characters' ) ? neoweaver_get_player_characters( get_current_user_id() ) : [];
-		$has_neoweaver = false;
-
-		if ( function_exists( 'WC' ) && WC() && WC()->cart ) {
-			foreach ( WC()->cart->get_cart() as $cart_item ) {
-				if ( ! empty( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_attribute' ) ) {
-					if ( $cart_item['data']->get_attribute( 'neoweaver_item_id' ) ) {
-						$has_neoweaver = true;
-						break;
-					}
-				}
-			}
-		}
-
-		wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
-			'characters'   => $characters ?: [],
-			'hasNeoweaver' => $has_neoweaver ? '1' : '0',
-			'createUrl'    => home_url( '/new-agent/' ),
-		] );
-	}
-
 	public static function print_supabase_bootstrap() {
 		if ( ! is_user_logged_in() || ! is_page_template( 'templates/adventure.php' ) ) {
 			return;
