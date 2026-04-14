@@ -34,9 +34,16 @@ function nw_supabase_base(): string {
 
 // ===========================================================================
 // WORLD / NODE ENDPOINT
+// BUG-FIX: Removed PHP 8.0 union return type (WP_REST_Response|WP_Error) —
+// fatal parse error on PHP 7.x. Plain @return annotation used instead.
+// BUG-FIX: INSERT headers used tw_supabase_service_key() which does not exist
+// in this codebase. Replaced with tw_supabase_anon_key() via nw_supabase_headers().
 // ===========================================================================
 
-function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+/**
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_create_world( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_WORLD: START (REST API)' );
 
 	// Nonce
@@ -77,13 +84,10 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 	}
 
 	// INSERT cyber_worlds
+	// BUG-FIX: was using tw_supabase_service_key() which does not exist.
+	// Use nw_supabase_headers( true ) which calls tw_supabase_anon_key().
 	$insert = wp_remote_post( $base . 'cyber_worlds', [
-		'headers' => [
-    'apikey'        => tw_supabase_service_key(),
-    'Authorization' => 'Bearer ' . tw_supabase_service_key(),
-    'Content-Type'  => 'application/json',
-    'Prefer'        => 'return=representation',
-],
+		'headers' => nw_supabase_headers( true ),
 		'body'    => wp_json_encode( $payload ),
 		'timeout' => 15,
 	] );
@@ -141,7 +145,12 @@ function neoweaver_create_world( WP_REST_Request $request ): WP_REST_Response|WP
 	] );
 }
 
-function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+/**
+ * @return WP_REST_Response|WP_Error
+ *
+ * BUG-FIX: Removed PHP 8.0 union return type — fatal on PHP 7.x.
+ */
+function neoweaver_create_character( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_CHARACTER: START (REST API)' );
 
 	// Nonce
@@ -173,7 +182,6 @@ function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Respons
 		return new WP_Error( 'missing_race_class', 'Race and class are required.', [ 'status' => 400 ] );
 	}
 
-	// BUG-FIX 14: use distinct variable names for attributes
 	$attr_body   = max( 1, min( 5, (int) ( $request->get_param( 'attr_body' )   ?? 3 ) ) );
 	$attr_reflex = max( 1, min( 5, (int) ( $request->get_param( 'attr_reflex' ) ?? 3 ) ) );
 	$attr_mind   = max( 1, min( 5, (int) ( $request->get_param( 'attr_mind' )   ?? 3 ) ) );
@@ -239,10 +247,13 @@ function neoweaver_create_character( WP_REST_Request $request ): WP_REST_Respons
 
 // ===========================================================================
 // CAMPAIGN / DEPLOYMENT ENDPOINT
-// BUG-FIX 9: Added nonce verification (was absent).
+// BUG-FIX: Removed PHP 8.0 union return type — fatal on PHP 7.x.
 // ===========================================================================
 
-function neoweaver_create_campaign( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+/**
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_create_campaign( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_CAMPAIGN: START (REST API)' );
 
 	$nonce = $request->get_param( 'nonce' ) ?? '';
@@ -296,9 +307,13 @@ function neoweaver_create_campaign( WP_REST_Request $request ): WP_REST_Response
 
 // ===========================================================================
 // SESSION START ENDPOINT
+// BUG-FIX: Removed PHP 8.0 union return type — fatal on PHP 7.x.
 // ===========================================================================
 
-function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+/**
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_start_game_session( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_START_GAME_SESSION: START (REST API)' );
 
 	$nonce = $request->get_param( 'security' ) ?? '';
@@ -435,9 +450,13 @@ function neoweaver_start_game_session( WP_REST_Request $request ): WP_REST_Respo
 
 // ===========================================================================
 // SESSION END ENDPOINT
+// BUG-FIX: Removed PHP 8.0 union return type — fatal on PHP 7.x.
 // ===========================================================================
 
-function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+/**
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_end_game_session( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_END_GAME_SESSION: START (REST API)' );
 
 	$user_id = get_current_user_id();
@@ -494,7 +513,6 @@ function neoweaver_end_game_session( WP_REST_Request $request ): WP_REST_Respons
 
 // ===========================================================================
 // ROUTE REGISTRATION
-// BUG-FIX 6: All registrations moved into a single add_action('rest_api_init').
 // ===========================================================================
 
 add_action( 'rest_api_init', function () {

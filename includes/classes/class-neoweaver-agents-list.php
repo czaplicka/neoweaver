@@ -46,27 +46,23 @@ class Neoweaver_Agents_List {
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
 		// Shared styles — output in both empty and populated states.
-		// Empty-state CSS intentionally mirrors .tw-no-worlds from tw_list_worlds.
 		ob_start();
 		?>
 		<style>
 			:root { --neon: #adff00; --dark: #0a0a0a; --gray: #151515; }
 
-			/* ── Empty state — pixel-match of .tw-no-worlds ── */
+			/* ── Empty state ── */
 			.tw-agents-empty {
 				text-align: center;
 				padding: 100px 0;
-				/* no border: tw-no-worlds has none either */
 				font-family: 'Chakra Petch', sans-serif;
 			}
-			/* ⚠️ emoji icon — same as .tw-alert-icon */
 			.tw-agents-empty-icon {
 				font-size: 40px;
 				margin-bottom: 20px;
 				opacity: 0.3;
 				line-height: 1;
 			}
-			/* "NO REALITIES…" equivalent */
 			.tw-agents-empty-main {
 				font-size: 1rem;
 				color: #adff00;
@@ -75,14 +71,12 @@ class Neoweaver_Agents_List {
 				text-transform: uppercase;
 				letter-spacing: 0.05em;
 			}
-			/* subtitle — matches the <small> in tw-no-worlds */
 			.tw-agents-empty-sub {
 				display: block;
 				font-size: 0.85rem;
 				color: #fff;
 				margin: 0 0 28px;
 			}
-			/* CTA button — neon green bg, BLACK text (never green-on-green) */
 			.tw-agents-empty-actions { display: flex; justify-content: center; }
 			.tw-agents-empty-actions .tw-btn-sync {
 				display: inline-block;
@@ -171,9 +165,7 @@ class Neoweaver_Agents_List {
 				$world_name = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
 				$is_public  = ! empty( $char['is_public'] );
 				$views      = isset( $char['view_count'] ) ? (int) $char['view_count'] : 0;
-				// BUG-FIX: $char['id'] is a UUID string — (int) cast collapses it to 0,
-				// producing a broken /legend/?char_id=0 URL for every character.
-				// Use the UUID string directly; esc_attr / urlencode handle output safety.
+				// char['id'] is a UUID string — never cast to int.
 				$char_id_safe = esc_attr( (string) $char['id'] );
 				$legend_url = add_query_arg( 'char_id', $char_id_safe, home_url( '/legend/' ) );
 			?>
@@ -200,9 +192,6 @@ class Neoweaver_Agents_List {
 							</div>
 							<div style="margin-top:8px; font-size:11px; color:#aaa;">
 								<label class="tw-toggle-label">
-									<?php // BUG-FIX: data-char-id was (int) $char['id'] — UUID → 0,
-									// so the toggle-public AJAX sent char_id=0 for every character.
-									// Emit as string with esc_attr. ?>
 									<input type="checkbox" class="tw-toggle-public" data-char-id="<?php echo $char_id_safe; ?>" <?php checked( $is_public ); ?>>
 									<span>Public on /legend</span>
 								</label>
@@ -213,9 +202,6 @@ class Neoweaver_Agents_List {
 						<button class="tw-btn" data-char="<?php echo esc_attr( wp_json_encode( $char ) ); ?>" onclick="twOpenModal(this)">
 							Agent Dossier
 						</button>
-						<?php // BUG-FIX: inline (int) $char['id'] collapsed UUID → 0, so every
-						// delete button called twConfirmDeleteCharacter(0, this).
-						// Pass as a JSON-encoded string so the UUID reaches JS intact. ?>
 						<button class="tw-btn tw-btn-danger" onclick="twConfirmDeleteCharacter(<?php echo wp_json_encode( (string) $char['id'] ); ?>, this)">
 							Delete Operative
 						</button>
@@ -345,8 +331,22 @@ class Neoweaver_Agents_List {
 
 	public function get_roster( int $wp_user_id ): array { return []; }
 	public function get_selectable_agents( int $wp_user_id ): array { return []; }
-	public function get_agents_in_node( int $node_id ): array { return []; }
-	public function get_data_ghosts_for_node( int $node_id, int $wp_user_id ): array { return []; }
+
+	/**
+	 * BUG-FIX: was typed as int — cyber_worlds.id is a UUID string.
+	 * intval() on a UUID collapses it to 0 and would match nothing in Supabase.
+	 *
+	 * @param string|int $node_id
+	 */
+	public function get_agents_in_node( $node_id ): array { return []; }
+
+	/**
+	 * BUG-FIX: was typed as int — same UUID issue as get_agents_in_node().
+	 *
+	 * @param string|int $node_id
+	 */
+	public function get_data_ghosts_for_node( $node_id, int $wp_user_id ): array { return []; }
+
 	public function render_agent_select( int $wp_user_id ): string { return ''; }
 	public function render_active_agent_badge( int $wp_user_id ): string { return ''; }
 	public function to_api_payload( int $wp_user_id ): array { return []; }
