@@ -33,3 +33,48 @@ add_action( 'woocommerce_blocks_loaded', function() {
         $integration_registry->register( new NeoWeaver_Checkout_Block_Integration() );
     } );
 } );
+add_shortcode( 'neoweaver_agent_select', 'neoweaver_agent_select_shortcode' );
+
+function neoweaver_agent_select_shortcode() {
+    // Pokaż tylko jeśli w koszyku jest produkt NeoWeaver
+    $has_neoweaver = false;
+    if ( function_exists( 'WC' ) && WC()->cart ) {
+        foreach ( WC()->cart->get_cart() as $cart_item ) {
+            $product = $cart_item['data'] ?? null;
+            if ( $product && get_post_meta( $product->get_id(), '_neoweaver_item_id', true ) ) {
+                $has_neoweaver = true;
+                break;
+            }
+        }
+    }
+
+    if ( ! $has_neoweaver ) return '';
+
+    // Pobierz postacie gracza
+    $characters = function_exists( 'neoweaver_get_player_characters' )
+        ? neoweaver_get_player_characters( get_current_user_id() )
+        : [];
+
+    ob_start();
+
+    if ( empty( $characters ) ) {
+        $create_url = home_url( '/new-agent/' );
+        echo '<div class="neoweaver-agent-select woocommerce-info" style="margin:16px 0;">';
+        echo '⚠️ You have no active Field Agents. ';
+        echo '<a href="' . esc_url( $create_url ) . '">Create a character</a> before purchasing.';
+        echo '</div>';
+    } else {
+        echo '<div class="neoweaver-agent-select" style="margin:16px 0;">';
+        echo '<label for="neoweaver_character_id" style="display:block;font-weight:600;margin-bottom:6px;">';
+        echo '⚔️ Which Field Agent receives this item?</label>';
+        echo '<select name="neoweaver_character_id" id="neoweaver_character_id" class="woocommerce-select" required>';
+        echo '<option value="">— Choose your Field Agent —</option>';
+        foreach ( $characters as $char ) {
+            echo '<option value="' . esc_attr( $char['id'] ) . '">' . esc_html( $char['name'] ) . '</option>';
+        }
+        echo '</select>';
+        echo '</div>';
+    }
+
+    return ob_get_clean();
+}
