@@ -26,7 +26,7 @@ final class NeoWeaver_Core {
 
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
-		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_assets' ], 20 );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_assets' ], 99 );
 
 		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
@@ -270,21 +270,46 @@ public static function enqueue_checkout_assets() {
         return;
     }
 
+    // Standardowy enqueue
     wp_enqueue_script(
         'neoweaver-checkout-block',
         NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
         [ 
             'wp-plugins',
-            'wp-element',
+            'wp-element', 
             'wp-components',
             'wc-blocks-checkout',
-            'wc-blocks-registry',  // ← dodaj
-            'wc-blocks-data',      // ← dodaj
-            'wc-settings',         // ← dodaj
+            'wc-blocks-registry',
+            'wc-blocks-data',
+            'wc-settings',
         ],
         NEOWEAVER_VERSION,
         true
     );
+
+    // Dane PHP → JS
+    $characters    = function_exists( 'neoweaver_get_player_characters' )
+        ? neoweaver_get_player_characters( get_current_user_id() )
+        : [];
+    $has_neoweaver = false;
+
+    if ( function_exists( 'WC' ) && WC()->cart ) {
+        foreach ( WC()->cart->get_cart() as $cart_item ) {
+            if ( ! empty( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_attribute' ) ) {
+                if ( $cart_item['data']->get_attribute( 'neoweaver_item_id' ) ) {
+                    $has_neoweaver = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
+        'characters'   => $characters ?: [],
+        'hasNeoweaver' => $has_neoweaver ? '1' : '0',
+        'createUrl'    => home_url( '/new-agent/' ),
+    ] );
+}
 
 		$characters    = function_exists( 'neoweaver_get_player_characters' ) ? neoweaver_get_player_characters( get_current_user_id() ) : [];
 		$has_neoweaver = false;
