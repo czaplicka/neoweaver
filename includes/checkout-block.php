@@ -78,3 +78,36 @@ function neoweaver_agent_select_shortcode() {
 
     return ob_get_clean();
 }
+// Walidacja
+add_action( 'woocommerce_checkout_process', function() {
+    if ( ! neoweaver_cart_has_item() ) return;
+
+    if ( empty( $_POST['neoweaver_character_id'] ) ) {
+        wc_add_notice(
+            '⚔️ Please select a Field Agent to receive the NeoWeaver item.',
+            'error'
+        );
+    }
+} );
+
+// Zapis do meta zamówienia
+add_action( 'woocommerce_checkout_create_order', function( $order ) {
+    if ( ! empty( $_POST['neoweaver_character_id'] ) ) {
+        $order->update_meta_data(
+            '_neoweaver_character_id',
+            sanitize_text_field( $_POST['neoweaver_character_id'] )
+        );
+    }
+} );
+
+// Helper
+function neoweaver_cart_has_item() {
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) return false;
+    foreach ( WC()->cart->get_cart() as $cart_item ) {
+        $product = $cart_item['data'] ?? null;
+        if ( $product && get_post_meta( $product->get_id(), '_neoweaver_item_id', true ) ) {
+            return true;
+        }
+    }
+    return false;
+}
