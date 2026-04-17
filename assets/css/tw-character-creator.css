@@ -1108,10 +1108,22 @@
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-attr-preset-btn.active,
 #tw-char-creator-wrapper .tw-attr-preset-btn.active {
-    background  : rgba(173,255,0,0.18);
-    border-color: var(--neon-green);
-    box-shadow  : 0 0 14px rgba(173,255,0,0.35), inset 0 0 6px rgba(173,255,0,0.1);
-    color       : #fff;
+    background  : rgba(173,255,0,0.22);
+    border-color: #adff00;
+    border-width: 2px;
+    box-shadow  : 0 0 18px rgba(173,255,0,0.55),
+                  0 0 36px rgba(173,255,0,0.2),
+                  inset 0 0 10px rgba(173,255,0,0.15);
+    color       : #adff00;
+    text-shadow : 0 0 8px rgba(173,255,0,0.9);
+    outline     : 1px solid rgba(173,255,0,0.4);
+    outline-offset: 2px;
+}
+
+.neoweaver-screen #tw-char-creator-wrapper .tw-attr-preset-btn.active .tw-attr-preset-vals,
+#tw-char-creator-wrapper .tw-attr-preset-btn.active .tw-attr-preset-vals {
+    opacity: 1;
+    color  : rgba(173,255,0,0.8);
 }
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-attr-preset-vals,
