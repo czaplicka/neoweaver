@@ -182,7 +182,6 @@ add_filter('body_class', function($classes) {
 						        data-spirit="<?php echo esc_attr( $preset['values'][3] ); ?>"
 						        aria-label="<?php echo esc_attr( $preset['label'] ); ?>: BODY <?php echo esc_attr( $preset['values'][0] ); ?> · REFLEX <?php echo esc_attr( $preset['values'][1] ); ?> · MIND <?php echo esc_attr( $preset['values'][2] ); ?> · SPIRIT <?php echo esc_attr( $preset['values'][3] ); ?>">
 							<?php echo esc_html( $preset['label'] ); ?>
-							<span class="tw-attr-preset-vals"><?php echo esc_html( implode( ' · ', $preset['values'] ) ); ?></span>
 						</button>
 					<?php endforeach; ?>
 				</div>
