@@ -433,7 +433,9 @@
     gap                  : 1.25rem;
 }
 
-/* Base card */
+/* Base card
+   overflow:hidden is kept for image clipping but the selected state
+   uses outline + box-shadow instead of ::after, so nothing is clipped. */
 .tw-grid-card,
 .tw-race-card,
 .tw-class-card {
@@ -444,12 +446,14 @@
     border-radius : 4px;
     cursor        : pointer;
     transition    : border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease,
-                    background 0.25s ease;
-    overflow      : hidden; /* FIX 2: prevents scrollbars */
+                    background 0.25s ease, outline-color 0.18s ease;
+    overflow      : hidden;
     user-select   : none;
     -webkit-user-select: none;
     position      : relative;
     z-index       : 4;
+    outline       : 2px solid transparent;
+    outline-offset: 0;
 }
 
 .tw-grid-card:hover,
@@ -461,32 +465,24 @@
     box-shadow  : 0 6px 24px rgba(0,0,0,0.4);
 }
 
-/* Selected highlight — scoped to #tw-char-creator-wrapper only (no .neoweaver-screen required) */
+/* ── Selected state ───────────────────────────────────────────
+   Uses outline (renders outside the box, not clipped by overflow:hidden)
+   + border-color + background + box-shadow for a strong neon-green glow.
+   outline-offset:-2 pulls it flush with the border so it looks like
+   a double-border rather than a separate ring.
+──────────────────────────────────────────────────────────────── */
 #tw-char-creator-wrapper .tw-grid-card.selected,
 #tw-char-creator-wrapper .tw-race-card.selected,
 #tw-char-creator-wrapper .tw-subrace-card.selected,
 #tw-char-creator-wrapper .tw-class-card.selected,
 #tw-char-creator-wrapper .tw-node-card.selected {
-    border-color: #adff00 !important;
-    background  : rgba(173,255,0,0.09) !important;
-    box-shadow  : 0 0 28px rgba(173,255,0,0.18) inset,
-                  0 0 14px rgba(173,255,0,0.22) !important;
-    outline     : none;
-    transform   : translateY(-2px);
-}
-
-/* Glowing inner border when selected */
-#tw-char-creator-wrapper .tw-grid-card.selected::after,
-#tw-char-creator-wrapper .tw-race-card.selected::after,
-#tw-char-creator-wrapper .tw-subrace-card.selected::after,
-#tw-char-creator-wrapper .tw-class-card.selected::after,
-#tw-char-creator-wrapper .tw-node-card.selected::after {
-    content       : '';
-    position      : absolute;
-    inset         : 0;
-    border        : 2px solid #adff00;
-    pointer-events: none;
-    z-index       : 10;
+    border-color  : #adff00 !important;
+    background    : rgba(173,255,0,0.12) !important;
+    outline       : 2px solid #adff00 !important;
+    outline-offset: -2px !important;
+    box-shadow    : 0 0 18px rgba(173,255,0,0.45),
+                    inset 0 0 24px rgba(173,255,0,0.08) !important;
+    transform     : translateY(-2px);
 }
 
 /* ── Card image area ──────────────────────────────────────── */
@@ -518,7 +514,9 @@
 .tw-grid-card:hover .tw-race-img img,
 .tw-grid-card.selected .tw-race-img img,
 .tw-race-card:hover .tw-race-img img,
-.tw-race-card.selected .tw-race-img img {
+.tw-race-card.selected .tw-race-img img,
+.tw-class-card:hover .tw-class-card__img-wrap img,
+.tw-class-card.selected .tw-class-card__img-wrap img {
     opacity: 1;
     filter : drop-shadow(0 0 12px rgba(173,255,0,0.7)) brightness(1.15);
 }
@@ -545,7 +543,9 @@
 }
 
 .tw-grid-card:hover .tw-race-img--placeholder .tw-race-card__icon,
-.tw-grid-card.selected .tw-race-img--placeholder .tw-race-card__icon {
+.tw-grid-card.selected .tw-race-img--placeholder .tw-race-card__icon,
+.tw-class-card:hover .tw-class-card__img-wrap--placeholder span,
+.tw-class-card.selected .tw-class-card__img-wrap--placeholder span {
     opacity: 0.8;
     filter : drop-shadow(0 0 10px rgba(173,255,0,0.6));
 }
@@ -574,15 +574,16 @@
     white-space   : nowrap;
     overflow      : hidden;
     text-overflow : ellipsis;
+    transition    : color 0.18s, text-shadow 0.18s;
 }
 
-/* Name highlight when card is selected */
+/* Name turns neon-green when card is selected */
 #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-name,
 #tw-char-creator-wrapper .tw-race-card.selected .tw-race-name,
 #tw-char-creator-wrapper .tw-subrace-card.selected .tw-race-name,
 #tw-char-creator-wrapper .tw-class-card.selected .tw-class-card__name {
     color      : #adff00 !important;
-    text-shadow: 0 0 8px #adff00 !important;
+    text-shadow: 0 0 8px rgba(173,255,0,0.7) !important;
 }
 
 /* Hidden: desc, bonus and select-hint (design shows image + name + tags only) */
@@ -599,14 +600,17 @@
     text-transform: uppercase;
     margin-top    : auto;
     padding-top   : 4px;
+    transition    : color 0.18s;
 }
 .tw-grid-card:hover .tw-race-select-hint,
-.tw-race-card:hover .tw-race-select-hint {
+.tw-race-card:hover .tw-race-select-hint,
+.tw-class-card:hover .tw-race-select-hint {
     color: rgba(173,255,0,0.8);
 }
 #tw-char-creator-wrapper .tw-grid-card.selected .tw-race-select-hint,
-#tw-char-creator-wrapper .tw-race-card.selected .tw-race-select-hint {
-    color: rgba(173,255,0,0.9);
+#tw-char-creator-wrapper .tw-race-card.selected .tw-race-select-hint,
+#tw-char-creator-wrapper .tw-class-card.selected .tw-race-select-hint {
+    color: #adff00;
 }
 
 /* Subrace: cyan accent for hint */
@@ -754,7 +758,7 @@
     border-radius  : 4px;
     cursor         : pointer;
     transition     : border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease,
-                     background 0.25s ease;
+                     background 0.25s ease, outline-color 0.18s ease;
     overflow       : hidden;
     user-select    : none;
     -webkit-user-select: none;
@@ -762,16 +766,8 @@
     z-index        : 4;
     padding        : 20px 18px;
     min-height     : 100px;
-}
-.neoweaver-screen #tw-char-creator-wrapper .tw-node-card::after,
-#tw-char-creator-wrapper .tw-node-card::after {
-    content       : '';
-    position      : absolute;
-    inset         : 0;
-    border        : 2px solid transparent;
-    pointer-events: none;
-    z-index       : 10;
-    transition    : border-color 0.18s;
+    outline        : 2px solid transparent;
+    outline-offset : 0;
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-node-card:hover,
 #tw-char-creator-wrapper .tw-node-card:hover {
@@ -788,6 +784,11 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin        : 0 0 6px;
+    transition    : color 0.18s;
+}
+#tw-char-creator-wrapper .tw-node-card.selected .tw-node-card__name {
+    color      : #adff00;
+    text-shadow: 0 0 8px rgba(173,255,0,0.7);
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-node-card__desc,
 #tw-char-creator-wrapper .tw-node-card__desc {
@@ -814,15 +815,8 @@
     min-height     : 140px;
     justify-content: center;
     position       : relative;
-}
-.neoweaver-screen #tw-char-creator-wrapper .tw-dyn-card::after,
-#tw-char-creator-wrapper .tw-dyn-card::after {
-    content       : '';
-    position      : absolute;
-    inset         : 0;
-    border        : 2px solid transparent;
-    transition    : border-color 0.25s;
-    pointer-events: none;
+    outline        : 2px solid transparent;
+    outline-offset : 0;
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-dyn-card:hover,
 #tw-char-creator-wrapper .tw-dyn-card:hover {
@@ -832,13 +826,11 @@
 }
 .neoweaver-screen #tw-char-creator-wrapper .tw-dyn-card.selected,
 #tw-char-creator-wrapper .tw-dyn-card.selected {
-    border-color: var(--neon-green);
-    background  : rgba(173,255,0,0.09);
-    box-shadow  : 0 0 28px rgba(173,255,0,0.18) inset, 0 0 14px rgba(173,255,0,0.22);
-}
-.neoweaver-screen #tw-char-creator-wrapper .tw-dyn-card.selected::after,
-#tw-char-creator-wrapper .tw-dyn-card.selected::after {
-    border-color: var(--neon-green);
+    border-color  : #adff00;
+    background    : rgba(173,255,0,0.12);
+    outline       : 2px solid #adff00;
+    outline-offset: -2px;
+    box-shadow    : 0 0 18px rgba(173,255,0,0.45), inset 0 0 24px rgba(173,255,0,0.08);
 }
 
 .neoweaver-screen #tw-char-creator-wrapper .tw-dyn-icon,
