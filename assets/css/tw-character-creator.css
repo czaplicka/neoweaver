@@ -21,6 +21,13 @@
     --cyan        : #00e5ff;
     --red-err     : #ff4444;
 }
+#tw-char-creator-wrapper .tw-attr-btn:disabled,
+.tw-attr-btn:disabled {
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.15);
+    cursor: not-allowed;
+    box-shadow: none;
+}
 
 /* ── 2. WRAPPER ───────────────────────────────────────────── */
 
