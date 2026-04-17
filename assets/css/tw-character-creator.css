@@ -477,12 +477,37 @@
 #tw-char-creator-wrapper .tw-class-card.selected,
 #tw-char-creator-wrapper .tw-node-card.selected {
     border-color  : #adff00 !important;
-    background    : rgba(173,255,0,0.12) !important;
+    background    : rgba(173,255,0,0.15) !important;
     outline       : 2px solid #adff00 !important;
     outline-offset: -2px !important;
-    box-shadow    : 0 0 18px rgba(173,255,0,0.45),
-                    inset 0 0 24px rgba(173,255,0,0.08) !important;
+    box-shadow    : 0 0 24px rgba(173,255,0,0.6),
+                    inset 0 0 30px rgba(173,255,0,0.12) !important;
     transform     : translateY(-2px);
+}
+
+/* Zielony znacznik ✓ w prawym górnym rogu wybranej karty */
+#tw-char-creator-wrapper .tw-grid-card.selected::after,
+#tw-char-creator-wrapper .tw-race-card.selected::after,
+#tw-char-creator-wrapper .tw-subrace-card.selected::after,
+#tw-char-creator-wrapper .tw-class-card.selected::after,
+#tw-char-creator-wrapper .tw-node-card.selected::after {
+    content    : '✓';
+    position   : absolute;
+    top        : 6px;
+    right      : 8px;
+    font-size  : 0.75rem;
+    font-weight: 700;
+    color      : #000;
+    background : #adff00;
+    width      : 18px;
+    height     : 18px;
+    border-radius: 50%;
+    display    : flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index    : 10;
+    box-shadow : 0 0 8px rgba(173,255,0,0.8);
 }
 
 /* ── Card image area ──────────────────────────────────────── */
