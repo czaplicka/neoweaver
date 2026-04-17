@@ -4,6 +4,10 @@
  * FIXES: subrace images, race scrollbars, race selection highlight, subrace tags,
  *        class cards mapped to cyber_classes columns (id/name/img_url/icon_slug/description/tags)
  * v2: preset quick-build buttons in BIOMETRIC CALIBRATION (step 4)
+ * v3: FIX — usunięto zduplikowaną wewnętrzną definicję showStep; dodano restoreSelections()
+ *           wywoływane przy każdej zmianie kroku (podświetlenie kart race/subrace/class/node)
+ *           class card: dodano aria-pressed + class_label do formState
+ *           node card: dodano aria-pressed
  */
 
 ( function () {
@@ -154,7 +158,6 @@
     }
 
     // ── Tag renderer ──────────────────────────────────────────────────────────
-    // tags may be an array of strings or objects {name, slug, ...}
     function buildTagsHtml( tags ) {
         if ( ! tags || ! tags.length ) return '';
         var items = tags.slice( 0, 4 ).map( function ( t ) {
@@ -183,8 +186,6 @@
             '</div></div>';
     }
 
-    // FIX 1: subrace card teraz obsługuje img z API (sub.img || sub.image || sub.thumbnail)
-    // FIX 4: subrace card teraz renderuje tagi identycznie jak karta rasy
     function buildSubraceCard( sub ) {
         var imgSrc  = sub.img || sub.image || sub.thumbnail || '';
         var imgHtml = imgSrc
@@ -201,12 +202,12 @@
             '</div></div>';
     }
 
-    // ── Race grid: fetch from AJAX, fallback to hardcoded ─────────────────────────
+    // ── Race grid: fetch from AJAX, fallback to hardcoded ────────────────────
     function fetchRaceGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-race-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
 
-        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE…</p>';
+        grid.innerHTML = '<p class="tw-loading">// SCANNING RACE DATABASE\u2026</p>';
 
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_races' );
@@ -215,13 +216,10 @@
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
-                if ( res.success && res.data && res.data.length ) {
-                    grid.innerHTML = res.data.map( buildRaceCard ).join( '' );
-                    grid.dataset.rendered = '1';
-                } else {
-                    grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
-                    grid.dataset.rendered = '1';
-                }
+                grid.innerHTML = ( res.success && res.data && res.data.length )
+                    ? res.data.map( buildRaceCard ).join( '' )
+                    : RACES_FALLBACK.map( buildRaceCard ).join( '' );
+                grid.dataset.rendered = '1';
             } )
             .catch( function () {
                 grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
@@ -229,14 +227,14 @@
             } );
     }
 
-    // ── Subrace grid: fetch from AJAX ───────────────────────────────────────────
+    // ── Subrace grid: fetch from AJAX ─────────────────────────────────────────
     function fetchSubraces( wrapper, raceKey ) {
         var section = wrapper.querySelector( '#tw-subrace-section' );
         var grid    = wrapper.querySelector( '#tw-subrace-grid' );
         if ( ! section || ! grid ) return;
 
         section.style.display = '';
-        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA…</p>';
+        grid.innerHTML = '<p class="tw-loading">// SCANNING SUBRACE DATA\u2026</p>';
 
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_subraces' );
@@ -247,24 +245,20 @@
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
-                    // FIX 1 + FIX 4: buildSubraceCard obsługuje teraz img i tags z API
                     grid.innerHTML = res.data.map( buildSubraceCard ).join( '' );
                 } else {
                     section.style.display = 'none';
                 }
             } )
-            .catch( function () {
-                section.style.display = 'none';
-            } );
+            .catch( function () { section.style.display = 'none'; } );
     }
 
-    // ── Class grid (AJAX) — mapped to cyber_classes columns ──────────────────
-    // cyber_classes: id, name, description, tags (jsonb), img_url, icon_slug
+    // ── Class grid (AJAX) ─────────────────────────────────────────────────────
     function fetchClassGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-class-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
 
-        grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>// SCANNING CLASS MATRIX…</div>';
+        grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>// SCANNING CLASS MATRIX\u2026</div>';
 
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_classes' );
@@ -275,26 +269,21 @@
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( function ( cls ) {
-                        // cyber_classes columns: id, name, img_url, icon_slug, description, tags
-                        var imgSrc  = cls.img_url || '';
-                        var icon    = cls.icon_slug || '&#128100;';
-                        var name    = cls.name || '';
-                        var desc    = cls.description || '';
-                        var tags    = cls.tags || [];
-                        var id      = cls.id || '';
-
-                        var imgHtml = imgSrc
+                        var imgSrc   = cls.img_url || '';
+                        var icon     = cls.icon_slug || '&#128100;';
+                        var name     = cls.name || '';
+                        var desc     = cls.description || '';
+                        var tags     = cls.tags || [];
+                        var id       = cls.id || '';
+                        var imgHtml  = imgSrc
                             ? '<div class="tw-class-card__img-wrap"><img src="' + esc( imgSrc ) + '" alt="' + esc( name ) + '" width="220" height="220" loading="lazy"/></div>'
                             : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + icon + '</span></div>';
-
-                        var tagsHtml = buildTagsHtml( tags );
-
-                        return '<div class="tw-class-card" data-char-class="' + esc( id ) + '" data-label="' + esc( name ) + '" role="button" tabindex="0">' +
+                        return '<div class="tw-class-card" data-char-class="' + esc( id ) + '" data-label="' + esc( name ) + '" role="button" tabindex="0" aria-pressed="false">' +
                             imgHtml +
                             '<div class="tw-class-card__body">' +
                                 '<h4 class="tw-class-card__name">' + esc( name ) + '</h4>' +
                                 ( desc ? '<p class="tw-class-card__desc">' + esc( desc ) + '</p>' : '' ) +
-                                tagsHtml +
+                                buildTagsHtml( tags ) +
                                 '<span class="tw-race-select-hint">[ select ]</span>' +
                             '</div>' +
                         '</div>';
@@ -313,15 +302,17 @@
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
         if ( ! grid || grid.dataset.rendered ) return;
+
         var fd = new FormData();
         fd.append( 'action', 'neoweaver_get_nodes' );
         fd.append( 'nonce',  nonce() );
+
         fetch( ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } )
             .then( function ( res ) {
                 if ( res.success && res.data && res.data.length ) {
                     grid.innerHTML = res.data.map( function ( node ) {
-                        return '<div class="tw-node-card" data-node-id="' + esc( node.id ) + '" data-label="' + esc( node.label ) + '" role="button" tabindex="0">' +
+                        return '<div class="tw-node-card" data-node-id="' + esc( node.id ) + '" data-label="' + esc( node.label ) + '" role="button" tabindex="0" aria-pressed="false">' +
                             '<div class="tw-node-card__body"><h4 class="tw-node-card__name">' + esc( node.label ) + '</h4><p class="tw-node-card__desc">' + esc( node.desc || '' ) + '</p></div></div>';
                     } ).join( '' );
                     grid.dataset.rendered = '1';
@@ -348,10 +339,9 @@
         set( 'race',    formState.race_label  || formState.race );
         set( 'class',   formState.class_label || formState[ 'class' ] );
         set( 'node_id', formState.node_label  || formState.node_id );
-        var attrsStr = ATTR_KEYS.map( function ( k ) {
+        set( 'attrs', ATTR_KEYS.map( function ( k ) {
             return k.toUpperCase() + ':' + ( formState[ 'attr_' + k ] || ATTR_MIN );
-        } ).join( ' \u00b7 ' );
-        set( 'attrs', attrsStr );
+        } ).join( ' \u00b7 ' ) );
         var avatarEl = wrapper.querySelector( '#tw-summary-avatar' );
         if ( avatarEl ) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '\u2014';
     }
@@ -374,27 +364,21 @@
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
     }
 
-    // ── Apply preset to formState ─────────────────────────────────────────────
-    // presetBtn: the button element with data-body / data-reflex / data-mind / data-spirit
+    // ── Apply preset ──────────────────────────────────────────────────────────
     function applyAttrPreset( wrapper, presetBtn ) {
-        var keys = ATTR_KEYS;
         var valid = true;
-        keys.forEach( function ( k ) {
+        ATTR_KEYS.forEach( function ( k ) {
             var v = parseInt( presetBtn.dataset[ k ], 10 );
             if ( isNaN( v ) || v < ATTR_MIN || v > ATTR_MAX ) { valid = false; }
         } );
         if ( ! valid ) return;
-
-        keys.forEach( function ( k ) {
+        ATTR_KEYS.forEach( function ( k ) {
             formState[ 'attr_' + k ] = parseInt( presetBtn.dataset[ k ], 10 );
         } );
-
-        // Highlight active preset button, clear others
         var allPresets = wrapper.querySelectorAll( '.tw-attr-preset-btn' );
         for ( var i = 0; i < allPresets.length; i++ ) {
             allPresets[ i ].classList.toggle( 'active', allPresets[ i ] === presetBtn );
         }
-
         renderAttrDisplay( wrapper );
         NW_SFX.preset();
     }
@@ -414,8 +398,8 @@
             var imgEl    = wrapper.querySelector( '#tw-avatar-img' );
             var preview  = wrapper.querySelector( '#tw-avatar-preview' );
             var selected = wrapper.querySelector( '#tw-avatar-selected' );
-            if ( imgEl )    imgEl.src            = ev.target.result;
-            if ( preview )  preview.style.display = 'none';
+            if ( imgEl )    imgEl.src             = ev.target.result;
+            if ( preview )  preview.style.display  = 'none';
             if ( selected ) selected.style.display = '';
         };
         reader.readAsDataURL( file );
@@ -482,7 +466,6 @@
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( ! wrapper ) return;
 
-        // GUARD: prevent double-init
         if ( wrapper.dataset.nwInit ) return;
         wrapper.dataset.nwInit = '1';
 
@@ -496,51 +479,48 @@
             'Writing operative data to the NeoWeave grid.'
         );
 
-        // Fetch races from DB immediately
         fetchRaceGrid( wrapper );
         renderAttrDisplay( wrapper );
 
+        // ── FIX: Restore .selected + aria-pressed on cards when returning to a step ──
+        function restoreSelections() {
+            var i, card, isMatch;
+
+            // Race cards
+            var rCards = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
+            for ( i = 0; i < rCards.length; i++ ) {
+                isMatch = formState.race && rCards[ i ].dataset.race === formState.race;
+                rCards[ i ].classList.toggle( 'selected', !! isMatch );
+                rCards[ i ].setAttribute( 'aria-pressed', isMatch ? 'true' : 'false' );
+            }
+
+            // Subrace cards
+            var sCards = wrapper.querySelectorAll( '.tw-subrace-card' );
+            for ( i = 0; i < sCards.length; i++ ) {
+                isMatch = formState.subrace && sCards[ i ].dataset.subrace === formState.subrace;
+                sCards[ i ].classList.toggle( 'selected', !! isMatch );
+                sCards[ i ].setAttribute( 'aria-pressed', isMatch ? 'true' : 'false' );
+            }
+
+            // Class cards
+            var cCards = wrapper.querySelectorAll( '.tw-class-card' );
+            for ( i = 0; i < cCards.length; i++ ) {
+                var cId = cCards[ i ].dataset.charClass || '';
+                isMatch = formState[ 'class' ] && cId === String( formState[ 'class' ] );
+                cCards[ i ].classList.toggle( 'selected', !! isMatch );
+                cCards[ i ].setAttribute( 'aria-pressed', isMatch ? 'true' : 'false' );
+            }
+
+            // Node cards
+            var nCards = wrapper.querySelectorAll( '.tw-node-card' );
+            for ( i = 0; i < nCards.length; i++ ) {
+                isMatch = formState.node_id && nCards[ i ].dataset.nodeId === String( formState.node_id );
+                nCards[ i ].classList.toggle( 'selected', !! isMatch );
+                nCards[ i ].setAttribute( 'aria-pressed', isMatch ? 'true' : 'false' );
+            }
+        }
+
         // ── showStep ──────────────────────────────────────────────────────────
-        // ── Przywróć klasę .selected na kartach po powrocie do kroku ──
-function restoreSelections() {
-    // Race
-    if ( formState.race ) {
-        var rCards = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
-        for ( var i = 0; i < rCards.length; i++ ) {
-            var isSelected = rCards[ i ].dataset.race === formState.race;
-            rCards[ i ].classList.toggle( 'selected', isSelected );
-            rCards[ i ].setAttribute( 'aria-pressed', isSelected ? 'true' : 'false' );
-        }
-    }
-    // Subrace
-    if ( formState.subrace ) {
-        var sCards = wrapper.querySelectorAll( '.tw-subrace-card' );
-        for ( var j = 0; j < sCards.length; j++ ) {
-            var isSel = sCards[ j ].dataset.subrace === formState.subrace;
-            sCards[ j ].classList.toggle( 'selected', isSel );
-            sCards[ j ].setAttribute( 'aria-pressed', isSel ? 'true' : 'false' );
-        }
-    }
-    // Class
-    if ( formState[ 'class' ] ) {
-        var cCards = wrapper.querySelectorAll( '.tw-class-card' );
-        for ( var k = 0; k < cCards.length; k++ ) {
-            var cId = cCards[ k ].dataset.charClass || cCards[ k ].dataset[ 'class' ] || '';
-            var isCsel = cId === String( formState[ 'class' ] );
-            cCards[ k ].classList.toggle( 'selected', isCsel );
-            cCards[ k ].setAttribute( 'aria-pressed', isCsel ? 'true' : 'false' );
-        }
-    }
-    // Node
-    if ( formState.node_id ) {
-        var nCards = wrapper.querySelectorAll( '.tw-node-card' );
-        for ( var m = 0; m < nCards.length; m++ ) {
-            var isNsel = nCards[ m ].dataset.nodeId === String( formState.node_id );
-            nCards[ m ].classList.toggle( 'selected', isNsel );
-            nCards[ m ].setAttribute( 'aria-pressed', isNsel ? 'true' : 'false' );
-        }
-    }
-}
         function showStep( idx ) {
             steps.forEach( function ( s, i ) {
                 s.classList.toggle( 'active', i === idx );
@@ -556,43 +536,17 @@ function restoreSelections() {
             var fillEl  = document.getElementById( 'tw-char-progress-fill' );
             var stepEl  = document.getElementById( 'tw-char-step-current' );
             var phaseEl = document.getElementById( 'tw-char-progress-phase' );
-            if ( fillEl )  fillEl.style.width = Math.round( ( ( idx + 1 ) / steps.length ) * 100 ) + '%';
-            if ( stepEl )  stepEl.textContent  = idx + 1;
-            if ( phaseEl ) phaseEl.textContent = phase;
+            if ( fillEl )  fillEl.style.width  = Math.round( ( ( idx + 1 ) / steps.length ) * 100 ) + '%';
+            if ( stepEl )  stepEl.textContent   = idx + 1;
+            if ( phaseEl ) phaseEl.textContent  = phase;
 
             var ticks = wrapper.querySelectorAll( '.tw-progress-tick' );
             for ( var t = 0; t < ticks.length; t++ ) {
-                var n = parseInt( ticks[ t ].dataset.tick, 10 );
-                ticks[ t ].classList.toggle( 'active', n <= idx + 1 );
+                ticks[ t ].classList.toggle( 'active', parseInt( ticks[ t ].dataset.tick, 10 ) <= idx + 1 );
             }
-            function showStep( idx ) {
-    steps.forEach( function ( s, i ) {
-        s.classList.toggle( 'active', i === idx );
-    } );
-    current = idx;
-    setStatus( '', false );
 
-    var phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
-    if ( phase === 'CLASS MATRIX' )  fetchClassGrid( wrapper );
-    if ( phase === 'NODE BINDING' )  fetchNodeGrid( wrapper );
-    if ( phase === 'SYSTEM REVIEW' ) updateSummary( wrapper );
-
-    var fillEl  = document.getElementById( 'tw-char-progress-fill' );
-    var stepEl  = document.getElementById( 'tw-char-step-current' );
-    var phaseEl = document.getElementById( 'tw-char-progress-phase' );
-    if ( fillEl )  fillEl.style.width = Math.round( ( ( idx + 1 ) / steps.length ) * 100 ) + '%';
-    if ( stepEl )  stepEl.textContent  = idx + 1;
-    if ( phaseEl ) phaseEl.textContent = phase;
-
-    var ticks = wrapper.querySelectorAll( '.tw-progress-tick' );
-    for ( var t = 0; t < ticks.length; t++ ) {
-        var n = parseInt( ticks[ t ].dataset.tick, 10 );
-        ticks[ t ].classList.toggle( 'active', n <= idx + 1 );
-    }
-
-    // ── Przywróć podświetlenie zaznaczonych kart po powrocie ──
-    restoreSelections();
-}
+            // Restore selection highlights after AJAX grids may have re-rendered
+            restoreSelections();
         }
 
         // ── validateStep ──────────────────────────────────────────────────────
@@ -674,7 +628,7 @@ function restoreSelections() {
             return true;
         }
 
-        // ── goNext / goPrev ────────────────────────────────────────────────────────────
+        // ── goNext / goPrev ───────────────────────────────────────────────────
         function goNext() {
             if ( validateStep( current ) ) {
                 clearStepError( steps[ current ] );
@@ -688,7 +642,7 @@ function restoreSelections() {
             if ( current > 0 ) { NW_SFX.back(); showStep( current - 1 ); }
         }
 
-        // ── Direct listener on Step 1 NEXT button (belt-and-suspenders) ───────
+        // ── Direct listener on Step 1 NEXT button ─────────────────────────────
         var step1Next = document.getElementById( 'tw-char-step1-next' );
         if ( step1Next ) {
             step1Next.addEventListener( 'click', function ( e ) {
@@ -700,7 +654,7 @@ function restoreSelections() {
         // ── Single delegated click handler ────────────────────────────────────
         wrapper.addEventListener( 'click', function ( e ) {
 
-            // ── Preset quick-build button ──────────────────────────────────────
+            // Preset quick-build button
             var presetBtn = e.target.closest( '.tw-attr-preset-btn' );
             if ( presetBtn ) {
                 applyAttrPreset( wrapper, presetBtn );
@@ -708,7 +662,7 @@ function restoreSelections() {
                 return;
             }
 
-            // Subrace card
+            // Subrace card (must check before race card)
             var subCard = e.target.closest( '.tw-subrace-card' );
             if ( subCard ) {
                 var allSub = wrapper.querySelectorAll( '.tw-subrace-card' );
@@ -724,7 +678,7 @@ function restoreSelections() {
                 return;
             }
 
-            // FIX 3: base race card — .selected dodawane poniżej; podświetlenie przez CSS .tw-race-card.selected
+            // Race card
             var raceCard = e.target.closest( '.tw-race-card:not(.tw-subrace-card)' );
             if ( raceCard && ! e.target.closest( 'button' ) ) {
                 var allRace = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
@@ -737,13 +691,11 @@ function restoreSelections() {
                 formState.race       = raceCard.dataset.race || '';
                 formState.race_label = ( raceCard.querySelector( '.tw-race-name' ) || {} ).textContent || formState.race;
                 formState.subrace    = '';
-                // Reset previously selected subrace cards
                 var allSubReset = wrapper.querySelectorAll( '.tw-subrace-card' );
                 for ( var sr = 0; sr < allSubReset.length; sr++ ) {
                     allSubReset[ sr ].classList.remove( 'selected' );
                     allSubReset[ sr ].setAttribute( 'aria-pressed', 'false' );
                 }
-                // Fetch subraces from DB
                 fetchSubraces( wrapper, formState.race );
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
@@ -751,16 +703,17 @@ function restoreSelections() {
             }
 
             // Class card
-var classCard = e.target.closest( '.tw-class-card' );
-if ( classCard && ! e.target.closest( 'button' ) ) {
-    var allClass = wrapper.querySelectorAll( '.tw-class-card' );
-    for ( var c = 0; c < allClass.length; c++ ) {
-        allClass[ c ].classList.remove( 'selected' );
-        allClass[ c ].setAttribute( 'aria-pressed', 'false' );
-    }
-    classCard.classList.add( 'selected' );
-    classCard.setAttribute( 'aria-pressed', 'true' );
-    formState[ 'class' ] = classCard.dataset.charClass || classCard.dataset[ 'class' ] || '';
+            var classCard = e.target.closest( '.tw-class-card' );
+            if ( classCard && ! e.target.closest( 'button' ) ) {
+                var allClass = wrapper.querySelectorAll( '.tw-class-card' );
+                for ( var c = 0; c < allClass.length; c++ ) {
+                    allClass[ c ].classList.remove( 'selected' );
+                    allClass[ c ].setAttribute( 'aria-pressed', 'false' );
+                }
+                classCard.classList.add( 'selected' );
+                classCard.setAttribute( 'aria-pressed', 'true' );
+                formState[ 'class' ] = classCard.dataset.charClass || '';
+                formState.class_label = classCard.dataset.label || ( classCard.querySelector( '.tw-class-card__name' ) || {} ).textContent || '';
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
                 return;
@@ -770,8 +723,12 @@ if ( classCard && ! e.target.closest( 'button' ) ) {
             var nodeCard = e.target.closest( '.tw-node-card' );
             if ( nodeCard && ! e.target.closest( 'button' ) ) {
                 var allNode = wrapper.querySelectorAll( '.tw-node-card' );
-                for ( var nd = 0; nd < allNode.length; nd++ ) allNode[ nd ].classList.remove( 'selected' );
+                for ( var nd = 0; nd < allNode.length; nd++ ) {
+                    allNode[ nd ].classList.remove( 'selected' );
+                    allNode[ nd ].setAttribute( 'aria-pressed', 'false' );
+                }
                 nodeCard.classList.add( 'selected' );
+                nodeCard.setAttribute( 'aria-pressed', 'true' );
                 formState.node_id    = nodeCard.dataset.nodeId || '';
                 formState.node_label = nodeCard.dataset.label  || ( ( nodeCard.querySelector( '.tw-node-card__name' ) || {} ).textContent || '' );
                 NW_SFX.select();
@@ -823,7 +780,6 @@ if ( classCard && ! e.target.closest( 'button' ) ) {
                         formState[ stateKey ] = val - 1;
                         NW_SFX.back();
                     }
-                    // Stepper use de-activates preset highlight
                     var allPresetBtns = wrapper.querySelectorAll( '.tw-attr-preset-btn' );
                     for ( var pb = 0; pb < allPresetBtns.length; pb++ ) {
                         allPresetBtns[ pb ].classList.remove( 'active' );
@@ -833,7 +789,7 @@ if ( classCard && ! e.target.closest( 'button' ) ) {
                 return;
             }
 
-            // Navigation
+            // Navigation buttons
             var action = '';
             if      ( btn.classList.contains( 'tw-btn-deploy' ) ) action = 'submit';
             else if ( btn.classList.contains( 'tw-btn-prev' ) )   action = 'prev';
@@ -903,7 +859,7 @@ if ( classCard && ! e.target.closest( 'button' ) ) {
         showStep( 0 );
     }
 
-    // ── Boot ──────────────────────────────────────────────────────────────────────
+    // ── Boot ──────────────────────────────────────────────────────────────────
     function boot() {
         var wrapper = document.getElementById( 'tw-char-creator-wrapper' );
         if ( wrapper ) {
