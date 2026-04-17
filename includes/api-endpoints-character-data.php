@@ -394,6 +394,27 @@ function neoweaver_ajax_get_classes(): void {
 add_action( 'wp_ajax_neoweaver_get_classes',        'neoweaver_ajax_get_classes' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
 
+add_action( 'wp_ajax_neoweaver_get_skills',        'neoweaver_get_skills' );
+add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_get_skills' );
+
+function neoweaver_get_skills() {
+    check_ajax_referer( 'neoweaver_nonce', 'nonce' );
+
+    global $wpdb;
+    $rows = $wpdb->get_results(
+        "SELECT id, name, description, category, tags, img_url
+         FROM cyber_skills
+         WHERE is_active = true
+         ORDER BY category, name",
+        ARRAY_A
+    );
+
+    foreach ( $rows as &$r ) {
+        $r['tags'] = json_decode( $r['tags'] ?? '[]', true );
+    }
+
+    wp_send_json_success( $rows );
+}
 // ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
