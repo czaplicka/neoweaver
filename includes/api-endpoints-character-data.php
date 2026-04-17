@@ -266,19 +266,6 @@ function neoweaver_get_classes_rest( WP_REST_Request $request ): WP_REST_Respons
 }
 
 // ---------------------------------------------------------------------------
-// REST: GET /wp-json/neoweaver/v1/nodes
-// ---------------------------------------------------------------------------
-
-function neoweaver_get_nodes_rest( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$data = nw_fetch_lookup_table( 'cyber_nodes', 'id,name,description,img_url', 'name.asc', 300 );
-	if ( is_wp_error( $data ) ) {
-		return $data;
-	}
-	$data = nw_resolve_img_urls( $data );
-	return rest_ensure_response( $data );
-}
-
-// ---------------------------------------------------------------------------
 // wp_ajax: neoweaver_get_races
 // ---------------------------------------------------------------------------
 
@@ -381,37 +368,33 @@ add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'neoweaver_ajax_get_subrace
 // ---------------------------------------------------------------------------
 
 function neoweaver_ajax_get_classes(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+    check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
 
-	$rows = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description,img_url' );
-	if ( is_wp_error( $rows ) ) {
-		wp_send_json_error( [ 'message' => $rows->get_error_message() ] );
-		return;
-	}
-	$rows = nw_resolve_img_urls( $rows );
-	wp_send_json_success( nw_map_card_shape( $rows ) );
+    $rows = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description,tags,img_url,icon_slug' );
+    if ( is_wp_error( $rows ) ) {
+        wp_send_json_error( [ 'message' => $rows->get_error_message() ] );
+        return;
+    }
+
+    $classes = array_map( function ( $r ) {
+        $tags = $r['tags'] ?? [];
+        if ( is_string( $tags ) ) {
+            $tags = json_decode( $tags, true ) ?: [];
+        }
+        return [
+            'id'          => $r['id']          ?? '',
+            'name'        => $r['name']        ?? '',       // ← JS czyta cls.name
+            'description' => $r['description'] ?? '',       // ← JS czyta cls.description
+            'img_url'     => ! empty( $r['img_url'] ) && strpos( $r['img_url'], 'http' ) !== 0
+                             ? NW_UPLOADS_BASE . $r['img_url']
+                             : ( $r['img_url'] ?? '' ),     // ← JS czyta cls.img_url
+            'icon_slug'   => $r['icon_slug']   ?? '',       // ← JS czyta cls.icon_slug
+            'tags'        => $tags,                         // ← JS czyta cls.tags
+        ];
+    }, $rows );
+
+    wp_send_json_success( $classes );
 }
-add_action( 'wp_ajax_neoweaver_get_classes',        'neoweaver_ajax_get_classes' );
-add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
-
-// ---------------------------------------------------------------------------
-// wp_ajax: neoweaver_get_nodes
-// ---------------------------------------------------------------------------
-
-function neoweaver_ajax_get_nodes(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
-
-	$rows = nw_fetch_lookup_table( 'cyber_nodes', 'id,name,description,img_url', 'name.asc', 300 );
-	if ( is_wp_error( $rows ) ) {
-		wp_send_json_error( [ 'message' => $rows->get_error_message() ] );
-		return;
-	}
-	$rows = nw_resolve_img_urls( $rows );
-	// Nodes need 'id' as key (not name) because node_id is stored as integer FK
-	wp_send_json_success( nw_map_card_shape( $rows, 'id' ) );
-}
-add_action( 'wp_ajax_neoweaver_get_nodes',        'neoweaver_ajax_get_nodes' );
-add_action( 'wp_ajax_nopriv_neoweaver_get_nodes', 'neoweaver_ajax_get_nodes' );
 
 // ---------------------------------------------------------------------------
 // Route registration
