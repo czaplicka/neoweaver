@@ -220,10 +220,12 @@
                     ? res.data.map( buildRaceCard ).join( '' )
                     : RACES_FALLBACK.map( buildRaceCard ).join( '' );
                 grid.dataset.rendered = '1';
+                restoreSelections();
             } )
             .catch( function () {
                 grid.innerHTML = RACES_FALLBACK.map( buildRaceCard ).join( '' );
                 grid.dataset.rendered = '1';
+                restoreSelections();
             } );
     }
 
@@ -289,6 +291,7 @@
                         '</div>';
                     } ).join( '' );
                     grid.dataset.rendered = '1';
+                    restoreSelections();
                 } else {
                     grid.innerHTML = '<p class="tw-empty-state">No classes available.</p>';
                 }
