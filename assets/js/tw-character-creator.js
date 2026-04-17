@@ -525,6 +525,34 @@
                 var n = parseInt( ticks[ t ].dataset.tick, 10 );
                 ticks[ t ].classList.toggle( 'active', n <= idx + 1 );
             }
+            function showStep( idx ) {
+    steps.forEach( function ( s, i ) {
+        s.classList.toggle( 'active', i === idx );
+    } );
+    current = idx;
+    setStatus( '', false );
+
+    var phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
+    if ( phase === 'CLASS MATRIX' )  fetchClassGrid( wrapper );
+    if ( phase === 'NODE BINDING' )  fetchNodeGrid( wrapper );
+    if ( phase === 'SYSTEM REVIEW' ) updateSummary( wrapper );
+
+    var fillEl  = document.getElementById( 'tw-char-progress-fill' );
+    var stepEl  = document.getElementById( 'tw-char-step-current' );
+    var phaseEl = document.getElementById( 'tw-char-progress-phase' );
+    if ( fillEl )  fillEl.style.width = Math.round( ( ( idx + 1 ) / steps.length ) * 100 ) + '%';
+    if ( stepEl )  stepEl.textContent  = idx + 1;
+    if ( phaseEl ) phaseEl.textContent = phase;
+
+    var ticks = wrapper.querySelectorAll( '.tw-progress-tick' );
+    for ( var t = 0; t < ticks.length; t++ ) {
+        var n = parseInt( ticks[ t ].dataset.tick, 10 );
+        ticks[ t ].classList.toggle( 'active', n <= idx + 1 );
+    }
+
+    // ── Przywróć podświetlenie zaznaczonych kart po powrocie ──
+    restoreSelections();
+}
         }
 
         // ── validateStep ──────────────────────────────────────────────────────
@@ -683,14 +711,16 @@
             }
 
             // Class card
-            var classCard = e.target.closest( '.tw-class-card' );
-            if ( classCard && ! e.target.closest( 'button' ) ) {
-                var allClass = wrapper.querySelectorAll( '.tw-class-card' );
-                for ( var c = 0; c < allClass.length; c++ ) allClass[ c ].classList.remove( 'selected' );
-                classCard.classList.add( 'selected' );
-                formState[ 'class' ] = classCard.dataset.charClass || classCard.dataset[ 'class' ] || '';
-                var nameEl = classCard.querySelector( '.tw-class-card__name' );
-                formState.class_label = classCard.dataset.label || ( nameEl ? nameEl.textContent : formState[ 'class' ] );
+var classCard = e.target.closest( '.tw-class-card' );
+if ( classCard && ! e.target.closest( 'button' ) ) {
+    var allClass = wrapper.querySelectorAll( '.tw-class-card' );
+    for ( var c = 0; c < allClass.length; c++ ) {
+        allClass[ c ].classList.remove( 'selected' );
+        allClass[ c ].setAttribute( 'aria-pressed', 'false' );
+    }
+    classCard.classList.add( 'selected' );
+    classCard.setAttribute( 'aria-pressed', 'true' );
+    formState[ 'class' ] = classCard.dataset.charClass || classCard.dataset[ 'class' ] || '';
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
                 return;
