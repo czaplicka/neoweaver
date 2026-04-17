@@ -362,6 +362,11 @@ if ( inputEl ) inputEl.style.display = 'none';
         }, 0 );
         var remainEl = document.getElementById( 'tw-attr-remaining' );
         if ( remainEl ) remainEl.textContent = ATTR_POOL - used;
+        var minusBtn = wrapper.querySelector( '[data-attr="' + key + '"].tw-attr-minus' );
+var plusBtn  = wrapper.querySelector( '[data-attr="' + key + '"].tw-attr-plus' );
+var usedTotal = ATTR_KEYS.reduce( function ( s, k ) { return s + ( formState[ 'attr_' + k ] || ATTR_MIN ); }, 0 );
+if ( minusBtn ) minusBtn.disabled = ( val <= ATTR_MIN );
+if ( plusBtn )  plusBtn.disabled  = ( val >= ATTR_MAX || usedTotal >= ATTR_POOL );
     }
 
     // ── Apply preset ──────────────────────────────────────────────────────────
