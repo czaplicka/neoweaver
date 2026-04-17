@@ -501,6 +501,46 @@
         renderAttrDisplay( wrapper );
 
         // ── showStep ──────────────────────────────────────────────────────────
+        // ── Przywróć klasę .selected na kartach po powrocie do kroku ──
+function restoreSelections() {
+    // Race
+    if ( formState.race ) {
+        var rCards = wrapper.querySelectorAll( '.tw-race-card:not(.tw-subrace-card)' );
+        for ( var i = 0; i < rCards.length; i++ ) {
+            var isSelected = rCards[ i ].dataset.race === formState.race;
+            rCards[ i ].classList.toggle( 'selected', isSelected );
+            rCards[ i ].setAttribute( 'aria-pressed', isSelected ? 'true' : 'false' );
+        }
+    }
+    // Subrace
+    if ( formState.subrace ) {
+        var sCards = wrapper.querySelectorAll( '.tw-subrace-card' );
+        for ( var j = 0; j < sCards.length; j++ ) {
+            var isSel = sCards[ j ].dataset.subrace === formState.subrace;
+            sCards[ j ].classList.toggle( 'selected', isSel );
+            sCards[ j ].setAttribute( 'aria-pressed', isSel ? 'true' : 'false' );
+        }
+    }
+    // Class
+    if ( formState[ 'class' ] ) {
+        var cCards = wrapper.querySelectorAll( '.tw-class-card' );
+        for ( var k = 0; k < cCards.length; k++ ) {
+            var cId = cCards[ k ].dataset.charClass || cCards[ k ].dataset[ 'class' ] || '';
+            var isCsel = cId === String( formState[ 'class' ] );
+            cCards[ k ].classList.toggle( 'selected', isCsel );
+            cCards[ k ].setAttribute( 'aria-pressed', isCsel ? 'true' : 'false' );
+        }
+    }
+    // Node
+    if ( formState.node_id ) {
+        var nCards = wrapper.querySelectorAll( '.tw-node-card' );
+        for ( var m = 0; m < nCards.length; m++ ) {
+            var isNsel = nCards[ m ].dataset.nodeId === String( formState.node_id );
+            nCards[ m ].classList.toggle( 'selected', isNsel );
+            nCards[ m ].setAttribute( 'aria-pressed', isNsel ? 'true' : 'false' );
+        }
+    }
+}
         function showStep( idx ) {
             steps.forEach( function ( s, i ) {
                 s.classList.toggle( 'active', i === idx );
