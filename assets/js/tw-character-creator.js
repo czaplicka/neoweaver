@@ -113,6 +113,8 @@
         node_id: '', node_label: '',
         avatar_file: null,
         attr_body: ATTR_MIN, attr_reflex: ATTR_MIN, attr_mind: ATTR_MIN, attr_spirit: ATTR_MIN,
+        skills: [],          // array of selected skill IDs
+skilllimit: 5,       // default, nadpisywane po wyborze klasy
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
