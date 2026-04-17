@@ -350,8 +350,8 @@
     function renderAttrDisplay( wrapper ) {
         ATTR_KEYS.forEach( function ( key ) {
             var val = formState[ 'attr_' + key ] || ATTR_MIN;
-            var inputEl = wrapper.querySelector( '#tw-attr-' + key );
-            if ( inputEl ) inputEl.value = val;
+var inputEl = wrapper.querySelector( '#tw-attr-' + key );
+if ( inputEl ) inputEl.style.display = 'none';
             var rows = wrapper.querySelectorAll( '[data-attr="' + key + '"] .tw-pip' );
             for ( var i = 0; i < rows.length; i++ ) {
                 rows[ i ].classList.toggle( 'active', parseInt( rows[ i ].dataset.pip, 10 ) <= val );
