@@ -8,13 +8,11 @@
  *   GET /wp-json/neoweaver/v1/races            → base races (parent_race IS NULL)
  *   GET /wp-json/neoweaver/v1/subraces?parent= → subraces for a given parent name
  *   GET /wp-json/neoweaver/v1/classes          → rows from cyber_classes
- *   GET /wp-json/neoweaver/v1/nodes            → rows from cyber_nodes (worlds)
  *
  * wp_ajax actions (used by character creator JS via fetch + FormData):
  *   neoweaver_get_races
  *   neoweaver_get_subraces
  *   neoweaver_get_classes
- *   neoweaver_get_nodes
  *
  * @package Neoweaver
  */
@@ -110,38 +108,7 @@ function nw_fetch_lookup_table(
 }
 
 /**
- * Map Supabase row keys to the shape expected by JS card renderers.
- * JS expects: { key, label, desc, img, bonus? }
- *
- * @param array  $rows
- * @param string $key_field   Supabase column that becomes 'key'
- * @param array  $extra_map   additional key => column mappings
- * @return array
- */
-function nw_map_card_shape( array $rows, string $key_field = 'name', array $extra_map = [] ): array {
-	return array_map( function ( $row ) use ( $key_field, $extra_map ) {
-		$item = [
-			'id'    => $row['id']    ?? null,
-			'key'   => (string) ( $row[ $key_field ] ?? $row['id'] ),
-			'label' => $row['name']        ?? '',
-			'desc'  => $row['description'] ?? '',
-			'img'   => $row['img_url']     ?? '',
-		];
-		foreach ( $extra_map as $js_key => $db_col ) {
-			$item[ $js_key ] = $row[ $db_col ] ?? '';
-		}
-		return $item;
-	}, $rows );
-}
-
-/**
  * Map race/subrace rows to JS card shape.
- *
- * cyber_races columns used:
- *   - tags  (JSONB)  → visual chip tags displayed via buildTagsHtml()
- *   - bonus (JSONB)  → flat string displayed in .tw-race-bonus span
- *
- * Both are separate columns — no duplication.
  *
  * @param array $rows  Raw rows from cyber_races (must include tags, bonus, img_url).
  * @return array
@@ -149,13 +116,11 @@ function nw_map_card_shape( array $rows, string $key_field = 'name', array $extr
 function nw_map_race_card_shape( array $rows ): array {
 	return array_map( function ( $row ) {
 
-		// tags — visual chips [{name: '...'}]
 		$raw_tags  = nw_decode_jsonb_array( $row['tags'] ?? [] );
 		$tags_out  = array_map( function ( $t ) {
 			return [ 'name' => $t ];
 		}, $raw_tags );
 
-		// bonus — separate JSONB column, rendered as plain string
 		$raw_bonus = nw_decode_jsonb_array( $row['bonus'] ?? [] );
 		$bonus_str = implode( ' · ', $raw_bonus );
 
@@ -258,10 +223,17 @@ function neoweaver_get_subraces( WP_REST_Request $request ): WP_REST_Response|WP
 // ---------------------------------------------------------------------------
 
 function neoweaver_get_classes_rest( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$data = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description,img_url' );
+	$data = nw_fetch_lookup_table(
+		'cyber_classes',
+		'id,name,description,tags,img_url,icon_slug',
+		'name.asc',
+		300,
+		[ 'is_active' => 'eq.true' ]
+	);
 	if ( is_wp_error( $data ) ) {
 		return $data;
 	}
+	$data = nw_resolve_img_urls( $data );
 	return rest_ensure_response( $data );
 }
 
@@ -368,33 +340,59 @@ add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'neoweaver_ajax_get_subrace
 // ---------------------------------------------------------------------------
 
 function neoweaver_ajax_get_classes(): void {
-    check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
 
-    $rows = nw_fetch_lookup_table( 'cyber_classes', 'id,name,description,tags,img_url,icon_slug' );
-    if ( is_wp_error( $rows ) ) {
-        wp_send_json_error( [ 'message' => $rows->get_error_message() ] );
-        return;
-    }
+	$cache_key = 'nw_classes_v2';
+	$cached    = get_transient( $cache_key );
+	if ( $cached !== false ) {
+		wp_send_json_success( $cached );
+		return;
+	}
 
-    $classes = array_map( function ( $r ) {
-        $tags = $r['tags'] ?? [];
-        if ( is_string( $tags ) ) {
-            $tags = json_decode( $tags, true ) ?: [];
-        }
-        return [
-            'id'          => $r['id']          ?? '',
-            'name'        => $r['name']        ?? '',       // ← JS czyta cls.name
-            'description' => $r['description'] ?? '',       // ← JS czyta cls.description
-            'img_url'     => ! empty( $r['img_url'] ) && strpos( $r['img_url'], 'http' ) !== 0
-                             ? NW_UPLOADS_BASE . $r['img_url']
-                             : ( $r['img_url'] ?? '' ),     // ← JS czyta cls.img_url
-            'icon_slug'   => $r['icon_slug']   ?? '',       // ← JS czyta cls.icon_slug
-            'tags'        => $tags,                         // ← JS czyta cls.tags
-        ];
-    }, $rows );
+	if ( ! function_exists( 'tw_supabase_get' ) ) {
+		wp_send_json_error( [ 'message' => 'Supabase helpers not loaded.' ] );
+		return;
+	}
 
-    wp_send_json_success( $classes );
+	$rows = tw_supabase_get(
+		'cyber_classes',
+		[
+			'select'    => 'id,name,description,tags,img_url,icon_slug',
+			'is_active' => 'eq.true',
+			'order'     => 'name.asc',
+		]
+	);
+
+	if ( ! is_array( $rows ) ) {
+		wp_send_json_error( [ 'message' => 'Database error fetching classes.' ] );
+		return;
+	}
+
+	$classes = array_map( function ( $r ) {
+		$tags = $r['tags'] ?? [];
+		if ( is_string( $tags ) ) {
+			$tags = json_decode( $tags, true ) ?: [];
+		}
+		return [
+			'id'          => $r['id']          ?? '',
+			'name'        => $r['name']        ?? '',
+			'description' => $r['description'] ?? '',
+			'img_url'     => ! empty( $r['img_url'] ) && strpos( $r['img_url'], 'http' ) !== 0
+			                 ? NW_UPLOADS_BASE . $r['img_url']
+			                 : ( $r['img_url'] ?? '' ),
+			'icon_slug'   => $r['icon_slug']   ?? '',
+			'tags'        => $tags,
+		];
+	}, $rows );
+
+	if ( ! empty( $classes ) ) {
+		set_transient( $cache_key, $classes, 300 );
+	}
+
+	wp_send_json_success( $classes );
 }
+add_action( 'wp_ajax_neoweaver_get_classes',        'neoweaver_ajax_get_classes' );
+add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
 
 // ---------------------------------------------------------------------------
 // Route registration
@@ -423,12 +421,6 @@ add_action( 'rest_api_init', function () {
 	register_rest_route( 'neoweaver/v1', '/classes', [
 		'methods'             => 'GET',
 		'callback'            => 'neoweaver_get_classes_rest',
-		'permission_callback' => '__return_true',
-	] );
-
-	register_rest_route( 'neoweaver/v1', '/nodes', [
-		'methods'             => 'GET',
-		'callback'            => 'neoweaver_get_nodes_rest',
 		'permission_callback' => '__return_true',
 	] );
 
