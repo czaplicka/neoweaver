@@ -282,7 +282,7 @@ skilllimit: 5,       // default, nadpisywane po wyborze klasy
                         var imgHtml  = imgSrc
                             ? '<div class="tw-class-card__img-wrap"><img src="' + esc( imgSrc ) + '" alt="' + esc( name ) + '" width="220" height="220" loading="lazy"/></div>'
                             : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + icon + '</span></div>';
-                        return '<div class="tw-class-card" data-char-class="' + esc( id ) + '" data-label="' + esc( name ) + '" role="button" tabindex="0" aria-pressed="false">' +
+                        return '<div class="tw-class-card" data-char-class="' + esc( id ) + '" data-label="' + esc( name ) + '" data-skilllimit="${parseInt(cls.skill_limit, 10) || 3}" role="button" tabindex="0" aria-pressed="false">' +
                             imgHtml +
                             '<div class="tw-class-card__body">' +
                                 '<h4 class="tw-class-card__name">' + esc( name ) + '</h4>' +
@@ -303,6 +303,58 @@ skilllimit: 5,       // default, nadpisywane po wyborze klasy
             } );
     }
 
+    // Skill grid AJAX
+function fetchSkillGrid(wrapper) {
+    var grid = wrapper.querySelector('#tw-skill-grid');
+    if (!grid) return;
+    if (grid.dataset.rendered) { restoreSelections(); return; }
+
+    grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>SCANNING SKILL DATABASE…</div>';
+
+    var fd = new FormData();
+    fd.append('action', 'neoweaver_get_skills');
+    fd.append('nonce', nonce());
+
+    fetch(ajaxUrl(), { method: 'POST', credentials: 'same-origin', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success && res.data && res.data.length) {
+                var categories = {};
+                res.data.forEach(function(sk) {
+                    var cat = sk.category || 'Other';
+                    if (!categories[cat]) categories[cat] = [];
+                    categories[cat].push(sk);
+                });
+                var html = '';
+                Object.keys(categories).forEach(function(cat) {
+                    html += '<div class="tw-skill-category">';
+                    html += '<h4 class="tw-skill-cat-label">' + esc(cat) + '</h4>';
+                    html += '<div class="tw-skill-cat-grid">';
+                    categories[cat].forEach(function(sk) {
+                        var imgHtml = sk.img_url
+                            ? '<div class="tw-race-img"><img src="' + esc(sk.img_url) + '" alt="' + esc(sk.name) + '" width="220" height="220" loading="lazy"></div>'
+                            : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">⚡</span></div>';
+                        html += '<div class="tw-skill-card tw-grid-card" data-skill-id="' + esc(sk.id) + '" data-label="' + esc(sk.name) + '" role="button" tabindex="0" aria-pressed="false">';
+                        html += imgHtml;
+                        html += '<div class="tw-race-body">';
+                        html += '<h4 class="tw-race-name">' + esc(sk.name) + '</h4>';
+                        html += buildTagsHtml(sk.tags);
+                        html += '<span class="tw-race-select-hint">select</span>';
+                        html += '</div></div>';
+                    });
+                    html += '</div></div>';
+                });
+                grid.innerHTML = html;
+                grid.dataset.rendered = 1;
+                restoreSelections();
+            } else {
+                grid.innerHTML = '<p class="tw-empty-state">No skills available.</p>';
+            }
+        })
+        .catch(function() {
+            grid.innerHTML = '<p class="tw-error-msg">ERROR: Skill data unavailable.</p>';
+        });
+}
     // ── Node grid (AJAX) ──────────────────────────────────────────────────────
     function fetchNodeGrid( wrapper ) {
         var grid = wrapper.querySelector( '#tw-node-grid' );
@@ -432,7 +484,7 @@ if ( plusBtn )  plusBtn.disabled  = ( val >= ATTR_MAX || usedTotal >= ATTR_POOL 
         data.append( 'race',           formState.race );
         data.append( 'subrace',        formState.subrace );
         data.append( 'char_class',     formState[ 'class' ] );
-        data.append( 'node_id',        formState.node_id );
+
         if ( formState.avatar_file ) data.append( 'avatar', formState.avatar_file );
         ATTR_KEYS.forEach( function ( k ) {
             data.append( 'attr_' + k, formState[ 'attr_' + k ] || ATTR_MIN );
@@ -540,7 +592,7 @@ if ( plusBtn )  plusBtn.disabled  = ( val >= ATTR_MAX || usedTotal >= ATTR_POOL 
 
             var phase = ( steps[ idx ] && steps[ idx ].dataset.phase ) || '';
             if ( phase === 'CLASS MATRIX' )  fetchClassGrid( wrapper );
-            if ( phase === 'NODE BINDING' )  fetchNodeGrid( wrapper );
+            if (phase === 'SKILL SELECTION') fetchSkillGrid(wrapper);
             if ( phase === 'SYSTEM REVIEW' ) updateSummary( wrapper );
 
             var fillEl  = document.getElementById( 'tw-char-progress-fill' );
@@ -724,27 +776,43 @@ if ( plusBtn )  plusBtn.disabled  = ( val >= ATTR_MAX || usedTotal >= ATTR_POOL 
                 classCard.setAttribute( 'aria-pressed', 'true' );
                 formState[ 'class' ] = classCard.dataset.charClass || '';
                 formState.class_label = classCard.dataset.label || ( classCard.querySelector( '.tw-class-card__name' ) || {} ).textContent || '';
+                formState.skilllimit = parseInt(classCard.dataset.skilllimit, 10) || 3;
+formState.skills = []; // reset skilli przy zmianie klasy
+// aktualizuj licznik jeśli widoczny
+var counter = wrapper.querySelector('#tw-skill-counter');
+if (counter) counter.textContent = '0 / ' + formState.skilllimit;
                 NW_SFX.select();
                 clearStepError( steps[ current ] );
                 return;
             }
 
             // Node card
-            var nodeCard = e.target.closest( '.tw-node-card' );
-            if ( nodeCard && ! e.target.closest( 'button' ) ) {
-                var allNode = wrapper.querySelectorAll( '.tw-node-card' );
-                for ( var nd = 0; nd < allNode.length; nd++ ) {
-                    allNode[ nd ].classList.remove( 'selected' );
-                    allNode[ nd ].setAttribute( 'aria-pressed', 'false' );
-                }
-                nodeCard.classList.add( 'selected' );
-                nodeCard.setAttribute( 'aria-pressed', 'true' );
-                formState.node_id    = nodeCard.dataset.nodeId || '';
-                formState.node_label = nodeCard.dataset.label  || ( ( nodeCard.querySelector( '.tw-node-card__name' ) || {} ).textContent || '' );
-                NW_SFX.select();
-                clearStepError( steps[ current ] );
-                return;
-            }
+// Skill card (multi-select)
+var skillCard = e.target.closest('.tw-skill-card');
+if (skillCard && !e.target.closest('button')) {
+    var skillId = skillCard.dataset.skillId;
+    var limit = formState.skilllimit || 3;
+    var idx = formState.skills.indexOf(skillId);
+    if (idx > -1) {
+        formState.skills.splice(idx, 1);
+        skillCard.classList.remove('selected');
+        skillCard.setAttribute('aria-pressed', 'false');
+    } else {
+        if (formState.skills.length >= limit) {
+            showStepError(steps[current], 'ERROR: Max ' + limit + ' skills for your class.');
+            NWSFX.error();
+            return;
+        }
+        formState.skills.push(skillId);
+        skillCard.classList.add('selected');
+        skillCard.setAttribute('aria-pressed', 'true');
+    }
+    var counter = wrapper.querySelector('#tw-skill-counter');
+    if (counter) counter.textContent = formState.skills.length + ' / ' + limit;
+    clearStepError(steps[current]);
+    NWSFX.select();
+    return;
+}
 
             var btn = e.target.closest( 'button' );
             if ( ! btn ) return;
