@@ -146,6 +146,18 @@ function nw_map_class_card_shape( array $rows ): array {
 function nw_map_skill_card_shape( array $rows ): array {
 	return array_map(
 		function ( $row ) {
+			$tags = array_values(
+				array_filter(
+					array_map( 'sanitize_text_field', nw_decode_jsonb_array( $row['tags'] ?? [] ) )
+				)
+			);
+
+			$linked_attributes = array_values(
+				array_filter(
+					array_map( 'sanitize_text_field', nw_decode_jsonb_array( $row['linked_attributes'] ?? [] ) )
+				)
+			);
+
 			return [
 				'id'                => $row['id'] ?? null,
 				'name'              => $row['name'] ?? '',
@@ -154,8 +166,8 @@ function nw_map_skill_card_shape( array $rows ): array {
 				'application'       => $row['application'] ?? '',
 				'card_effect'       => $row['card_effect'] ?? '',
 				'img_url'           => $row['img_url'] ?? '',
-				'tags'              => nw_decode_jsonb_array( $row['tags'] ?? [] ),
-				'linked_attributes' => nw_decode_jsonb_array( $row['linked_attributes'] ?? [] ),
+				'tags'              => $tags,
+				'linked_attributes' => $linked_attributes,
 			];
 		},
 		$rows
@@ -257,32 +269,6 @@ function nw_supabase_request( string $method, string $table, array $query = [], 
 	}
 
 	return is_array( $data ) ? $data : [];
-}
-
-/**
- * Find race by name (legacy helper).
- */
-function nw_find_race_by_name( string $name ) {
-	$name = sanitize_text_field( $name );
-	if ( '' === $name ) {
-		return null;
-	}
-
-	$rows = nw_supabase_request(
-		'GET',
-		'cyber_races',
-		[
-			'select' => 'id,name,parent_race',
-			'name'   => 'eq.' . $name,
-			'limit'  => 1,
-		]
-	);
-
-	if ( is_wp_error( $rows ) || empty( $rows[0] ) ) {
-		return null;
-	}
-
-	return $rows[0];
 }
 
 /**
@@ -414,7 +400,7 @@ function nw_find_tag_defs_by_labels( array $labels ): array {
 
 	$quoted = array_map(
 		function ( $label ) {
-			return '"' . str_replace( '"', '\\"', $label ) . '"';
+			return '"' . str_replace( '"', '\\\\"', $label ) . '"';
 		},
 		$labels
 	);
@@ -446,7 +432,7 @@ function nw_find_skills_by_ids( array $skill_ids ): array {
 
 	$quoted = array_map(
 		function ( $id ) {
-			return '"' . str_replace( '"', '\\"', $id ) . '"';
+			return '"' . str_replace( '"', '\\\\"', $id ) . '"';
 		},
 		$skill_ids
 	);
@@ -477,15 +463,17 @@ function nw_validate_skill_selection( string $class_id, array $skills ) {
 		return new WP_Error( 'invalid_class', 'Selected class does not exist or is inactive.', [ 'status' => 400 ] );
 	}
 
+	$skills = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $skills ) ) ) );
+
 	$limit = isset( $class_row['skill_limit'] ) ? (int) $class_row['skill_limit'] : 5;
 	$limit = $limit > 0 ? $limit : 5;
 
-	if ( count( $skills ) > $limit ) {
-		return new WP_Error( 'skill_limit_exceeded', 'Too many skills selected for this class.', [ 'status' => 400 ] );
+	if ( empty( $skills ) ) {
+		return new WP_Error( 'skills_required', 'At least one skill must be selected.', [ 'status' => 400 ] );
 	}
 
-	if ( empty( $skills ) ) {
-		return true;
+	if ( count( $skills ) > $limit ) {
+		return new WP_Error( 'skill_limit_exceeded', 'Too many skills selected for this class.', [ 'status' => 400 ] );
 	}
 
 	$skill_rows = nw_find_skills_by_ids( $skills );
@@ -599,6 +587,26 @@ function nw_store_character_backstory_tags( string $character_id, array $tag_lab
 }
 
 /**
+ * Delete character by id (cleanup helper).
+ */
+function nw_delete_character_by_id( string $character_id ) {
+	$character_id = sanitize_text_field( $character_id );
+	if ( '' === $character_id ) {
+		return false;
+	}
+
+	$result = nw_supabase_request(
+		'DELETE',
+		'cyber_characters',
+		[
+			'id' => 'eq.' . $character_id,
+		]
+	);
+
+	return ! is_wp_error( $result );
+}
+
+/**
  * Handle avatar upload, return URL or empty string.
  */
 function nw_handle_avatar_upload(): string {
@@ -637,7 +645,9 @@ function nw_create_character_from_request() {
 		wp_send_json_error( [ 'message' => 'Login required.' ], 403 );
 	}
 
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$user_id = get_current_user_id();
 	$name    = sanitize_text_field( $_POST['character_name'] ?? '' );
@@ -737,12 +747,14 @@ function nw_create_character_from_request() {
 
 	$skills_store = nw_store_character_skills( $character_id, $skills );
 	if ( is_wp_error( $skills_store ) ) {
-		wp_send_json_error( [ 'message' => 'Character created, but skills could not be saved.' ], 500 );
+		nw_delete_character_by_id( $character_id );
+		wp_send_json_error( [ 'message' => 'Character could not be saved with skills.' ], 500 );
 	}
 
 	$tags_store = nw_store_character_backstory_tags( $character_id, $backstory_tags );
 	if ( is_wp_error( $tags_store ) ) {
-		wp_send_json_error( [ 'message' => 'Character created, but backstory tags could not be saved.' ], 500 );
+		nw_delete_character_by_id( $character_id );
+		wp_send_json_error( [ 'message' => 'Character could not be saved with backstory tags.' ], 500 );
 	}
 
 	$redirect = home_url( '/character/' . rawurlencode( $character_id ) . '/' );
@@ -853,7 +865,9 @@ function neoweaver_get_starting_packages_rest( WP_REST_Request $request ): WP_RE
 /* ===== AJAX LOOKUPS ===== */
 
 function neoweaver_ajax_get_races(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$data = nw_fetch_lookup_table(
 		'cyber_races',
@@ -873,7 +887,9 @@ add_action( 'wp_ajax_neoweaver_get_races', 'neoweaver_ajax_get_races' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_races', 'neoweaver_ajax_get_races' );
 
 function neoweaver_ajax_get_subraces(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$parent = sanitize_text_field( $_POST['parent'] ?? '' );
 	if ( '' === $parent ) {
@@ -898,7 +914,9 @@ add_action( 'wp_ajax_neoweaver_get_subraces', 'neoweaver_ajax_get_subraces' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'neoweaver_ajax_get_subraces' );
 
 function neoweaver_ajax_get_classes(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$data = nw_fetch_lookup_table(
 		'cyber_classes',
@@ -918,7 +936,9 @@ add_action( 'wp_ajax_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_ajax_get_classes' );
 
 function neoweaver_ajax_get_skills(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$data = nw_fetch_lookup_table(
 		'cyber_skills',
@@ -938,7 +958,9 @@ add_action( 'wp_ajax_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
 
 function neoweaver_ajax_get_starting_packages(): void {
-	check_ajax_referer( 'neoweaver_nonce', 'nonce', false );
+	if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+		wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
+	}
 
 	$class_tag = sanitize_text_field( $_POST['class_tag'] ?? '' );
 	if ( '' === $class_tag ) {
