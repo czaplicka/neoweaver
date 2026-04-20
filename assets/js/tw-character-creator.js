@@ -193,7 +193,7 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
+      .replace(/\"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
 
@@ -592,6 +592,11 @@
     var classTag = selectedClassTag(wrapper);
     if (!classTag) {
       grid.innerHTML = '<p class="tw-empty-state">Select a class first.</p>';
+      return;
+    }
+
+    if (grid.dataset.rendered && grid.dataset.rendered === classTag) {
+      restoreSelections(wrapper);
       return;
     }
 
