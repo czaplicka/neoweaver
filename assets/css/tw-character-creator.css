@@ -32,7 +32,7 @@ avatar + manual bio flow
 
 /* Główna ramka kreatora – analogowy terminal */
 #tw-char-creator-wrapper {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: 'Chakra Petch', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--tw-text);
   background:
     radial-gradient(circle at top, rgba(173,255,0,0.08), transparent 34%),
@@ -245,6 +245,11 @@ avatar + manual bio flow
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+#tw-char-creator-wrapper input::placeholder,
+#tw-char-creator-wrapper textarea::placeholder {
+  color: var(--tw-text-faint);
+}
+
 #tw-char-creator-wrapper input:focus,
 #tw-char-creator-wrapper textarea:focus,
 #tw-char-creator-wrapper select:focus {
@@ -258,7 +263,7 @@ avatar + manual bio flow
   box-shadow: 0 0 0 3px rgba(255,77,109,0.14) !important;
 }
 
-/* backstory textarea – zostaje generyjnie, ale nie jest wymagane */
+/* backstory textarea – generyjny, ale krok jest teraz BIO */
 #tw-char-creator-wrapper textarea {
   min-height: 120px;
   resize: vertical;
@@ -317,10 +322,12 @@ avatar + manual bio flow
   gap: 16px;
 }
 
-/* Ogólna karta (race/class/lore/package) */
+/* Ogólna karta (race/class/lore/package/skill) */
 .tw-grid-card,
 .tw-class-card,
-.tw-lore-card {
+.tw-lore-card,
+.tw-skill-card,
+.tw-package-card {
   display: flex;
   flex-direction: column;
   min-height: 100%;
@@ -335,9 +342,13 @@ avatar + manual bio flow
 .tw-grid-card:hover,
 .tw-class-card:hover,
 .tw-lore-card:hover,
+.tw-skill-card:hover,
+.tw-package-card:hover,
 .tw-grid-card:focus-visible,
 .tw-class-card:focus-visible,
-.tw-lore-card:focus-visible {
+.tw-lore-card:focus-visible,
+.tw-skill-card:focus-visible,
+.tw-package-card:focus-visible {
   transform: translateY(-2px);
   border-color: var(--tw-border-strong);
   box-shadow: 0 18px 30px rgba(0,0,0,0.28), 0 0 0 1px rgba(173,255,0,0.14);
@@ -356,11 +367,12 @@ avatar + manual bio flow
   background: linear-gradient(180deg, rgba(18,29,14,0.96), rgba(10,15,9,0.96));
 }
 
-/* ===== RASY / KLASY – większe obrazki, pełna postać ===== */
+/* ===== RASY / KLASY / SKILLS – obrazki ===== */
 
 .tw-race-card,
 .tw-subrace-card,
-.tw-class-card {
+.tw-class-card,
+.tw-skill-card {
   display: flex;
   flex-direction: column;
 }
@@ -375,7 +387,7 @@ avatar + manual bio flow
   overflow: hidden;
 }
 
-/* Nowa klasa – pełne, nieuciete postaci */
+/* Pełne postaci / ikony */
 .tw-race-img--full img,
 .tw-class-card__img-wrap img {
   width: 100%;
@@ -383,7 +395,7 @@ avatar + manual bio flow
   object-fit: contain;
 }
 
-/* Fallback – pozostawione dla kompatybilności (race/class, gdy bez --full) */
+/* Fallback – kompatybilność */
 .tw-race-img img,
 .tw-class-card__img-wrap img {
   width: 100%;
@@ -397,6 +409,12 @@ avatar + manual bio flow
   font-size: 2rem;
 }
 
+/* Skill preview */
+.tw-skill-card .tw-race-img {
+  min-height: 140px;
+}
+
+/* Ciała kart */
 .tw-race-body,
 .tw-class-card__body {
   padding: 18px;
@@ -406,7 +424,7 @@ avatar + manual bio flow
   height: 100%;
 }
 
-/* Nazwa – rasa / klasa */
+/* Nazwy */
 .tw-race-name,
 .tw-class-card__name {
   margin: 0;
@@ -415,8 +433,7 @@ avatar + manual bio flow
   color: var(--tw-text);
 }
 
-/* Opisy ras usuwamy w HTML/JS – zostaje tylko nazwa + tagi */
-
+/* Opisy */
 .tw-race-desc,
 .tw-class-card__desc {
   margin: 0;
@@ -425,7 +442,7 @@ avatar + manual bio flow
   font-size: 0.95rem;
 }
 
-/* Bonus – jeśli używasz */
+/* Bonus – armor, itp. */
 .tw-race-bonus {
   display: inline-flex;
   width: fit-content;
@@ -550,6 +567,8 @@ avatar + manual bio flow
   padding: 10px 14px;
   cursor: pointer;
   transition: all 180ms ease;
+  font-family: inherit;
+  font-size: 0.86rem;
 }
 
 .tw-attr-preset-btn:hover,
@@ -620,6 +639,10 @@ avatar + manual bio flow
   color: var(--tw-acid);
   cursor: pointer;
   transition: all 180ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
 }
 
 .tw-attr-btn:hover:not(:disabled) {
@@ -730,6 +753,20 @@ avatar + manual bio flow
   font-size: 1.9rem;
 }
 
+.tw-avatar-selected {
+  display: grid;
+  gap: 14px;
+}
+
+#tw-avatar-img {
+  width: min(100%, 360px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid rgba(173,255,0,0.18);
+  background: rgba(255,255,255,0.03);
+}
+
 /* ===== BUTTONY / LINKI ===== */
 
 .tw-link-btn,
@@ -750,20 +787,6 @@ avatar + manual bio flow
   padding: 0;
 }
 
-.tw-avatar-selected {
-  display: grid;
-  gap: 14px;
-}
-
-#tw-avatar-img {
-  width: min(100%, 360px);
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: 18px;
-  border: 1px solid rgba(173,255,0,0.18);
-  background: rgba(255,255,255,0.03);
-}
-
 .tw-avatar-clear {
   width: fit-content;
   min-height: 42px;
@@ -773,6 +796,36 @@ avatar + manual bio flow
   background: rgba(255,77,109,0.08);
   color: #ffd6de;
   cursor: pointer;
+}
+
+.tw-btn,
+.tw-btn-nav {
+  appearance: none;
+  min-height: 46px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(173,255,0,0.18);
+  background: rgba(255,255,255,0.03);
+  color: var(--tw-text);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: all 180ms ease;
+}
+
+.tw-btn:hover,
+.tw-btn-nav:hover,
+.tw-summary-edit:hover,
+.tw-avatar-clear:hover,
+.tw-link-btn:hover {
+  filter: brightness(1.06);
+}
+
+.tw-btn--primary {
+  color: var(--tw-bg);
+  background: var(--tw-acid);
+  border-color: var(--tw-acid);
+  box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
 /* ===== PODSUMOWANIE ===== */
@@ -848,6 +901,14 @@ avatar + manual bio flow
   gap: 10px;
 }
 
+.tw-step-error__icon {
+  font-size: 1.1rem;
+}
+
+.tw-step-error__msg {
+  font-size: 0.95rem;
+}
+
 .tw-step-error.visible {
   display: flex;
 }
@@ -872,36 +933,6 @@ avatar + manual bio flow
   gap: 12px;
   margin-top: 24px;
   flex-wrap: wrap;
-}
-
-.tw-btn,
-.tw-btn-nav {
-  appearance: none;
-  min-height: 46px;
-  padding: 12px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(173,255,0,0.18);
-  background: rgba(255,255,255,0.03);
-  color: var(--tw-text);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  transition: all 180ms ease;
-}
-
-.tw-btn:hover,
-.tw-btn-nav:hover,
-.tw-summary-edit:hover,
-.tw-avatar-clear:hover,
-.tw-link-btn:hover {
-  filter: brightness(1.06);
-}
-
-.tw-btn--primary {
-  color: var(--tw-bg);
-  background: var(--tw-acid);
-  border-color: var(--tw-acid);
-  box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
 /* ===== SUCCESS ===== */
