@@ -165,9 +165,10 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			<div class="tw-step" data-step="2" data-phase="RACE PROTOCOL">
 				<h2>RACE PROTOCOL</h2>
 				<p class="tw-question-text">Select the operative's biological or synthetic origin.</p>
+
 				<div class="tw-dynamic-grid tw-race-grid" id="tw-race-grid"></div>
 
-				<div id="tw-subrace-section" style="display:none;">
+				<div id="tw-subrace-section" class="tw-subrace-section" hidden>
 					<h3 class="tw-subrace-heading">SELECT SUBRACE</h3>
 					<div class="tw-dynamic-grid tw-subrace-grid" id="tw-subrace-grid"></div>
 				</div>
@@ -234,38 +235,40 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 								</h4>
 								<span><?php echo esc_html( $attr['desc'] ); ?></span>
 							</div>
-							<div class="tw-attr-stepper">
-								<button
-									type="button"
-									class="tw-attr-btn tw-attr-minus"
-									data-attr="<?php echo esc_attr( $key ); ?>"
-									aria-label="Decrease <?php echo esc_attr( $attr['label'] ); ?>"
-								>−</button>
-								<input
-									type="number"
-									class="tw-attr-val"
-									name="attr_<?php echo esc_attr( $key ); ?>"
-									id="tw-attr-<?php echo esc_attr( $key ); ?>"
-									value="<?php echo esc_attr( $attr_min ); ?>"
-									min="<?php echo esc_attr( $attr_min ); ?>"
-									max="<?php echo esc_attr( $attr_max ); ?>"
-									readonly
-									aria-label="<?php echo esc_attr( $attr['label'] ); ?> value"
-								>
-								<button
-									type="button"
-									class="tw-attr-btn tw-attr-plus"
-									data-attr="<?php echo esc_attr( $key ); ?>"
-									aria-label="Increase <?php echo esc_attr( $attr['label'] ); ?>"
-								>+</button>
-							</div>
-							<div class="tw-attr-pips">
-								<?php for ( $p = 1; $p <= $attr_max; $p++ ) : ?>
-									<span
-										class="tw-pip <?php echo $p <= $attr_min ? 'active' : ''; ?>"
-										data-pip="<?php echo esc_attr( $p ); ?>"
-									></span>
-								<?php endfor; ?>
+							<div class="tw-attr-controls">
+								<div class="tw-attr-stepper">
+									<button
+										type="button"
+										class="tw-attr-btn tw-attr-minus"
+										data-attr="<?php echo esc_attr( $key ); ?>"
+										aria-label="Decrease <?php echo esc_attr( $attr['label'] ); ?>"
+									>−</button>
+									<input
+										type="number"
+										class="tw-attr-val"
+										name="attr_<?php echo esc_attr( $key ); ?>"
+										id="tw-attr-<?php echo esc_attr( $key ); ?>"
+										value="<?php echo esc_attr( $attr_min ); ?>"
+										min="<?php echo esc_attr( $attr_min ); ?>"
+										max="<?php echo esc_attr( $attr_max ); ?>"
+										readonly
+										aria-label="<?php echo esc_attr( $attr['label'] ); ?> value"
+									>
+									<button
+										type="button"
+										class="tw-attr-btn tw-attr-plus"
+										data-attr="<?php echo esc_attr( $key ); ?>"
+										aria-label="Increase <?php echo esc_attr( $attr['label'] ); ?>"
+									>+</button>
+								</div>
+								<div class="tw-attr-pips">
+									<?php for ( $p = 1; $p <= $attr_max; $p++ ) : ?>
+										<span
+											class="tw-pip <?php echo $p <= $attr_min ? 'active' : ''; ?>"
+											data-pip="<?php echo esc_attr( $p ); ?>"
+										></span>
+									<?php endfor; ?>
+								</div>
 							</div>
 						</div>
 					<?php endforeach; ?>
@@ -283,7 +286,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				<h2>SKILL SELECTION</h2>
 				<p class="tw-question-text">Choose active skills unlocked for this operative class.</p>
 
-				<div class="tw-skill-counter" id="tw-skill-counter">0 / 5</div>
+				<div class="tw-skill-counter" id="tw-skill-counter">0 / 5 skills</div>
 				<div id="tw-skill-grid"></div>
 
 				<div class="tw-nav-row">
