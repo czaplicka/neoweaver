@@ -1,8 +1,12 @@
 /* =========================================
 NeoWeaver Character Creator CSS
-Updated for: skills + starting package +
-data origin + previous operation + sync crisis +
-avatar + manual bio flow
+Updated for:
+- compact race/class/skill cards
+- skills step
+- starting package
+- origin / operation / crisis
+- avatar + bio
+- right-aligned attributes controls
 ========================================= */
 
 :root {
@@ -30,7 +34,6 @@ avatar + manual bio flow
   box-sizing: border-box;
 }
 
-/* Główna ramka kreatora – analogowy terminal */
 #tw-char-creator-wrapper {
   font-family: 'Chakra Petch', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--tw-text);
@@ -45,7 +48,6 @@ avatar + manual bio flow
   overflow: hidden;
 }
 
-/* Scanlines + szum */
 #tw-char-creator-wrapper::before {
   content: '';
   position: absolute;
@@ -72,7 +74,7 @@ avatar + manual bio flow
   z-index: 1;
 }
 
-/* ===== Pasek postępu / HEADER ===== */
+/* ===== HEADER / PROGRESS ===== */
 
 .tw-progress-bar {
   margin-bottom: 24px;
@@ -177,7 +179,7 @@ avatar + manual bio flow
   font-size: 0.82rem;
 }
 
-/* ===== KROKI ===== */
+/* ===== STEPS ===== */
 
 .tw-step {
   display: none;
@@ -229,7 +231,7 @@ avatar + manual bio flow
   margin-bottom: 8px;
 }
 
-/* ===== INPUTY ===== */
+/* ===== INPUTS ===== */
 
 #tw-char-creator-wrapper input[type="text"],
 #tw-char-creator-wrapper input[type="number"],
@@ -263,7 +265,6 @@ avatar + manual bio flow
   box-shadow: 0 0 0 3px rgba(255,77,109,0.14) !important;
 }
 
-/* backstory textarea – generyjny, ale krok jest teraz BIO */
 #tw-char-creator-wrapper textarea {
   min-height: 120px;
   resize: vertical;
@@ -302,10 +303,6 @@ avatar + manual bio flow
   transition: all 180ms ease;
 }
 
-.tw-pronoun-label span {
-  font-size: 0.92rem;
-}
-
 .tw-pronoun-option input:checked + .tw-pronoun-label {
   color: var(--tw-bg);
   background: var(--tw-acid);
@@ -313,7 +310,7 @@ avatar + manual bio flow
   box-shadow: 0 0 18px rgba(173,255,0,0.28);
 }
 
-/* ===== GRIDY / KARTY ===== */
+/* ===== GRIDS ===== */
 
 .tw-dynamic-grid,
 .tw-skill-cat-grid {
@@ -322,7 +319,8 @@ avatar + manual bio flow
   gap: 16px;
 }
 
-/* Ogólna karta (race/class/lore/package/skill) */
+/* ===== CARDS ===== */
+
 .tw-grid-card,
 .tw-class-card,
 .tw-lore-card,
@@ -337,6 +335,7 @@ avatar + manual bio flow
   overflow: hidden;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  position: relative;
 }
 
 .tw-grid-card:hover,
@@ -367,98 +366,84 @@ avatar + manual bio flow
   background: linear-gradient(180deg, rgba(18,29,14,0.96), rgba(10,15,9,0.96));
 }
 
-/* ===== RASY / KLASY / SKILLS – obrazki ===== */
+.tw-grid-card.selected::after,
+.tw-class-card.selected::after,
+.tw-lore-card.selected::after,
+.tw-skill-card.selected::after,
+.tw-package-card.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tw-acid);
+  color: #0a1208;
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(173,255,0,0.42);
+  z-index: 2;
+}
+
+/* ===== RACE / SUBRACE ===== */
 
 .tw-race-card,
-.tw-subrace-card,
-.tw-class-card,
-.tw-skill-card {
+.tw-subrace-card {
   display: flex;
   flex-direction: column;
 }
 
-.tw-race-img,
-.tw-class-card__img-wrap {
-  background: linear-gradient(180deg, rgba(173,255,0,0.06), rgba(255,255,255,0.02));
+.tw-race-img {
+  min-height: 160px;
+  max-height: 160px;
+  background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
   border-bottom: 1px solid rgba(173,255,0,0.10);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   overflow: hidden;
 }
 
-/* Pełne postaci / ikony */
-.tw-race-img--full img,
-.tw-class-card__img-wrap img {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-}
-
-/* Fallback – kompatybilność */
-.tw-race-img img,
-.tw-class-card__img-wrap img {
+.tw-race-img img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  filter: drop-shadow(0 0 10px rgba(173,255,0,0.12));
 }
 
-.tw-race-img--placeholder,
-.tw-class-card__img-wrap--placeholder {
+.tw-race-img--placeholder {
   color: rgba(173,255,0,0.72);
   font-size: 2rem;
 }
 
-/* Skill preview */
-.tw-skill-card .tw-race-img {
-  min-height: 140px;
-}
-
-/* Ciała kart */
-.tw-race-body,
-.tw-class-card__body {
-  padding: 18px;
+.tw-race-body {
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: 100%;
+  min-height: 0;
 }
 
-/* Nazwy */
-.tw-race-name,
-.tw-class-card__name {
+.tw-race-name {
   margin: 0;
-  font-size: 1.12rem;
-  line-height: 1.2;
+  font-size: 1.05rem;
+  line-height: 1.15;
   color: var(--tw-text);
 }
 
-/* Opisy */
 .tw-race-desc,
-.tw-class-card__desc {
-  margin: 0;
-  color: var(--tw-text-dim);
-  line-height: 1.5;
-  font-size: 0.95rem;
-}
-
-/* Bonus – armor, itp. */
 .tw-race-bonus {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(173,255,0,0.11);
-  border: 1px solid rgba(173,255,0,0.18);
-  color: var(--tw-acid);
-  font-size: 0.84rem;
-  line-height: 1.2;
+  display: none !important;
 }
 
-/* Tagi */
-.tw-race-tags,
-.tw-package-items {
+.tw-race-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -477,7 +462,11 @@ avatar + manual bio flow
   letter-spacing: 0.03em;
 }
 
-/* Hint select */
+.tw-subrace-card .tw-race-tag {
+  border-color: rgba(173,255,0,0.14);
+  background: rgba(255,255,255,0.04);
+}
+
 .tw-race-select-hint {
   margin-top: auto;
   display: inline-flex;
@@ -488,14 +477,150 @@ avatar + manual bio flow
   text-transform: uppercase;
 }
 
-/* Subrace heading */
+/* ===== SUBRACE SECTION ===== */
+
+.tw-subrace-section {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(173,255,0,0.12);
+}
+
+.tw-subrace-section[hidden] {
+  display: none !important;
+}
+
 .tw-subrace-heading {
-  margin: 28px 0 14px;
+  margin: 0 0 14px;
   color: var(--tw-acid);
   font-size: 0.96rem;
 }
 
-/* ===== STANY ŁADOWANIA / BŁĘDY ===== */
+/* ===== CLASS CARDS ===== */
+
+.tw-class-card {
+  min-height: 320px;
+}
+
+.tw-class-card__img-wrap {
+  min-height: 140px;
+  max-height: 140px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
+  border-bottom: 1px solid rgba(173,255,0,0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tw-class-card__img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  filter: drop-shadow(0 0 10px rgba(173,255,0,0.10));
+}
+
+.tw-class-card__img-wrap--placeholder {
+  color: rgba(173,255,0,0.72);
+  font-size: 2rem;
+}
+
+.tw-class-card__body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.tw-class-card__name {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.15;
+  color: var(--tw-text);
+}
+
+.tw-class-card__desc {
+  display: none !important;
+}
+
+.tw-class-card .tw-race-tags {
+  margin-top: 2px;
+}
+
+.tw-class-card .tw-race-select-hint {
+  margin-top: auto;
+  opacity: 0.9;
+}
+
+/* ===== SKILLS ===== */
+
+.tw-skill-counter {
+  margin: -6px 0 18px;
+  color: var(--tw-text-dim);
+  font-size: 0.95rem;
+}
+
+.tw-skill-category + .tw-skill-category {
+  margin-top: 20px;
+}
+
+.tw-skill-cat-label {
+  margin: 0 0 10px;
+  color: var(--tw-acid);
+  font-size: 0.84rem;
+}
+
+.tw-skill-card .tw-race-img {
+  min-height: 120px;
+  max-height: 120px;
+  padding: 14px;
+}
+
+.tw-skill-card .tw-race-body {
+  gap: 8px;
+}
+
+.tw-skill-card .tw-race-name {
+  font-size: 1rem;
+}
+
+.tw-skill-card .tw-race-tags,
+.tw-skill-card .tw-race-bonus,
+.tw-skill-card .tw-race-select-hint {
+  display: none !important;
+}
+
+.tw-skill-card .tw-race-desc {
+  display: block !important;
+  margin: 0;
+  color: var(--tw-text-dim);
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+/* ===== LORE CARDS ===== */
+
+.tw-lore-card__effects {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.tw-lore-card__effect {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(173,255,0,0.10);
+  background: rgba(255,255,255,0.03);
+}
+
+.tw-lore-card__effect strong {
+  color: var(--tw-acid);
+}
+
+/* ===== STATES ===== */
 
 .tw-loading,
 .tw-empty-state,
@@ -585,7 +710,7 @@ avatar + manual bio flow
 
 .tw-attr-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 18px;
@@ -606,6 +731,10 @@ avatar + manual bio flow
   font-size: 1.4rem;
 }
 
+.tw-attr-info {
+  min-width: 0;
+}
+
 .tw-attr-info h4 {
   margin: 0 0 4px;
   font-size: 1rem;
@@ -624,9 +753,19 @@ avatar + manual bio flow
   line-height: 1.5;
 }
 
+.tw-attr-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  min-width: 150px;
+}
+
 .tw-attr-stepper {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -662,8 +801,8 @@ avatar + manual bio flow
 }
 
 .tw-attr-pips {
-  grid-column: 2 / 4;
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -682,44 +821,7 @@ avatar + manual bio flow
   box-shadow: 0 0 12px rgba(173,255,0,0.46);
 }
 
-/* ===== SKILLS ===== */
-
-.tw-skill-counter {
-  margin: -6px 0 18px;
-  color: var(--tw-text-dim);
-  font-size: 0.95rem;
-}
-
-.tw-skill-category + .tw-skill-category {
-  margin-top: 20px;
-}
-
-.tw-skill-cat-label {
-  margin: 0 0 10px;
-  color: var(--tw-acid);
-  font-size: 0.84rem;
-}
-
-/* ===== LORE CARDS (origin / operation / crisis) ===== */
-
-.tw-lore-card__effects {
-  display: grid;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.tw-lore-card__effect {
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(173,255,0,0.10);
-  background: rgba(255,255,255,0.03);
-}
-
-.tw-lore-card__effect strong {
-  color: var(--tw-acid);
-}
-
-/* ===== AVATAR UPLOAD ===== */
+/* ===== AVATAR ===== */
 
 .tw-upload-box {
   padding: 22px;
@@ -767,7 +869,7 @@ avatar + manual bio flow
   background: rgba(255,255,255,0.03);
 }
 
-/* ===== BUTTONY / LINKI ===== */
+/* ===== BUTTONS ===== */
 
 .tw-link-btn,
 .tw-avatar-clear,
@@ -828,7 +930,7 @@ avatar + manual bio flow
   box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
-/* ===== PODSUMOWANIE ===== */
+/* ===== SUMMARY ===== */
 
 .tw-summary-grid {
   display: grid;
@@ -871,7 +973,7 @@ avatar + manual bio flow
   cursor: pointer;
 }
 
-/* ===== STATUS / ERROR ===== */
+/* ===== STATUS ===== */
 
 .tw-char-status {
   margin-top: 16px;
@@ -924,7 +1026,7 @@ avatar + manual bio flow
   75%      { transform: translateX(-2px); }
 }
 
-/* ===== NAWIGACJA ===== */
+/* ===== NAV ===== */
 
 .tw-nav-row {
   display: flex;
@@ -953,7 +1055,7 @@ avatar + manual bio flow
   color: var(--tw-text);
 }
 
-/* ===== GLOBALNY SPINNER ===== */
+/* ===== SPINNER ===== */
 
 #tw-char-spinner {
   position: fixed;
@@ -1019,7 +1121,7 @@ avatar + manual bio flow
   line-height: 1.5;
 }
 
-/* ===== RESPONSYWNOŚĆ ===== */
+/* ===== RESPONSIVE ===== */
 
 @media (max-width: 900px) {
   #tw-char-creator-wrapper {
@@ -1037,10 +1139,18 @@ avatar + manual bio flow
 
   .tw-attr-row {
     grid-template-columns: 1fr;
+    align-items: start;
   }
 
+  .tw-attr-controls {
+    width: 100%;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .tw-attr-stepper,
   .tw-attr-pips {
-    grid-column: auto;
+    justify-content: flex-start;
   }
 }
 
@@ -1075,5 +1185,17 @@ avatar + manual bio flow
 
   .tw-progress-header {
     align-items: flex-start;
+  }
+
+  .tw-class-card,
+  .tw-grid-card,
+  .tw-skill-card {
+    min-height: auto;
+  }
+
+  .tw-class-card__img-wrap,
+  .tw-race-img {
+    min-height: 120px;
+    max-height: 120px;
   }
 }
