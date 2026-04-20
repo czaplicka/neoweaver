@@ -1,15 +1,14 @@
 (function () {
   'use strict';
 
-  // ==========================
-  // AUDIO FEEDBACK
-  // ==========================
   var NW_SFX = (function () {
     var ctx = null;
+
     function getCtx() {
       if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
       return ctx;
     }
+
     function beep(freq, type, duration, vol) {
       try {
         var ac = getCtx();
@@ -25,49 +24,202 @@
         osc.stop(ac.currentTime + (duration || 0.08));
       } catch (e) {}
     }
+
     return {
       nav: function () { beep(660, 'square', 0.06, 0.15); },
       select: function () { beep(880, 'sine', 0.10, 0.20); },
       back: function () { beep(330, 'sawtooth', 0.08, 0.12); },
-      deploy: function () { beep(440, 'square', 0.10, 0.20); setTimeout(function(){ beep(660, 'sine', 0.15, 0.25); }, 120); },
+      deploy: function () {
+        beep(440, 'square', 0.10, 0.20);
+        setTimeout(function () { beep(660, 'sine', 0.15, 0.25); }, 120);
+      },
       error: function () { beep(180, 'sawtooth', 0.18, 0.20); },
       preset: function () { beep(740, 'sine', 0.12, 0.22); }
     };
   })();
 
-  // ==========================
-  // UTILS
-  // ==========================
+  var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
+  var ATTR_MIN = 1;
+  var ATTR_MAX = 5;
+  var ATTR_POOL = 12;
+
+  var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
+  var RACES_FALLBACK = [];
+
+  var DATA_ORIGIN_OPTIONS = [
+    {
+      key: 'palace',
+      label: 'Palace',
+      desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.',
+      bonus_tag: 'Wealthy',
+      bonus_desc: '+100 Credits at initialization.',
+      flaw_tag: 'Fragile-Gear',
+      flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.'
+    },
+    {
+      key: 'slums',
+      label: 'Slums',
+      desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.',
+      bonus_tag: 'Street-Smart',
+      bonus_desc: 'Reveal hidden mechanics in locations tagged #city or #shady.',
+      flaw_tag: 'Malnourished',
+      flaw_desc: 'Max Satiety -2.'
+    },
+    {
+      key: 'void-labs',
+      label: 'Void Labs',
+      desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.',
+      bonus_tag: 'Fast-Sync',
+      bonus_desc: 'Resting recovers +2 additional Sync.',
+      flaw_tag: 'Social-Glitch',
+      flaw_desc: '-10% success rate on Social actions vs #human targets.'
+    },
+    {
+      key: 'borderlines',
+      label: 'Borderlines',
+      desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.',
+      bonus_tag: 'Scout',
+      bonus_desc: 'Travel between nodes consumes -1 Satiety.',
+      flaw_tag: 'Analog-Mind',
+      flaw_desc: 'Cannot use #Digital cards during the first 3 turns of a Deployment.'
+    }
+  ];
+
+  var PREVIOUS_OPERATION_OPTIONS = [
+    {
+      key: 'repair-unit',
+      label: '[REPAIR UNIT]',
+      desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.',
+      bonus_tag: 'Technician',
+      bonus_desc: 'Utility items restore +50% more Durability.',
+      flaw_tag: 'Heavy-Handed',
+      flaw_desc: '-5% success rate on Acrobatics and Stealth tests.'
+    },
+    {
+      key: 'void-runner',
+      label: '[VOID-RUNNER]',
+      desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.',
+      bonus_tag: 'Agile',
+      bonus_desc: 'Playing a Dodge card allows drawing an extra card on the next turn.',
+      flaw_tag: 'Light-Frame',
+      flaw_desc: 'Starting Max HP -1.'
+    },
+    {
+      key: 'archive-analyst',
+      label: '[ARCHIVE ANALYST]',
+      desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.',
+      bonus_tag: 'Researcher',
+      bonus_desc: '+5% success rate on Arcana and Science tests.',
+      flaw_tag: 'Code-Bound',
+      flaw_desc: 'Cannot equip two-handed weapons.'
+    },
+    {
+      key: 'enforcer',
+      label: '[ENFORCER]',
+      desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.',
+      bonus_tag: 'Unyielding',
+      bonus_desc: 'Ignore the first Pressure or Panic card encountered in every combat.',
+      flaw_tag: 'Loud-Footsteps',
+      flaw_desc: 'Cannot obtain "First Strike" bonus from stealth.'
+    }
+  ];
+
+  var SYNC_CRISIS_OPTIONS = [
+    {
+      key: 'system-stabilizer',
+      label: '[SYSTEM STABILIZER]',
+      desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.',
+      bonus_tag: 'Glitch-Learner',
+      bonus_desc: '+10% global XP gain.',
+      flaw_tag: 'System-Spasm',
+      flaw_desc: 'Every 10 turns, one random card from your hand is discarded/burned.'
+    },
+    {
+      key: 'aggressive-response',
+      label: '[AGGRESSIVE RESPONSE]',
+      desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.',
+      bonus_tag: 'Striker',
+      bonus_desc: 'Every played Attack card generates +1 additional XP for itself.',
+      flaw_tag: 'Reckless',
+      flaw_desc: 'On failure in a Physical test, lose an additional 1 Durability on armor.'
+    },
+    {
+      key: 'data-ghost-adaptation',
+      label: '[DATA-GHOST ADAPTATION]',
+      desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.',
+      bonus_tag: 'Iron-Grip',
+      bonus_desc: 'Your physical attack cards cannot be countered.',
+      flaw_tag: 'Feedback-Vulnerability',
+      flaw_desc: 'Receive double damage from enemies with the #Hacker or #Digital tag.'
+    },
+    {
+      key: 'sensory-overload',
+      label: '[SENSORY OVERLOAD]',
+      desc: 'You survived by embracing the flood of input, turning collapse into unstable power.',
+      bonus_tag: 'Wild-Card',
+      bonus_desc: 'Critical successes deal triple damage instead of double.',
+      flaw_tag: 'Magnetized',
+      flaw_desc: 'In locations tagged #High-Technology, suffer -5% to all tests.'
+    }
+  ];
+
+  var formState = {
+    character_name: '',
+    pronouns: '',
+    race: '',
+    subrace: '',
+    race_label: '',
+    subrace_label: '',
+    character_class: '',
+    class_label: '',
+    avatar_file: null,
+    bio: '',
+    attr_body: ATTR_MIN,
+    attr_reflex: ATTR_MIN,
+    attr_mind: ATTR_MIN,
+    attr_spirit: ATTR_MIN,
+    skills: [],
+    skill_limit: 5,
+    starting_package_id: '',
+    starting_package_label: '',
+    data_origin: '',
+    previous_operation: '',
+    sync_crisis: '',
+    backstory_tags: []
+  };
+
   function esc(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
+    return String(str == null ? '' : str)
       .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   function ajaxUrl() {
-    return (window.twCharCreatorAjax && window.twCharCreatorAjax.ajax_url) || (window.ajaxurl || '');
-  }
-  function nonce() {
-    return (window.twCharCreatorAjax && window.twCharCreatorAjax.nonce) || '';
+    return cfg.ajaxurl || cfg.ajax_url || '/wp-admin/admin-ajax.php';
   }
 
-  function fetchPost(action, payload) {
-    var data = new FormData();
-    data.append('action', action);
-    data.append('nonce', nonce());
-    if (payload && typeof payload === 'object') {
-      Object.keys(payload).forEach(function (key) {
-        data.append(key, payload[key]);
-      });
-    }
+  function nonce() {
+    return cfg.nonce || '';
+  }
+
+  function fetchPost(action, extraData) {
+    var fd = new FormData();
+    fd.append('action', action);
+    fd.append('nonce', nonce());
+    Object.keys(extraData || {}).forEach(function (key) {
+      fd.append(key, extraData[key]);
+    });
+
     return fetch(ajaxUrl(), {
       method: 'POST',
       credentials: 'same-origin',
-      body: data
-    }).then(function (r) { return r.json(); });
+      body: fd
+    }).then(function (r) {
+      return r.json();
+    });
   }
 
   function makeSpinner(id, title, subtitle) {
@@ -78,9 +230,10 @@
         hide: function () { existing.classList.remove('active'); }
       };
     }
+
     var el = document.createElement('div');
     el.id = id;
-    el.innerHTML =
+    el.innerHTML = '' +
       '<div class="tw-spinner-inner">' +
         '<div class="tw-spinner-ring"></div>' +
         '<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
@@ -88,49 +241,52 @@
         '<p class="tw-spinner-sub">' + esc(subtitle) + '</p>' +
       '</div>';
     document.body.appendChild(el);
+
     return {
       show: function () { el.classList.add('active'); },
       hide: function () { el.classList.remove('active'); }
     };
   }
 
-  // ==========================
-  // STATE
-  // ==========================
-  var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
-  var ATTR_MIN = 1;
-  var ATTR_MAX = 5;
-  var ATTR_POOL = 16;
+  function setStatus(msg, isError) {
+    var el = document.querySelector('#tw-char-status-msg');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'tw-char-status' + (isError ? ' tw-char-status--error' : '');
+  }
 
-  var formState = {
-    character_name: '',
-    pronouns: '',
-    backstory: '',
-    bio: '',
-    race: '',
-    race_label: '',
-    subrace: '',
-    subrace_label: '',
-    character_class: '',
-    class_label: '',
-    skill_limit: 5,
-    skills: [],
-    starting_package_id: '',
-    starting_package_label: '',
-    data_origin: '',
-    previous_operation: '',
-    sync_crisis: '',
-    backstory_tags: [],
-    avatar_file: null,
-    attr_body: ATTR_MIN,
-    attr_reflex: ATTR_MIN,
-    attr_mind: ATTR_MIN,
-    attr_spirit: ATTR_MIN
-  };
+  function getCurrentStepErrorBox(stepEl) {
+    if (!stepEl) return null;
+    var errEl = stepEl.querySelector('.tw-step-error');
+    if (!errEl) {
+      errEl = document.createElement('div');
+      errEl.className = 'tw-step-error';
+      var navRow = stepEl.querySelector('.tw-nav-row');
+      if (navRow) stepEl.insertBefore(errEl, navRow);
+      else stepEl.appendChild(errEl);
+    }
+    return errEl;
+  }
 
-  // ==========================
-  // CARD BUILDERS
-  // ==========================
+  function showStepError(stepEl, msg) {
+    if (!stepEl) return;
+    var errEl = getCurrentStepErrorBox(stepEl);
+    if (!errEl) return;
+    errEl.innerHTML = '<span class="tw-step-error__icon">⚠</span><span class="tw-step-error__msg">' + esc(msg) + '</span>';
+    errEl.classList.add('visible');
+    errEl.classList.remove('tw-step-error--shake');
+    void errEl.offsetWidth;
+    errEl.classList.add('tw-step-error--shake');
+    errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    NW_SFX.error();
+  }
+
+  function clearStepError(stepEl) {
+    if (!stepEl) return;
+    var errEl = stepEl.querySelector('.tw-step-error');
+    if (errEl) errEl.classList.remove('visible', 'tw-step-error--shake');
+  }
+
   function buildTagsHtml(tags) {
     if (!tags || !tags.length) return '';
     return '<div class="tw-race-tags">' + tags.map(function (t) {
@@ -161,7 +317,7 @@
   function buildSubraceCard(sub) {
     var imgSrc = sub.img || sub.img_url || '';
     var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(sub.label || sub.name) + '" alt="' + esc(sub.label || sub.name) + '" loading="lazy"></div>'
+      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(sub.label || sub.name) + '" loading="lazy"></div>'
       : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
     return '' +
@@ -178,97 +334,144 @@
       '</div>';
   }
 
-  function buildClassCard(cls) {
-    var imgSrc = cls.img_url || '';
-    var imgHtml = imgSrc
-      ? '<div class="tw-class-card__img-wrap tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" loading="lazy"></div>'
-      : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span class="tw-race-card__icon">◎</span></div>';
-
-    var tags = (cls.tags || []).map(function (t) { return { name: t }; });
-
+  function buildLoreChoiceCard(item, kind) {
     return '' +
-      '<div class="tw-class-card"' +
-        ' data-char-class="' + esc(cls.id || '') + '"' +
-        ' data-class-tag="' + esc(cls.name || '') + '"' +
-        ' data-skilllimit="' + String(cls.skill_limit != null ? cls.skill_limit : 5) + '"' +
-        ' role="button" tabindex="0" aria-pressed="false">' +
-        imgHtml +
-        '<div class="tw-class-card__body">' +
-          '<h4 class="tw-class-card__name">' + esc(cls.name) + '</h4>' +
-          (cls.description ? '<p class="tw-class-card__desc">' + esc(cls.description) + '</p>' : '') +
-          buildTagsHtml(tags) +
+      '<div class="tw-lore-card tw-grid-card" data-choice-type="' + esc(kind) + '" data-choice-key="' + esc(item.key) + '" data-label="' + esc(item.label) + '" data-bonus-tag="' + esc(item.bonus_tag) + '" data-flaw-tag="' + esc(item.flaw_tag) + '" role="button" tabindex="0" aria-pressed="false">' +
+        '<div class="tw-race-body">' +
+          '<h4 class="tw-race-name">' + esc(item.label) + '</h4>' +
+          '<p class="tw-race-desc">' + esc(item.desc || '') + '</p>' +
+          '<div class="tw-lore-card__effects">' +
+            '<div class="tw-lore-card__effect"><strong>BONUS:</strong> ' + esc(item.bonus_tag) + ' — ' + esc(item.bonus_desc || '') + '</div>' +
+            '<div class="tw-lore-card__effect"><strong>FLAW:</strong> ' + esc(item.flaw_tag) + ' — ' + esc(item.flaw_desc || '') + '</div>' +
+          '</div>' +
+          buildTagsHtml([item.bonus_tag, item.flaw_tag]) +
           '<span class="tw-race-select-hint">select</span>' +
         '</div>' +
       '</div>';
+  }
+
+  function renderLoreChoices(wrapper) {
+    var originGrid = wrapper.querySelector('#tw-origin-grid');
+    var operationGrid = wrapper.querySelector('#tw-operation-grid');
+    var crisisGrid = wrapper.querySelector('#tw-crisis-grid');
+
+    if (originGrid && !originGrid.dataset.rendered) {
+      originGrid.innerHTML = DATA_ORIGIN_OPTIONS.map(function (item) {
+        return buildLoreChoiceCard(item, 'data_origin');
+      }).join('');
+      originGrid.dataset.rendered = '1';
+    }
+
+    if (operationGrid && !operationGrid.dataset.rendered) {
+      operationGrid.innerHTML = PREVIOUS_OPERATION_OPTIONS.map(function (item) {
+        return buildLoreChoiceCard(item, 'previous_operation');
+      }).join('');
+      operationGrid.dataset.rendered = '1';
+    }
+
+    if (crisisGrid && !crisisGrid.dataset.rendered) {
+      crisisGrid.innerHTML = SYNC_CRISIS_OPTIONS.map(function (item) {
+        return buildLoreChoiceCard(item, 'sync_crisis');
+      }).join('');
+      crisisGrid.dataset.rendered = '1';
+    }
+  }
+
+  function choiceByKey(kind, key) {
+    var set = [];
+    if (kind === 'data_origin') set = DATA_ORIGIN_OPTIONS;
+    else if (kind === 'previous_operation') set = PREVIOUS_OPERATION_OPTIONS;
+    else if (kind === 'sync_crisis') set = SYNC_CRISIS_OPTIONS;
+
+    for (var i = 0; i < set.length; i++) {
+      if (set[i].key === key) return set[i];
+    }
+    return null;
+  }
+
+  function recomputeBackstoryTags() {
+    var tags = [];
+    ['data_origin', 'previous_operation', 'sync_crisis'].forEach(function (kind) {
+      var row = choiceByKey(kind, formState[kind]);
+      if (row) {
+        if (row.bonus_tag) tags.push(row.bonus_tag);
+        if (row.flaw_tag) tags.push(row.flaw_tag);
+      }
+    });
+    formState.backstory_tags = tags;
+  }
+
+  function buildClassCard(cls) {
+    var imgSrc = cls.img_url || cls.imgurl || '';
+    var imgHtml = imgSrc
+      ? '<div class="tw-class-card__img-wrap"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" width="220" height="220" loading="lazy"></div>'
+      : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + esc(cls.icon_slug || '✦') + '</span></div>';
+
+    return '<div class="tw-class-card" data-char-class="' + esc(cls.id || cls.name) + '" data-label="' + esc(cls.name || '') + '" data-class-tag="' + esc((cls.name || '').toLowerCase()) + '" data-skilllimit="' + esc(parseInt(cls.skill_limit, 10) || 5) + '" role="button" tabindex="0" aria-pressed="false">' +
+      imgHtml +
+      '<div class="tw-class-card__body">' +
+        '<h4 class="tw-class-card__name">' + esc(cls.name || '') + '</h4>' +
+        ((cls.description) ? '<p class="tw-class-card__desc">' + esc(cls.description) + '</p>' : '') +
+        buildTagsHtml(cls.tags || []) +
+        '<span class="tw-race-select-hint">select</span>' +
+      '</div>' +
+    '</div>';
   }
 
   function buildSkillCard(skill) {
-    var imgSrc = skill.img_url || '';
+    var imgSrc = skill.img_url || skill.imgurl || '';
+    var tags = [].concat(skill.tags || [], skill.linked_attributes || []);
     var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" loading="lazy"></div>'
-      : '';
+      ? '<div class="tw-race-img"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" width="220" height="220" loading="lazy"></div>'
+      : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
-    var tags = (skill.tags || []).map(function (t) { return { name: t }; });
-
-    return '' +
-      '<div class="tw-grid-card tw-skill-card" data-skill-id="' + esc(skill.id || '') + '"' +
-        ' role="button" tabindex="0" aria-pressed="false">' +
-        (imgHtml || '') +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(skill.name) + '</h4>' +
-          (skill.description ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
-          buildTagsHtml(tags) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
+    return '<div class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-label="' + esc(skill.name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
+      imgHtml +
+      '<div class="tw-race-body">' +
+        '<h4 class="tw-race-name">' + esc(skill.name || '') + '</h4>' +
+        ((skill.description) ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
+        buildTagsHtml(tags) +
+        '<span class="tw-race-select-hint">select</span>' +
+      '</div>' +
+    '</div>';
   }
 
   function buildPackageCard(pkg) {
-    var tags = (pkg.compatibility_tags || []).map(function (t) { return { name: t }; });
+    var tags = pkg.compatibility_tags || [];
     var items = pkg.items_list || [];
-    var itemsPreview = items.length
-      ? '<div class="tw-package-items">' + items.slice(0, 4).map(function (it) {
-          return '<span class="tw-race-tag">' + esc(it) + '</span>';
+    var itemsPreview = Array.isArray(items) && items.length
+      ? '<div class="tw-package-items">' + items.slice(0, 5).map(function (item) {
+          return '<span class="tw-race-tag">' + esc(typeof item === 'string' ? item : (item.name || item.label || 'item')) + '</span>';
         }).join('') + '</div>'
       : '';
 
-    return '' +
-      '<div class="tw-grid-card tw-package-card" data-package-id="' + esc(pkg.id || '') + '"' +
-        ' role="button" tabindex="0" aria-pressed="false">' +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(pkg.package_name || '') + '</h4>' +
-          (pkg.description ? '<p class="tw-class-card__desc">' + esc(pkg.description) + '</p>' : '') +
-          ((pkg.base_armor != null) ? '<span class="tw-race-bonus">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
-          buildTagsHtml(tags) +
-          itemsPreview +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
+    return '<div class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id || '') + '" data-label="' + esc(pkg.package_name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
+      '<div class="tw-race-body">' +
+        '<h4 class="tw-race-name">' + esc(pkg.package_name || '') + '</h4>' +
+        ((pkg.description) ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
+        ((pkg.base_armor != null) ? '<span class="tw-race-bonus">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
+        buildTagsHtml(tags) +
+        itemsPreview +
+        '<span class="tw-race-select-hint">select</span>' +
+      '</div>' +
+    '</div>';
   }
-
-  // ==========================
-  // FETCHERS
-  // ==========================
-  var RACES_FALLBACK = [];
 
   function fetchRaceGrid(wrapper) {
     var grid = wrapper.querySelector('#tw-race-grid');
     if (!grid || grid.dataset.rendered) return;
+
     grid.innerHTML = '<p class="tw-loading">SCANNING RACE DATABASE…</p>';
 
     fetchPost('neoweaver_get_races', {})
       .then(function (res) {
         var rows = (res && res.success && res.data && res.data.length) ? res.data : RACES_FALLBACK;
-        grid.innerHTML = rows.length
-          ? rows.map(buildRaceCard).join('')
-          : '<p class="tw-empty-state">No races available.</p>';
+        grid.innerHTML = rows.length ? rows.map(buildRaceCard).join('') : '<p class="tw-empty-state">No races available.</p>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       })
       .catch(function () {
-        grid.innerHTML = RACES_FALLBACK.length
-          ? RACES_FALLBACK.map(buildRaceCard).join('')
-          : '<p class="tw-error-msg">ERROR: Race data unavailable.</p>';
+        grid.innerHTML = RACES_FALLBACK.length ? RACES_FALLBACK.map(buildRaceCard).join('') : '<p class="tw-error-msg">ERROR: Race data unavailable.</p>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       });
@@ -362,6 +565,7 @@
         } else {
           grid.innerHTML = '<p class="tw-empty-state">No skills available.</p>';
         }
+
         grid.dataset.rendered = '1';
         updateSkillCounter(wrapper);
         restoreSelections(wrapper);
@@ -374,9 +578,7 @@
   function selectedClassTag(wrapper) {
     if (!formState.class_label) return '';
     var selected = wrapper.querySelector('.tw-class-card.selected');
-    if (selected && selected.dataset.classTag) {
-      return String(selected.dataset.classTag).trim().toLowerCase();
-    }
+    if (selected && selected.dataset.classTag) return String(selected.dataset.classTag).trim().toLowerCase();
     return String(formState.class_label).trim().toLowerCase();
   }
 
@@ -390,15 +592,12 @@
       return;
     }
 
-    grid.innerHTML = '<p class="tw-loading">SCANNING LOADOUT PROTOCOLS…</p>';
+    grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>FETCHING STARTING PACKAGES…</div>';
 
     fetchPost('neoweaver_get_starting_packages', { class_tag: classTag })
       .then(function (res) {
-        if (res && res.success && res.data && res.data.length) {
-          grid.innerHTML = res.data.map(buildPackageCard).join('');
-        } else {
-          grid.innerHTML = '<p class="tw-empty-state">No starting packages available for this class.</p>';
-        }
+        if (res && res.success && res.data && res.data.length) grid.innerHTML = res.data.map(buildPackageCard).join('');
+        else grid.innerHTML = '<p class="tw-empty-state">No starting packages available for this class.</p>';
         grid.dataset.rendered = classTag;
         restoreSelections(wrapper);
       })
@@ -407,9 +606,6 @@
       });
   }
 
-  // ==========================
-  // ATTRIBUTES
-  // ==========================
   function renderAttrDisplay(wrapper) {
     ATTR_KEYS.forEach(function (key) {
       var val = formState['attr_' + key] || ATTR_MIN;
@@ -424,6 +620,7 @@
     var used = ATTR_KEYS.reduce(function (sum, k) {
       return sum + (formState['attr_' + k] || ATTR_MIN);
     }, 0);
+
     var remainEl = wrapper.querySelector('#tw-attr-remaining');
     if (remainEl) remainEl.textContent = ATTR_POOL - used;
   }
@@ -439,17 +636,16 @@
     ATTR_KEYS.forEach(function (k) {
       formState['attr_' + k] = parseInt(presetBtn.dataset[k], 10);
     });
+
     var allPresets = wrapper.querySelectorAll('.tw-attr-preset-btn');
     for (var i = 0; i < allPresets.length; i++) {
       allPresets[i].classList.toggle('active', allPresets[i] === presetBtn);
     }
+
     renderAttrDisplay(wrapper);
     NW_SFX.preset();
   }
 
-  // ==========================
-  // AVATAR
-  // ==========================
   function handleAvatarFile(wrapper, file) {
     var allowed = ['image/jpeg', 'image/png', 'image/webp'];
     if (!file || allowed.indexOf(file.type) === -1 || file.size > 2 * 1024 * 1024) {
@@ -457,8 +653,10 @@
       NW_SFX.error();
       return;
     }
+
     formState.avatar_file = file;
     NW_SFX.select();
+
     var reader = new FileReader();
     reader.onload = function (ev) {
       var imgEl = wrapper.querySelector('#tw-avatar-img');
@@ -471,18 +669,6 @@
     reader.readAsDataURL(file);
   }
 
-  // ==========================
-  // SUMMARY
-  // ==========================
-  function choiceByKey(type, key) {
-    if (!window.twCharCreatorChoices || !key) return null;
-    var list = window.twCharCreatorChoices[type] || [];
-    for (var i = 0; i < list.length; i++) {
-      if (String(list[i].key) === String(key)) return list[i];
-    }
-    return null;
-  }
-
   function updateSummary(wrapper) {
     function set(id, val) {
       var el = wrapper.querySelector('#tw-summary-' + id);
@@ -491,70 +677,37 @@
 
     set('character-name', formState.character_name);
     set('pronouns', formState.pronouns);
-
-    set('backstory', formState.backstory
-      ? (formState.backstory.length > 80 ? formState.backstory.substring(0, 80) + '…' : formState.backstory)
-      : '—'
-    );
-
-    set('race',
-      [formState.race_label, formState.subrace_label].filter(Boolean).join(' / ') ||
-      formState.race ||
-      '—'
-    );
-
+    set('race', [formState.race_label, formState.subrace_label].filter(Boolean).join(' / ') || formState.race || '—');
     set('class', formState.class_label || formState.character_class || '—');
-
     set('attrs', ATTR_KEYS.map(function (k) {
-      return k.toUpperCase() + ' ' + (formState['attr_' + k] || ATTR_MIN);
+      return k.toUpperCase() + ' ' + formState['attr_' + k];
     }).join(' · '));
-
     set('skills', formState.skills.length ? (formState.skills.length + ' selected') : '—');
     set('package', formState.starting_package_label || '—');
 
-    var origin    = choiceByKey('data_origin', formState.data_origin);
+    var origin = choiceByKey('data_origin', formState.data_origin);
     var operation = choiceByKey('previous_operation', formState.previous_operation);
-    var crisis    = choiceByKey('sync_crisis', formState.sync_crisis);
+    var crisis = choiceByKey('sync_crisis', formState.sync_crisis);
 
-    set('origin',    origin    ? origin.label    : '—');
+    set('origin', origin ? origin.label : '—');
     set('operation', operation ? operation.label : '—');
-    set('crisis',    crisis    ? crisis.label    : '—');
-
-    set('tag-bundle',
-      formState.backstory_tags.length ? formState.backstory_tags.join(' · ') : '—'
-    );
-
-    set('bio', formState.bio
-      ? (formState.bio.length > 80 ? formState.bio.substring(0, 80) + '…' : formState.bio)
-      : '—'
-    );
+    set('crisis', crisis ? crisis.label : '—');
+    set('tag-bundle', formState.backstory_tags.length ? formState.backstory_tags.join(' · ') : '—');
+    set('bio', formState.bio ? (formState.bio.length > 80 ? formState.bio.substring(0, 80) + '…' : formState.bio) : '—');
 
     var avatarEl = wrapper.querySelector('#tw-summary-avatar');
-    if (avatarEl) {
-      avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
-    }
+    if (avatarEl) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
   }
 
-  // ==========================
-  // STATUS
-  // ==========================
-  var statusEl = null;
-  function setStatus(msg, isError) {
-    if (!statusEl) return;
-    statusEl.textContent = msg || '';
-    statusEl.classList.toggle('tw-char-status--error', !!isError);
-  }
-
-  // ==========================
-  // SUBMIT
-  // ==========================
   function submitCharacter(wrapper, steps, current, spinner) {
     setStatus('Uploading agent profile…', false);
+
     var submitBtn = wrapper.querySelector('#tw-char-submit');
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = '⏳ SYNCHRONIZING…';
     }
+
     spinner.show();
 
     var data = new FormData();
@@ -562,7 +715,6 @@
     data.append('nonce', nonce());
     data.append('character_name', formState.character_name);
     data.append('pronouns', formState.pronouns);
-    data.append('backstory', formState.backstory);
     data.append('bio', formState.bio);
     data.append('race', formState.race);
     data.append('subrace', formState.subrace);
@@ -578,9 +730,7 @@
       data.append('attr_' + k, formState['attr_' + k]);
     });
 
-    if (formState.avatar_file) {
-      data.append('avatar', formState.avatar_file);
-    }
+    if (formState.avatar_file) data.append('avatar', formState.avatar_file);
 
     var t0 = Date.now();
 
@@ -596,411 +746,399 @@
           spinner.hide();
           if (res && res.success) {
             setStatus('Agent profile created. Welcome to the Grid.', false);
+            wrapper.innerHTML = '<div class="tw-success"><p class="tw-success__msg">✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</p>' + (((res.data && res.data.redirect)) ? '<a href="' + esc(res.data.redirect) + '" class="tw-btn tw-btn--primary">Enter the Grid</a>' : '') + '</div>';
             NW_SFX.deploy();
-            var data = res.data || {};
-            wrapper.innerHTML =
-              '<div class="tw-success">' +
-                '<p class="tw-success__msg">✓ ' + esc(data.message || 'Character created!') + '</p>' +
-                (data.redirect
-                  ? '<a class="tw-btn tw-btn--primary" href="' + esc(data.redirect) + '">Enter the Grid</a>'
-                  : ''
-                ) +
-              '</div>';
           } else {
-            var msg = (res && res.data && res.data.message) || (res && res.message) || 'Unknown error.';
-            setStatus('ERROR: ' + msg, true);
+            var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Submission failed. Retry.';
+            setStatus('ERROR: ' + errMsg, true);
+            showStepError(steps[current], errMsg);
             if (submitBtn) {
               submitBtn.disabled = false;
-              submitBtn.textContent = 'Deploy Agent';
+              submitBtn.textContent = '⌘ SYNCHRONIZE AGENT';
             }
-            NW_SFX.error();
           }
         }, wait);
       })
       .catch(function () {
         spinner.hide();
-        setStatus('ERROR: Network failure.', true);
+        setStatus('ERROR: Connection lost. Check your link and retry.', true);
+        NW_SFX.error();
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Deploy Agent';
+          submitBtn.textContent = '⌘ SYNCHRONIZE AGENT';
         }
-        NW_SFX.error();
       });
   }
 
-  // ==========================
-  // RESTORE SELECTIONS
-  // ==========================
   function restoreSelections(wrapper) {
-    // race
-    var raceCards = wrapper.querySelectorAll('.tw-race-card:not(.tw-subrace-card)');
-    for (var i = 0; i < raceCards.length; i++) {
-      var rc = raceCards[i];
-      var match = !!formState.race && rc.dataset.raceId === formState.race;
-      rc.classList.toggle('selected', match);
-      rc.setAttribute('aria-pressed', match ? 'true' : 'false');
+    var i, cards, isMatch;
+
+    cards = wrapper.querySelectorAll('.tw-race-card:not(.tw-subrace-card)');
+    for (i = 0; i < cards.length; i++) {
+      isMatch = !!formState.race && String(cards[i].dataset.raceId) === String(formState.race);
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     }
-    // subrace
-    var subCards = wrapper.querySelectorAll('.tw-subrace-card');
-    for (var j = 0; j < subCards.length; j++) {
-      var sc = subCards[j];
-      var sm = !!formState.subrace && sc.dataset.subraceId === formState.subrace;
-      sc.classList.toggle('selected', sm);
-      sc.setAttribute('aria-pressed', sm ? 'true' : 'false');
+
+    cards = wrapper.querySelectorAll('.tw-subrace-card');
+    for (i = 0; i < cards.length; i++) {
+      isMatch = !!formState.subrace && String(cards[i].dataset.subraceId) === String(formState.subrace);
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     }
-    // class
-    var classCards = wrapper.querySelectorAll('.tw-class-card');
-    for (var k = 0; k < classCards.length; k++) {
-      var cc = classCards[k];
-      var cm = !!formState.character_class && (cc.dataset.charClass === formState.character_class || cc.dataset.charclass === formState.character_class);
-      cc.classList.toggle('selected', cm);
-      cc.setAttribute('aria-pressed', cm ? 'true' : 'false');
+
+    cards = wrapper.querySelectorAll('.tw-class-card');
+    for (i = 0; i < cards.length; i++) {
+      isMatch = !!formState.character_class && String(cards[i].dataset.charClass) === String(formState.character_class);
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     }
-    // skills
-    var skillCards = wrapper.querySelectorAll('.tw-skill-card');
-    for (var s = 0; s < skillCards.length; s++) {
-      var card = skillCards[s];
-      var id = card.dataset.skillId;
-      var has = id && formState.skills.indexOf(id) !== -1;
-      card.classList.toggle('selected', has);
-      card.setAttribute('aria-pressed', has ? 'true' : 'false');
+
+    cards = wrapper.querySelectorAll('.tw-skill-card');
+    for (i = 0; i < cards.length; i++) {
+      isMatch = formState.skills.indexOf(cards[i].dataset.skillId) !== -1;
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     }
-    // packages
-    var pkgCards = wrapper.querySelectorAll('.tw-package-card');
-    for (var p = 0; p < pkgCards.length; p++) {
-      var pc = pkgCards[p];
-      var pm = !!formState.starting_package_id && pc.dataset.packageId === formState.starting_package_id;
-      pc.classList.toggle('selected', pm);
-      pc.setAttribute('aria-pressed', pm ? 'true' : 'false');
+
+    cards = wrapper.querySelectorAll('.tw-package-card');
+    for (i = 0; i < cards.length; i++) {
+      isMatch = !!formState.starting_package_id && String(cards[i].dataset.packageId) === String(formState.starting_package_id);
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     }
-    // attributes
-    renderAttrDisplay(wrapper);
-    // summary
-    updateSummary(wrapper);
-    // skill counter
+
+    cards = wrapper.querySelectorAll('.tw-lore-card');
+    for (i = 0; i < cards.length; i++) {
+      var type = cards[i].dataset.choiceType;
+      var key = cards[i].dataset.choiceKey;
+      isMatch = !!type && formState[type] === key;
+      cards[i].classList.toggle('selected', isMatch);
+      cards[i].setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+    }
+
     updateSkillCounter(wrapper);
   }
 
-  // ==========================
-  // VALIDATION
-  // ==========================
-  function validateAttrs() {
-    var total = ATTR_KEYS.reduce(function (sum, key) {
-      var v = formState['attr_' + key];
-      return sum + (typeof v === 'number' ? v : ATTR_MIN);
-    }, 0);
-    return total === ATTR_POOL;
-  }
+  function validateStep(wrapper, steps, idx) {
+    var step = steps[idx];
+    if (!step) return true;
 
-  function showStepError(wrapper, msg) {
-    var box = wrapper.querySelector('.tw-step-error');
-    if (!box) {
-      setStatus(msg, true);
-      return;
-    }
-    box.textContent = msg;
-    box.classList.add('visible');
-    box.classList.add('tw-step-error--shake');
-    setTimeout(function () {
-      box.classList.remove('tw-step-error--shake');
-    }, 280);
-  }
+    clearStepError(step);
 
-  function clearStepError(wrapper) {
-    var box = wrapper.querySelector('.tw-step-error');
-    if (box) {
-      box.classList.remove('visible');
-    }
-  }
-
-  function validateStep(wrapper, idx) {
-    clearStepError(wrapper);
-    // 0: name / pronouns
     if (idx === 0) {
-      if (!formState.character_name || !formState.character_name.trim()) {
-        showStepError(wrapper, 'Character name is required.');
+      var nameInput = wrapper.querySelector('#tw-char-name');
+      if (!nameInput || !nameInput.value.trim()) {
+        if (nameInput) nameInput.focus();
+        showStepError(step, 'ERROR: Agent designation is required.');
+        setStatus('ERROR: Agent designation is required.', true);
         return false;
       }
-      if (!formState.pronouns) {
-        showStepError(wrapper, 'Select pronouns for this agent.');
-        return false;
+
+      formState.character_name = nameInput.value.trim();
+
+      var checkedRadio = wrapper.querySelector('.tw-pronoun-radio:checked');
+      if (checkedRadio) {
+        if (checkedRadio.value === 'custom') {
+          var customEl = wrapper.querySelector('#tw-char-pronouns-custom');
+          formState.pronouns = customEl && customEl.value.trim() ? customEl.value.trim() : 'custom';
+        } else {
+          formState.pronouns = checkedRadio.value;
+        }
+      } else {
+        formState.pronouns = '';
       }
+
       return true;
     }
-    // 1: race
-    if (idx === 1) {
+
+    if (step.dataset.phase === 'RACE PROTOCOL') {
       if (!formState.race) {
-        showStepError(wrapper, 'Select a race to continue.');
+        showStepError(step, 'ERROR: Select a race to continue.');
+        setStatus('ERROR: Select a race to continue.', true);
         return false;
       }
       return true;
     }
-    // 2: class
-    if (idx === 2) {
+
+    if (step.dataset.phase === 'CLASS MATRIX') {
       if (!formState.character_class) {
-        showStepError(wrapper, 'Select a class to continue.');
+        showStepError(step, 'ERROR: Select a class to continue.');
+        setStatus('ERROR: Select a class to continue.', true);
         return false;
       }
       return true;
     }
-    // 3: attributes
-    if (idx === 3) {
-      if (!validateAttrs()) {
-        showStepError(wrapper, 'Allocate all attribute points (must total ' + ATTR_POOL + ').');
+
+    if (step.dataset.phase === 'BIOMETRIC CALIBRATION') {
+      var used = ATTR_KEYS.reduce(function (sum, k) {
+        return sum + (formState['attr_' + k] || ATTR_MIN);
+      }, 0);
+
+      if (used !== ATTR_POOL) {
+        showStepError(step, 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.');
+        setStatus('ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true);
         return false;
       }
       return true;
     }
-    // 4: skills
-    if (idx === 4) {
+
+    if (step.dataset.phase === 'SKILL SELECTION') {
       if (!formState.skills.length) {
-        showStepError(wrapper, 'Select at least one skill.');
+        showStepError(step, 'ERROR: Select at least 1 skill.');
+        setStatus('ERROR: Select at least 1 skill.', true);
         return false;
       }
+
       if (formState.skills.length > (formState.skill_limit || 5)) {
-        showStepError(wrapper, 'Too many skills selected for this class.');
+        showStepError(step, 'ERROR: Too many skills selected for this class.');
+        setStatus('ERROR: Too many skills selected for this class.', true);
         return false;
       }
+
       return true;
     }
-    // 5: starting package
-    if (idx === 5) {
+
+    if (step.dataset.phase === 'STARTING PACKAGE') {
       if (!formState.starting_package_id) {
-        showStepError(wrapper, 'Select a starting package to continue.');
+        showStepError(step, 'ERROR: Select a starting package to continue.');
+        setStatus('ERROR: Select a starting package to continue.', true);
         return false;
       }
       return true;
     }
-    // 6–8: narrative choices (at least one each)
-    if (idx === 6) {
+
+    if (step.dataset.phase === 'DATA ORIGIN') {
       if (!formState.data_origin) {
-        showStepError(wrapper, 'Select a data origin.');
+        showStepError(step, 'ERROR: Select a data origin to continue.');
+        setStatus('ERROR: Select a data origin to continue.', true);
         return false;
       }
       return true;
     }
-    if (idx === 7) {
+
+    if (step.dataset.phase === 'PREVIOUS OPERATION') {
       if (!formState.previous_operation) {
-        showStepError(wrapper, 'Select a previous operation.');
+        showStepError(step, 'ERROR: Select a previous operation to continue.');
+        setStatus('ERROR: Select a previous operation to continue.', true);
         return false;
       }
       return true;
     }
-    if (idx === 8) {
+
+    if (step.dataset.phase === 'SYNCHRONIZATION CRISIS') {
       if (!formState.sync_crisis) {
-        showStepError(wrapper, 'Select a synchronization crisis profile.');
+        showStepError(step, 'ERROR: Select a synchronization crisis response to continue.');
+        setStatus('ERROR: Select a synchronization crisis response to continue.', true);
         return false;
       }
+      recomputeBackstoryTags();
       return true;
     }
-    // 9: avatar / bio – nic nie jest wymagane
-    if (idx === 9) {
+
+    if (step.dataset.phase === 'VISUAL SIGNATURE') {
+      var bioEl = wrapper.querySelector('#tw-char-bio');
+      formState.bio = bioEl ? bioEl.value.trim() : '';
       return true;
     }
-    // 10: summary
-    if (idx === 10) {
-      return true;
-    }
+
     return true;
   }
 
-  // ==========================
-  // STEP NAVIGATION
-  // ==========================
-  function phases() {
-    return [
-      'IDENTITY PROTOCOL',
-      'RACE PROTOCOL',
-      'CLASS MATRIX',
-      'BIOMETRIC CALIBRATION',
-      'SKILL SELECTION',
-      'STARTING PACKAGE',
-      'DATA ORIGIN',
-      'PREVIOUS OPERATION',
-      'SYNCHRONIZATION CRISIS',
-      'VISUAL SIGNATURE',
-      'SYSTEM REVIEW'
-    ];
+  function resolveNextButton(target, wrapper) {
+    return target.closest('#tw-char-step1-next, .tw-btn-next, .tw-btn-nav[data-dir="next"]');
+  }
+
+  function resolvePrevButton(target, wrapper) {
+    return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"]');
   }
 
   function showStep(wrapper, steps, idx) {
-    for (var i = 0; i < steps.length; i++) {
-      steps[i].classList.toggle('active', i === idx);
-    }
-    var label = wrapper.querySelector('.tw-progress-label');
-    var counter = wrapper.querySelector('.tw-progress-counter');
-    var phase = wrapper.querySelector('.tw-progress-phase');
-    var fill = wrapper.querySelector('.tw-progress-fill');
+    steps.forEach(function (step, i) {
+      step.classList.toggle('active', i === idx);
+    });
+
+    setStatus('', false);
+
+    var phase = steps[idx] ? (steps[idx].dataset.phase || '') : '';
+    if (phase === 'CLASS MATRIX') fetchClassGrid(wrapper);
+    if (phase === 'SKILL SELECTION') fetchSkillGrid(wrapper);
+    if (phase === 'STARTING PACKAGE') fetchPackageGrid(wrapper);
+    if (phase === 'DATA ORIGIN' || phase === 'PREVIOUS OPERATION' || phase === 'SYNCHRONIZATION CRISIS') renderLoreChoices(wrapper);
+    if (phase === 'SYSTEM REVIEW') updateSummary(wrapper);
+
+    var fillEl = wrapper.querySelector('#tw-char-progress-fill');
+    var stepElCounter = wrapper.querySelector('#tw-char-step-current');
+    var phaseEl = wrapper.querySelector('#tw-char-progress-phase');
+
+    if (fillEl) fillEl.style.width = Math.round(((idx + 1) / steps.length) * 100) + '%';
+    if (stepElCounter) stepElCounter.textContent = idx + 1;
+    if (phaseEl) phaseEl.textContent = phase;
+
     var ticks = wrapper.querySelectorAll('.tw-progress-tick');
-
-    if (label) label.textContent = 'NEOWEAVER: ARCHITECT CORE';
-    if (counter) counter.textContent = 'STEP ' + (idx + 1) + ' / ' + steps.length;
-    if (phase) phase.textContent = phases()[idx] || '';
-
-    if (fill) fill.style.width = ((idx) / (steps.length - 1) * 100) + '%';
-
     for (var t = 0; t < ticks.length; t++) {
-      var stepNo = parseInt(ticks[t].dataset.tick, 10);
-      ticks[t].classList.toggle('active', stepNo <= (idx + 1));
+      ticks[t].classList.toggle('active', parseInt(ticks[t].dataset.tick, 10) <= idx + 1);
     }
 
-    clearStepError(wrapper);
-
-    var step = steps[idx];
-    var phaseName = phases()[idx] || '';
-
-    if (phaseName === 'RACE PROTOCOL') {
-      fetchRaceGrid(wrapper);
-    }
-    if (phaseName === 'CLASS MATRIX') {
-      fetchClassGrid(wrapper);
-    }
-    if (phaseName === 'SKILL SELECTION') {
-      fetchSkillGrid(wrapper);
-    }
-    if (phaseName === 'STARTING PACKAGE') {
-      fetchPackageGrid(wrapper);
-    }
-    if (phaseName === 'SYSTEM REVIEW') {
-      updateSummary(wrapper);
-    }
+    restoreSelections(wrapper);
   }
 
-  // ==========================
-  // MAIN INIT
-  // ==========================
-  function initCharacterCreator() {
+  function init() {
     var wrapper = document.getElementById('tw-char-creator-wrapper');
-    if (!wrapper) return;
+    if (!wrapper || wrapper.dataset.nwInit) return;
+    wrapper.dataset.nwInit = '1';
 
-    statusEl = wrapper.querySelector('.tw-char-status');
-
-    var steps = wrapper.querySelectorAll('.tw-step');
+    var steps = Array.prototype.slice.call(wrapper.querySelectorAll('.tw-step'));
+    var current = 0;
     if (!steps.length) return;
 
-    var current = 0;
-    var spinner = makeSpinner('tw-char-spinner', 'DEPLOYING AGENT…', 'Synchronizing character with the NeoWeave grid.');
+    var spinner = makeSpinner('tw-char-spinner', 'SYNCHRONIZING AGENT…', 'Writing operative data to the NeoWeave grid.');
 
-    showStep(wrapper, steps, current);
+    function goNext() {
+      if (validateStep(wrapper, steps, current)) {
+        clearStepError(steps[current]);
+        setStatus('', false);
+        if (current < steps.length - 1) {
+          current++;
+          NW_SFX.nav();
+          showStep(wrapper, steps, current);
+        }
+      }
+    }
+
+    function goPrev() {
+      clearStepError(steps[current]);
+      setStatus('', false);
+      if (current > 0) {
+        current--;
+        NW_SFX.back();
+        showStep(wrapper, steps, current);
+      }
+    }
+
+    fetchRaceGrid(wrapper);
     renderAttrDisplay(wrapper);
-    updateSummary(wrapper);
+    renderLoreChoices(wrapper);
 
-    // NAV BUTTONS
     wrapper.addEventListener('click', function (e) {
       var target = e.target;
 
-      // next
-      if (target.closest('.tw-btn-nav[data-dir="next"]')) {
+      var presetBtn = target.closest('.tw-attr-preset-btn');
+      if (presetBtn) {
         e.preventDefault();
-        if (!validateStep(wrapper, current)) {
-          NW_SFX.error();
-          return;
-        }
-        if (current < steps.length - 1) {
-          current++;
-          showStep(wrapper, steps, current);
-          NW_SFX.nav();
-        }
+        applyAttrPreset(wrapper, presetBtn);
+        clearStepError(steps[current]);
+        return;
       }
 
-      // prev
-      if (target.closest('.tw-btn-nav[data-dir="prev"]')) {
+      var nextBtn = resolveNextButton(target, wrapper);
+      if (nextBtn) {
         e.preventDefault();
-        if (current > 0) {
-          current--;
-          showStep(wrapper, steps, current);
-          NW_SFX.back();
-        }
+        goNext();
+        return;
       }
 
-      // submit
-      if (target.id === 'tw-char-submit' || target.closest('#tw-char-submit')) {
+      var prevBtn = resolvePrevButton(target, wrapper);
+      if (prevBtn) {
         e.preventDefault();
-        if (!validateStep(wrapper, current)) {
-          NW_SFX.error();
-          return;
-        }
-        submitCharacter(wrapper, steps, current, spinner);
+        goPrev();
+        return;
       }
 
-      // race click
-      var raceCard = target.closest('.tw-race-card');
-      if (raceCard && !raceCard.classList.contains('tw-subrace-card')) {
+      var submitBtn = target.closest('#tw-char-submit');
+      if (submitBtn) {
         e.preventDefault();
-        var allR = wrapper.querySelectorAll('.tw-race-card:not(.tw-subrace-card)');
-        for (var r = 0; r < allR.length; r++) {
-          allR[r].classList.remove('selected');
-          allR[r].setAttribute('aria-pressed', 'false');
+        if (validateStep(wrapper, steps, current)) {
+          submitCharacter(wrapper, steps, current, spinner);
         }
+        return;
+      }
+
+      var raceCard = target.closest('.tw-race-card:not(.tw-subrace-card)');
+      if (raceCard) {
+        var allRaces = wrapper.querySelectorAll('.tw-race-card:not(.tw-subrace-card)');
+        for (var r = 0; r < allRaces.length; r++) {
+          allRaces[r].classList.remove('selected');
+          allRaces[r].setAttribute('aria-pressed', 'false');
+        }
+
         raceCard.classList.add('selected');
         raceCard.setAttribute('aria-pressed', 'true');
 
         formState.race = raceCard.dataset.raceId || '';
-        formState.race_label = (raceCard.querySelector('.tw-race-name') || {}).textContent || formState.race;
+        formState.race_label = raceCard.querySelector('.tw-race-name') ? raceCard.querySelector('.tw-race-name').textContent.trim() : '';
         formState.subrace = '';
         formState.subrace_label = '';
 
         fetchSubraces(wrapper, raceCard.dataset.race || '');
+        clearStepError(steps[current]);
         restoreSelections(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // subrace click
       var subCard = target.closest('.tw-subrace-card');
       if (subCard) {
-        e.preventDefault();
-        var allS = wrapper.querySelectorAll('.tw-subrace-card');
-        for (var s = 0; s < allS.length; s++) {
-          allS[s].classList.remove('selected');
-          allS[s].setAttribute('aria-pressed', 'false');
+        var allSubs = wrapper.querySelectorAll('.tw-subrace-card');
+        for (var s = 0; s < allSubs.length; s++) {
+          allSubs[s].classList.remove('selected');
+          allSubs[s].setAttribute('aria-pressed', 'false');
         }
+
         subCard.classList.add('selected');
         subCard.setAttribute('aria-pressed', 'true');
 
         formState.subrace = subCard.dataset.subraceId || '';
-        formState.subrace_label = (subCard.querySelector('.tw-race-name') || {}).textContent || formState.subrace;
+        formState.subrace_label = subCard.querySelector('.tw-race-name') ? subCard.querySelector('.tw-race-name').textContent.trim() : '';
+
+        clearStepError(steps[current]);
         restoreSelections(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // class click
       var classCard = target.closest('.tw-class-card');
       if (classCard) {
-        e.preventDefault();
-        var allC = wrapper.querySelectorAll('.tw-class-card');
-        for (var c = 0; c < allC.length; c++) {
-          allC[c].classList.remove('selected');
-          allC[c].setAttribute('aria-pressed', 'false');
+        var allClasses = wrapper.querySelectorAll('.tw-class-card');
+        for (var c = 0; c < allClasses.length; c++) {
+          allClasses[c].classList.remove('selected');
+          allClasses[c].setAttribute('aria-pressed', 'false');
         }
+
         classCard.classList.add('selected');
         classCard.setAttribute('aria-pressed', 'true');
 
-        formState.character_class = classCard.dataset.charClass || classCard.dataset.charclass || '';
-        formState.class_label = (classCard.querySelector('.tw-class-card__name') || {}).textContent || formState.character_class;
+        formState.character_class = classCard.dataset.charClass || '';
+        formState.class_label = classCard.dataset.label || (classCard.querySelector('.tw-class-card__name') ? classCard.querySelector('.tw-class-card__name').textContent.trim() : '');
         formState.skill_limit = parseInt(classCard.dataset.skilllimit, 10) || 5;
-
         formState.skills = [];
-        updateSkillCounter(wrapper);
+        formState.starting_package_id = '';
+        formState.starting_package_label = '';
 
+        var skillGrid = wrapper.querySelector('#tw-skill-grid');
+        if (skillGrid) delete skillGrid.dataset.rendered;
+
+        fetchSkillGrid(wrapper);
         fetchPackageGrid(wrapper);
+        clearStepError(steps[current]);
         restoreSelections(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // skill click
       var skillCard = target.closest('.tw-skill-card');
       if (skillCard) {
-        e.preventDefault();
-        var id = skillCard.dataset.skillId;
-        if (!id) return;
-        var idx = formState.skills.indexOf(id);
+        var skillId = skillCard.dataset.skillId;
+        if (!skillId) return;
+
+        var idx = formState.skills.indexOf(skillId);
         if (idx === -1) {
           if (formState.skills.length >= (formState.skill_limit || 5)) {
-            setStatus('Skill limit reached for this class.', true);
+            setStatus('ERROR: Skill limit reached for this class.', true);
             NW_SFX.error();
             return;
           }
-          formState.skills.push(id);
+          formState.skills.push(skillId);
           skillCard.classList.add('selected');
           skillCard.setAttribute('aria-pressed', 'true');
         } else {
@@ -1008,70 +1146,58 @@
           skillCard.classList.remove('selected');
           skillCard.setAttribute('aria-pressed', 'false');
         }
+
+        clearStepError(steps[current]);
         updateSkillCounter(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // package click
-      var pkgCard = target.closest('.tw-package-card');
-      if (pkgCard) {
-        e.preventDefault();
-        var allP = wrapper.querySelectorAll('.tw-package-card');
-        for (var pp = 0; pp < allP.length; pp++) {
-          allP[pp].classList.remove('selected');
-          allP[pp].setAttribute('aria-pressed', 'false');
+      var packageCard = target.closest('.tw-package-card');
+      if (packageCard) {
+        var allPackages = wrapper.querySelectorAll('.tw-package-card');
+        for (var p = 0; p < allPackages.length; p++) {
+          allPackages[p].classList.remove('selected');
+          allPackages[p].setAttribute('aria-pressed', 'false');
         }
-        pkgCard.classList.add('selected');
-        pkgCard.setAttribute('aria-pressed', 'true');
 
-        formState.starting_package_id = pkgCard.dataset.packageId || '';
-        formState.starting_package_label = (pkgCard.querySelector('.tw-race-name') || {}).textContent || formState.starting_package_id;
+        packageCard.classList.add('selected');
+        packageCard.setAttribute('aria-pressed', 'true');
+
+        formState.starting_package_id = packageCard.dataset.packageId || '';
+        formState.starting_package_label = packageCard.dataset.label || (packageCard.querySelector('.tw-race-name') ? packageCard.querySelector('.tw-race-name').textContent.trim() : '');
+
+        clearStepError(steps[current]);
         restoreSelections(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // narrative cards (origin/operation/crisis) – wybór po data-choice-type / data-choice-key
       var loreCard = target.closest('.tw-lore-card');
       if (loreCard) {
-        e.preventDefault();
         var type = loreCard.dataset.choiceType;
-        var key  = loreCard.dataset.choiceKey;
+        var key = loreCard.dataset.choiceKey;
         if (!type || !key) return;
 
-        var groupCards = wrapper.querySelectorAll('.tw-lore-card[data-choice-type="' + type + '"]');
-        for (var lc = 0; lc < groupCards.length; lc++) {
-          groupCards[lc].classList.remove('selected');
-          groupCards[lc].setAttribute('aria-pressed', 'false');
+        var loreCards = wrapper.querySelectorAll('.tw-lore-card[data-choice-type="' + type + '"]');
+        for (var l = 0; l < loreCards.length; l++) {
+          loreCards[l].classList.remove('selected');
+          loreCards[l].setAttribute('aria-pressed', 'false');
         }
+
         loreCard.classList.add('selected');
         loreCard.setAttribute('aria-pressed', 'true');
 
-        if (type === 'data_origin') {
-          formState.data_origin = key;
-        } else if (type === 'previous_operation') {
-          formState.previous_operation = key;
-        } else if (type === 'sync_crisis') {
-          formState.sync_crisis = key;
-        }
+        formState[type] = key;
+        recomputeBackstoryTags();
 
-        var tags = [];
-        if (window.twCharCreatorChoices && window.twCharCreatorChoices.backstory_tags) {
-          var defs = window.twCharCreatorChoices.backstory_tags;
-          defs.forEach(function (def) {
-            if (def.choice_key === key && def.tag_label) {
-              tags.push(def.tag_label);
-            }
-          });
-        }
-        if (tags.length) {
-          formState.backstory_tags = (formState.backstory_tags || []).concat(tags);
-          formState.backstory_tags = Array.from(new Set(formState.backstory_tags));
-        }
+        clearStepError(steps[current]);
         restoreSelections(wrapper);
         NW_SFX.select();
+        return;
       }
 
-      // summary EDIT buttons
       var editBtn = target.closest('.tw-summary-edit');
       if (editBtn && editBtn.dataset.goto) {
         e.preventDefault();
@@ -1081,128 +1207,168 @@
           showStep(wrapper, steps, current);
           NW_SFX.nav();
         }
+        return;
       }
 
-      // clear avatar
-      if (target.classList.contains('tw-avatar-clear')) {
+      var clearAvatarBtn = target.closest('#tw-avatar-clear, .tw-avatar-clear');
+      if (clearAvatarBtn) {
         e.preventDefault();
         formState.avatar_file = null;
+
         var imgEl = wrapper.querySelector('#tw-avatar-img');
         var preview = wrapper.querySelector('#tw-avatar-preview');
         var selected = wrapper.querySelector('#tw-avatar-selected');
+        var fileInput = wrapper.querySelector('#tw-char-avatar');
+
         if (imgEl) imgEl.src = '';
         if (preview) preview.style.display = '';
         if (selected) selected.style.display = 'none';
+        if (fileInput) fileInput.value = '';
+
+        updateSummary(wrapper);
         NW_SFX.back();
+      }
+
+      var uploadTrigger = target.closest('.tw-upload-trigger');
+      if (uploadTrigger) {
+        e.preventDefault();
+        var hiddenFileInput = wrapper.querySelector('#tw-char-avatar');
+        if (hiddenFileInput) hiddenFileInput.click();
       }
     });
 
-    // INPUT HANDLERS
     wrapper.addEventListener('input', function (e) {
       var t = e.target;
+
       if (t.id === 'tw-char-name') {
         formState.character_name = t.value || '';
         updateSummary(wrapper);
       }
-      if (t.id === 'tw-char-backstory') {
-        formState.backstory = t.value || '';
-        updateSummary(wrapper);
+
+      if (t.id === 'tw-char-pronouns-custom') {
+        var customRadio = wrapper.querySelector('.tw-pronoun-radio[value="custom"]');
+        if (customRadio && customRadio.checked) {
+          formState.pronouns = t.value.trim() || 'custom';
+          updateSummary(wrapper);
+        }
       }
+
       if (t.id === 'tw-char-bio') {
         formState.bio = t.value || '';
         updateSummary(wrapper);
       }
-      if (t.classList.contains('tw-attr-val')) {
-        var key = t.dataset.attr;
-        if (ATTR_KEYS.indexOf(key) !== -1) {
-          var v = parseInt(t.value, 10);
-          if (isNaN(v)) v = ATTR_MIN;
-          v = Math.max(ATTR_MIN, Math.min(ATTR_MAX, v));
-          formState['attr_' + key] = v;
-          renderAttrDisplay(wrapper);
+    });
+
+    wrapper.addEventListener('change', function (e) {
+      if (e.target && e.target.classList.contains('tw-pronoun-radio')) {
+        var customInput = wrapper.querySelector('#tw-char-pronouns-custom');
+        if (customInput) {
+          customInput.style.display = e.target.value === 'custom' ? '' : 'none';
+          if (e.target.value === 'custom') {
+            customInput.focus();
+            formState.pronouns = customInput.value.trim() || 'custom';
+          } else {
+            formState.pronouns = e.target.value;
+          }
+          updateSummary(wrapper);
         }
       }
     });
 
-    // PRONOUN radios
-    wrapper.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t.name === 'tw-pronouns') {
-        formState.pronouns = t.value || '';
-        updateSummary(wrapper);
+    wrapper.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var card = e.target.closest('.tw-race-card, .tw-class-card, .tw-skill-card, .tw-package-card, .tw-lore-card, .tw-subrace-card');
+      if (card) {
+        e.preventDefault();
+        card.click();
       }
     });
 
-    // ATTR buttons
     wrapper.addEventListener('click', function (e) {
       var t = e.target;
-      var preset = t.closest('.tw-attr-preset-btn');
-      if (preset) {
-        e.preventDefault();
-        applyAttrPreset(wrapper, preset);
-      }
-
       var attrBtn = t.closest('.tw-attr-btn');
-      if (attrBtn && attrBtn.dataset.dir && attrBtn.dataset.attr) {
+      if (attrBtn && attrBtn.dataset.attr) {
         e.preventDefault();
+
         var key = attrBtn.dataset.attr;
-        var dir = attrBtn.dataset.dir === 'up' ? 1 : -1;
         if (ATTR_KEYS.indexOf(key) === -1) return;
+
+        var isPlus = attrBtn.classList.contains('tw-attr-plus') || attrBtn.dataset.dir === 'up' || attrBtn.dataset.dir === 'plus';
+        var isMinus = attrBtn.classList.contains('tw-attr-minus') || attrBtn.dataset.dir === 'down' || attrBtn.dataset.dir === 'minus';
+
         var currentVal = formState['attr_' + key] || ATTR_MIN;
-        var newVal = currentVal + dir;
-        if (newVal < ATTR_MIN || newVal > ATTR_MAX) return;
-        formState['attr_' + key] = newVal;
+        var used = ATTR_KEYS.reduce(function (sum, k) {
+          return sum + (formState['attr_' + k] || ATTR_MIN);
+        }, 0);
+
+        if (isPlus) {
+          if (currentVal >= ATTR_MAX) return;
+          if (used >= ATTR_POOL) {
+            NW_SFX.error();
+            return;
+          }
+          formState['attr_' + key] = currentVal + 1;
+        } else if (isMinus) {
+          if (currentVal <= ATTR_MIN) return;
+          formState['attr_' + key] = currentVal - 1;
+        } else {
+          return;
+        }
+
         renderAttrDisplay(wrapper);
+        clearStepError(steps[current]);
+        updateSummary(wrapper);
         NW_SFX.nav();
       }
     });
 
-    // AVATAR drag & drop + file input
-    var fileInput = wrapper.querySelector('#tw-avatar-file');
+    var dropBox = wrapper.querySelector('#tw-avatar-drop');
+    var fileInput = wrapper.querySelector('#tw-char-avatar');
+
+    if (dropBox) {
+      dropBox.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropBox.classList.add('tw-upload-box--drag');
+      });
+
+      dropBox.addEventListener('dragleave', function () {
+        dropBox.classList.remove('tw-upload-box--drag');
+      });
+
+      dropBox.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropBox.classList.remove('tw-upload-box--drag');
+        var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) handleAvatarFile(wrapper, file);
+      });
+    }
+
     if (fileInput) {
       fileInput.addEventListener('change', function () {
-        if (fileInput.files && fileInput.files[0]) {
-          handleAvatarFile(wrapper, fileInput.files[0]);
-        }
+        if (fileInput.files && fileInput.files[0]) handleAvatarFile(wrapper, fileInput.files[0]);
       });
     }
 
-    var uploadBox = wrapper.querySelector('.tw-upload-box');
-    if (uploadBox) {
-      uploadBox.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        uploadBox.classList.add('tw-upload-box--drag');
-      });
-      uploadBox.addEventListener('dragleave', function (e) {
-        e.preventDefault();
-        uploadBox.classList.remove('tw-upload-box--drag');
-      });
-      uploadBox.addEventListener('drop', function (e) {
-        e.preventDefault();
-        uploadBox.classList.remove('tw-upload-box--drag');
-        var files = e.dataTransfer && e.dataTransfer.files;
-        if (files && files[0]) {
-          handleAvatarFile(wrapper, files[0]);
+    showStep(wrapper, steps, 0);
+  }
+
+  function boot() {
+    var wrapper = document.getElementById('tw-char-creator-wrapper');
+    if (wrapper) init();
+    else {
+      var retry = 0;
+      var poll = setInterval(function () {
+        retry++;
+        if (document.getElementById('tw-char-creator-wrapper')) {
+          clearInterval(poll);
+          init();
+        } else if (retry > 50) {
+          clearInterval(poll);
         }
-      });
+      }, 100);
     }
-
-    // STEP KEYS (Enter as next, arrows for attr)
-    wrapper.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        var isButton = e.target.closest('button, a, .tw-btn, .tw-btn-nav, .tw-summary-edit');
-        if (!isButton) {
-          e.preventDefault();
-          var nextBtn = wrapper.querySelector('.tw-btn-nav[data-dir="next"]');
-          if (nextBtn) nextBtn.click();
-        }
-      }
-    });
   }
 
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(initCharacterCreator, 0);
-  } else {
-    document.addEventListener('DOMContentLoaded', initCharacterCreator);
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
