@@ -157,6 +157,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				</fieldset>
 
 				<div class="tw-nav-row">
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<span></span>
 					<button type="button" class="tw-btn-nav tw-btn-next" id="tw-char-step1-next">NEXT &rarr;</button>
 				</div>
@@ -175,6 +176,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -189,6 +191,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -278,6 +281,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -287,10 +291,11 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				<p class="tw-question-text">Choose active skills unlocked for this operative class.</p>
 
 				<div class="tw-skill-counter" id="tw-skill-counter">0 / 5 skills</div>
-				<div id="tw-skill-grid"></div>
+				<div id="tw-skill-grid" class="tw-skill-grid"></div>
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -303,6 +308,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -315,6 +321,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -327,6 +334,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -339,6 +347,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button>
 				</div>
 			</div>
@@ -381,6 +390,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
+					<button type="button" class="tw-btn-nav tw-btn-review-return" data-review-return hidden>REVIEW &rarr;</button>
 					<button type="button" class="tw-btn-nav tw-btn-next">REVIEW &rarr;</button>
 				</div>
 			</div>
@@ -390,67 +400,67 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 				<p class="tw-question-text">Verify operative parameters before synchronization.</p>
 
 				<div class="tw-summary-grid">
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="character_name">
 						<span class="tw-summary-key">AGENT ID</span>
 						<span class="tw-summary-val" id="tw-summary-character-name">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="1">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="pronouns">
 						<span class="tw-summary-key">PRONOUNS</span>
 						<span class="tw-summary-val" id="tw-summary-pronouns">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="1">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="race">
 						<span class="tw-summary-key">RACE</span>
 						<span class="tw-summary-val" id="tw-summary-race">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="2">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="class">
 						<span class="tw-summary-key">CLASS</span>
 						<span class="tw-summary-val" id="tw-summary-class">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="3">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="attrs">
 						<span class="tw-summary-key">ATTRIBUTES</span>
 						<span class="tw-summary-val" id="tw-summary-attrs">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="4">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="skills">
 						<span class="tw-summary-key">SKILLS</span>
 						<span class="tw-summary-val" id="tw-summary-skills">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="5">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="package">
 						<span class="tw-summary-key">PACKAGE</span>
 						<span class="tw-summary-val" id="tw-summary-package">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="6">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="origin">
 						<span class="tw-summary-key">DATA ORIGIN</span>
 						<span class="tw-summary-val" id="tw-summary-origin">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="7">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="operation">
 						<span class="tw-summary-key">PREVIOUS OP</span>
 						<span class="tw-summary-val" id="tw-summary-operation">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="8">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="crisis">
 						<span class="tw-summary-key">SYNC CRISIS</span>
 						<span class="tw-summary-val" id="tw-summary-crisis">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="9">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="tag_bundle">
 						<span class="tw-summary-key">BACKSTORY TAGS</span>
 						<span class="tw-summary-val" id="tw-summary-tag-bundle">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="9">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="avatar">
 						<span class="tw-summary-key">PORTRAIT</span>
 						<span class="tw-summary-val" id="tw-summary-avatar">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="10">EDIT</button>
 					</div>
-					<div class="tw-summary-row">
+					<div class="tw-summary-row" data-summary-field="bio">
 						<span class="tw-summary-key">MANUAL BIO</span>
 						<span class="tw-summary-val" id="tw-summary-bio">—</span>
 						<button type="button" class="tw-summary-edit" data-goto="10">EDIT</button>
