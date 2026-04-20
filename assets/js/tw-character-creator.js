@@ -233,7 +233,7 @@
 
     var el = document.createElement('div');
     el.id = id;
-    el.innerHTML = '' +
+    el.innerHTML =
       '<div class="tw-spinner-inner">' +
         '<div class="tw-spinner-ring"></div>' +
         '<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
@@ -407,15 +407,16 @@
       ? '<div class="tw-class-card__img-wrap"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" width="220" height="220" loading="lazy"></div>'
       : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + esc(cls.icon_slug || '✦') + '</span></div>';
 
-    return '<div class="tw-class-card" data-char-class="' + esc(cls.id || cls.name) + '" data-label="' + esc(cls.name || '') + '" data-class-tag="' + esc((cls.name || '').toLowerCase()) + '" data-skilllimit="' + esc(parseInt(cls.skill_limit, 10) || 5) + '" role="button" tabindex="0" aria-pressed="false">' +
-      imgHtml +
-      '<div class="tw-class-card__body">' +
-        '<h4 class="tw-class-card__name">' + esc(cls.name || '') + '</h4>' +
-        ((cls.description) ? '<p class="tw-class-card__desc">' + esc(cls.description) + '</p>' : '') +
-        buildTagsHtml(cls.tags || []) +
-        '<span class="tw-race-select-hint">select</span>' +
-      '</div>' +
-    '</div>';
+    return '' +
+      '<div class="tw-class-card" data-char-class="' + esc(cls.id || cls.name) + '" data-label="' + esc(cls.name || '') + '" data-class-tag="' + esc((cls.name || '').toLowerCase()) + '" data-skilllimit="' + esc(parseInt(cls.skill_limit, 10) || 5) + '" role="button" tabindex="0" aria-pressed="false">' +
+        imgHtml +
+        '<div class="tw-class-card__body">' +
+          '<h4 class="tw-class-card__name">' + esc(cls.name || '') + '</h4>' +
+          ((cls.description) ? '<p class="tw-class-card__desc">' + esc(cls.description) + '</p>' : '') +
+          buildTagsHtml(cls.tags || []) +
+          '<span class="tw-race-select-hint">select</span>' +
+        '</div>' +
+      '</div>';
   }
 
   function buildSkillCard(skill) {
@@ -425,15 +426,16 @@
       ? '<div class="tw-race-img"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" width="220" height="220" loading="lazy"></div>'
       : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
-    return '<div class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-label="' + esc(skill.name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
-      imgHtml +
-      '<div class="tw-race-body">' +
-        '<h4 class="tw-race-name">' + esc(skill.name || '') + '</h4>' +
-        ((skill.description) ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
-        buildTagsHtml(tags) +
-        '<span class="tw-race-select-hint">select</span>' +
-      '</div>' +
-    '</div>';
+    return '' +
+      '<div class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-label="' + esc(skill.name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
+        imgHtml +
+        '<div class="tw-race-body">' +
+          '<h4 class="tw-race-name">' + esc(skill.name || '') + '</h4>' +
+          ((skill.description) ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
+          buildTagsHtml(tags) +
+          '<span class="tw-race-select-hint">select</span>' +
+        '</div>' +
+      '</div>';
   }
 
   function buildPackageCard(pkg) {
@@ -445,16 +447,17 @@
         }).join('') + '</div>'
       : '';
 
-    return '<div class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id || '') + '" data-label="' + esc(pkg.package_name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
-      '<div class="tw-race-body">' +
-        '<h4 class="tw-race-name">' + esc(pkg.package_name || '') + '</h4>' +
-        ((pkg.description) ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
-        ((pkg.base_armor != null) ? '<span class="tw-race-bonus">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
-        buildTagsHtml(tags) +
-        itemsPreview +
-        '<span class="tw-race-select-hint">select</span>' +
-      '</div>' +
-    '</div>';
+    return '' +
+      '<div class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id || '') + '" data-label="' + esc(pkg.package_name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
+        '<div class="tw-race-body">' +
+          '<h4 class="tw-race-name">' + esc(pkg.package_name || '') + '</h4>' +
+          ((pkg.description) ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
+          ((pkg.base_armor != null) ? '<span class="tw-race-bonus">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
+          buildTagsHtml(tags) +
+          itemsPreview +
+          '<span class="tw-race-select-hint">select</span>' +
+        '</div>' +
+      '</div>';
   }
 
   function fetchRaceGrid(wrapper) {
@@ -526,7 +529,7 @@
   function updateSkillCounter(wrapper) {
     var counter = wrapper.querySelector('#tw-skill-counter');
     if (counter) {
-      counter.textContent = formState.skills.length + ' / ' + (formState.skill_limit || 5);
+      counter.textContent = formState.skills.length + ' / ' + (formState.skill_limit || 5) + ' skills';
     }
   }
 
@@ -665,6 +668,7 @@
       if (imgEl) imgEl.src = ev.target.result;
       if (preview) preview.style.display = 'none';
       if (selected) selected.style.display = '';
+      updateSummary(wrapper);
     };
     reader.readAsDataURL(file);
   }
@@ -682,7 +686,7 @@
     set('attrs', ATTR_KEYS.map(function (k) {
       return k.toUpperCase() + ' ' + formState['attr_' + k];
     }).join(' · '));
-    set('skills', formState.skills.length ? (formState.skills.length + ' selected') : '—');
+    set('skills', formState.skills.length ? (formState.skills.length + ' / ' + (formState.skill_limit || 5)) : '—');
     set('package', formState.starting_package_label || '—');
 
     var origin = choiceByKey('data_origin', formState.data_origin);
@@ -746,7 +750,11 @@
           spinner.hide();
           if (res && res.success) {
             setStatus('Agent profile created. Welcome to the Grid.', false);
-            wrapper.innerHTML = '<div class="tw-success"><p class="tw-success__msg">✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</p>' + (((res.data && res.data.redirect)) ? '<a href="' + esc(res.data.redirect) + '" class="tw-btn tw-btn--primary">Enter the Grid</a>' : '') + '</div>';
+            wrapper.innerHTML =
+              '<div class="tw-success">' +
+                '<p class="tw-success__msg">✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</p>' +
+                (((res.data && res.data.redirect)) ? '<a href="' + esc(res.data.redirect) + '" class="tw-btn tw-btn--primary">Enter the Grid</a>' : '') +
+              '</div>';
             NW_SFX.deploy();
           } else {
             var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Submission failed. Retry.';
@@ -945,11 +953,11 @@
     return true;
   }
 
-  function resolveNextButton(target, wrapper) {
+  function resolveNextButton(target) {
     return target.closest('#tw-char-step1-next, .tw-btn-next, .tw-btn-nav[data-dir="next"]');
   }
 
-  function resolvePrevButton(target, wrapper) {
+  function resolvePrevButton(target) {
     return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"]');
   }
 
@@ -1031,14 +1039,14 @@
         return;
       }
 
-      var nextBtn = resolveNextButton(target, wrapper);
+      var nextBtn = resolveNextButton(target);
       if (nextBtn) {
         e.preventDefault();
         goNext();
         return;
       }
 
-      var prevBtn = resolvePrevButton(target, wrapper);
+      var prevBtn = resolvePrevButton(target);
       if (prevBtn) {
         e.preventDefault();
         goPrev();
@@ -1073,6 +1081,7 @@
         fetchSubraces(wrapper, raceCard.dataset.race || '');
         clearStepError(steps[current]);
         restoreSelections(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
@@ -1093,6 +1102,7 @@
 
         clearStepError(steps[current]);
         restoreSelections(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
@@ -1118,10 +1128,14 @@
         var skillGrid = wrapper.querySelector('#tw-skill-grid');
         if (skillGrid) delete skillGrid.dataset.rendered;
 
+        var packageGrid = wrapper.querySelector('#tw-package-grid');
+        if (packageGrid) delete packageGrid.dataset.rendered;
+
         fetchSkillGrid(wrapper);
         fetchPackageGrid(wrapper);
         clearStepError(steps[current]);
         restoreSelections(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
@@ -1170,6 +1184,7 @@
 
         clearStepError(steps[current]);
         restoreSelections(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
@@ -1194,6 +1209,7 @@
 
         clearStepError(steps[current]);
         restoreSelections(wrapper);
+        updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
