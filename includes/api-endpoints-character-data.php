@@ -7,18 +7,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! defined( 'NW_UPLOADS_BASE' ) ) {
+	define( 'NW_UPLOADS_BASE', trailingslashit( home_url( '/wp-content/uploads/' ) ) );
+}
+
 /**
  * Helper: decode jsonb-like arrays safely.
  */
 function nw_decode_jsonb_array( $value ): array {
 	if ( is_array( $value ) ) {
-		return $value;
+		return array_values(
+			array_filter(
+				array_map(
+					'sanitize_text_field',
+					array_filter( $value, 'is_scalar' )
+				)
+			)
+		);
 	}
 
 	if ( is_string( $value ) && '' !== $value ) {
 		$decoded = json_decode( $value, true );
 		if ( is_array( $decoded ) ) {
-			return $decoded;
+			return array_values(
+				array_filter(
+					array_map(
+						'sanitize_text_field',
+						array_filter( $decoded, 'is_scalar' )
+					)
+				)
+			);
 		}
 	}
 
@@ -26,12 +44,31 @@ function nw_decode_jsonb_array( $value ): array {
 }
 
 /**
- * Helper: resolve Supabase storage URLs if needed.
+ * Helper: resolve Supabase storage / uploads URLs if needed.
  */
+function nw_normalize_single_img_url( $url ): string {
+	$url = is_string( $url ) ? trim( $url ) : '';
+	if ( '' === $url ) {
+		return '';
+	}
+
+	if ( preg_match( '#^https?://#i', $url ) ) {
+		return esc_url_raw( $url );
+	}
+
+	$url = ltrim( $url, '/' );
+
+	if ( 0 === strpos( $url, 'wp-content/uploads/' ) ) {
+		return esc_url_raw( home_url( '/' . $url ) );
+	}
+
+	return esc_url_raw( NW_UPLOADS_BASE . $url );
+}
+
 function nw_resolve_img_urls( array $rows ): array {
 	foreach ( $rows as &$row ) {
-		if ( ! empty( $row['img_url'] ) && is_string( $row['img_url'] ) ) {
-			$row['img_url'] = esc_url_raw( $row['img_url'] );
+		if ( array_key_exists( 'img_url', $row ) ) {
+			$row['img_url'] = nw_normalize_single_img_url( $row['img_url'] );
 		}
 	}
 	unset( $row );
@@ -146,17 +183,8 @@ function nw_map_class_card_shape( array $rows ): array {
 function nw_map_skill_card_shape( array $rows ): array {
 	return array_map(
 		function ( $row ) {
-			$tags = array_values(
-				array_filter(
-					array_map( 'sanitize_text_field', nw_decode_jsonb_array( $row['tags'] ?? [] ) )
-				)
-			);
-
-			$linked_attributes = array_values(
-				array_filter(
-					array_map( 'sanitize_text_field', nw_decode_jsonb_array( $row['linked_attributes'] ?? [] ) )
-				)
-			);
+			$tags = nw_decode_jsonb_array( $row['tags'] ?? [] );
+			$linked_attributes = nw_decode_jsonb_array( $row['linked_attributes'] ?? [] );
 
 			return [
 				'id'                => $row['id'] ?? null,
@@ -176,16 +204,32 @@ function nw_map_skill_card_shape( array $rows ): array {
 
 /**
  * Map starting packages to frontend card shape.
+ * Removes class-name tag from visible tags.
  */
-function nw_map_starting_package_shape( array $rows ): array {
+function nw_map_starting_package_shape( array $rows, string $class_tag = '' ): array {
+	$class_tag = strtolower( trim( $class_tag ) );
+
 	return array_map(
-		function ( $row ) {
+		function ( $row ) use ( $class_tag ) {
+			$compatibility_tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? [] );
+
+			if ( '' !== $class_tag ) {
+				$compatibility_tags = array_values(
+					array_filter(
+						$compatibility_tags,
+						function ( $tag ) use ( $class_tag ) {
+							return strtolower( trim( (string) $tag ) ) !== $class_tag;
+						}
+					)
+				);
+			}
+
 			return [
 				'id'                 => $row['id'] ?? null,
 				'package_name'       => $row['package_name'] ?? '',
 				'description'        => $row['description'] ?? '',
 				'items_list'         => nw_decode_jsonb_array( $row['items_list'] ?? [] ),
-				'compatibility_tags' => nw_decode_jsonb_array( $row['compatibility_tags'] ?? [] ),
+				'compatibility_tags' => $compatibility_tags,
 				'attack_cards_pool'  => nw_decode_jsonb_array( $row['attack_cards_pool'] ?? [] ),
 				'defense_cards_pool' => nw_decode_jsonb_array( $row['defense_cards_pool'] ?? [] ),
 				'base_armor'         => isset( $row['base_armor'] ) ? (int) $row['base_armor'] : 0,
@@ -271,9 +315,6 @@ function nw_supabase_request( string $method, string $table, array $query = [], 
 	return is_array( $data ) ? $data : [];
 }
 
-/**
- * Find race by id.
- */
 function nw_find_race_by_id( string $race_id ) {
 	$race_id = sanitize_text_field( $race_id );
 	if ( '' === $race_id ) {
@@ -297,9 +338,6 @@ function nw_find_race_by_id( string $race_id ) {
 	return $rows[0];
 }
 
-/**
- * Find starting package by id.
- */
 function nw_find_starting_package_by_id( string $package_id ) {
 	$package_id = sanitize_text_field( $package_id );
 	if ( '' === $package_id ) {
@@ -324,9 +362,6 @@ function nw_find_starting_package_by_id( string $package_id ) {
 	return $rows[0];
 }
 
-/**
- * Find class by id.
- */
 function nw_find_class_by_id( string $class_id ) {
 	$class_id = sanitize_text_field( $class_id );
 	if ( '' === $class_id ) {
@@ -350,9 +385,6 @@ function nw_find_class_by_id( string $class_id ) {
 	return $rows[0];
 }
 
-/**
- * Validate starting package vs. class.
- */
 function nw_validate_starting_package_selection( string $class_id, string $package_id ) {
 	if ( '' === $package_id ) {
 		return true;
@@ -389,9 +421,6 @@ function nw_validate_starting_package_selection( string $class_id, string $packa
 	return true;
 }
 
-/**
- * Find tag definitions by labels.
- */
 function nw_find_tag_defs_by_labels( array $labels ): array {
 	$labels = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $labels ) ) ) );
 	if ( empty( $labels ) ) {
@@ -421,9 +450,6 @@ function nw_find_tag_defs_by_labels( array $labels ): array {
 	return $rows;
 }
 
-/**
- * Find skills by ids (only active).
- */
 function nw_find_skills_by_ids( array $skill_ids ): array {
 	$skill_ids = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $skill_ids ) ) ) );
 	if ( empty( $skill_ids ) ) {
@@ -454,9 +480,6 @@ function nw_find_skills_by_ids( array $skill_ids ): array {
 	return $rows;
 }
 
-/**
- * Validate skills vs. class skill_limit and active flags.
- */
 function nw_validate_skill_selection( string $class_id, array $skills ) {
 	$class_row = nw_find_class_by_id( $class_id );
 	if ( empty( $class_row ) || empty( $class_row['id'] ) || empty( $class_row['is_active'] ) ) {
@@ -492,9 +515,6 @@ function nw_validate_skill_selection( string $class_id, array $skills ) {
 	return true;
 }
 
-/**
- * Validate backstory tags exist in defs.
- */
 function nw_validate_backstory_tags( array $tag_labels ) {
 	if ( empty( $tag_labels ) ) {
 		return true;
@@ -518,9 +538,6 @@ function nw_validate_backstory_tags( array $tag_labels ) {
 	return true;
 }
 
-/**
- * Store character skills (junction).
- */
 function nw_store_character_skills( string $character_id, array $skills ) {
 	if ( empty( $skills ) ) {
 		return true;
@@ -553,9 +570,6 @@ function nw_store_character_skills( string $character_id, array $skills ) {
 	return true;
 }
 
-/**
- * Store character backstory tags (junction).
- */
 function nw_store_character_backstory_tags( string $character_id, array $tag_labels ) {
 	$defs = nw_find_tag_defs_by_labels( $tag_labels );
 	if ( empty( $defs ) ) {
@@ -586,9 +600,6 @@ function nw_store_character_backstory_tags( string $character_id, array $tag_lab
 	return true;
 }
 
-/**
- * Delete character by id (cleanup helper).
- */
 function nw_delete_character_by_id( string $character_id ) {
 	$character_id = sanitize_text_field( $character_id );
 	if ( '' === $character_id ) {
@@ -606,9 +617,6 @@ function nw_delete_character_by_id( string $character_id ) {
 	return ! is_wp_error( $result );
 }
 
-/**
- * Handle avatar upload, return URL or empty string.
- */
 function nw_handle_avatar_upload(): string {
 	if ( empty( $_FILES['avatar'] ) || empty( $_FILES['avatar']['name'] ) ) {
 		return '';
@@ -637,9 +645,6 @@ function nw_handle_avatar_upload(): string {
 	return '';
 }
 
-/**
- * AJAX: create character from request.
- */
 function nw_create_character_from_request() {
 	if ( ! is_user_logged_in() ) {
 		wp_send_json_error( [ 'message' => 'Login required.' ], 403 );
@@ -859,7 +864,7 @@ function neoweaver_get_starting_packages_rest( WP_REST_Request $request ): WP_RE
 	}
 
 	$data = nw_filter_packages_by_class_tag( $data, $class_tag );
-	return rest_ensure_response( nw_map_starting_package_shape( $data ) );
+	return rest_ensure_response( nw_map_starting_package_shape( $data, $class_tag ) );
 }
 
 /* ===== AJAX LOOKUPS ===== */
@@ -980,7 +985,7 @@ function neoweaver_ajax_get_starting_packages(): void {
 	}
 
 	$data = nw_filter_packages_by_class_tag( $data, $class_tag );
-	wp_send_json_success( nw_map_starting_package_shape( $data ) );
+	wp_send_json_success( nw_map_starting_package_shape( $data, $class_tag ) );
 }
 add_action( 'wp_ajax_neoweaver_get_starting_packages', 'neoweaver_ajax_get_starting_packages' );
 add_action( 'wp_ajax_nopriv_neoweaver_get_starting_packages', 'neoweaver_ajax_get_starting_packages' );
