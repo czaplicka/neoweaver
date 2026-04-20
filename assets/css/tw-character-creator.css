@@ -1,9 +1,9 @@
 /* =========================================
-   NeoWeaver Character Creator CSS
-   Updated for: skills + starting package +
-   data origin + previous operation + sync crisis +
-   avatar + manual bio flow
-   ========================================= */
+NeoWeaver Character Creator CSS
+Updated for: skills + starting package +
+data origin + previous operation + sync crisis +
+avatar + manual bio flow
+========================================= */
 
 :root {
   --tw-acid: #adff00;
@@ -30,6 +30,7 @@
   box-sizing: border-box;
 }
 
+/* Główna ramka kreatora – analogowy terminal */
 #tw-char-creator-wrapper {
   font-family: 'Chakra Petch', sans-serif;
   color: var(--tw-text);
@@ -44,6 +45,7 @@
   overflow: hidden;
 }
 
+/* Scanlines + szum */
 #tw-char-creator-wrapper::before {
   content: '';
   position: absolute;
@@ -59,6 +61,7 @@
       transparent 24px
     );
   opacity: 0.7;
+  mix-blend-mode: soft-light;
 }
 
 .tw-progress-bar,
@@ -68,6 +71,8 @@
   position: relative;
   z-index: 1;
 }
+
+/* ===== Pasek postępu / HEADER ===== */
 
 .tw-progress-bar {
   margin-bottom: 24px;
@@ -154,15 +159,15 @@
   box-shadow: 0 0 10px rgba(173,255,0,0.86);
 }
 
-.tw-progress-tick[data-tick="1"] { left: 0%; }
-.tw-progress-tick[data-tick="2"] { left: 10%; }
-.tw-progress-tick[data-tick="3"] { left: 20%; }
-.tw-progress-tick[data-tick="4"] { left: 30%; }
-.tw-progress-tick[data-tick="5"] { left: 40%; }
-.tw-progress-tick[data-tick="6"] { left: 50%; }
-.tw-progress-tick[data-tick="7"] { left: 60%; }
-.tw-progress-tick[data-tick="8"] { left: 70%; }
-.tw-progress-tick[data-tick="9"] { left: 80%; }
+.tw-progress-tick[data-tick="1"]  { left: 0%; }
+.tw-progress-tick[data-tick="2"]  { left: 10%; }
+.tw-progress-tick[data-tick="3"]  { left: 20%; }
+.tw-progress-tick[data-tick="4"]  { left: 30%; }
+.tw-progress-tick[data-tick="5"]  { left: 40%; }
+.tw-progress-tick[data-tick="6"]  { left: 50%; }
+.tw-progress-tick[data-tick="7"]  { left: 60%; }
+.tw-progress-tick[data-tick="8"]  { left: 70%; }
+.tw-progress-tick[data-tick="9"]  { left: 80%; }
 .tw-progress-tick[data-tick="10"] { left: 90%; }
 .tw-progress-tick[data-tick="11"] { left: 100%; }
 
@@ -171,6 +176,8 @@
   color: var(--tw-text-faint);
   font-size: 0.82rem;
 }
+
+/* ===== KROKI ===== */
 
 .tw-step {
   display: none;
@@ -188,7 +195,7 @@
 
 @keyframes twFadeIn {
   from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .tw-step h2 {
@@ -222,6 +229,8 @@
   margin-bottom: 8px;
 }
 
+/* ===== INPUTY ===== */
+
 #tw-char-creator-wrapper input[type="text"],
 #tw-char-creator-wrapper input[type="number"],
 #tw-char-creator-wrapper textarea,
@@ -249,10 +258,13 @@
   box-shadow: 0 0 0 3px rgba(255,77,109,0.14) !important;
 }
 
+/* backstory textarea – zostaje generyjnie, ale nie jest wymagane */
 #tw-char-creator-wrapper textarea {
   min-height: 120px;
   resize: vertical;
 }
+
+/* ===== PRONOUNS ===== */
 
 .tw-pronoun-options {
   display: flex;
@@ -285,12 +297,18 @@
   transition: all 180ms ease;
 }
 
+.tw-pronoun-label span {
+  font-size: 0.92rem;
+}
+
 .tw-pronoun-option input:checked + .tw-pronoun-label {
   color: var(--tw-bg);
   background: var(--tw-acid);
   border-color: var(--tw-acid);
   box-shadow: 0 0 18px rgba(173,255,0,0.28);
 }
+
+/* ===== GRIDY / KARTY ===== */
 
 .tw-dynamic-grid,
 .tw-skill-cat-grid {
@@ -299,6 +317,7 @@
   gap: 16px;
 }
 
+/* Ogólna karta (race/class/lore/package) */
 .tw-grid-card,
 .tw-class-card,
 .tw-lore-card {
@@ -330,13 +349,24 @@
 .tw-skill-card.selected,
 .tw-package-card.selected {
   border-color: rgba(173,255,0,0.82);
-  box-shadow: 0 0 0 2px rgba(173,255,0,0.18), 0 18px 36px rgba(0,0,0,0.34), 0 0 22px rgba(173,255,0,0.16);
+  box-shadow:
+    0 0 0 2px rgba(173,255,0,0.18),
+    0 18px 36px rgba(0,0,0,0.34),
+    0 0 22px rgba(173,255,0,0.16);
   background: linear-gradient(180deg, rgba(18,29,14,0.96), rgba(10,15,9,0.96));
+}
+
+/* ===== RASY / KLASY – większe obrazki, pełna postać ===== */
+
+.tw-race-card,
+.tw-subrace-card,
+.tw-class-card {
+  display: flex;
+  flex-direction: column;
 }
 
 .tw-race-img,
 .tw-class-card__img-wrap {
-  aspect-ratio: 1 / 1;
   background: linear-gradient(180deg, rgba(173,255,0,0.06), rgba(255,255,255,0.02));
   border-bottom: 1px solid rgba(173,255,0,0.10);
   display: flex;
@@ -345,6 +375,15 @@
   overflow: hidden;
 }
 
+/* Nowa klasa – pełne, nieuciete postaci */
+.tw-race-img--full img,
+.tw-class-card__img-wrap img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Fallback – pozostawione dla kompatybilności (race/class, gdy bez --full) */
 .tw-race-img img,
 .tw-class-card__img-wrap img {
   width: 100%;
@@ -367,6 +406,7 @@
   height: 100%;
 }
 
+/* Nazwa – rasa / klasa */
 .tw-race-name,
 .tw-class-card__name {
   margin: 0;
@@ -375,15 +415,17 @@
   color: var(--tw-text);
 }
 
+/* Opisy ras usuwamy w HTML/JS – zostaje tylko nazwa + tagi */
+
 .tw-race-desc,
-.tw-class-card__desc,
-.tw-lore-card__effect {
+.tw-class-card__desc {
   margin: 0;
   color: var(--tw-text-dim);
   line-height: 1.5;
   font-size: 0.95rem;
 }
 
+/* Bonus – jeśli używasz */
 .tw-race-bonus {
   display: inline-flex;
   width: fit-content;
@@ -397,6 +439,7 @@
   line-height: 1.2;
 }
 
+/* Tagi */
 .tw-race-tags,
 .tw-package-items {
   display: flex;
@@ -417,6 +460,7 @@
   letter-spacing: 0.03em;
 }
 
+/* Hint select */
 .tw-race-select-hint {
   margin-top: auto;
   display: inline-flex;
@@ -427,11 +471,14 @@
   text-transform: uppercase;
 }
 
+/* Subrace heading */
 .tw-subrace-heading {
   margin: 28px 0 14px;
   color: var(--tw-acid);
   font-size: 0.96rem;
 }
+
+/* ===== STANY ŁADOWANIA / BŁĘDY ===== */
 
 .tw-loading,
 .tw-empty-state,
@@ -469,6 +516,8 @@
   0%, 100% { transform: scale(0.78); opacity: 0.45; }
   50% { transform: scale(1.15); opacity: 1; }
 }
+
+/* ===== ATTRIBUTES ===== */
 
 .tw-attr-remaining-label {
   display: inline-flex;
@@ -610,6 +659,8 @@
   box-shadow: 0 0 12px rgba(173,255,0,0.46);
 }
 
+/* ===== SKILLS ===== */
+
 .tw-skill-counter {
   margin: -6px 0 18px;
   color: var(--tw-text-dim);
@@ -625,6 +676,8 @@
   color: var(--tw-acid);
   font-size: 0.84rem;
 }
+
+/* ===== LORE CARDS (origin / operation / crisis) ===== */
 
 .tw-lore-card__effects {
   display: grid;
@@ -642,6 +695,8 @@
 .tw-lore-card__effect strong {
   color: var(--tw-acid);
 }
+
+/* ===== AVATAR UPLOAD ===== */
 
 .tw-upload-box {
   padding: 22px;
@@ -674,6 +729,8 @@
   color: var(--tw-acid);
   font-size: 1.9rem;
 }
+
+/* ===== BUTTONY / LINKI ===== */
 
 .tw-link-btn,
 .tw-avatar-clear,
@@ -718,6 +775,8 @@
   cursor: pointer;
 }
 
+/* ===== PODSUMOWANIE ===== */
+
 .tw-summary-grid {
   display: grid;
   gap: 12px;
@@ -759,6 +818,8 @@
   cursor: pointer;
 }
 
+/* ===== STATUS / ERROR ===== */
+
 .tw-char-status {
   margin-top: 16px;
   padding: 14px 16px;
@@ -797,10 +858,12 @@
 
 @keyframes twShake {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  50% { transform: translateX(4px); }
-  75% { transform: translateX(-2px); }
+  25%      { transform: translateX(-4px); }
+  50%      { transform: translateX(4px); }
+  75%      { transform: translateX(-2px); }
 }
+
+/* ===== NAWIGACJA ===== */
 
 .tw-nav-row {
   display: flex;
@@ -841,6 +904,8 @@
   box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
+/* ===== SUCCESS ===== */
+
 .tw-success {
   display: grid;
   gap: 18px;
@@ -856,6 +921,8 @@
   font-size: 1.06rem;
   color: var(--tw-text);
 }
+
+/* ===== GLOBALNY SPINNER ===== */
 
 #tw-char-spinner {
   position: fixed;
@@ -904,7 +971,7 @@
 
 @keyframes twSpin {
   from { transform: rotate(0); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .tw-spinner-text {
@@ -920,6 +987,8 @@
   color: var(--tw-text-dim);
   line-height: 1.5;
 }
+
+/* ===== RESPONSYWNOŚĆ ===== */
 
 @media (max-width: 900px) {
   #tw-char-creator-wrapper {
