@@ -3,57 +3,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'wp_ajax_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax_handler' );
-add_action( 'wp_ajax_nopriv_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax_handler' );
-
-function tw_get_scenarios_ajax_handler() {
-	// BUG-FIX: missing return after wp_send_json_error() calls — execution
-	// fell through to the next block and triggered fatal errors.
-	if ( empty( $_POST['campaign_id'] ) ) {
-		wp_send_json_error( [ 'message' => 'Missing campaign_id' ] );
-		return;
-	}
-
-	// BUG-FIX: campaign_id is a UUID. intval() collapses any UUID to 0.
-	$campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['campaign_id'] );
-
-	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-		wp_send_json_error( [ 'message' => 'Supabase config missing' ] );
-		return;
-	}
-
-	$supabase_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-	$anon_key      = tw_supabase_anon_key();
-
-	$url = add_query_arg(
-		[
-			'campaign_id' => 'eq.' . $campaign_id,
-			'select'      => 'id,name,goal,type,category,difficulty,tags,img_url,is_boss,is_key_arc',
-			'order'       => 'created_at.asc',
-			'limit'       => 3,
-		],
-		$supabase_base . 'cyber_scenarios'
-	);
-
-	$resp = wp_remote_get( $url, [
-		'headers' => [
-			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . $anon_key,
-		],
-		'timeout' => 10,
-	] );
-
-	if ( is_wp_error( $resp ) ) {
-		wp_send_json_error( [ 'message' => 'Supabase error', 'error' => $resp->get_error_message() ] );
-		return;
-	}
-
-	$code = wp_remote_retrieve_response_code( $resp );
-	if ( $code < 200 || $code >= 300 ) {
-		wp_send_json_error( [ 'message' => 'Supabase HTTP ' . $code, 'body' => wp_remote_retrieve_body( $resp ) ] );
-		return;
-	}
-
-	$rows = json_decode( wp_remote_retrieve_body( $resp ), true ) ?: [];
-	wp_send_json_success( $rows );
-}
+/**
+ * BUG-FIX: This file previously registered wp_ajax_tw_get_scenarios_ajax
+ * pointing to tw_get_scenarios_ajax_handler(). That hook is already
+ * registered (with nonce protection) in ajax-deck-scenarios.php as
+ * tw_get_scenarios_ajax(). Having two handlers on the same action caused
+ * both to fire on every request, producing a double JSON response and
+ * potential fatal errors if either handler exited early.
+ *
+ * Fix: registrations and handler removed from this file entirely.
+ * The canonical, nonce-protected handler in ajax-deck-scenarios.php
+ * is the single source of truth for tw_get_scenarios_ajax.
+ */

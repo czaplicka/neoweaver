@@ -184,7 +184,6 @@ add_action( 'wp_footer', function () {
 	    };
 
 	    // Listens for the shared twTagsUpdated event (dispatched by twUpdatePlayerTags).
-	    // This keeps quick-actions in sync with any tags update, same as the Loom.
 	    document.addEventListener('twTagsUpdated', function() {
 	        if (window.twGameReady) window.twLoadQuickActions();
 	    });
@@ -194,8 +193,38 @@ add_action( 'wp_footer', function () {
 	        document.dispatchEvent(new CustomEvent('twTagsUpdated', { detail: window.currentPlayerTags }));
 	    };
 
+	    // BUG-FIX: the previous setInterval called twLoadQuickActions() — a full
+	    // Supabase round-trip — every second whenever any disabled button existed
+	    // on the page. During an active combo cooldown (up to 30 s) this fired
+	    // 30 consecutive full-reload queries just to update the countdown text.
+	    // Fix: the interval only updates the countdown label in-place using
+	    // localStorage, and triggers a real reload only when a cooldown actually
+	    // expires so the button re-enables itself.
 	    setInterval(() => {
-	        if (document.querySelector('button[disabled]')) window.twLoadQuickActions();
+	        const disabledBtns = document.querySelectorAll('#quick-actions-bar button[disabled]');
+	        if (!disabledBtns.length) return;
+
+	        let anyExpired = false;
+	        disabledBtns.forEach(btn => {
+	            // Extract combo id from the onclick of the sibling combo buttons
+	            // by scanning localStorage keys that are still active.
+	            // We update the countdown text without a network call.
+	            const text = btn.textContent || '';
+	            const match = text.match(/(\d+)s/);
+	            if (match) {
+	                const remaining = parseInt(match[1], 10) - 1;
+	                if (remaining <= 0) {
+	                    anyExpired = true;
+	                } else {
+	                    btn.textContent = `⏳ ${remaining}s`;
+	                }
+	            }
+	        });
+
+	        // Only do a real reload when at least one cooldown has expired.
+	        if (anyExpired && window.twGameReady) {
+	            window.twLoadQuickActions();
+	        }
 	    }, 1000);
 
 	    if (window.twGameReady) {

@@ -42,9 +42,6 @@ function tw_localize_deck_vars() {
     $campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
 
     // Auto-detect last campaign for this user if not provided.
-    // BUG-FIX: use tw_supabase_url() / tw_supabase_anon_key() helpers instead
-    // of raw TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY constants, which
-    // may not be defined (only the helper functions are guaranteed to exist).
     if ( ! $campaign_id && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
         $anon_key = tw_supabase_anon_key();
 
@@ -111,24 +108,17 @@ add_action( 'wp_ajax_nopriv_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax' );
 
 function tw_get_scenarios_ajax() {
 
-    // BUG-FIX: nonce was commented out, leaving this endpoint completely
-    // unauthenticated — any visitor could enumerate all scenarios.
-    // The nonce is now enforced. The JS side must send it as the 'nonce'
-    // POST field (wp_localize_script already provides twGameConfig.nonce).
     if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => 'Security check failed' ] );
         return;
     }
 
     // BUG-FIX: cyber_campaign.id is a UUID — (int) cast collapses it to 0.
-    // Sanitize with UUID-safe stripping instead.
     $campaign_id_raw = $_POST['campaign_id'] ?? '';
     $campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
 
     error_log( 'tw_get_scenarios_ajax: received campaign_id=' . $campaign_id );
 
-    // BUG-FIX: previously checked for TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY
-    // constants, which may not be defined. Use the project-wide helpers instead.
     if ( ! $campaign_id || ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
         wp_send_json_error( [ 'message' => 'Missing campaign_id or Supabase config' ] );
         return;
@@ -141,15 +131,24 @@ function tw_get_scenarios_ajax() {
         'Authorization' => 'Bearer ' . $anon_key,
     ];
 
-    // Helper — single Supabase GET with unified error handling.
+    // BUG-FIX: the closure previously called wp_send_json_error() without
+    // returning, so execution continued into the next Supabase call after
+    // an error response was already sent, producing malformed output and
+    // PHP notices about headers already being sent.
+    // Fix: add `return` after every wp_send_json_error() call inside the
+    // closure. Because wp_send_json_error() calls wp_die() internally this
+    // is now belt-and-suspenders, but it makes the intent explicit and
+    // prevents issues if wp_die() is ever short-circuited in tests.
     $supa_get = function ( $url, $label ) use ( $headers ) {
         $resp = wp_remote_get( $url, [ 'headers' => $headers, 'timeout' => 10 ] );
         if ( is_wp_error( $resp ) ) {
             wp_send_json_error( [ 'message' => $label . ' fetch failed', 'error' => $resp->get_error_message() ] );
+            return null;
         }
         $code = wp_remote_retrieve_response_code( $resp );
         if ( $code < 200 || $code >= 300 ) {
             wp_send_json_error( [ 'message' => 'Supabase error for ' . $label, 'status' => $code, 'body' => wp_remote_retrieve_body( $resp ) ] );
+            return null;
         }
         return json_decode( wp_remote_retrieve_body( $resp ), true );
     };
@@ -159,8 +158,11 @@ function tw_get_scenarios_ajax() {
     error_log( 'tw_get_scenarios_ajax: campaign URL = ' . $campaign_url );
 
     $campaigns = $supa_get( $campaign_url, 'campaign' );
-    if ( empty( $campaigns ) || ! is_array( $campaigns ) ) {
-        wp_send_json_error( [ 'message' => 'Campaign not found' ] );
+    if ( $campaigns === null || empty( $campaigns ) || ! is_array( $campaigns ) ) {
+        // wp_send_json_error already called inside $supa_get if null.
+        if ( ! empty( $campaigns ) || $campaigns === [] ) {
+            wp_send_json_error( [ 'message' => 'Campaign not found' ] );
+        }
         return;
     }
 
@@ -173,7 +175,11 @@ function tw_get_scenarios_ajax() {
     $played_url = $rest_base . 'cyber_campaign_played_scenarios?campaign_id=eq.' . $campaign_id;
     error_log( 'tw_get_scenarios_ajax: played scenarios URL = ' . $played_url );
 
-    $played     = $supa_get( $played_url, 'played scenarios' ) ?: [];
+    $played = $supa_get( $played_url, 'played scenarios' );
+    if ( $played === null ) {
+        return;
+    }
+    $played     = $played ?: [];
     $played_ids = ! empty( $played ) ? array_map( 'intval', array_column( $played, 'scenario_id' ) ) : [];
 
     error_log( 'tw_get_scenarios_ajax: played_ids=' . ( $played_ids ? implode( ',', $played_ids ) : 'none' ) );
@@ -202,6 +208,9 @@ function tw_get_scenarios_ajax() {
     error_log( 'tw_get_scenarios_ajax: scenarios URL = ' . $url );
 
     $scenarios = $supa_get( $url, 'scenarios' );
+    if ( $scenarios === null ) {
+        return;
+    }
 
     if ( empty( $scenarios ) || ! is_array( $scenarios ) ) {
         wp_send_json_error( [ 'message' => 'No scenarios available' ] );

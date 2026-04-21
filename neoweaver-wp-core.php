@@ -25,6 +25,8 @@ final class NeoWeaver_Core {
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
+		// BUG-FIX: enqueue_checkout_assets() was defined but never hooked.
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_assets' ] );
 		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
 
@@ -262,42 +264,51 @@ final class NeoWeaver_Core {
 		] );
 	}
 
-public static function enqueue_checkout_assets() {
-    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
-        return;
-    }
+	public static function enqueue_checkout_assets() {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+			return;
+		}
 
-	// Dane PHP → JS
-    $characters    = function_exists( 'neoweaver_get_player_characters' )
-        ? neoweaver_get_player_characters( get_current_user_id() )
-        : [];
-    $has_neoweaver = false;
+		$characters    = function_exists( 'neoweaver_get_player_characters' )
+			? neoweaver_get_player_characters( get_current_user_id() )
+			: [];
+		$has_neoweaver = false;
 
-    if ( function_exists( 'WC' ) && WC()->cart ) {
-        foreach ( WC()->cart->get_cart() as $cart_item ) {
-            if ( ! empty( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_attribute' ) ) {
-                if ( $cart_item['data']->get_attribute( 'neoweaver_item_id' ) ) {
-                    $has_neoweaver = true;
-                    break;
-                }
-            }
-        }
-    }
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			foreach ( WC()->cart->get_cart() as $cart_item ) {
+				if ( ! empty( $cart_item['data'] ) && method_exists( $cart_item['data'], 'get_attribute' ) ) {
+					if ( $cart_item['data']->get_attribute( 'neoweaver_item_id' ) ) {
+						$has_neoweaver = true;
+						break;
+					}
+				}
+			}
+		}
 
-    wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
-        'characters'   => $characters ?: [],
-        'hasNeoweaver' => $has_neoweaver ? '1' : '0',
-        'createUrl'    => home_url( '/new-agent/' ),
-    ] );
-}
+		wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
+			'characters'   => $characters ?: [],
+			'hasNeoweaver' => $has_neoweaver ? '1' : '0',
+			'createUrl'    => home_url( '/new-agent/' ),
+		] );
+	}
 
 	public static function print_supabase_bootstrap() {
 		if ( ! is_user_logged_in() || ! is_page_template( 'templates/adventure.php' ) ) {
 			return;
 		}
 
-		$url = defined( 'NEOWEAVER_SUPA_URL' ) ? NEOWEAVER_SUPA_URL : '';
-		$key = defined( 'NEOWEAVER_SUPA_KEY' ) ? NEOWEAVER_SUPA_KEY : '';
+		// BUG-FIX: previously read NEOWEAVER_SUPA_URL and NEOWEAVER_SUPA_KEY
+		// constants which are never defined anywhere in the plugin — the block
+		// always exited early and the Supabase client was never initialised on
+		// the adventure page, breaking all JS that depends on window.twSupabase.
+		// Fix: use the project-standard helpers tw_supabase_url() and
+		// tw_supabase_anon_key() (defined in supabase-config.php).
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return;
+		}
+
+		$url = tw_supabase_url();
+		$key = tw_supabase_anon_key();
 
 		if ( ! $url || ! $key ) {
 			return;
