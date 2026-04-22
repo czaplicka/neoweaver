@@ -405,7 +405,7 @@ function nw_find_tag_defs_by_labels( array $labels ): array {
 
 	$quoted = array_map(
 		static function ( $label ) {
-			return '"' . str_replace( '"', '\\\"', $label ) . '"';
+			return '"' . str_replace( '"', '\\\\\\"', $label ) . '"';
 		},
 		$labels
 	);
@@ -434,7 +434,7 @@ function nw_find_skills_by_ids( array $skill_ids ): array {
 
 	$quoted = array_map(
 		static function ( $id ) {
-			return '"' . str_replace( '"', '\\\"', $id ) . '"';
+			return '"' . str_replace( '"', '\\\\\\"', $id ) . '"';
 		},
 		$skill_ids
 	);
@@ -493,7 +493,7 @@ function nw_validate_skill_selection( string $class_id, array $skills ) {
 
 function nw_validate_backstory_tags( array $tag_labels ) {
 	if ( empty( $tag_labels ) ) {
-		return true;
+		return new WP_Error( 'backstory_tags_required', 'Backstory tags are required.', [ 'status' => 400 ] );
 	}
 
 	$defs = nw_find_tag_defs_by_labels( $tag_labels );
@@ -702,6 +702,40 @@ function nw_handle_avatar_upload_strict() {
 }
 
 /**
+ * Map frontend pronouns to allowed gender constraint values.
+ */
+function nw_map_pronouns_to_gender( string $pronouns ) {
+	$pronouns = strtolower( trim( sanitize_text_field( $pronouns ) ) );
+
+	switch ( $pronouns ) {
+		case 'he':
+		case 'he/him':
+		case 'he-him':
+			return 'male';
+
+		case 'she':
+		case 'she/her':
+		case 'she-her':
+			return 'female';
+
+		case 'they':
+		case 'they/them':
+		case 'they-them':
+			return 'non-binary';
+
+		case 'xe':
+		case 'xe/xem':
+		case 'xe-xem':
+			return 'sexless';
+
+		case 'custom':
+			return 'non-binary';
+	}
+
+	return null;
+}
+
+/**
  * Create character from AJAX request.
  */
 function nw_create_character_from_request() {
@@ -722,9 +756,10 @@ function nw_create_character_from_request() {
 	$subrace_id_input = sanitize_text_field( $_POST['subrace'] ?? '' );
 	$class_id         = sanitize_text_field( $_POST['char_class'] ?? '' );
 	$start_pack       = sanitize_text_field( $_POST['starting_package_id'] ?? '' );
-	$data_origin      = sanitize_text_field( $_POST['data_origin'] ?? '' );
-	$prev_operation   = sanitize_text_field( $_POST['previous_operation'] ?? '' );
-	$sync_crisis      = sanitize_text_field( $_POST['sync_crisis'] ?? '' );
+
+	$data_origin    = sanitize_text_field( $_POST['data_origin'] ?? '' );
+	$prev_operation = sanitize_text_field( $_POST['previous_operation'] ?? '' );
+	$sync_crisis    = sanitize_text_field( $_POST['sync_crisis'] ?? '' );
 
 	$skills = json_decode( wp_unslash( $_POST['skills'] ?? '[]' ), true );
 	$skills = is_array( $skills )
@@ -742,6 +777,18 @@ function nw_create_character_from_request() {
 
 	if ( '' === $class_id ) {
 		wp_send_json_error( [ 'message' => 'Class is required.' ], 400 );
+	}
+
+	if ( '' === $data_origin ) {
+		wp_send_json_error( [ 'message' => 'Data origin is required.' ], 400 );
+	}
+
+	if ( '' === $prev_operation ) {
+		wp_send_json_error( [ 'message' => 'Previous operation is required.' ], 400 );
+	}
+
+	if ( '' === $sync_crisis ) {
+		wp_send_json_error( [ 'message' => 'Sync crisis selection is required.' ], 400 );
 	}
 
 	$body   = max( 1, min( 5, (int) ( $_POST['attr_body'] ?? 1 ) ) );
@@ -773,10 +820,24 @@ function nw_create_character_from_request() {
 		wp_send_json_error( [ 'message' => $tags_validation->get_error_message() ], 400 );
 	}
 
-	$avatar_url = nw_handle_avatar_upload_strict();
-	if ( is_wp_error( $avatar_url ) ) {
-		wp_send_json_error( [ 'message' => $avatar_url->get_error_message() ], 400 );
+	$avatar_upload_url = nw_handle_avatar_upload_strict();
+	if ( is_wp_error( $avatar_upload_url ) ) {
+		wp_send_json_error( [ 'message' => $avatar_upload_url->get_error_message() ], 400 );
 	}
+
+	$avatar_url_from_gallery = '';
+	if ( ! empty( $_POST['avatar_url'] ) ) {
+		$avatar_url_from_gallery = esc_url_raw( wp_unslash( $_POST['avatar_url'] ) );
+	}
+
+	$final_avatar_url = '';
+	if ( is_string( $avatar_upload_url ) && '' !== $avatar_upload_url ) {
+		$final_avatar_url = $avatar_upload_url;
+	} elseif ( '' !== $avatar_url_from_gallery ) {
+		$final_avatar_url = $avatar_url_from_gallery;
+	}
+
+	$gender = nw_map_pronouns_to_gender( $pronouns );
 
 	$character_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'char_', true );
 
@@ -784,9 +845,9 @@ function nw_create_character_from_request() {
 		'id'                => $character_id,
 		'name'              => $name,
 		'wp_user_id'        => $user_id,
-		'gender'            => '' !== $pronouns ? $pronouns : null,
+		'gender'            => $gender,
 		'bio'               => '' !== $bio ? $bio : null,
-		'avatar'            => is_string( $avatar_url ) && '' !== $avatar_url ? $avatar_url : null,
+		'avatar'            => '' !== $final_avatar_url ? $final_avatar_url : null,
 		'body'              => $body,
 		'reflex'            => $reflex,
 		'mind'              => $mind,
@@ -798,9 +859,6 @@ function nw_create_character_from_request() {
 		'gold'              => 0,
 		'world_id'          => null,
 		'world_credentials' => null,
-		'data_origin'       => '' !== $data_origin ? $data_origin : null,
-		'prev_operation'    => '' !== $prev_operation ? $prev_operation : null,
-		'sync_crisis'       => '' !== $sync_crisis ? $sync_crisis : null,
 	];
 
 	$result = nw_supabase_request( 'POST', 'cyber_characters', [], $payload, true );
