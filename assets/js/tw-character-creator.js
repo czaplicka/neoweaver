@@ -467,15 +467,27 @@
     formState.backstory_tags = tags;
   }
 
+  function hideSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (!section) return;
+    section.hidden = true;
+    section.style.display = 'none';
+  }
+
+  function showSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (!section) return;
+    section.hidden = false;
+    section.style.display = '';
+  }
+
   function resetSubraceState(wrapper) {
     formState.subrace = '';
     formState.subrace_label = '';
 
-    var section = q(wrapper, '#tw-subrace-section');
     var grid = q(wrapper, '#tw-subrace-grid');
-
     if (grid) grid.innerHTML = '';
-    if (section) section.style.display = 'none';
+    hideSubraceSection(wrapper);
   }
 
   function resetClassDependentState(wrapper) {
@@ -540,33 +552,30 @@
   }
 
   function fetchSubraces(wrapper, raceKey) {
-    var section = q(wrapper, '#tw-subrace-section');
     var grid = q(wrapper, '#tw-subrace-grid');
-
-    if (!section || !grid) return;
+    if (!grid) return;
 
     resetSubraceState(wrapper);
-
     if (!raceKey) return;
 
-    section.style.display = '';
+    showSubraceSection(wrapper);
     grid.innerHTML = '<p class="tw-loading">SCANNING SUBRACE DATA…</p>';
 
     fetchPost('neoweaver_get_subraces', { parent: raceKey })
       .then(function (res) {
         if (hasRows(res)) {
           grid.innerHTML = res.data.map(buildSubraceCard).join('');
-          section.style.display = '';
+          showSubraceSection(wrapper);
         } else {
           grid.innerHTML = '';
-          section.style.display = 'none';
+          hideSubraceSection(wrapper);
         }
         restoreSelections(wrapper);
         updateSummary(wrapper);
       })
       .catch(function () {
         grid.innerHTML = '';
-        section.style.display = 'none';
+        hideSubraceSection(wrapper);
         restoreSelections(wrapper);
         updateSummary(wrapper);
       });
@@ -966,7 +975,7 @@
   }
 
   function resolvePrevButton(target) {
-    return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"]');
+    return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"], .tw-btn-review-return');
   }
 
   function showStep(wrapper, steps, idx) {
