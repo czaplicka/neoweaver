@@ -18,6 +18,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
+		// Spinner CSS for global modal.
 		$spinner_css = defined( 'NEOWEAVER_PLUGIN_DIR' ) ? NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css' : '';
 		if ( $spinner_css && file_exists( $spinner_css ) ) {
 			wp_enqueue_style(
