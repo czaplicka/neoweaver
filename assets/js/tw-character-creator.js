@@ -1476,7 +1476,170 @@
       }
     }, 100);
   }
+let reviewReturnStep = null;
 
+document.querySelectorAll('.tw-summary-edit').forEach(btn => {
+  btn.addEventListener('click', () => {
+    reviewReturnStep = 11;
+    goToStep(Number(btn.dataset.goto), { fromReview: true });
+  });
+});
+
+document.querySelectorAll('[data-review-return]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (reviewReturnStep) goToStep(reviewReturnStep);
+  });
+});
+
+function syncReviewReturnButtons(currentStep, fromReview = false) {
+  document.querySelectorAll('[data-review-return]').forEach(btn => {
+    if (fromReview || reviewReturnStep === 11) {
+      btn.hidden = currentStep === 11;
+    } else {
+      btn.hidden = true;
+    }
+  });
+}
+  const TW_UPLOADS_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
+const TW_AVATAR_GALLERY = [
+  {
+    id: 'avatar-1',
+    name: 'Avatar',
+    url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg'
+  },
+  {
+    id: 'avatar-2',
+    name: 'Avatar 2',
+    url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar-1.svg'
+  }
+];
+
+function twNormalizeMediaUrl(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+
+  if (!raw) return '';
+
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  if (raw.startsWith('/wp-content/uploads/')) {
+    return `https://neoweaver.nieodparady.pl${raw}`;
+  }
+  if (raw.includes('wp-content/uploads/')) {
+    return raw.startsWith('/') ? `https://neoweaver.nieodparady.pl${raw}` : `https://${raw}`;
+  }
+
+  return `${TW_UPLOADS_BASE}${raw.replace(/^\/+/, '')}`;
+}
+
+function twEscapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function twGetImageUrl(item) {
+  return twNormalizeMediaUrl(
+    item?.image_url ||
+    item?.image ||
+    item?.imageUrl ||
+    item?.avatar ||
+    item?.icon ||
+    item?.thumbnail ||
+    item?.graphic ||
+    item?.file ||
+    ''
+  );
+}
+
+function twRenderImage(url, alt, placeholder = '✦') {
+  const safeAlt = twEscapeHtml(alt || 'NeoWeaver graphic');
+  if (!url) {
+    return `<div class="tw-race-img--placeholder" aria-hidden="true">${placeholder}</div>`;
+  }
+  return `<img src="${twEscapeHtml(url)}" alt="${safeAlt}" loading="lazy" decoding="async">`;
+}
+
+/* ===== race / subrace cards ===== */
+
+function renderRaceCard(race) {
+  const imageUrl = twGetImageUrl(race);
+  const tags = Array.isArray(race?.tags) ? race.tags : [];
+
+  return `
+    <button type="button" class="tw-grid-card tw-race-card" data-race-id="${twEscapeHtml(race.id || '')}">
+      <div class="tw-race-img">
+        ${twRenderImage(imageUrl, race.name || 'Race')}
+      </div>
+      <div class="tw-race-body">
+        <h3 class="tw-race-name">${twEscapeHtml(race.name || 'Unknown race')}</h3>
+        <div class="tw-race-tags">
+          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
+        </div>
+        <span class="tw-race-select-hint">Select race</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderSubraceCard(subrace) {
+  const imageUrl = twGetImageUrl(subrace);
+  const tags = Array.isArray(subrace?.tags) ? subrace.tags : [];
+
+  return `
+    <button type="button" class="tw-grid-card tw-subrace-card" data-subrace-id="${twEscapeHtml(subrace.id || '')}">
+      <div class="tw-race-img">
+        ${twRenderImage(imageUrl, subrace.name || 'Subrace')}
+      </div>
+      <div class="tw-race-body">
+        <h3 class="tw-race-name">${twEscapeHtml(subrace.name || 'Unknown subrace')}</h3>
+        <div class="tw-race-tags">
+          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
+        </div>
+        <span class="tw-race-select-hint">Select subrace</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderClassCard(cls) {
+  const imageUrl = twGetImageUrl(cls);
+  const tags = Array.isArray(cls?.tags) ? cls.tags : [];
+
+  return `
+    <button type="button" class="tw-class-card" data-class-id="${twEscapeHtml(cls.id || '')}">
+      <div class="tw-class-card__img-wrap">
+        ${twRenderImage(imageUrl, cls.name || 'Class')}
+      </div>
+      <div class="tw-class-card__body">
+        <h3 class="tw-class-card__name">${twEscapeHtml(cls.name || 'Unknown class')}</h3>
+        <div class="tw-race-tags">
+          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
+        </div>
+        <span class="tw-race-select-hint">Select class</span>
+      </div>
+    </button>
+  `;
+}
+
+function renderSkillCard(skill) {
+  const imageUrl = twGetImageUrl(skill);
+
+  return `
+    <button type="button" class="tw-skill-card" data-skill-id="${twEscapeHtml(skill.id || '')}">
+      <div class="tw-race-img">
+        ${twRenderImage(imageUrl, skill.name || 'Skill')}
+      </div>
+      <div class="tw-race-body">
+        <h3 class="tw-race-name">${twEscapeHtml(skill.name || 'Unknown skill')}</h3>
+        <p class="tw-race-desc">${twEscapeHtml(skill.description || '')}</p>
+      </div>
+    </button>
+  `;
+}
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
