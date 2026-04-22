@@ -1,13 +1,3 @@
-/* =========================================
-NeoWeaver Character Creator CSS
-Updated for:
-- larger race/class/skill visuals
-- no nested scroll in card grids
-- subrace section compatible with JS + shortcode
-- right-aligned attribute controls
-- cleaner summary + review flow
-========================================= */
-
 :root {
   --tw-acid: #adff00;
   --tw-acid-soft: rgba(173, 255, 0, 0.16);
@@ -73,8 +63,6 @@ Updated for:
   position: relative;
   z-index: 1;
 }
-
-/* ===== HEADER / PROGRESS ===== */
 
 .tw-progress-bar {
   margin-bottom: 24px;
@@ -179,8 +167,6 @@ Updated for:
   font-size: 0.82rem;
 }
 
-/* ===== STEPS ===== */
-
 .tw-step {
   display: none;
   background: var(--tw-panel);
@@ -231,8 +217,6 @@ Updated for:
   margin-bottom: 8px;
 }
 
-/* ===== INPUTS ===== */
-
 #tw-char-creator-wrapper input[type="text"],
 #tw-char-creator-wrapper input[type="number"],
 #tw-char-creator-wrapper textarea,
@@ -269,8 +253,6 @@ Updated for:
   min-height: 120px;
   resize: vertical;
 }
-
-/* ===== PRONOUNS ===== */
 
 .tw-pronoun-options {
   display: flex;
@@ -310,19 +292,32 @@ Updated for:
   box-shadow: 0 0 18px rgba(173,255,0,0.28);
 }
 
-/* ===== GRIDS ===== */
+/* ===== grids without nested scrolling ===== */
 
 .tw-dynamic-grid,
-.tw-skill-cat-grid {
+.tw-skill-cat-grid,
+#tw-skill-grid,
+#tw-race-grid,
+#tw-subrace-grid,
+#tw-class-grid,
+#tw-package-grid,
+#tw-origin-grid,
+#tw-operation-grid,
+#tw-crisis-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
-  overflow: visible;
-  max-height: none;
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
   padding: 0;
 }
 
-/* ===== CARDS ===== */
+#tw-skill-grid {
+  align-items: stretch;
+}
+
+/* ===== cards ===== */
 
 .tw-grid-card,
 .tw-class-card,
@@ -392,7 +387,7 @@ Updated for:
   z-index: 2;
 }
 
-/* ===== RACE / SUBRACE ===== */
+/* ===== race / subrace visuals ===== */
 
 .tw-race-card,
 .tw-subrace-card {
@@ -402,6 +397,7 @@ Updated for:
 
 .tw-race-img {
   min-height: 220px;
+  height: 220px;
   max-height: 220px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
   border-bottom: 1px solid rgba(173,255,0,0.10);
@@ -410,14 +406,18 @@ Updated for:
   justify-content: center;
   padding: 18px;
   overflow: hidden;
+  position: relative;
 }
 
 .tw-race-img img {
   width: 100%;
   height: 100%;
+  max-width: 100%;
   object-fit: contain;
   object-position: center;
   display: block;
+  visibility: visible;
+  opacity: 1;
   filter: drop-shadow(0 0 12px rgba(173,255,0,0.14));
 }
 
@@ -481,8 +481,6 @@ Updated for:
   text-transform: uppercase;
 }
 
-/* ===== SUBRACE SECTION ===== */
-
 .tw-subrace-section {
   margin-top: 26px;
   padding-top: 18px;
@@ -499,14 +497,13 @@ Updated for:
   font-size: 0.96rem;
 }
 
-/* ===== CLASS CARDS ===== */
-
 .tw-class-card {
   min-height: 380px;
 }
 
 .tw-class-card__img-wrap {
   min-height: 220px;
+  height: 220px;
   max-height: 220px;
   padding: 18px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
@@ -559,8 +556,6 @@ Updated for:
   opacity: 0.9;
 }
 
-/* ===== SKILLS ===== */
-
 .tw-skill-counter {
   margin: -6px 0 18px;
   color: var(--tw-text-dim);
@@ -579,6 +574,7 @@ Updated for:
 
 .tw-skill-card .tw-race-img {
   min-height: 170px;
+  height: 170px;
   max-height: 170px;
   padding: 16px;
 }
@@ -605,8 +601,6 @@ Updated for:
   font-size: 0.92rem;
 }
 
-/* ===== PACKAGE ===== */
-
 .tw-package-card .tw-race-body {
   padding: 18px;
 }
@@ -616,8 +610,6 @@ Updated for:
   flex-wrap: wrap;
   gap: 8px;
 }
-
-/* ===== LORE CARDS ===== */
 
 .tw-lore-card__effects {
   display: grid;
@@ -635,8 +627,6 @@ Updated for:
 .tw-lore-card__effect strong {
   color: var(--tw-acid);
 }
-
-/* ===== STATES ===== */
 
 .tw-loading,
 .tw-empty-state,
@@ -674,8 +664,6 @@ Updated for:
   0%, 100% { transform: scale(0.78); opacity: 0.45; }
   50% { transform: scale(1.15); opacity: 1; }
 }
-
-/* ===== ATTRIBUTES ===== */
 
 .tw-attr-remaining-label {
   display: inline-flex;
@@ -772,10 +760,12 @@ Updated for:
 .tw-attr-controls {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-end !important;
   justify-content: center;
   gap: 10px;
   min-width: 150px;
+  justify-self: end;
+  text-align: right;
 }
 
 .tw-attr-stepper {
@@ -783,6 +773,7 @@ Updated for:
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  width: 100%;
 }
 
 .tw-attr-btn {
@@ -821,6 +812,7 @@ Updated for:
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .tw-pip {
@@ -836,8 +828,6 @@ Updated for:
   border-color: var(--tw-acid);
   box-shadow: 0 0 12px rgba(173,255,0,0.46);
 }
-
-/* ===== AVATAR ===== */
 
 .tw-upload-box {
   padding: 22px;
@@ -884,8 +874,6 @@ Updated for:
   border: 1px solid rgba(173,255,0,0.18);
   background: rgba(255,255,255,0.03);
 }
-
-/* ===== BUTTONS ===== */
 
 .tw-link-btn,
 .tw-avatar-clear,
@@ -950,7 +938,9 @@ Updated for:
   display: none !important;
 }
 
-/* ===== SUMMARY ===== */
+.tw-btn-review-return:not([hidden]) {
+  display: inline-flex !important;
+}
 
 .tw-summary-grid {
   display: grid;
@@ -992,8 +982,6 @@ Updated for:
   color: var(--tw-acid);
   cursor: pointer;
 }
-
-/* ===== STATUS ===== */
 
 .tw-char-status {
   margin-top: 16px;
@@ -1046,8 +1034,6 @@ Updated for:
   75%      { transform: translateX(-2px); }
 }
 
-/* ===== NAV ===== */
-
 .tw-nav-row {
   display: flex;
   justify-content: space-between;
@@ -1056,8 +1042,6 @@ Updated for:
   margin-top: 24px;
   flex-wrap: wrap;
 }
-
-/* ===== SUCCESS ===== */
 
 .tw-success {
   display: grid;
@@ -1074,8 +1058,6 @@ Updated for:
   font-size: 1.06rem;
   color: var(--tw-text);
 }
-
-/* ===== SPINNER ===== */
 
 #tw-char-spinner {
   position: fixed;
@@ -1141,8 +1123,6 @@ Updated for:
   line-height: 1.5;
 }
 
-/* ===== RESPONSIVE ===== */
-
 @media (max-width: 900px) {
   #tw-char-creator-wrapper {
     padding: 20px;
@@ -1164,18 +1144,20 @@ Updated for:
 
   .tw-attr-controls {
     width: 100%;
-    align-items: flex-start;
+    align-items: flex-end !important;
+    justify-self: stretch;
     min-width: 0;
   }
 
   .tw-attr-stepper,
   .tw-attr-pips {
-    justify-content: flex-start;
+    justify-content: flex-end !important;
   }
 
   .tw-race-img,
   .tw-class-card__img-wrap {
     min-height: 180px;
+    height: 180px;
     max-height: 180px;
   }
 }
@@ -1192,7 +1174,15 @@ Updated for:
   }
 
   .tw-dynamic-grid,
-  .tw-skill-cat-grid {
+  .tw-skill-cat-grid,
+  #tw-skill-grid,
+  #tw-race-grid,
+  #tw-subrace-grid,
+  #tw-class-grid,
+  #tw-package-grid,
+  #tw-origin-grid,
+  #tw-operation-grid,
+  #tw-crisis-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1222,11 +1212,13 @@ Updated for:
   .tw-class-card__img-wrap,
   .tw-race-img {
     min-height: 140px;
+    height: 140px;
     max-height: 140px;
   }
 
   .tw-skill-card .tw-race-img {
     min-height: 130px;
+    height: 130px;
     max-height: 130px;
   }
 }
