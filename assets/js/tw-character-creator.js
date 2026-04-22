@@ -1640,6 +1640,107 @@ function renderSkillCard(skill) {
     </button>
   `;
 }
+  const avatarGalleryEl = document.getElementById('tw-avatar-gallery');
+const avatarPreviewImg = document.getElementById('tw-avatar-img');
+const avatarSelectedWrap = document.getElementById('tw-avatar-selected');
+const avatarInput = document.getElementById('tw-char-avatar');
+const avatarClearBtn = document.getElementById('tw-avatar-clear');
+
+let selectedAvatarUrl = '';
+let selectedAvatarSource = ''; // 'upload' | 'gallery' | ''
+
+function renderAvatarGallery() {
+  if (!avatarGalleryEl) return;
+
+  avatarGalleryEl.innerHTML = TW_AVATAR_GALLERY.map(item => `
+    <button
+      type="button"
+      class="tw-avatar-option"
+      data-avatar-url="${twEscapeHtml(item.url)}"
+      data-avatar-id="${twEscapeHtml(item.id)}"
+      aria-label="Choose ${twEscapeHtml(item.name)}"
+    >
+      <img
+        src="${twEscapeHtml(item.url)}"
+        alt="${twEscapeHtml(item.name)}"
+        loading="lazy"
+        decoding="async"
+      >
+      <span class="tw-avatar-option__label">${twEscapeHtml(item.name)}</span>
+    </button>
+  `).join('');
+
+  avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.dataset.avatarUrl || '';
+      selectedAvatarUrl = url;
+      selectedAvatarSource = 'gallery';
+
+      avatarPreviewImg.src = url;
+      avatarPreviewImg.alt = 'Selected gallery avatar';
+      avatarSelectedWrap.style.display = 'grid';
+
+      if (avatarInput) {
+        avatarInput.value = '';
+      }
+
+      avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
+        x.classList.toggle('selected', x === btn);
+      });
+    });
+  });
+}
+
+function clearAvatarSelection() {
+  selectedAvatarUrl = '';
+  selectedAvatarSource = '';
+
+  if (avatarPreviewImg) {
+    avatarPreviewImg.src = '';
+    avatarPreviewImg.alt = '';
+  }
+
+  if (avatarSelectedWrap) {
+    avatarSelectedWrap.style.display = 'none';
+  }
+
+  if (avatarInput) {
+    avatarInput.value = '';
+  }
+
+  if (avatarGalleryEl) {
+    avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
+      x.classList.remove('selected');
+    });
+  }
+}
+
+if (avatarInput) {
+  avatarInput.addEventListener('change', event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    selectedAvatarUrl = objectUrl;
+    selectedAvatarSource = 'upload';
+
+    avatarPreviewImg.src = objectUrl;
+    avatarPreviewImg.alt = 'Uploaded avatar preview';
+    avatarSelectedWrap.style.display = 'grid';
+
+    if (avatarGalleryEl) {
+      avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
+        x.classList.remove('selected');
+      });
+    }
+  });
+}
+
+if (avatarClearBtn) {
+  avatarClearBtn.addEventListener('click', clearAvatarSelection);
+}
+
+renderAvatarGallery();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
