@@ -1,12 +1,11 @@
 /* =========================================
 NeoWeaver Character Creator CSS
 Updated for:
-- compact race/class/skill cards
-- skills step
-- starting package
-- origin / operation / crisis
-- avatar + bio
-- right-aligned attributes controls
+- larger race/class/skill visuals
+- no nested scroll in card grids
+- subrace section compatible with JS + shortcode
+- right-aligned attribute controls
+- cleaner summary + review flow
 ========================================= */
 
 :root {
@@ -23,6 +22,7 @@ Updated for:
   --tw-text-dim: rgba(245, 255, 232, 0.72);
   --tw-text-faint: rgba(245, 255, 232, 0.48);
   --tw-danger: #ff4d6d;
+  --tw-cyan: #00e5ff;
   --tw-shadow: 0 0 0 1px rgba(173,255,0,0.05), 0 18px 48px rgba(0,0,0,0.42);
   --tw-radius-lg: 24px;
   --tw-radius-md: 18px;
@@ -315,8 +315,11 @@ Updated for:
 .tw-dynamic-grid,
 .tw-skill-cat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
+  overflow: visible;
+  max-height: none;
+  padding: 0;
 }
 
 /* ===== CARDS ===== */
@@ -398,14 +401,14 @@ Updated for:
 }
 
 .tw-race-img {
-  min-height: 160px;
-  max-height: 160px;
+  min-height: 220px;
+  max-height: 220px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
   border-bottom: 1px solid rgba(173,255,0,0.10);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 18px;
   overflow: hidden;
 }
 
@@ -415,7 +418,7 @@ Updated for:
   object-fit: contain;
   object-position: center;
   display: block;
-  filter: drop-shadow(0 0 10px rgba(173,255,0,0.12));
+  filter: drop-shadow(0 0 12px rgba(173,255,0,0.14));
 }
 
 .tw-race-img--placeholder {
@@ -424,7 +427,7 @@ Updated for:
 }
 
 .tw-race-body {
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -433,7 +436,7 @@ Updated for:
 
 .tw-race-name {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   line-height: 1.15;
   color: var(--tw-text);
 }
@@ -463,8 +466,9 @@ Updated for:
 }
 
 .tw-subrace-card .tw-race-tag {
-  border-color: rgba(173,255,0,0.14);
-  background: rgba(255,255,255,0.04);
+  border-color: rgba(0,229,255,0.18);
+  background: rgba(0,229,255,0.08);
+  color: rgba(220, 251, 255, 0.86);
 }
 
 .tw-race-select-hint {
@@ -491,20 +495,20 @@ Updated for:
 
 .tw-subrace-heading {
   margin: 0 0 14px;
-  color: var(--tw-acid);
+  color: var(--tw-cyan);
   font-size: 0.96rem;
 }
 
 /* ===== CLASS CARDS ===== */
 
 .tw-class-card {
-  min-height: 320px;
+  min-height: 380px;
 }
 
 .tw-class-card__img-wrap {
-  min-height: 140px;
-  max-height: 140px;
-  padding: 14px;
+  min-height: 220px;
+  max-height: 220px;
+  padding: 18px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
   border-bottom: 1px solid rgba(173,255,0,0.10);
   display: flex;
@@ -519,7 +523,7 @@ Updated for:
   object-fit: contain;
   object-position: center;
   display: block;
-  filter: drop-shadow(0 0 10px rgba(173,255,0,0.10));
+  filter: drop-shadow(0 0 12px rgba(173,255,0,0.10));
 }
 
 .tw-class-card__img-wrap--placeholder {
@@ -528,7 +532,7 @@ Updated for:
 }
 
 .tw-class-card__body {
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -537,7 +541,7 @@ Updated for:
 
 .tw-class-card__name {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: 1.05rem;
   line-height: 1.15;
   color: var(--tw-text);
 }
@@ -574,9 +578,9 @@ Updated for:
 }
 
 .tw-skill-card .tw-race-img {
-  min-height: 120px;
-  max-height: 120px;
-  padding: 14px;
+  min-height: 170px;
+  max-height: 170px;
+  padding: 16px;
 }
 
 .tw-skill-card .tw-race-body {
@@ -599,6 +603,18 @@ Updated for:
   color: var(--tw-text-dim);
   line-height: 1.45;
   font-size: 0.92rem;
+}
+
+/* ===== PACKAGE ===== */
+
+.tw-package-card .tw-race-body {
+  padding: 18px;
+}
+
+.tw-package-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ===== LORE CARDS ===== */
@@ -930,6 +946,10 @@ Updated for:
   box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
+.tw-btn-review-return[hidden] {
+  display: none !important;
+}
+
 /* ===== SUMMARY ===== */
 
 .tw-summary-grid {
@@ -1152,6 +1172,12 @@ Updated for:
   .tw-attr-pips {
     justify-content: flex-start;
   }
+
+  .tw-race-img,
+  .tw-class-card__img-wrap {
+    min-height: 180px;
+    max-height: 180px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1195,7 +1221,12 @@ Updated for:
 
   .tw-class-card__img-wrap,
   .tw-race-img {
-    min-height: 120px;
-    max-height: 120px;
+    min-height: 140px;
+    max-height: 140px;
+  }
+
+  .tw-skill-card .tw-race-img {
+    min-height: 130px;
+    max-height: 130px;
   }
 }
