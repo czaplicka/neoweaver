@@ -45,6 +45,11 @@
 
   var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
   var RACES_FALLBACK = [];
+  var TW_UPLOADS_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
+  var TW_AVATAR_GALLERY = [
+    { id: 'avatar-1', name: 'Avatar', url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg' },
+    { id: 'avatar-2', name: 'Avatar 2', url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar-1.svg' }
+  ];
 
   var DATA_ORIGIN_OPTIONS = [
     {
@@ -173,6 +178,8 @@
     character_class: '',
     class_label: '',
     avatar_file: null,
+    avatar_gallery_url: '',
+    avatar_gallery_id: '',
     bio: '',
     attr_body: ATTR_MIN,
     attr_reflex: ATTR_MIN,
@@ -215,6 +222,25 @@
 
   function nonce() {
     return cfg.nonce || '';
+  }
+
+  function normalizeMediaUrl(value) {
+    if (!value) return '';
+    var raw = String(value).trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.indexOf('//') === 0) return 'https:' + raw;
+    if (raw.indexOf('/wp-content/uploads/') === 0) return 'https://neoweaver.nieodparady.pl' + raw;
+    if (raw.indexOf('wp-content/uploads/') !== -1) {
+      return raw.charAt(0) === '/' ? 'https://neoweaver.nieodparady.pl' + raw : 'https://' + raw;
+    }
+    return TW_UPLOADS_BASE + raw.replace(/^\/+/, '');
+  }
+
+  function pickImage(item) {
+    return normalizeMediaUrl(
+      (item && (item.image_url || item.img_url || item.img || item.image || item.imageUrl || item.avatar || item.icon || item.thumbnail || item.graphic || item.file)) || ''
+    );
   }
 
   function fetchPost(action, extraData) {
@@ -326,9 +352,9 @@
   }
 
   function buildRaceCard(race) {
-    var imgSrc = race.img || race.img_url || '';
+    var imgSrc = pickImage(race);
     var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(race.label || race.name) + '" loading="lazy"></div>'
+      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(race.label || race.name) + '" loading="lazy" decoding="async"></div>'
       : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
     return '' +
@@ -346,9 +372,9 @@
   }
 
   function buildSubraceCard(sub) {
-    var imgSrc = sub.img || sub.img_url || '';
+    var imgSrc = pickImage(sub);
     var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(sub.label || sub.name) + '" loading="lazy"></div>'
+      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(sub.label || sub.name) + '" loading="lazy" decoding="async"></div>'
       : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
     return '' +
@@ -382,9 +408,9 @@
   }
 
   function buildClassCard(cls) {
-    var imgSrc = cls.img_url || cls.imgurl || '';
+    var imgSrc = pickImage(cls);
     var imgHtml = imgSrc
-      ? '<div class="tw-class-card__img-wrap"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" width="220" height="220" loading="lazy"></div>'
+      ? '<div class="tw-class-card__img-wrap"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" width="220" height="220" loading="lazy" decoding="async"></div>'
       : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + esc(cls.icon_slug || '✦') + '</span></div>';
 
     return '' +
@@ -400,10 +426,10 @@
   }
 
   function buildSkillCard(skill) {
-    var imgSrc = skill.img_url || skill.imgurl || '';
+    var imgSrc = pickImage(skill);
     var tags = [].concat(skill.tags || [], skill.linked_attributes || []);
     var imgHtml = imgSrc
-      ? '<div class="tw-race-img"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" width="220" height="220" loading="lazy"></div>'
+      ? '<div class="tw-race-img"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" width="220" height="220" loading="lazy" decoding="async"></div>'
       : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
 
     return '' +
@@ -729,6 +755,37 @@
     NW_SFX.preset();
   }
 
+  function highlightAvatarGallery(wrapper) {
+    var gallery = q(wrapper, '#tw-avatar-gallery');
+    if (!gallery) return;
+    qa(gallery, '.tw-avatar-option').forEach(function (btn) {
+      btn.classList.toggle('selected', btn.dataset.avatarId === formState.avatar_gallery_id);
+    });
+  }
+
+  function selectGalleryAvatar(wrapper, avatarId, avatarUrl, avatarName) {
+    formState.avatar_file = null;
+    formState.avatar_gallery_id = avatarId || '';
+    formState.avatar_gallery_url = avatarUrl || '';
+
+    var imgEl = q(wrapper, '#tw-avatar-img');
+    var preview = q(wrapper, '#tw-avatar-preview');
+    var selected = q(wrapper, '#tw-avatar-selected');
+    var fileInput = q(wrapper, '#tw-char-avatar');
+
+    if (imgEl) {
+      imgEl.src = avatarUrl || '';
+      imgEl.alt = avatarName || 'Selected avatar';
+    }
+    if (preview) preview.style.display = 'none';
+    if (selected) selected.style.display = 'grid';
+    if (fileInput) fileInput.value = '';
+
+    highlightAvatarGallery(wrapper);
+    updateSummary(wrapper);
+    NW_SFX.select();
+  }
+
   function handleAvatarFile(wrapper, file) {
     var allowed = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -739,6 +796,9 @@
     }
 
     formState.avatar_file = file;
+    formState.avatar_gallery_id = '';
+    formState.avatar_gallery_url = '';
+    highlightAvatarGallery(wrapper);
     NW_SFX.select();
 
     var reader = new FileReader();
@@ -747,9 +807,12 @@
       var preview = q(wrapper, '#tw-avatar-preview');
       var selected = q(wrapper, '#tw-avatar-selected');
 
-      if (imgEl) imgEl.src = ev.target.result;
+      if (imgEl) {
+        imgEl.src = ev.target.result;
+        imgEl.alt = file.name || 'Uploaded avatar';
+      }
       if (preview) preview.style.display = 'none';
-      if (selected) selected.style.display = '';
+      if (selected) selected.style.display = 'grid';
       updateSummary(wrapper);
     };
 
@@ -758,19 +821,40 @@
 
   function clearAvatar(wrapper) {
     formState.avatar_file = null;
+    formState.avatar_gallery_id = '';
+    formState.avatar_gallery_url = '';
 
     var imgEl = q(wrapper, '#tw-avatar-img');
     var preview = q(wrapper, '#tw-avatar-preview');
     var selected = q(wrapper, '#tw-avatar-selected');
     var fileInput = q(wrapper, '#tw-char-avatar');
 
-    if (imgEl) imgEl.src = '';
+    if (imgEl) {
+      imgEl.src = '';
+      imgEl.alt = '';
+    }
     if (preview) preview.style.display = '';
     if (selected) selected.style.display = 'none';
     if (fileInput) fileInput.value = '';
 
+    highlightAvatarGallery(wrapper);
     updateSummary(wrapper);
     NW_SFX.back();
+  }
+
+  function renderAvatarGallery(wrapper) {
+    var gallery = q(wrapper, '#tw-avatar-gallery');
+    if (!gallery) return;
+
+    gallery.innerHTML = TW_AVATAR_GALLERY.map(function (item) {
+      return '' +
+        '<button type="button" class="tw-avatar-option" data-avatar-id="' + esc(item.id) + '" data-avatar-url="' + esc(item.url) + '" aria-label="Choose ' + esc(item.name) + '">' +
+          '<img src="' + esc(item.url) + '" alt="' + esc(item.name) + '" loading="lazy" decoding="async">' +
+          '<span class="tw-avatar-option__label">' + esc(item.name) + '</span>' +
+        '</button>';
+    }).join('');
+
+    highlightAvatarGallery(wrapper);
   }
 
   function updateSummary(wrapper) {
@@ -800,7 +884,11 @@
     set('bio', formState.bio ? (formState.bio.length > 80 ? formState.bio.substring(0, 80) + '…' : formState.bio) : '—');
 
     var avatarEl = q(wrapper, '#tw-summary-avatar');
-    if (avatarEl) avatarEl.textContent = formState.avatar_file ? formState.avatar_file.name : '—';
+    if (avatarEl) {
+      if (formState.avatar_file) avatarEl.textContent = formState.avatar_file.name;
+      else if (formState.avatar_gallery_id) avatarEl.textContent = 'Gallery: ' + formState.avatar_gallery_id;
+      else avatarEl.textContent = '—';
+    }
   }
 
   function syncSingleSelection(wrapper, selector, selectedId, dataAttr) {
@@ -831,6 +919,7 @@
       card.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     });
 
+    highlightAvatarGallery(wrapper);
     updateSkillCounter(wrapper);
   }
 
@@ -871,35 +960,26 @@
 
     clearStepError(step);
 
-    if (idx === 0) {
-      return validateIdentityStep(wrapper, step);
-    }
+    if (idx === 0) return validateIdentityStep(wrapper, step);
 
     var phase = stepPhase(step);
 
-    if (phase === 'RACE PROTOCOL') {
-      if (!formState.race) {
-        showStepError(step, 'ERROR: Select a race to continue.');
-        setStatus('ERROR: Select a race to continue.', true);
-        return false;
-      }
-      return true;
+    if (phase === 'RACE PROTOCOL' && !formState.race) {
+      showStepError(step, 'ERROR: Select a race to continue.');
+      setStatus('ERROR: Select a race to continue.', true);
+      return false;
     }
 
-    if (phase === 'CLASS MATRIX') {
-      if (!formState.character_class) {
-        showStepError(step, 'ERROR: Select a class to continue.');
-        setStatus('ERROR: Select a class to continue.', true);
-        return false;
-      }
-      return true;
+    if (phase === 'CLASS MATRIX' && !formState.character_class) {
+      showStepError(step, 'ERROR: Select a class to continue.');
+      setStatus('ERROR: Select a class to continue.', true);
+      return false;
     }
 
     if (phase === 'BIOMETRIC CALIBRATION') {
       var used = ATTR_KEYS.reduce(function (sum, key) {
         return sum + (formState['attr_' + key] || ATTR_MIN);
       }, 0);
-
       if (used !== ATTR_POOL) {
         showStepError(step, 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.');
         setStatus('ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true);
@@ -914,41 +994,30 @@
         setStatus('ERROR: Select at least 1 skill.', true);
         return false;
       }
-
       if (formState.skills.length > (formState.skill_limit || 5)) {
         showStepError(step, 'ERROR: Too many skills selected for this class.');
         setStatus('ERROR: Too many skills selected for this class.', true);
         return false;
       }
-
       return true;
     }
 
-    if (phase === 'STARTING PACKAGE') {
-      if (!formState.starting_package_id) {
-        showStepError(step, 'ERROR: Select a starting package to continue.');
-        setStatus('ERROR: Select a starting package to continue.', true);
-        return false;
-      }
-      return true;
+    if (phase === 'STARTING PACKAGE' && !formState.starting_package_id) {
+      showStepError(step, 'ERROR: Select a starting package to continue.');
+      setStatus('ERROR: Select a starting package to continue.', true);
+      return false;
     }
 
-    if (phase === 'DATA ORIGIN') {
-      if (!formState.data_origin) {
-        showStepError(step, 'ERROR: Select a data origin to continue.');
-        setStatus('ERROR: Select a data origin to continue.', true);
-        return false;
-      }
-      return true;
+    if (phase === 'DATA ORIGIN' && !formState.data_origin) {
+      showStepError(step, 'ERROR: Select a data origin to continue.');
+      setStatus('ERROR: Select a data origin to continue.', true);
+      return false;
     }
 
-    if (phase === 'PREVIOUS OPERATION') {
-      if (!formState.previous_operation) {
-        showStepError(step, 'ERROR: Select a previous operation to continue.');
-        setStatus('ERROR: Select a previous operation to continue.', true);
-        return false;
-      }
-      return true;
+    if (phase === 'PREVIOUS OPERATION' && !formState.previous_operation) {
+      showStepError(step, 'ERROR: Select a previous operation to continue.');
+      setStatus('ERROR: Select a previous operation to continue.', true);
+      return false;
     }
 
     if (phase === 'SYNCHRONIZATION CRISIS') {
@@ -978,7 +1047,13 @@
     return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"], .tw-btn-review-return');
   }
 
-  function showStep(wrapper, steps, idx) {
+  function syncReviewReturnButtons(wrapper, currentStepIndex, reviewStepIndex, reviewReturnStepIndex) {
+    qa(wrapper, '[data-review-return], .tw-btn-review-return').forEach(function (btn) {
+      btn.hidden = !(reviewReturnStepIndex !== null && currentStepIndex !== reviewStepIndex);
+    });
+  }
+
+  function showStep(wrapper, steps, idx, reviewStepIndex, reviewReturnStepIndex) {
     steps.forEach(function (step, i) {
       step.classList.toggle('active', i === idx);
     });
@@ -991,6 +1066,7 @@
     if (phase === 'SKILL SELECTION') fetchSkillGrid(wrapper);
     if (phase === 'STARTING PACKAGE') fetchPackageGrid(wrapper);
     if (phase === 'DATA ORIGIN' || phase === 'PREVIOUS OPERATION' || phase === 'SYNCHRONIZATION CRISIS') renderLoreChoices(wrapper);
+    if (phase === 'VISUAL SIGNATURE') renderAvatarGallery(wrapper);
     if (phase === 'SYSTEM REVIEW') updateSummary(wrapper);
 
     var fillEl = q(wrapper, '#tw-char-progress-fill');
@@ -1005,6 +1081,7 @@
       tick.classList.toggle('active', parseInt(tick.dataset.tick, 10) <= idx + 1);
     });
 
+    syncReviewReturnButtons(wrapper, idx, reviewStepIndex, reviewReturnStepIndex);
     restoreSelections(wrapper);
   }
 
@@ -1034,6 +1111,8 @@
     data.append('previous_operation', formState.previous_operation);
     data.append('sync_crisis', formState.sync_crisis);
     data.append('backstory_tags', JSON.stringify(formState.backstory_tags));
+    data.append('avatar_gallery_url', formState.avatar_gallery_url || '');
+    data.append('avatar_gallery_id', formState.avatar_gallery_id || '');
 
     ATTR_KEYS.forEach(function (key) {
       data.append('attr_' + key, formState['attr_' + key]);
@@ -1236,9 +1315,18 @@
 
     var steps = qa(wrapper, '.tw-step');
     var current = 0;
+    var reviewReturnStep = null;
     if (!steps.length) return;
 
+    var reviewStepIndex = steps.length - 1;
     var spinner = makeSpinner('tw-char-spinner', 'SYNCHRONIZING AGENT…', 'Writing operative data to the NeoWeave grid.');
+
+    function goToStep(stepIndex, fromReview) {
+      if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= steps.length) return;
+      if (fromReview) reviewReturnStep = reviewStepIndex;
+      current = stepIndex;
+      showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
+    }
 
     function goNext() {
       if (!validateStep(wrapper, steps, current)) return;
@@ -1248,7 +1336,7 @@
       if (current < steps.length - 1) {
         current++;
         NW_SFX.nav();
-        showStep(wrapper, steps, current);
+        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
       }
     }
 
@@ -1256,16 +1344,25 @@
       clearStepError(steps[current]);
       setStatus('', false);
 
+      if (reviewReturnStep !== null && current !== reviewStepIndex) {
+        current = reviewReturnStep;
+        reviewReturnStep = null;
+        NW_SFX.back();
+        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
+        return;
+      }
+
       if (current > 0) {
         current--;
         NW_SFX.back();
-        showStep(wrapper, steps, current);
+        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
       }
     }
 
     fetchRaceGrid(wrapper);
     renderAttrDisplay(wrapper);
     renderLoreChoices(wrapper);
+    renderAvatarGallery(wrapper);
     updateSummary(wrapper);
     resetSubraceState(wrapper);
 
@@ -1298,9 +1395,7 @@
       var submitBtn = target.closest('#tw-char-submit');
       if (submitBtn) {
         e.preventDefault();
-        if (validateStep(wrapper, steps, current)) {
-          submitCharacter(wrapper, steps, current, spinner);
-        }
+        if (validateStep(wrapper, steps, current)) submitCharacter(wrapper, steps, current, spinner);
         return;
       }
 
@@ -1345,10 +1440,17 @@
         e.preventDefault();
         var go = parseInt(editBtn.dataset.goto, 10);
         if (!isNaN(go) && go >= 1 && go <= steps.length) {
-          current = go - 1;
-          showStep(wrapper, steps, current);
+          reviewReturnStep = reviewStepIndex;
+          goToStep(go - 1, true);
           NW_SFX.nav();
         }
+        return;
+      }
+
+      var avatarBtn = target.closest('.tw-avatar-option');
+      if (avatarBtn) {
+        e.preventDefault();
+        selectGalleryAvatar(wrapper, avatarBtn.dataset.avatarId || '', avatarBtn.dataset.avatarUrl || '', q(avatarBtn, '.tw-avatar-option__label') ? q(avatarBtn, '.tw-avatar-option__label').textContent.trim() : 'Selected avatar');
         return;
       }
 
@@ -1397,27 +1499,32 @@
     });
 
     wrapper.addEventListener('change', function (e) {
-      if (!(e.target && e.target.classList.contains('tw-pronoun-radio'))) return;
+      if (e.target && e.target.classList.contains('tw-pronoun-radio')) {
+        var customInput = q(wrapper, '#tw-char-pronouns-custom');
+        if (!customInput) return;
 
-      var customInput = q(wrapper, '#tw-char-pronouns-custom');
-      if (!customInput) return;
+        customInput.style.display = e.target.value === 'custom' ? '' : 'none';
 
-      customInput.style.display = e.target.value === 'custom' ? '' : 'none';
+        if (e.target.value === 'custom') {
+          customInput.focus();
+          formState.pronouns = customInput.value.trim() || 'custom';
+        } else {
+          formState.pronouns = e.target.value;
+        }
 
-      if (e.target.value === 'custom') {
-        customInput.focus();
-        formState.pronouns = customInput.value.trim() || 'custom';
-      } else {
-        formState.pronouns = e.target.value;
+        updateSummary(wrapper);
+        return;
       }
 
-      updateSummary(wrapper);
+      if (e.target && e.target.id === 'tw-char-avatar') {
+        if (e.target.files && e.target.files[0]) handleAvatarFile(wrapper, e.target.files[0]);
+      }
     });
 
     wrapper.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter' && e.key !== ' ') return;
 
-      var card = e.target.closest('.tw-race-card, .tw-class-card, .tw-skill-card, .tw-package-card, .tw-lore-card, .tw-subrace-card');
+      var card = e.target.closest('.tw-race-card, .tw-class-card, .tw-skill-card, .tw-package-card, .tw-lore-card, .tw-subrace-card, .tw-avatar-option');
       if (!card) return;
 
       e.preventDefault();
@@ -1425,8 +1532,6 @@
     });
 
     var dropBox = q(wrapper, '#tw-avatar-drop');
-    var fileInput = q(wrapper, '#tw-char-avatar');
-
     if (dropBox) {
       dropBox.addEventListener('dragover', function (e) {
         e.preventDefault();
@@ -1445,15 +1550,7 @@
       });
     }
 
-    if (fileInput) {
-      fileInput.addEventListener('change', function () {
-        if (fileInput.files && fileInput.files[0]) {
-          handleAvatarFile(wrapper, fileInput.files[0]);
-        }
-      });
-    }
-
-    showStep(wrapper, steps, 0);
+    showStep(wrapper, steps, 0, reviewStepIndex, reviewReturnStep);
   }
 
   function boot() {
@@ -1476,271 +1573,7 @@
       }
     }, 100);
   }
-let reviewReturnStep = null;
 
-document.querySelectorAll('.tw-summary-edit').forEach(btn => {
-  btn.addEventListener('click', () => {
-    reviewReturnStep = 11;
-    goToStep(Number(btn.dataset.goto), { fromReview: true });
-  });
-});
-
-document.querySelectorAll('[data-review-return]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (reviewReturnStep) goToStep(reviewReturnStep);
-  });
-});
-
-function syncReviewReturnButtons(currentStep, fromReview = false) {
-  document.querySelectorAll('[data-review-return]').forEach(btn => {
-    if (fromReview || reviewReturnStep === 11) {
-      btn.hidden = currentStep === 11;
-    } else {
-      btn.hidden = true;
-    }
-  });
-}
-  const TW_UPLOADS_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
-const TW_AVATAR_GALLERY = [
-  {
-    id: 'avatar-1',
-    name: 'Avatar',
-    url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg'
-  },
-  {
-    id: 'avatar-2',
-    name: 'Avatar 2',
-    url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar-1.svg'
-  }
-];
-
-function twNormalizeMediaUrl(value) {
-  if (!value) return '';
-  const raw = String(value).trim();
-
-  if (!raw) return '';
-
-  if (/^https?:\/\//i.test(raw)) return raw;
-  if (raw.startsWith('//')) return `https:${raw}`;
-  if (raw.startsWith('/wp-content/uploads/')) {
-    return `https://neoweaver.nieodparady.pl${raw}`;
-  }
-  if (raw.includes('wp-content/uploads/')) {
-    return raw.startsWith('/') ? `https://neoweaver.nieodparady.pl${raw}` : `https://${raw}`;
-  }
-
-  return `${TW_UPLOADS_BASE}${raw.replace(/^\/+/, '')}`;
-}
-
-function twEscapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function twGetImageUrl(item) {
-  return twNormalizeMediaUrl(
-    item?.image_url ||
-    item?.image ||
-    item?.imageUrl ||
-    item?.avatar ||
-    item?.icon ||
-    item?.thumbnail ||
-    item?.graphic ||
-    item?.file ||
-    ''
-  );
-}
-
-function twRenderImage(url, alt, placeholder = '✦') {
-  const safeAlt = twEscapeHtml(alt || 'NeoWeaver graphic');
-  if (!url) {
-    return `<div class="tw-race-img--placeholder" aria-hidden="true">${placeholder}</div>`;
-  }
-  return `<img src="${twEscapeHtml(url)}" alt="${safeAlt}" loading="lazy" decoding="async">`;
-}
-
-/* ===== race / subrace cards ===== */
-
-function renderRaceCard(race) {
-  const imageUrl = twGetImageUrl(race);
-  const tags = Array.isArray(race?.tags) ? race.tags : [];
-
-  return `
-    <button type="button" class="tw-grid-card tw-race-card" data-race-id="${twEscapeHtml(race.id || '')}">
-      <div class="tw-race-img">
-        ${twRenderImage(imageUrl, race.name || 'Race')}
-      </div>
-      <div class="tw-race-body">
-        <h3 class="tw-race-name">${twEscapeHtml(race.name || 'Unknown race')}</h3>
-        <div class="tw-race-tags">
-          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
-        </div>
-        <span class="tw-race-select-hint">Select race</span>
-      </div>
-    </button>
-  `;
-}
-
-function renderSubraceCard(subrace) {
-  const imageUrl = twGetImageUrl(subrace);
-  const tags = Array.isArray(subrace?.tags) ? subrace.tags : [];
-
-  return `
-    <button type="button" class="tw-grid-card tw-subrace-card" data-subrace-id="${twEscapeHtml(subrace.id || '')}">
-      <div class="tw-race-img">
-        ${twRenderImage(imageUrl, subrace.name || 'Subrace')}
-      </div>
-      <div class="tw-race-body">
-        <h3 class="tw-race-name">${twEscapeHtml(subrace.name || 'Unknown subrace')}</h3>
-        <div class="tw-race-tags">
-          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
-        </div>
-        <span class="tw-race-select-hint">Select subrace</span>
-      </div>
-    </button>
-  `;
-}
-
-function renderClassCard(cls) {
-  const imageUrl = twGetImageUrl(cls);
-  const tags = Array.isArray(cls?.tags) ? cls.tags : [];
-
-  return `
-    <button type="button" class="tw-class-card" data-class-id="${twEscapeHtml(cls.id || '')}">
-      <div class="tw-class-card__img-wrap">
-        ${twRenderImage(imageUrl, cls.name || 'Class')}
-      </div>
-      <div class="tw-class-card__body">
-        <h3 class="tw-class-card__name">${twEscapeHtml(cls.name || 'Unknown class')}</h3>
-        <div class="tw-race-tags">
-          ${tags.map(tag => `<span class="tw-race-tag">${twEscapeHtml(tag)}</span>`).join('')}
-        </div>
-        <span class="tw-race-select-hint">Select class</span>
-      </div>
-    </button>
-  `;
-}
-
-function renderSkillCard(skill) {
-  const imageUrl = twGetImageUrl(skill);
-
-  return `
-    <button type="button" class="tw-skill-card" data-skill-id="${twEscapeHtml(skill.id || '')}">
-      <div class="tw-race-img">
-        ${twRenderImage(imageUrl, skill.name || 'Skill')}
-      </div>
-      <div class="tw-race-body">
-        <h3 class="tw-race-name">${twEscapeHtml(skill.name || 'Unknown skill')}</h3>
-        <p class="tw-race-desc">${twEscapeHtml(skill.description || '')}</p>
-      </div>
-    </button>
-  `;
-}
-  const avatarGalleryEl = document.getElementById('tw-avatar-gallery');
-const avatarPreviewImg = document.getElementById('tw-avatar-img');
-const avatarSelectedWrap = document.getElementById('tw-avatar-selected');
-const avatarInput = document.getElementById('tw-char-avatar');
-const avatarClearBtn = document.getElementById('tw-avatar-clear');
-
-let selectedAvatarUrl = '';
-let selectedAvatarSource = ''; // 'upload' | 'gallery' | ''
-
-function renderAvatarGallery() {
-  if (!avatarGalleryEl) return;
-
-  avatarGalleryEl.innerHTML = TW_AVATAR_GALLERY.map(item => `
-    <button
-      type="button"
-      class="tw-avatar-option"
-      data-avatar-url="${twEscapeHtml(item.url)}"
-      data-avatar-id="${twEscapeHtml(item.id)}"
-      aria-label="Choose ${twEscapeHtml(item.name)}"
-    >
-      <img
-        src="${twEscapeHtml(item.url)}"
-        alt="${twEscapeHtml(item.name)}"
-        loading="lazy"
-        decoding="async"
-      >
-      <span class="tw-avatar-option__label">${twEscapeHtml(item.name)}</span>
-    </button>
-  `).join('');
-
-  avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const url = btn.dataset.avatarUrl || '';
-      selectedAvatarUrl = url;
-      selectedAvatarSource = 'gallery';
-
-      avatarPreviewImg.src = url;
-      avatarPreviewImg.alt = 'Selected gallery avatar';
-      avatarSelectedWrap.style.display = 'grid';
-
-      if (avatarInput) {
-        avatarInput.value = '';
-      }
-
-      avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
-        x.classList.toggle('selected', x === btn);
-      });
-    });
-  });
-}
-
-function clearAvatarSelection() {
-  selectedAvatarUrl = '';
-  selectedAvatarSource = '';
-
-  if (avatarPreviewImg) {
-    avatarPreviewImg.src = '';
-    avatarPreviewImg.alt = '';
-  }
-
-  if (avatarSelectedWrap) {
-    avatarSelectedWrap.style.display = 'none';
-  }
-
-  if (avatarInput) {
-    avatarInput.value = '';
-  }
-
-  if (avatarGalleryEl) {
-    avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
-      x.classList.remove('selected');
-    });
-  }
-}
-
-if (avatarInput) {
-  avatarInput.addEventListener('change', event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const objectUrl = URL.createObjectURL(file);
-    selectedAvatarUrl = objectUrl;
-    selectedAvatarSource = 'upload';
-
-    avatarPreviewImg.src = objectUrl;
-    avatarPreviewImg.alt = 'Uploaded avatar preview';
-    avatarSelectedWrap.style.display = 'grid';
-
-    if (avatarGalleryEl) {
-      avatarGalleryEl.querySelectorAll('.tw-avatar-option').forEach(x => {
-        x.classList.remove('selected');
-      });
-    }
-  });
-}
-
-if (avatarClearBtn) {
-  avatarClearBtn.addEventListener('click', clearAvatarSelection);
-}
-
-renderAvatarGallery();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
