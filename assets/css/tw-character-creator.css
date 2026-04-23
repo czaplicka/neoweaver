@@ -1,3 +1,13 @@
+/* =========================================
+NeoWeaver Character Creator CSS
+Updated for:
+- larger race/class/skill visuals
+- no nested scroll in card grids
+- subrace section compatible with JS + shortcode
+- right-aligned attribute controls
+- cleaner summary + review flow
+========================================= */
+
 :root {
   --tw-acid: #adff00;
   --tw-acid-soft: rgba(173, 255, 0, 0.16);
@@ -18,8 +28,6 @@
   --tw-radius-md: 18px;
   --tw-radius-sm: 12px;
 }
-
-/* base layout */
 
 #tw-char-creator-wrapper,
 #tw-char-creator-wrapper * {
@@ -66,7 +74,7 @@
   z-index: 1;
 }
 
-/* progress */
+/* ===== HEADER / PROGRESS ===== */
 
 .tw-progress-bar {
   margin-bottom: 24px;
@@ -171,7 +179,7 @@
   font-size: 0.82rem;
 }
 
-/* steps / copy */
+/* ===== STEPS ===== */
 
 .tw-step {
   display: none;
@@ -223,7 +231,7 @@
   margin-bottom: 8px;
 }
 
-/* inputs */
+/* ===== INPUTS ===== */
 
 #tw-char-creator-wrapper input[type="text"],
 #tw-char-creator-wrapper input[type="number"],
@@ -262,7 +270,7 @@
   resize: vertical;
 }
 
-/* pronouns */
+/* ===== PRONOUNS ===== */
 
 .tw-pronoun-options {
   display: flex;
@@ -302,32 +310,19 @@
   box-shadow: 0 0 18px rgba(173,255,0,0.28);
 }
 
-/* grids – no nested scroll */
+/* ===== GRIDS ===== */
 
 .tw-dynamic-grid,
-.tw-skill-cat-grid,
-#tw-skill-grid,
-#tw-race-grid,
-#tw-subrace-grid,
-#tw-class-grid,
-#tw-package-grid,
-#tw-origin-grid,
-#tw-operation-grid,
-#tw-crisis-grid {
+.tw-skill-cat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
-  overflow: visible !important;
-  max-height: none !important;
-  height: auto !important;
+  overflow: visible;
+  max-height: none;
   padding: 0;
 }
 
-#tw-skill-grid {
-  align-items: stretch;
-}
-
-/* cards */
+/* ===== CARDS ===== */
 
 .tw-grid-card,
 .tw-class-card,
@@ -397,7 +392,7 @@
   z-index: 2;
 }
 
-/* race / subrace */
+/* ===== RACE / SUBRACE ===== */
 
 .tw-race-card,
 .tw-subrace-card {
@@ -407,7 +402,6 @@
 
 .tw-race-img {
   min-height: 220px;
-  height: 220px;
   max-height: 220px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
   border-bottom: 1px solid rgba(173,255,0,0.10);
@@ -416,18 +410,14 @@
   justify-content: center;
   padding: 18px;
   overflow: hidden;
-  position: relative;
 }
 
 .tw-race-img img {
   width: 100%;
   height: 100%;
-  max-width: 100%;
   object-fit: contain;
   object-position: center;
   display: block;
-  visibility: visible;
-  opacity: 1;
   filter: drop-shadow(0 0 12px rgba(173,255,0,0.14));
 }
 
@@ -491,7 +481,7 @@
   text-transform: uppercase;
 }
 
-/* subrace section */
+/* ===== SUBRACE SECTION ===== */
 
 .tw-subrace-section {
   margin-top: 26px;
@@ -509,7 +499,7 @@
   font-size: 0.96rem;
 }
 
-/* class cards */
+/* ===== CLASS CARDS ===== */
 
 .tw-class-card {
   min-height: 380px;
@@ -517,7 +507,6 @@
 
 .tw-class-card__img-wrap {
   min-height: 220px;
-  height: 220px;
   max-height: 220px;
   padding: 18px;
   background: linear-gradient(180deg, rgba(173,255,0,0.05), rgba(255,255,255,0.015));
@@ -570,7 +559,7 @@
   opacity: 0.9;
 }
 
-/* skills */
+/* ===== SKILLS ===== */
 
 .tw-skill-counter {
   margin: -6px 0 18px;
@@ -590,7 +579,6 @@
 
 .tw-skill-card .tw-race-img {
   min-height: 170px;
-  height: 170px;
   max-height: 170px;
   padding: 16px;
 }
@@ -617,7 +605,7 @@
   font-size: 0.92rem;
 }
 
-/* packages */
+/* ===== PACKAGE ===== */
 
 .tw-package-card .tw-race-body {
   padding: 18px;
@@ -629,7 +617,7 @@
   gap: 8px;
 }
 
-/* lore cards */
+/* ===== LORE CARDS ===== */
 
 .tw-lore-card__effects {
   display: grid;
@@ -648,7 +636,7 @@
   color: var(--tw-acid);
 }
 
-/* states */
+/* ===== STATES ===== */
 
 .tw-loading,
 .tw-empty-state,
@@ -687,7 +675,7 @@
   50% { transform: scale(1.15); opacity: 1; }
 }
 
-/* attributes */
+/* ===== ATTRIBUTES ===== */
 
 .tw-attr-remaining-label {
   display: inline-flex;
@@ -784,12 +772,10 @@
 .tw-attr-controls {
   display: flex;
   flex-direction: column;
-  align-items: flex-end !important;
+  align-items: flex-end;
   justify-content: center;
   gap: 10px;
   min-width: 150px;
-  justify-self: end;
-  text-align: right;
 }
 
 .tw-attr-stepper {
@@ -797,7 +783,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  width: 100%;
 }
 
 .tw-attr-btn {
@@ -836,7 +821,6 @@
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
-  width: 100%;
 }
 
 .tw-pip {
@@ -853,7 +837,7 @@
   box-shadow: 0 0 12px rgba(173,255,0,0.46);
 }
 
-/* avatar upload + gallery */
+/* ===== AVATAR ===== */
 
 .tw-upload-box {
   padding: 22px;
@@ -901,7 +885,7 @@
   background: rgba(255,255,255,0.03);
 }
 
-/* buttons */
+/* ===== BUTTONS ===== */
 
 .tw-link-btn,
 .tw-avatar-clear,
@@ -962,17 +946,11 @@
   box-shadow: 0 0 18px rgba(173,255,0,0.22);
 }
 
-/* review-return visibility */
-
 .tw-btn-review-return[hidden] {
   display: none !important;
 }
 
-.tw-btn-review-return:not([hidden]) {
-  display: inline-flex !important;
-}
-
-/* summary */
+/* ===== SUMMARY ===== */
 
 .tw-summary-grid {
   display: grid;
@@ -1015,7 +993,7 @@
   cursor: pointer;
 }
 
-/* status + errors */
+/* ===== STATUS ===== */
 
 .tw-char-status {
   margin-top: 16px;
@@ -1068,7 +1046,7 @@
   75%      { transform: translateX(-2px); }
 }
 
-/* nav row */
+/* ===== NAV ===== */
 
 .tw-nav-row {
   display: flex;
@@ -1079,7 +1057,7 @@
   flex-wrap: wrap;
 }
 
-/* success */
+/* ===== SUCCESS ===== */
 
 .tw-success {
   display: grid;
@@ -1097,7 +1075,7 @@
   color: var(--tw-text);
 }
 
-/* spinner overlay */
+/* ===== SPINNER ===== */
 
 #tw-char-spinner {
   position: fixed;
@@ -1163,64 +1141,7 @@
   line-height: 1.5;
 }
 
-/* avatar gallery */
-
-.tw-avatar-gallery-block {
-  margin-top: 18px;
-}
-
-.tw-avatar-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
-}
-
-.tw-avatar-option {
-  appearance: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(173,255,0,0.16);
-  background: rgba(255,255,255,0.03);
-  cursor: pointer;
-  transition: all 180ms ease;
-}
-
-.tw-avatar-option:hover,
-.tw-avatar-option:focus-visible {
-  border-color: rgba(173,255,0,0.42);
-  box-shadow: 0 0 0 1px rgba(173,255,0,0.14), 0 12px 24px rgba(0,0,0,0.22);
-  transform: translateY(-2px);
-}
-
-.tw-avatar-option.selected {
-  border-color: rgba(173,255,0,0.82);
-  box-shadow:
-    0 0 0 2px rgba(173,255,0,0.18),
-    0 12px 24px rgba(0,0,0,0.26),
-    0 0 18px rgba(173,255,0,0.12);
-  background: linear-gradient(180deg, rgba(18,29,14,0.96), rgba(10,15,9,0.96));
-}
-
-.tw-avatar-option img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: contain;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(173,255,0,0.10);
-  padding: 10px;
-}
-
-.tw-avatar-option__label {
-  color: var(--tw-text);
-  font-size: 0.88rem;
-  text-align: center;
-}
-
-/* responsive */
+/* ===== RESPONSIVE ===== */
 
 @media (max-width: 900px) {
   #tw-char-creator-wrapper {
@@ -1243,20 +1164,18 @@
 
   .tw-attr-controls {
     width: 100%;
-    align-items: flex-end !important;
-    justify-self: stretch;
+    align-items: flex-start;
     min-width: 0;
   }
 
   .tw-attr-stepper,
   .tw-attr-pips {
-    justify-content: flex-end !important;
+    justify-content: flex-start;
   }
 
   .tw-race-img,
   .tw-class-card__img-wrap {
     min-height: 180px;
-    height: 180px;
     max-height: 180px;
   }
 }
@@ -1273,15 +1192,7 @@
   }
 
   .tw-dynamic-grid,
-  .tw-skill-cat-grid,
-  #tw-skill-grid,
-  #tw-race-grid,
-  #tw-subrace-grid,
-  #tw-class-grid,
-  #tw-package-grid,
-  #tw-origin-grid,
-  #tw-operation-grid,
-  #tw-crisis-grid {
+  .tw-skill-cat-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1311,13 +1222,11 @@
   .tw-class-card__img-wrap,
   .tw-race-img {
     min-height: 140px;
-    height: 140px;
     max-height: 140px;
   }
 
   .tw-skill-card .tw-race-img {
     min-height: 130px;
-    height: 130px;
     max-height: 130px;
   }
 }
