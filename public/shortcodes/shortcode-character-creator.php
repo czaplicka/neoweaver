@@ -1,56 +1,56 @@
 <?php
 /**
- * NeoWeaver Character Creator shortcode
- * Full version with preserved multi-step form and compatibility fixes.
+ * NeoWeaver Character Creator Shortcode
+ * Full renderer for [taleweaver_character_creator]
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Register assets
+ */
 if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
 	function neoweaver_register_character_creator_assets(): void {
-		$plugin_url  = plugin_dir_url( __FILE__ );
-		$plugin_path = plugin_dir_path( __FILE__ );
-		$css_file    = $plugin_path . 'tw-character-creator-4.css';
-		$js_file     = $plugin_path . 'tw-character-creator-4.js';
-		$uploads     = wp_upload_dir();
-		$baseurl     = trailingslashit( $uploads['baseurl'] );
+		$base_url = plugin_dir_url( __FILE__ );
 
 		wp_register_style(
 			'neoweaver-character-creator',
-			$plugin_url . 'tw-character-creator-4.css',
+			$base_url . '../assets/css/tw-character-creator.css',
 			array(),
-			file_exists( $css_file ) ? (string) filemtime( $css_file ) : '1.0.0'
+			'4.0.0'
 		);
 
 		wp_register_script(
 			'neoweaver-character-creator',
-			$plugin_url . 'tw-character-creator-4.js',
+			$base_url . '../assets/js/tw-character-creator.js',
 			array(),
-			file_exists( $js_file ) ? (string) filemtime( $js_file ) : '1.0.0',
+			'4.0.0',
 			true
 		);
+
+		$uploads = wp_upload_dir();
 
 		wp_localize_script(
 			'neoweaver-character-creator',
 			'twCharCreatorConfig',
 			array(
-				'ajaxurl'        => admin_url( 'admin-ajax.php' ),
-				'ajax_url'       => admin_url( 'admin-ajax.php' ),
-				'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
-				'site_base'      => home_url(),
-				'uploads_base'   => $baseurl,
-				'avatar_gallery' => array(
+				'ajaxurl'       => admin_url( 'admin-ajax.php' ),
+				'ajax_url'      => admin_url( 'admin-ajax.php' ),
+				'nonce'         => wp_create_nonce( 'neoweaver_nonce' ),
+				'site_base'     => home_url(),
+				'uploads_base'  => trailingslashit( $uploads['baseurl'] ),
+				'avatar_gallery'=> array(
 					array(
 						'id'   => 'avatar-1',
 						'name' => 'Avatar',
-						'url'  => $baseurl . 'Avatar.svg',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
 					),
 					array(
 						'id'   => 'avatar-2',
 						'name' => 'Avatar 2',
-						'url'  => $baseurl . 'Avatar-1.svg',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
 					),
 				),
 			)
@@ -59,551 +59,13 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
 	add_action( 'wp_enqueue_scripts', 'neoweaver_register_character_creator_assets' );
 }
 
-if ( ! function_exists( 'neoweaver_cc_uploads_base_url' ) ) {
-	function neoweaver_cc_uploads_base_url(): string {
-		$uploads = wp_upload_dir();
-		return trailingslashit( $uploads['baseurl'] );
-	}
-}
-
-if ( ! function_exists( 'neoweaver_cc_normalize_media_url' ) ) {
-	function neoweaver_cc_normalize_media_url( $value ): string {
-		$value = is_string( $value ) ? trim( $value ) : '';
-
-		if ( '' === $value ) {
-			return '';
-		}
-
-		if ( preg_match( '~^https?://~i', $value ) ) {
-			return esc_url_raw( $value );
-		}
-
-		if ( 0 === strpos( $value, '/wp-content/uploads/' ) ) {
-			return esc_url_raw( home_url( $value ) );
-		}
-
-		$value = ltrim( $value, '/' );
-		return esc_url_raw( neoweaver_cc_uploads_base_url() . $value );
-	}
-}
-
-if ( ! function_exists( 'neoweaver_cc_decode_array' ) ) {
-	function neoweaver_cc_decode_array( $value ): array {
-		if ( is_array( $value ) ) {
-			return array_values( array_filter( array_map( 'strval', $value ) ) );
-		}
-
-		if ( ! is_string( $value ) || '' === trim( $value ) ) {
-			return array();
-		}
-
-		$decoded = json_decode( $value, true );
-		if ( is_array( $decoded ) ) {
-			return array_values( array_filter( array_map( 'strval', $decoded ) ) );
-		}
-
-		return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ) ) );
-	}
-}
-
-/* ===== AJAX LOOKUPS — compatibility with current JS ===== */
-
-if ( ! function_exists( 'neoweaver_get_races_ajax' ) ) {
-	function neoweaver_get_races_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$rows = tw_supabase_get(
-				'cyber_races',
-				array(
-					'select'      => 'id,name,description,tags,bonus,img_url,parent_race',
-					'parent_race' => 'is.null',
-					'order'       => 'name.asc',
-					'limit'       => 300,
-				)
-			);
-
-			$rows = is_array( $rows ) ? $rows : array();
-			$data = array();
-
-			foreach ( $rows as $row ) {
-				$data[] = array(
-					'id'          => (string) ( $row['id'] ?? '' ),
-					'name'        => (string) ( $row['name'] ?? '' ),
-					'description' => (string) ( $row['description'] ?? '' ),
-					'image_url'   => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'img_url'     => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-					'bonus'       => neoweaver_cc_decode_array( $row['bonus'] ?? array() ),
-				);
-			}
-
-			wp_send_json_success( $data );
-		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_races';
-		$rows  = $wpdb->get_results(
-			"SELECT id, name, slug, description, image_url, img_url, tags, parent_race
-			 FROM {$table}
-			 WHERE parent_race IS NULL OR parent_race = ''
-			 ORDER BY name ASC",
-			ARRAY_A
-		);
-
-		$data = array();
-
-		foreach ( (array) $rows as $row ) {
-			$raw_img = ! empty( $row['image_url'] ) ? $row['image_url'] : ( $row['img_url'] ?? '' );
-
-			$data[] = array(
-				'id'          => (string) ( $row['id'] ?? ( $row['slug'] ?? '' ) ),
-				'name'        => (string) ( $row['name'] ?? '' ),
-				'description' => (string) ( $row['description'] ?? '' ),
-				'image_url'   => neoweaver_cc_normalize_media_url( $raw_img ),
-				'img_url'     => neoweaver_cc_normalize_media_url( $raw_img ),
-				'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-			);
-		}
-
-		wp_send_json_success( $data );
-	}
-	add_action( 'wp_ajax_neoweaver_get_races', 'neoweaver_get_races_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_races', 'neoweaver_get_races_ajax' );
-}
-
-if ( ! function_exists( 'neoweaver_get_subraces_ajax' ) ) {
-	function neoweaver_get_subraces_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		$parent = isset( $_POST['parent'] ) ? sanitize_text_field( wp_unslash( $_POST['parent'] ) ) : '';
-
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$rows = tw_supabase_get(
-				'cyber_races',
-				array(
-					'select'      => 'id,name,description,tags,bonus,img_url,parent_race',
-					'parent_race' => 'eq.' . $parent,
-					'order'       => 'name.asc',
-					'limit'       => 300,
-				)
-			);
-
-			$rows = is_array( $rows ) ? $rows : array();
-			$data = array();
-
-			foreach ( $rows as $row ) {
-				$data[] = array(
-					'id'          => (string) ( $row['id'] ?? '' ),
-					'name'        => (string) ( $row['name'] ?? '' ),
-					'description' => (string) ( $row['description'] ?? '' ),
-					'image_url'   => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'img_url'     => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-					'bonus'       => neoweaver_cc_decode_array( $row['bonus'] ?? array() ),
-				);
-			}
-
-			wp_send_json_success( $data );
-		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_races';
-		$rows  = array();
-
-		if ( '' !== $parent ) {
-			$rows = $wpdb->get_results(
-				$wpdb->prepare(
-					"SELECT id, name, slug, description, image_url, img_url, tags, parent_race
-					 FROM {$table}
-					 WHERE parent_race = %s
-					 ORDER BY name ASC",
-					$parent
-				),
-				ARRAY_A
-			);
-		}
-
-		$data = array();
-
-		foreach ( (array) $rows as $row ) {
-			$raw_img = ! empty( $row['image_url'] ) ? $row['image_url'] : ( $row['img_url'] ?? '' );
-
-			$data[] = array(
-				'id'          => (string) ( $row['id'] ?? ( $row['slug'] ?? '' ) ),
-				'name'        => (string) ( $row['name'] ?? '' ),
-				'description' => (string) ( $row['description'] ?? '' ),
-				'image_url'   => neoweaver_cc_normalize_media_url( $raw_img ),
-				'img_url'     => neoweaver_cc_normalize_media_url( $raw_img ),
-				'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-			);
-		}
-
-		wp_send_json_success( $data );
-	}
-	add_action( 'wp_ajax_neoweaver_get_subraces', 'neoweaver_get_subraces_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'neoweaver_get_subraces_ajax' );
-}
-
-if ( ! function_exists( 'neoweaver_get_classes_ajax' ) ) {
-	function neoweaver_get_classes_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$rows = tw_supabase_get(
-				'cyber_classes',
-				array(
-					'select'    => 'id,name,description,tags,img_url,icon_slug,skill_limit',
-					'is_active' => 'eq.true',
-					'order'     => 'name.asc',
-					'limit'     => 300,
-				)
-			);
-
-			$rows = is_array( $rows ) ? $rows : array();
-			$data = array();
-
-			foreach ( $rows as $row ) {
-				$data[] = array(
-					'id'          => (string) ( $row['id'] ?? '' ),
-					'name'        => (string) ( $row['name'] ?? '' ),
-					'description' => (string) ( $row['description'] ?? '' ),
-					'image_url'   => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'img_url'     => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-					'skill_limit' => isset( $row['skill_limit'] ) ? (int) $row['skill_limit'] : 5,
-				);
-			}
-
-			wp_send_json_success( $data );
-		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_classes';
-		$rows  = $wpdb->get_results(
-			"SELECT id, name, slug, description, image_url, img_url, tags, skill_limit
-			 FROM {$table}
-			 ORDER BY name ASC",
-			ARRAY_A
-		);
-
-		$data = array();
-
-		foreach ( (array) $rows as $row ) {
-			$raw_img = ! empty( $row['image_url'] ) ? $row['image_url'] : ( $row['img_url'] ?? '' );
-
-			$data[] = array(
-				'id'          => (string) ( $row['id'] ?? ( $row['slug'] ?? '' ) ),
-				'name'        => (string) ( $row['name'] ?? '' ),
-				'description' => (string) ( $row['description'] ?? '' ),
-				'image_url'   => neoweaver_cc_normalize_media_url( $raw_img ),
-				'img_url'     => neoweaver_cc_normalize_media_url( $raw_img ),
-				'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-				'skill_limit' => isset( $row['skill_limit'] ) ? (int) $row['skill_limit'] : 5,
-			);
-		}
-
-		wp_send_json_success( $data );
-	}
-	add_action( 'wp_ajax_neoweaver_get_classes', 'neoweaver_get_classes_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_classes', 'neoweaver_get_classes_ajax' );
-}
-
-if ( ! function_exists( 'neoweaver_get_skills_ajax' ) ) {
-	function neoweaver_get_skills_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$rows = tw_supabase_get(
-				'cyber_skills',
-				array(
-					'select'    => 'id,name,description,category,application,card_effect,img_url,tags,linked_attributes',
-					'is_active' => 'eq.true',
-					'order'     => 'category.asc,name.asc',
-					'limit'     => 300,
-				)
-			);
-
-			$rows = is_array( $rows ) ? $rows : array();
-			$data = array();
-
-			foreach ( $rows as $row ) {
-				$data[] = array(
-					'id'                => (string) ( $row['id'] ?? '' ),
-					'name'              => (string) ( $row['name'] ?? '' ),
-					'description'       => (string) ( $row['description'] ?? '' ),
-					'category'          => (string) ( $row['category'] ?? 'Other' ),
-					'application'       => (string) ( $row['application'] ?? '' ),
-					'card_effect'       => (string) ( $row['card_effect'] ?? '' ),
-					'image_url'         => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'img_url'           => neoweaver_cc_normalize_media_url( $row['img_url'] ?? '' ),
-					'tags'              => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-					'linked_attributes' => neoweaver_cc_decode_array( $row['linked_attributes'] ?? array() ),
-				);
-			}
-
-			wp_send_json_success( $data );
-		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_skills';
-		$rows  = $wpdb->get_results(
-			"SELECT id, name, slug, description, category, image_url, img_url, tags
-			 FROM {$table}
-			 ORDER BY category ASC, name ASC",
-			ARRAY_A
-		);
-
-		$data = array();
-
-		foreach ( (array) $rows as $row ) {
-			$raw_img = ! empty( $row['image_url'] ) ? $row['image_url'] : ( $row['img_url'] ?? '' );
-
-			$data[] = array(
-				'id'          => (string) ( $row['id'] ?? ( $row['slug'] ?? '' ) ),
-				'name'        => (string) ( $row['name'] ?? '' ),
-				'description' => (string) ( $row['description'] ?? '' ),
-				'category'    => (string) ( $row['category'] ?? 'Other' ),
-				'image_url'   => neoweaver_cc_normalize_media_url( $raw_img ),
-				'img_url'     => neoweaver_cc_normalize_media_url( $raw_img ),
-				'tags'        => neoweaver_cc_decode_array( $row['tags'] ?? array() ),
-			);
-		}
-
-		wp_send_json_success( $data );
-	}
-	add_action( 'wp_ajax_neoweaver_get_skills', 'neoweaver_get_skills_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_get_skills_ajax' );
-}
-
-if ( ! function_exists( 'neoweaver_get_packages_ajax' ) ) {
-	function neoweaver_get_packages_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		$class_tag = isset( $_POST['class_tag'] ) ? sanitize_text_field( wp_unslash( $_POST['class_tag'] ) ) : '';
-
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$rows = tw_supabase_get(
-				'cyber_starting_packages',
-				array(
-					'select'               => 'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
-					'is_player_selectable' => 'eq.true',
-					'order'                => 'package_name.asc',
-					'limit'                => 300,
-				)
-			);
-
-			$rows = is_array( $rows ) ? $rows : array();
-			$data = array();
-
-			foreach ( $rows as $row ) {
-				$compatibility = array_map( 'strtolower', neoweaver_cc_decode_array( $row['compatibility_tags'] ?? array() ) );
-
-				if ( '' !== $class_tag && ! in_array( strtolower( $class_tag ), $compatibility, true ) ) {
-					continue;
-				}
-
-				$data[] = array(
-					'id'                 => (string) ( $row['id'] ?? '' ),
-					'name'               => (string) ( $row['package_name'] ?? '' ),
-					'package_name'       => (string) ( $row['package_name'] ?? '' ),
-					'description'        => (string) ( $row['description'] ?? '' ),
-					'items'              => neoweaver_cc_decode_array( $row['items_list'] ?? array() ),
-					'items_list'         => neoweaver_cc_decode_array( $row['items_list'] ?? array() ),
-					'tags'               => $compatibility,
-					'compatibility_tags' => $compatibility,
-					'base_armor'         => isset( $row['base_armor'] ) ? (string) $row['base_armor'] : '',
-				);
-			}
-
-			wp_send_json_success( $data );
-		}
-
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_starting_packages';
-		$rows  = $wpdb->get_results(
-			"SELECT id, package_name, name, slug, description, compatibility_tags, items_list, items, base_armor
-			 FROM {$table}
-			 ORDER BY package_name ASC, name ASC",
-			ARRAY_A
-		);
-
-		$data = array();
-
-		foreach ( (array) $rows as $row ) {
-			$compatibility = array_map( 'strtolower', neoweaver_cc_decode_array( $row['compatibility_tags'] ?? array() ) );
-
-			if ( '' !== $class_tag && ! in_array( strtolower( $class_tag ), $compatibility, true ) ) {
-				continue;
-			}
-
-			$data[] = array(
-				'id'                 => (string) ( $row['id'] ?? ( $row['slug'] ?? '' ) ),
-				'name'               => (string) ( $row['package_name'] ?? ( $row['name'] ?? '' ) ),
-				'package_name'       => (string) ( $row['package_name'] ?? ( $row['name'] ?? '' ) ),
-				'description'        => (string) ( $row['description'] ?? '' ),
-				'items'              => neoweaver_cc_decode_array( $row['items_list'] ?? ( $row['items'] ?? array() ) ),
-				'items_list'         => neoweaver_cc_decode_array( $row['items_list'] ?? ( $row['items'] ?? array() ) ),
-				'tags'               => $compatibility,
-				'compatibility_tags' => $compatibility,
-				'base_armor'         => isset( $row['base_armor'] ) ? (string) $row['base_armor'] : '',
-			);
-		}
-
-		wp_send_json_success( $data );
-	}
-	add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_get_packages_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_get_packages_ajax' );
-	add_action( 'wp_ajax_neoweaver_get_starting_packages', 'neoweaver_get_packages_ajax' );
-	add_action( 'wp_ajax_nopriv_neoweaver_get_starting_packages', 'neoweaver_get_packages_ajax' );
-}
-
-if ( ! function_exists( 'neoweaver_create_character_ajax' ) ) {
-	function neoweaver_create_character_ajax(): void {
-		check_ajax_referer( 'neoweaver_nonce', 'nonce' );
-
-		if ( ! is_user_logged_in() ) {
-			wp_send_json_error(
-				array(
-					'message' => 'You must be logged in.',
-				),
-				403
-			);
-		}
-
-		if ( function_exists( 'neoweaver_ajax_create_character' ) ) {
-			neoweaver_ajax_create_character();
-		}
-
-		global $wpdb;
-
-		$table              = $wpdb->prefix . 'cyber_characters';
-		$user               = get_current_user_id();
-		$character_name     = isset( $_POST['character_name'] ) ? sanitize_text_field( wp_unslash( $_POST['character_name'] ) ) : '';
-		$pronouns           = isset( $_POST['pronouns'] ) ? sanitize_text_field( wp_unslash( $_POST['pronouns'] ) ) : '';
-		$bio                = isset( $_POST['bio'] ) ? sanitize_textarea_field( wp_unslash( $_POST['bio'] ) ) : '';
-		$race               = isset( $_POST['race'] ) ? sanitize_text_field( wp_unslash( $_POST['race'] ) ) : '';
-		$subrace            = isset( $_POST['subrace'] ) ? sanitize_text_field( wp_unslash( $_POST['subrace'] ) ) : '';
-		$char_class         = isset( $_POST['char_class'] ) ? sanitize_text_field( wp_unslash( $_POST['char_class'] ) ) : '';
-		$starting_package   = isset( $_POST['starting_package_id'] ) ? sanitize_text_field( wp_unslash( $_POST['starting_package_id'] ) ) : '';
-		$data_origin        = isset( $_POST['data_origin'] ) ? sanitize_text_field( wp_unslash( $_POST['data_origin'] ) ) : '';
-		$previous_operation = isset( $_POST['previous_operation'] ) ? sanitize_text_field( wp_unslash( $_POST['previous_operation'] ) ) : '';
-		$sync_crisis        = isset( $_POST['sync_crisis'] ) ? sanitize_text_field( wp_unslash( $_POST['sync_crisis'] ) ) : '';
-		$skills             = array();
-		$backstory_tags     = array();
-
-		if ( isset( $_POST['skills'] ) ) {
-			$decoded = json_decode( wp_unslash( $_POST['skills'] ), true );
-			if ( is_array( $decoded ) ) {
-				$skills = array_values( array_map( 'sanitize_text_field', $decoded ) );
-			}
-		}
-
-		if ( isset( $_POST['backstory_tags'] ) ) {
-			$decoded = json_decode( wp_unslash( $_POST['backstory_tags'] ), true );
-			if ( is_array( $decoded ) ) {
-				$backstory_tags = array_values( array_map( 'sanitize_text_field', $decoded ) );
-			}
-		}
-
-		$attr_body   = isset( $_POST['attr_body'] ) ? (int) $_POST['attr_body'] : 1;
-		$attr_reflex = isset( $_POST['attr_reflex'] ) ? (int) $_POST['attr_reflex'] : 1;
-		$attr_mind   = isset( $_POST['attr_mind'] ) ? (int) $_POST['attr_mind'] : 1;
-		$attr_spirit = isset( $_POST['attr_spirit'] ) ? (int) $_POST['attr_spirit'] : 1;
-		$avatar_url  = isset( $_POST['avatar_url'] ) ? esc_url_raw( wp_unslash( $_POST['avatar_url'] ) ) : '';
-
-		if ( '' === $character_name ) {
-			wp_send_json_error(
-				array(
-					'message' => 'Character name is required.',
-				),
-				400
-			);
-		}
-
-		if ( ! empty( $_FILES['avatar']['name'] ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-			$uploaded = wp_handle_upload(
-				$_FILES['avatar'],
-				array(
-					'test_form' => false,
-				)
-			);
-
-			if ( empty( $uploaded['error'] ) && ! empty( $uploaded['url'] ) ) {
-				$avatar_url = esc_url_raw( $uploaded['url'] );
-			}
-		}
-
-		$insert = $wpdb->insert(
-			$table,
-			array(
-				'user_id'             => $user,
-				'character_name'      => $character_name,
-				'pronouns'            => $pronouns,
-				'bio'                 => $bio,
-				'race'                => $race,
-				'subrace'             => $subrace,
-				'char_class'          => $char_class,
-				'starting_package_id' => $starting_package,
-				'skills'              => wp_json_encode( $skills ),
-				'data_origin'         => $data_origin,
-				'previous_operation'  => $previous_operation,
-				'sync_crisis'         => $sync_crisis,
-				'backstory_tags'      => wp_json_encode( $backstory_tags ),
-				'attr_body'           => $attr_body,
-				'attr_reflex'         => $attr_reflex,
-				'attr_mind'           => $attr_mind,
-				'attr_spirit'         => $attr_spirit,
-				'avatar_url'          => $avatar_url,
-				'created_at'          => current_time( 'mysql' ),
-			),
-			array(
-				'%d',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%s',
-				'%d',
-				'%d',
-				'%d',
-				'%d',
-				'%s',
-				'%s',
-			)
-		);
-
-		if ( false === $insert ) {
-			wp_send_json_error(
-				array(
-					'message' => 'Could not create character.',
-				),
-				500
-			);
-		}
-
-		wp_send_json_success(
-			array(
-				'message'  => 'Character created successfully.',
-				'id'       => (int) $wpdb->insert_id,
-				'redirect' => '',
-			)
-		);
-	}
-	add_action( 'wp_ajax_neoweaver_create_character', 'neoweaver_create_character_ajax' );
-}
-
+/**
+ * Shortcode renderer
+ */
 if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 	function neoweaver_shortcode_character_creator(): string {
 		if ( ! is_user_logged_in() ) {
-			return '<div class="tw-char-login-required">You must be logged in to create a Field Agent.</div>';
+			return '<div class="tw-login-required">You must be logged in to create a character.</div>';
 		}
 
 		wp_enqueue_style( 'neoweaver-character-creator' );
@@ -611,208 +73,501 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 		ob_start();
 		?>
-		<div id="tw-char-creator-wrapper">
+		<div id="tw-char-creator-wrapper" class="tw-char-creator">
+
 			<style>
-				#tw-char-creator-wrapper .tw-attr-controls{align-items:flex-start}
-				#tw-char-creator-wrapper .tw-attr-stepper,#tw-char-creator-wrapper .tw-attr-pips{justify-content:flex-start}
-				#tw-char-creator-wrapper .tw-avatar-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px}
-				#tw-char-creator-wrapper .tw-avatar-option{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid rgba(173,255,0,.18);border-radius:16px;background:rgba(255,255,255,.03);cursor:pointer;transition:all .18s ease}
-				#tw-char-creator-wrapper .tw-avatar-option:hover,#tw-char-creator-wrapper .tw-avatar-option.selected{border-color:rgba(173,255,0,.7);box-shadow:0 0 0 2px rgba(173,255,0,.14);background:rgba(173,255,0,.05)}
-				#tw-char-creator-wrapper .tw-avatar-option img{width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:12px;background:rgba(255,255,255,.03);padding:8px}
-				#tw-char-creator-wrapper .tw-avatar-option span{color:var(--tw-text,#e8ffe1);font-size:.9rem}
+				#tw-char-creator-wrapper .tw-custom-pronouns-field[hidden]{display:none!important}
+				#tw-char-creator-wrapper .tw-step{display:none}
+				#tw-char-creator-wrapper .tw-step.active{display:block}
+				#tw-char-creator-wrapper .tw-subrace-section[hidden]{display:none!important}
+				#tw-char-creator-wrapper .tw-attr-presets{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px}
+				#tw-char-creator-wrapper .tw-preset-btn{
+					background:rgba(173,255,0,.08);
+					border:1px solid rgba(173,255,0,.24);
+					color:#d8ff7a;
+					padding:10px 14px;
+					border-radius:999px;
+					cursor:pointer;
+					font:inherit;
+					transition:.2s ease;
+				}
+				#tw-char-creator-wrapper .tw-preset-btn:hover,
+				#tw-char-creator-wrapper .tw-preset-btn.active{
+					background:rgba(173,255,0,.18);
+					border-color:rgba(173,255,0,.7);
+					box-shadow:0 0 0 2px rgba(173,255,0,.14);
+				}
+				#tw-char-creator-wrapper .tw-status[hidden]{display:none!important}
+				#tw-char-creator-wrapper .tw-step-error[hidden]{display:none!important}
+				#tw-char-creator-wrapper .tw-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+				#tw-char-creator-wrapper .tw-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+				#tw-char-creator-wrapper .tw-summary-item{padding:14px;border:1px solid rgba(173,255,0,.18);border-radius:16px;background:rgba(255,255,255,.02)}
+				#tw-char-creator-wrapper .tw-summary-item dt{font-weight:700;margin-bottom:6px}
+				#tw-char-creator-wrapper .tw-progress-ticks{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+				#tw-char-creator-wrapper .tw-progress-tick{width:12px;height:12px;border-radius:999px;background:rgba(255,255,255,.18)}
+				#tw-char-creator-wrapper .tw-progress-tick.active{background:#adff00}
+				#tw-char-creator-wrapper .tw-attr-grid{display:grid;gap:16px}
+				#tw-char-creator-wrapper .tw-attr-row{padding:14px;border:1px solid rgba(173,255,0,.18);border-radius:16px}
+				#tw-char-creator-wrapper .tw-attr-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
+				#tw-char-creator-wrapper .tw-attr-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+				#tw-char-creator-wrapper .tw-attr-btn{width:36px;height:36px;border-radius:999px;border:1px solid rgba(173,255,0,.35);background:rgba(173,255,0,.08);color:#d8ff7a;cursor:pointer}
+				#tw-char-creator-wrapper .tw-attr-pips{display:flex;gap:8px}
+				#tw-char-creator-wrapper .tw-pip{width:14px;height:14px;border-radius:999px;background:rgba(255,255,255,.15);border:1px solid rgba(173,255,0,.2)}
+				#tw-char-creator-wrapper .tw-pip.active{background:#adff00;border-color:#adff00}
+				#tw-char-creator-wrapper .tw-avatar-layout{display:grid;grid-template-columns:1.1fr .9fr;gap:20px}
+				@media (max-width: 900px){
+					#tw-char-creator-wrapper .tw-avatar-layout{grid-template-columns:1fr}
+				}
+				#tw-char-creator-wrapper .tw-avatar-dropzone{border:1px dashed rgba(173,255,0,.35);border-radius:18px;padding:18px}
+				#tw-char-creator-wrapper .tw-avatar-selected{display:none;gap:14px;align-items:center}
+				#tw-char-creator-wrapper .tw-avatar-selected img{width:96px;height:96px;object-fit:cover;border-radius:18px}
+				#tw-char-creator-wrapper .tw-avatar-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+				#tw-char-creator-wrapper .tw-avatar-option{border:1px solid rgba(173,255,0,.18);background:rgba(255,255,255,.02);border-radius:16px;padding:10px;cursor:pointer}
+				#tw-char-creator-wrapper .tw-avatar-option.selected{border-color:#adff00;box-shadow:0 0 0 2px rgba(173,255,0,.15)}
+				#tw-char-creator-wrapper .tw-avatar-option img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px}
+				#tw-char-creator-wrapper .tw-nav{display:flex;justify-content:space-between;gap:12px;margin-top:24px;flex-wrap:wrap}
+				#tw-char-creator-wrapper .tw-btn-nav,
+				#tw-char-creator-wrapper .tw-btn-next,
+				#tw-char-creator-wrapper .tw-btn-prev,
+				#tw-char-creator-wrapper .tw-btn-review-return,
+				#tw-char-creator-wrapper #tw-char-submit{
+					padding:12px 18px;border-radius:999px;border:1px solid rgba(173,255,0,.35);background:rgba(173,255,0,.08);color:#e7ffad;cursor:pointer;font:inherit
+				}
+				#tw-char-creator-wrapper #tw-char-submit{background:#adff00;color:#111;font-weight:700}
+				#tw-char-creator-wrapper .tw-spinner[hidden]{display:none!important}
 			</style>
 
-			<div class="tw-progress-bar">
-				<div class="tw-progress-header">
-					<div class="tw-progress-label">Character Sync <span class="tw-blink">●</span></div>
-					<div class="tw-progress-counter">Step <span id="tw-char-step-current">1</span> / 11</div>
-				</div>
-				<div class="tw-progress-track">
-					<div class="tw-progress-fill" id="tw-char-progress-fill"></div>
-					<span class="tw-progress-tick active" data-tick="1"></span>
-					<span class="tw-progress-tick" data-tick="2"></span>
-					<span class="tw-progress-tick" data-tick="3"></span>
-					<span class="tw-progress-tick" data-tick="4"></span>
-					<span class="tw-progress-tick" data-tick="5"></span>
-					<span class="tw-progress-tick" data-tick="6"></span>
-					<span class="tw-progress-tick" data-tick="7"></span>
-					<span class="tw-progress-tick" data-tick="8"></span>
-					<span class="tw-progress-tick" data-tick="9"></span>
-					<span class="tw-progress-tick" data-tick="10"></span>
-					<span class="tw-progress-tick" data-tick="11"></span>
-				</div>
-				<div class="tw-progress-phase" id="tw-char-progress-phase">IDENTITY</div>
-			</div>
+			<header class="tw-char-header">
+				<p class="tw-kicker">NeoWeaver</p>
+				<h2>Create Field Agent</h2>
+				<p class="tw-intro">Build your operative profile for a single world deployment.</p>
 
-			<div class="tw-step active" data-phase="IDENTITY">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Define the operative identity</h2>
-				<p class="tw-question-text">Set the core identity for your Field Agent.</p>
-				<label class="tw-field-label">
-					<span>Character name <span class="tw-required">*</span></span>
-					<input type="text" id="tw-char-name" placeholder="Enter agent designation">
-				</label>
-				<fieldset class="tw-pronoun-fieldset">
-					<legend>Pronouns</legend>
-					<div class="tw-pronoun-options">
-						<label class="tw-pronoun-option"><input class="tw-pronoun-radio" type="radio" name="tw-pronouns" value="she/her"><span class="tw-pronoun-label">She / Her</span></label>
-						<label class="tw-pronoun-option"><input class="tw-pronoun-radio" type="radio" name="tw-pronouns" value="he/him"><span class="tw-pronoun-label">He / Him</span></label>
-						<label class="tw-pronoun-option"><input class="tw-pronoun-radio" type="radio" name="tw-pronouns" value="they/them"><span class="tw-pronoun-label">They / Them</span></label>
-						<label class="tw-pronoun-option"><input class="tw-pronoun-radio" type="radio" name="tw-pronouns" value="xe/xem"><span class="tw-pronoun-label">Xe / Xem</span></label>
-						<label class="tw-pronoun-option"><input class="tw-pronoun-radio" type="radio" name="tw-pronouns" value="custom"><span class="tw-pronoun-label">Custom</span></label>
+				<div class="tw-progress">
+					<div class="tw-progress-meta">
+						<span>Step <span id="tw-char-step-current">1</span> / 10</span>
+						<strong id="tw-char-progress-phase">IDENTITY SEED</strong>
 					</div>
-				</fieldset>
-				<label class="tw-field-label">
-					<span>Custom pronouns</span>
-					<input type="text" id="tw-char-pronouns-custom" placeholder="Optional">
-				</label>
-				<div class="tw-nav-row"><button type="button" id="tw-char-step1-next" class="tw-btn tw-btn--primary tw-btn-next">Continue</button></div>
-			</div>
 
-			<div class="tw-step" data-phase="RACE PROTOCOL">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Select the operative's biological or synthetic origin</h2>
-				<p class="tw-question-text">Choose race first, then subrace if available.</p>
-				<div id="tw-race-grid" class="tw-dynamic-grid"></div>
-				<section id="tw-subrace-section" class="tw-subrace-section hidden">
-					<h3 class="tw-subrace-heading">Subrace variants</h3>
-					<div id="tw-subrace-grid" class="tw-dynamic-grid"></div>
+					<div class="tw-progress-bar">
+						<div id="tw-char-progress-fill" class="tw-progress-bar-fill" style="width:10%"></div>
+					</div>
+
+					<div class="tw-progress-ticks" aria-hidden="true">
+						<span class="tw-progress-tick active" data-tick="1"></span>
+						<span class="tw-progress-tick" data-tick="2"></span>
+						<span class="tw-progress-tick" data-tick="3"></span>
+						<span class="tw-progress-tick" data-tick="4"></span>
+						<span class="tw-progress-tick" data-tick="5"></span>
+						<span class="tw-progress-tick" data-tick="6"></span>
+						<span class="tw-progress-tick" data-tick="7"></span>
+						<span class="tw-progress-tick" data-tick="8"></span>
+						<span class="tw-progress-tick" data-tick="9"></span>
+						<span class="tw-progress-tick" data-tick="10"></span>
+					</div>
+				</div>
+
+				<div id="tw-char-status" class="tw-status" hidden></div>
+			</header>
+
+			<div class="tw-steps">
+
+				<section class="tw-step active" data-phase="IDENTITY SEED">
+					<div class="tw-step-copy">
+						<h3>Define the operative identity before synchronization.</h3>
+					</div>
+
+					<div class="tw-form-grid">
+						<label class="tw-field-label">
+							<span>Agent designation</span>
+							<input type="text" id="tw-char-name" maxlength="80" placeholder="Enter character name">
+						</label>
+
+						<fieldset class="tw-fieldset">
+							<legend>Pronouns</legend>
+
+							<div class="tw-radio-grid">
+								<label class="tw-radio-card">
+									<input class="tw-pronoun-radio" type="radio" name="tw-char-pronouns" value="she/her">
+									<span>She / Her</span>
+								</label>
+
+								<label class="tw-radio-card">
+									<input class="tw-pronoun-radio" type="radio" name="tw-char-pronouns" value="he/him">
+									<span>He / Him</span>
+								</label>
+
+								<label class="tw-radio-card">
+									<input class="tw-pronoun-radio" type="radio" name="tw-char-pronouns" value="they/them">
+									<span>They / Them</span>
+								</label>
+
+								<label class="tw-radio-card">
+									<input class="tw-pronoun-radio" type="radio" name="tw-char-pronouns" value="xe/xem">
+									<span>Xe / Xem</span>
+								</label>
+
+								<label class="tw-radio-card">
+									<input class="tw-pronoun-radio" type="radio" name="tw-char-pronouns" value="custom">
+									<span>Custom</span>
+								</label>
+							</div>
+
+							<label class="tw-field-label tw-custom-pronouns-field" id="tw-custom-pronouns-field" hidden>
+								<span>Custom pronouns</span>
+								<input type="text" id="tw-char-pronouns-custom" placeholder="Optional">
+							</label>
+						</fieldset>
+					</div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<span></span>
+						<button type="button" id="tw-char-step1-next" class="tw-btn-next">Continue</button>
+					</div>
 				</section>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
 
-			<div class="tw-step" data-phase="CLASS MATRIX">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Select the operative's combat and skill archetype</h2>
-				<p class="tw-question-text">Choose the class matrix for your agent.</p>
-				<div id="tw-class-grid" class="tw-dynamic-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
+				<section class="tw-step" data-phase="RACE PROTOCOL">
+					<div class="tw-step-copy">
+						<h3>Select the operative's biological or synthetic origin.</h3>
+					</div>
 
-			<div class="tw-step" data-phase="BIOMETRIC CALIBRATION">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Distribute attribute points</h2>
-				<p class="tw-question-text">Each attribute starts at 1 and caps at 5. Remaining <span class="tw-attr-remaining-label"><span id="tw-attr-remaining">8</span> points</span></p>
-				<div class="tw-attr-grid">
-					<?php
-					$attrs = array(
-						'body'   => array( 'icon' => '⬢', 'label' => 'Body',   'desc' => 'Strength, endurance, resistance.' ),
-						'reflex' => array( 'icon' => '⬣', 'label' => 'Reflex', 'desc' => 'Speed, agility, reaction time.' ),
-						'mind'   => array( 'icon' => '◈', 'label' => 'Mind',   'desc' => 'Logic, focus, technical cognition.' ),
-						'spirit' => array( 'icon' => '✦', 'label' => 'Spirit', 'desc' => 'Willpower, intuition, entropy handling.' ),
-					);
-					foreach ( $attrs as $key => $attr ) :
-						?>
-						<div class="tw-attr-row" data-attr="<?php echo esc_attr( $key ); ?>">
-							<div class="tw-attr-icon"><?php echo esc_html( $attr['icon'] ); ?></div>
-							<div class="tw-attr-info"><h4><?php echo esc_html( $attr['label'] ); ?> <small>1-5</small></h4><span><?php echo esc_html( $attr['desc'] ); ?></span></div>
-							<div class="tw-attr-controls">
-								<div class="tw-attr-stepper">
-									<button type="button" class="tw-attr-btn" data-attr-action="minus" data-attr-key="<?php echo esc_attr( $key ); ?>">−</button>
-									<input type="number" id="tw-attr-<?php echo esc_attr( $key ); ?>" class="tw-attr-val" value="1" min="1" max="5" readonly>
-									<button type="button" class="tw-attr-btn" data-attr-action="plus" data-attr-key="<?php echo esc_attr( $key ); ?>">+</button>
+					<div id="tw-race-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div id="tw-subrace-section" class="tw-subrace-section" hidden>
+						<div class="tw-step-copy">
+							<h4>Subrace</h4>
+							<p>Choose a specialization branch if available.</p>
+						</div>
+						<div id="tw-subrace-grid" class="tw-card-grid" aria-live="polite"></div>
+					</div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="CLASS MATRIX">
+					<div class="tw-step-copy">
+						<h3>Select the operative's combat and skill archetype.</h3>
+					</div>
+
+					<div id="tw-class-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="BIOMETRIC CALIBRATION">
+					<div class="tw-step-copy">
+						<h3>Distribute attribute points across four core systems.</h3>
+						<p>Each attribute starts at 1 and caps at 5. Remaining <strong id="tw-attr-remaining">8</strong></p>
+					</div>
+
+					<div class="tw-attr-presets">
+						<button type="button" class="tw-preset-btn" data-preset="gunslinger">Gunslinger</button>
+						<button type="button" class="tw-preset-btn" data-preset="tank">Tank</button>
+						<button type="button" class="tw-preset-btn" data-preset="technomancer">Technomancer</button>
+						<button type="button" class="tw-preset-btn" data-preset="balanced">Balanced</button>
+					</div>
+
+					<div class="tw-attr-grid">
+						<div class="tw-attr-row" data-attr="body">
+							<div class="tw-attr-head">
+								<div>
+									<h4>Body</h4>
+									<p>Strength, endurance, damage soak.</p>
 								</div>
+								<input type="hidden" id="tw-attr-body" value="1">
+							</div>
+							<div class="tw-attr-controls">
+								<button type="button" class="tw-attr-btn" data-attr-action="minus" data-attr-key="body">−</button>
 								<div class="tw-attr-pips">
-									<span class="tw-pip active" data-pip="1"></span><span class="tw-pip" data-pip="2"></span><span class="tw-pip" data-pip="3"></span><span class="tw-pip" data-pip="4"></span><span class="tw-pip" data-pip="5"></span>
+									<span class="tw-pip active" data-pip="1"></span>
+									<span class="tw-pip" data-pip="2"></span>
+									<span class="tw-pip" data-pip="3"></span>
+									<span class="tw-pip" data-pip="4"></span>
+									<span class="tw-pip" data-pip="5"></span>
+								</div>
+								<button type="button" class="tw-attr-btn" data-attr-action="plus" data-attr-key="body">+</button>
+							</div>
+						</div>
+
+						<div class="tw-attr-row" data-attr="reflex">
+							<div class="tw-attr-head">
+								<div>
+									<h4>Reflex</h4>
+									<p>Speed, initiative, evasion.</p>
+								</div>
+								<input type="hidden" id="tw-attr-reflex" value="1">
+							</div>
+							<div class="tw-attr-controls">
+								<button type="button" class="tw-attr-btn" data-attr-action="minus" data-attr-key="reflex">−</button>
+								<div class="tw-attr-pips">
+									<span class="tw-pip active" data-pip="1"></span>
+									<span class="tw-pip" data-pip="2"></span>
+									<span class="tw-pip" data-pip="3"></span>
+									<span class="tw-pip" data-pip="4"></span>
+									<span class="tw-pip" data-pip="5"></span>
+								</div>
+								<button type="button" class="tw-attr-btn" data-attr-action="plus" data-attr-key="reflex">+</button>
+							</div>
+						</div>
+
+						<div class="tw-attr-row" data-attr="mind">
+							<div class="tw-attr-head">
+								<div>
+									<h4>Mind</h4>
+									<p>Logic, analysis, arcane-tech control.</p>
+								</div>
+								<input type="hidden" id="tw-attr-mind" value="1">
+							</div>
+							<div class="tw-attr-controls">
+								<button type="button" class="tw-attr-btn" data-attr-action="minus" data-attr-key="mind">−</button>
+								<div class="tw-attr-pips">
+									<span class="tw-pip active" data-pip="1"></span>
+									<span class="tw-pip" data-pip="2"></span>
+									<span class="tw-pip" data-pip="3"></span>
+									<span class="tw-pip" data-pip="4"></span>
+									<span class="tw-pip" data-pip="5"></span>
+								</div>
+								<button type="button" class="tw-attr-btn" data-attr-action="plus" data-attr-key="mind">+</button>
+							</div>
+						</div>
+
+						<div class="tw-attr-row" data-attr="spirit">
+							<div class="tw-attr-head">
+								<div>
+									<h4>Spirit</h4>
+									<p>Will, sync stability, magical resonance.</p>
+								</div>
+								<input type="hidden" id="tw-attr-spirit" value="1">
+							</div>
+							<div class="tw-attr-controls">
+								<button type="button" class="tw-attr-btn" data-attr-action="minus" data-attr-key="spirit">−</button>
+								<div class="tw-attr-pips">
+									<span class="tw-pip active" data-pip="1"></span>
+									<span class="tw-pip" data-pip="2"></span>
+									<span class="tw-pip" data-pip="3"></span>
+									<span class="tw-pip" data-pip="4"></span>
+									<span class="tw-pip" data-pip="5"></span>
+								</div>
+								<button type="button" class="tw-attr-btn" data-attr-action="plus" data-attr-key="spirit">+</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="SKILL SELECTION">
+					<div class="tw-step-copy">
+						<h3>Choose active skills unlocked for this operative class.</h3>
+						<p id="tw-skill-counter">0 / 5 skills</p>
+					</div>
+
+					<div id="tw-skill-grid" class="tw-skill-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="STARTING PACKAGE">
+					<div class="tw-step-copy">
+						<h3>Select the initial equipment loadout available to the chosen class.</h3>
+					</div>
+
+					<div id="tw-package-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="DATA ORIGIN">
+					<div class="tw-step-copy">
+						<h3>Where was your consciousness first stabilized?</h3>
+					</div>
+
+					<div id="tw-origin-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="PREVIOUS OPERATION">
+					<div class="tw-step-copy">
+						<h3>What was your primary function before current Deployment?</h3>
+					</div>
+
+					<div id="tw-operation-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="SYNCHRONIZATION CRISIS">
+					<div class="tw-step-copy">
+						<h3>How did you react to the first contact with Entropy (The Fray)?</h3>
+					</div>
+
+					<div id="tw-crisis-grid" class="tw-card-grid" aria-live="polite"></div>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
+					</div>
+				</section>
+
+				<section class="tw-step" data-phase="VISUAL SIGNATURE">
+					<div class="tw-step-copy">
+						<h3>Upload an operative portrait and add a manual bio. Both are optional.</h3>
+					</div>
+
+					<div class="tw-avatar-layout">
+						<div class="tw-avatar-dropzone">
+							<div id="tw-avatar-preview" class="tw-avatar-preview">
+								<p>Drag &amp; drop or</p>
+								<label class="tw-btn-nav" for="tw-char-avatar">Choose file</label>
+								<p>JPG / PNG / WEBP / SVG, max 2 MB</p>
+							</div>
+
+							<input type="file" id="tw-char-avatar" accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml" hidden>
+
+							<div id="tw-avatar-selected" class="tw-avatar-selected">
+								<img id="tw-avatar-img" src="" alt="">
+								<div>
+									<p>Portrait selected.</p>
+									<button type="button" id="tw-avatar-clear" class="tw-btn-nav">Remove</button>
 								</div>
 							</div>
 						</div>
-					<?php endforeach; ?>
-				</div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
 
-			<div class="tw-step" data-phase="SKILL SELECTION">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Choose active skills</h2>
-				<p class="tw-question-text">Select active skills unlocked for this class.</p>
-				<div class="tw-skill-counter" id="tw-skill-counter">0 / 5 skills</div>
-				<div id="tw-skill-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
-
-			<div class="tw-step" data-phase="STARTING PACKAGE">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Select the initial equipment loadout</h2>
-				<p class="tw-question-text">Choose the starting package available to the selected class.</p>
-				<div id="tw-package-grid" class="tw-dynamic-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
-
-			<div class="tw-step" data-phase="DATA ORIGIN">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Where was your consciousness first stabilized?</h2>
-				<p class="tw-question-text">Pick the origin layer of your pattern.</p>
-				<div id="tw-origin-grid" class="tw-dynamic-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
-
-			<div class="tw-step" data-phase="PREVIOUS OPERATION">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>What was your primary function before current Deployment?</h2>
-				<p class="tw-question-text">Choose the previous operation profile.</p>
-				<div id="tw-operation-grid" class="tw-dynamic-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
-
-			<div class="tw-step" data-phase="SYNCHRONIZATION CRISIS">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>How did you react to the first contact with Entropy?</h2>
-				<p class="tw-question-text">Choose the crisis response pattern.</p>
-				<div id="tw-crisis-grid" class="tw-dynamic-grid"></div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
-			</div>
-
-			<div class="tw-step" data-phase="VISUAL SIGNATURE">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Upload an operative portrait and add a manual bio</h2>
-				<p class="tw-question-text">Both are optional.</p>
-				<div class="tw-upload-box" id="tw-upload-box">
-					<div class="tw-upload-preview" id="tw-avatar-preview">
-						<div class="tw-upload-icon">⬡</div>
-						<p>Drag &amp; drop or <button type="button" class="tw-link-btn" id="tw-avatar-trigger">browse</button></p>
-						<p>JPG / PNG / WEBP / SVG, max 2 MB</p>
+						<div>
+							<p>Or choose from gallery</p>
+							<div id="tw-avatar-gallery" class="tw-avatar-gallery"></div>
+						</div>
 					</div>
-					<div class="tw-avatar-selected" id="tw-avatar-selected" style="display:none">
-						<img id="tw-avatar-img" src="" alt="">
-						<button type="button" class="tw-avatar-clear" id="tw-avatar-clear">Remove image</button>
+
+					<label class="tw-field-label">
+						<span>Bio</span>
+						<textarea id="tw-char-bio" rows="6" maxlength="1200" placeholder="Add your Field Agent bio"></textarea>
+					</label>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-prev">Back</button>
+						<button type="button" class="tw-btn-next">Continue</button>
 					</div>
-					<input type="file" id="tw-char-avatar" accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml" hidden>
-				</div>
-				<div style="margin-top:16px">
-					<div class="tw-field-label">Or choose from gallery</div>
-					<div id="tw-avatar-gallery" class="tw-avatar-gallery"></div>
-					<label class="tw-field-label" style="margin-top:18px"><span>Bio</span><textarea id="tw-char-bio" placeholder="Who is this Field Agent?"></textarea></label>
-				</div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button><button type="button" class="tw-btn-nav tw-btn-next" data-dir="next">Continue</button></div>
+				</section>
+
+				<section class="tw-step" data-phase="SYSTEM REVIEW">
+					<div class="tw-step-copy">
+						<h3>Verify operative parameters before synchronization.</h3>
+					</div>
+
+					<dl class="tw-summary-grid">
+						<div class="tw-summary-item">
+							<dt>Name</dt>
+							<dd id="tw-summary-character-name">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Pronouns</dt>
+							<dd id="tw-summary-pronouns">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Race / Subrace</dt>
+							<dd id="tw-summary-race">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Class</dt>
+							<dd id="tw-summary-class">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Attributes</dt>
+							<dd id="tw-summary-attrs">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Skills</dt>
+							<dd id="tw-summary-skills">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Starting package</dt>
+							<dd id="tw-summary-package">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Data origin</dt>
+							<dd id="tw-summary-origin">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Previous operation</dt>
+							<dd id="tw-summary-operation">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Sync crisis</dt>
+							<dd id="tw-summary-crisis">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Backstory tags</dt>
+							<dd id="tw-summary-tag-bundle">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Bio</dt>
+							<dd id="tw-summary-bio">—</dd>
+						</div>
+						<div class="tw-summary-item">
+							<dt>Avatar</dt>
+							<dd id="tw-summary-avatar">—</dd>
+						</div>
+					</dl>
+
+					<div class="tw-step-error" hidden></div>
+
+					<div class="tw-nav">
+						<button type="button" class="tw-btn-review-return">Back</button>
+						<button type="button" id="tw-char-submit">Create character</button>
+					</div>
+				</section>
+
 			</div>
 
-			<div class="tw-step" data-phase="SYSTEM REVIEW">
-				<div class="tw-step-error"><span class="tw-step-error-icon">!</span><span class="tw-step-error-msg"></span></div>
-				<h2>Verify operative parameters before synchronization</h2>
-				<p class="tw-question-text">Review the final profile before creating the character.</p>
-				<div class="tw-summary-grid">
-					<div class="tw-summary-row"><div class="tw-summary-key">Name</div><div class="tw-summary-val" id="tw-summary-character-name"></div><button type="button" class="tw-summary-edit" data-edit-step="0">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Pronouns</div><div class="tw-summary-val" id="tw-summary-pronouns"></div><button type="button" class="tw-summary-edit" data-edit-step="0">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Race</div><div class="tw-summary-val" id="tw-summary-race"></div><button type="button" class="tw-summary-edit" data-edit-step="1">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Class</div><div class="tw-summary-val" id="tw-summary-class"></div><button type="button" class="tw-summary-edit" data-edit-step="2">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Attributes</div><div class="tw-summary-val" id="tw-summary-attrs"></div><button type="button" class="tw-summary-edit" data-edit-step="3">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Skills</div><div class="tw-summary-val" id="tw-summary-skills"></div><button type="button" class="tw-summary-edit" data-edit-step="4">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Package</div><div class="tw-summary-val" id="tw-summary-package"></div><button type="button" class="tw-summary-edit" data-edit-step="5">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Origin</div><div class="tw-summary-val" id="tw-summary-origin"></div><button type="button" class="tw-summary-edit" data-edit-step="6">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Operation</div><div class="tw-summary-val" id="tw-summary-operation"></div><button type="button" class="tw-summary-edit" data-edit-step="7">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Crisis</div><div class="tw-summary-val" id="tw-summary-crisis"></div><button type="button" class="tw-summary-edit" data-edit-step="8">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Tag bundle</div><div class="tw-summary-val" id="tw-summary-tag-bundle"></div><button type="button" class="tw-summary-edit" data-edit-step="8">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Avatar</div><div class="tw-summary-val" id="tw-summary-avatar"></div><button type="button" class="tw-summary-edit" data-edit-step="9">Edit</button></div>
-					<div class="tw-summary-row"><div class="tw-summary-key">Bio</div><div class="tw-summary-val" id="tw-summary-bio"></div><button type="button" class="tw-summary-edit" data-edit-step="9">Edit</button></div>
-				</div>
-				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-review-return" data-dir="prev">Back</button><button type="button" class="tw-btn tw-btn--primary" id="tw-char-submit">Create character</button></div>
+			<div id="tw-char-spinner" class="tw-spinner" hidden>
+				<div class="tw-spinner-core"></div>
+				<p>Synchronizing operative profile…</p>
 			</div>
-
-			<div class="tw-char-status" id="tw-char-status" aria-live="polite"></div>
 		</div>
 		<?php
 		return (string) ob_get_clean();
 	}
+
 	add_shortcode( 'taleweaver_character_creator', 'neoweaver_shortcode_character_creator' );
-}
