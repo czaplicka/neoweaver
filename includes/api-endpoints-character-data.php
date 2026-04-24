@@ -1,6 +1,10 @@
 <?php
 /**
  * NeoWeaver Character Creator API Endpoints
+ * Full file aligned to:
+ * - character UUID
+ * - backstory tag IDs (bigint)
+ * - WordPress AJAX + optional REST lookup routes
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -8,26 +12,50 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Decode json/jsonb or fallback array/string list.
+ * Decode json/jsonb arrays or comma-separated lists.
  */
 if ( ! function_exists( 'nw_decode_jsonb_array' ) ) {
 	function nw_decode_jsonb_array( $value ): array {
 		if ( is_array( $value ) ) {
-			return array_values( array_filter( array_map( 'strval', $value ) ) );
+			return array_values(
+				array_filter(
+					array_map(
+						static function ( $item ) {
+							return is_scalar( $item ) ? trim( (string) $item ) : '';
+						},
+						$value
+					)
+				)
+			);
 		}
 
 		if ( is_string( $value ) ) {
 			$value = trim( $value );
+
 			if ( '' === $value ) {
 				return array();
 			}
 
 			$decoded = json_decode( $value, true );
+
 			if ( is_array( $decoded ) ) {
-				return array_values( array_filter( array_map( 'strval', $decoded ) ) );
+				return array_values(
+					array_filter(
+						array_map(
+							static function ( $item ) {
+								return is_scalar( $item ) ? trim( (string) $item ) : '';
+							},
+							$decoded
+						)
+					)
+				);
 			}
 
-			return array_values( array_filter( array_map( 'trim', explode( ',', $value ) ) ) );
+			return array_values(
+				array_filter(
+					array_map( 'trim', explode( ',', $value ) )
+				)
+			);
 		}
 
 		return array();
@@ -40,11 +68,12 @@ if ( ! function_exists( 'nw_decode_jsonb_array' ) ) {
 if ( ! function_exists( 'nw_normalize_media_url' ) ) {
 	function nw_normalize_media_url( $value ): string {
 		$value = is_string( $value ) ? trim( $value ) : '';
+
 		if ( '' === $value ) {
 			return '';
 		}
 
-		if ( preg_match( '~^https?://~i', $value ) ) {
+		if ( preg_match( '#^https?://#i', $value ) ) {
 			return esc_url_raw( $value );
 		}
 
@@ -52,13 +81,14 @@ if ( ! function_exists( 'nw_normalize_media_url' ) ) {
 			return esc_url_raw( home_url( $value ) );
 		}
 
-		$uploads = wp_upload_dir();
+		$uploads = wp_get_upload_dir();
+
 		return esc_url_raw( trailingslashit( $uploads['baseurl'] ) . ltrim( $value, '/' ) );
 	}
 }
 
 /**
- * Resolve img_url fields.
+ * Resolve img_url/image_url fields.
  */
 if ( ! function_exists( 'nw_resolve_img_urls' ) ) {
 	function nw_resolve_img_urls( array $rows ): array {
@@ -67,9 +97,11 @@ if ( ! function_exists( 'nw_resolve_img_urls' ) ) {
 				if ( isset( $row['img_url'] ) ) {
 					$row['img_url'] = nw_normalize_media_url( $row['img_url'] );
 				}
+
 				if ( isset( $row['image_url'] ) ) {
 					$row['image_url'] = nw_normalize_media_url( $row['image_url'] );
 				}
+
 				return $row;
 			},
 			$rows
@@ -78,15 +110,35 @@ if ( ! function_exists( 'nw_resolve_img_urls' ) ) {
 }
 
 /**
+ * Compatibility wrapper.
+ */
+if ( ! function_exists( 'tw_supabase_get' ) ) {
+	function tw_supabase_get( string $table, array $query = array() ) {
+		return nw_supabase_request( 'GET', $table, $query );
+	}
+}
+
+/**
  * Low-level Supabase request helper.
  */
 if ( ! function_exists( 'nw_supabase_request' ) ) {
-	function nw_supabase_request( string $method, string $table, array $query = array(), $body = null, bool $return_representation = false ) {
+	function nw_supabase_request(
+		string $method,
+		string $table,
+		array $query = array(),
+		$body = null,
+		bool $return_representation = false
+	) {
 		if ( ! function_exists( 'tw_supabase_rest_url' ) || ! function_exists( 'tw_supabase_headers' ) ) {
-			return new WP_Error( 'config_missing', 'Supabase REST configuration missing.', array( 'status' => 500 ) );
+			return new WP_Error(
+				'config_missing',
+				'Supabase REST configuration missing.',
+				array( 'status' => 500 )
+			);
 		}
 
 		$url = trailingslashit( tw_supabase_rest_url() ) . ltrim( $table, '/' );
+
 		if ( ! empty( $query ) ) {
 			$url = add_query_arg( $query, $url );
 		}
@@ -114,6 +166,7 @@ if ( ! function_exists( 'nw_supabase_request' ) ) {
 		}
 
 		$response = wp_remote_request( $url, $args );
+
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
@@ -180,12 +233,46 @@ if ( ! function_exists( 'nw_fetch_lookup_table' ) ) {
 		}
 
 		$data = tw_supabase_get( $table, $params );
+
 		if ( ! is_array( $data ) ) {
 			return new WP_Error( 'supabase_error', 'Database error.', array( 'status' => 500 ) );
 		}
 
 		set_transient( $cache_key, $data, $ttl );
+
 		return $data;
+	}
+}
+
+/**
+ * Sanitize integer IDs.
+ */
+if ( ! function_exists( 'nw_sanitize_int_id' ) ) {
+	function nw_sanitize_int_id( $value ): int {
+		if ( is_int( $value ) ) {
+			return $value > 0 ? $value : 0;
+		}
+
+		if ( is_string( $value ) ) {
+			$value = trim( $value );
+		}
+
+		if ( '' === (string) $value || ! is_numeric( $value ) ) {
+			return 0;
+		}
+
+		$value = (int) $value;
+
+		return $value > 0 ? $value : 0;
+	}
+}
+
+/**
+ * Sanitize text IDs.
+ */
+if ( ! function_exists( 'nw_sanitize_text_id' ) ) {
+	function nw_sanitize_text_id( $value ): string {
+		return sanitize_text_field( (string) $value );
 	}
 }
 
@@ -206,15 +293,15 @@ if ( ! function_exists( 'nw_map_race_card_shape' ) ) {
 				$raw_bonus = nw_decode_jsonb_array( $row['bonus'] ?? array() );
 
 				return array(
-					'id'    => (string) ( $row['id'] ?? '' ),
-					'key'   => (string) ( $row['id'] ?? '' ),
-					'label' => (string) ( $row['name'] ?? '' ),
-					'name'  => (string) ( $row['name'] ?? '' ),
-					'desc'  => (string) ( $row['description'] ?? '' ),
-					'bonus' => implode( ' · ', $raw_bonus ),
-					'img'   => (string) ( $row['img_url'] ?? '' ),
+					'id'      => (string) ( $row['id'] ?? '' ),
+					'key'     => (string) ( $row['id'] ?? '' ),
+					'label'   => (string) ( $row['name'] ?? '' ),
+					'name'    => (string) ( $row['name'] ?? '' ),
+					'desc'    => (string) ( $row['description'] ?? '' ),
+					'bonus'   => implode( ' · ', $raw_bonus ),
+					'img'     => (string) ( $row['img_url'] ?? '' ),
 					'img_url' => (string) ( $row['img_url'] ?? '' ),
-					'tags'  => $tags_out,
+					'tags'    => $tags_out,
 				);
 			},
 			$rows
@@ -269,7 +356,7 @@ if ( ! function_exists( 'nw_map_skill_card_shape' ) ) {
 }
 
 /**
- * Map packages to frontend shape.
+ * Map starting packages to frontend shape.
  */
 if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
 	function nw_map_starting_package_shape( array $rows, string $class_name = '' ): array {
@@ -325,6 +412,7 @@ if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
 				static function ( $row ) use ( $class_name ) {
 					$tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
 					$tags = array_map( 'strtolower', $tags );
+
 					return in_array( $class_name, $tags, true );
 				}
 			)
@@ -338,6 +426,7 @@ if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
 if ( ! function_exists( 'nw_find_race_by_id' ) ) {
 	function nw_find_race_by_id( string $race_id ) {
 		$race_id = sanitize_text_field( $race_id );
+
 		if ( '' === $race_id ) {
 			return null;
 		}
@@ -366,6 +455,7 @@ if ( ! function_exists( 'nw_find_race_by_id' ) ) {
 if ( ! function_exists( 'nw_find_class_by_id' ) ) {
 	function nw_find_class_by_id( string $class_id ) {
 		$class_id = sanitize_text_field( $class_id );
+
 		if ( '' === $class_id ) {
 			return null;
 		}
@@ -389,11 +479,12 @@ if ( ! function_exists( 'nw_find_class_by_id' ) ) {
 }
 
 /**
- * Find package by ID.
+ * Find starting package by ID.
  */
 if ( ! function_exists( 'nw_find_starting_package_by_id' ) ) {
 	function nw_find_starting_package_by_id( string $package_id ) {
 		$package_id = sanitize_text_field( $package_id );
+
 		if ( '' === $package_id ) {
 			return null;
 		}
@@ -418,7 +509,7 @@ if ( ! function_exists( 'nw_find_starting_package_by_id' ) ) {
 }
 
 /**
- * Validate starting package.
+ * Validate starting package selection.
  */
 if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
 	function nw_validate_starting_package_selection( string $class_id, string $package_id ) {
@@ -427,23 +518,29 @@ if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
 		}
 
 		$class_row = nw_find_class_by_id( $class_id );
+
 		if ( empty( $class_row ) || empty( $class_row['id'] ) || empty( $class_row['is_active'] ) ) {
 			return new WP_Error( 'invalid_class', 'Selected class does not exist or is inactive.', array( 'status' => 400 ) );
 		}
 
 		$package_row = nw_find_starting_package_by_id( $package_id );
+
 		if ( empty( $package_row ) || empty( $package_row['id'] ) ) {
 			return new WP_Error( 'invalid_starting_package', 'Selected starting package does not exist or is not player selectable.', array( 'status' => 400 ) );
 		}
 
 		$class_name = strtolower( trim( (string) ( $class_row['name'] ?? '' ) ) );
+
 		if ( '' === $class_name ) {
 			return new WP_Error( 'invalid_class', 'Selected class has no valid name.', array( 'status' => 400 ) );
 		}
 
 		$package_tags = array_map(
 			'strtolower',
-			nw_decode_jsonb_array( $package_row['compatibility_tags'] ?? array() )
+			nw_de) );
+		}
+
+		$package_tags = array_mpatibility_tags'] ?? array() )
 		);
 
 		if ( empty( $package_tags ) ) {
@@ -459,52 +556,31 @@ if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
 }
 
 /**
- * Find tag defs by labels.
- */
-if ( ! function_exists( 'nw_find_tag_defs_by_labels' ) ) {
-	function nw_find_tag_defs_by_labels( array $labels ): array {
-		$labels = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $labels ) ) ) );
-		if ( empty( $labels ) ) {
-			return array();
-		}
-
-		$quoted = array_map(
-			static function ( $label ) {
-				return '"' . str_replace( '"', '\\"', $label ) . '"';
-			},
-			$labels
-		);
-
-		$rows = nw_supabase_request(
-			'GET',
-			'cyber_character_tag_defs',
-			array(
-				'select' => 'id,label',
-				'label'  => 'in.(' . implode( ',', $quoted ) . ')',
-			)
-		);
-
-		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
-			return array();
-		}
-
-		return $rows;
-	}
-}
-
-/**
  * Find skills by IDs.
+ * NOTE: current old file treated them as strings; keep as text IDs unless your table is bigint.
  */
 if ( ! function_exists( 'nw_find_skills_by_ids' ) ) {
 	function nw_find_skills_by_ids( array $skill_ids ): array {
-		$skill_ids = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $skill_ids ) ) ) );
+		$skill_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map(
+						static function ( $id ) {
+							return sanitize_text_field( (string) $id );
+						},
+						$skill_ids
+					)
+				)
+			)
+		);
+
 		if ( empty( $skill_ids ) ) {
 			return array();
 		}
 
 		$quoted = array_map(
 			static function ( $id ) {
-				return '"' . str_replace( '"', '\\"', $id ) . '"';
+				return '"' . str_replace( '"', '\"', $id ) . '"';
 			},
 			$skill_ids
 		);
@@ -528,16 +604,28 @@ if ( ! function_exists( 'nw_find_skills_by_ids' ) ) {
 }
 
 /**
- * Validate selected skills.
+ * Validate skill selection.
  */
 if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
 	function nw_validate_skill_selection( string $class_id, array $skills ) {
 		$class_row = nw_find_class_by_id( $class_id );
+
 		if ( empty( $class_row ) || empty( $class_row['id'] ) || empty( $class_row['is_active'] ) ) {
 			return new WP_Error( 'invalid_class', 'Selected class does not exist or is inactive.', array( 'status' => 400 ) );
 		}
 
-		$skills = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $skills ) ) ) );
+		$skills = array_values(
+			array_unique(
+				array_filter(
+					array_map(
+						static function ( $id ) {
+							return sanitize_text_field( (string) $id );
+						},
+						$skills
+					)
+				)
+			)
+		);
 
 		$limit = isset( $class_row['skill_limit'] ) ? (int) $class_row['skill_limit'] : 5;
 		$limit = $limit > 0 ? $limit : 5;
@@ -559,6 +647,7 @@ if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
 		);
 
 		$missing = array_values( array_diff( $skills, $found_ids ) );
+
 		if ( ! empty( $missing ) ) {
 			return new WP_Error( 'invalid_skills', 'One or more selected skills are invalid or inactive.', array( 'status' => 400 ) );
 		}
@@ -568,126 +657,71 @@ if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
 }
 
 /**
- * Validate backstory tags.
+ * Find backstory tag defs by integer IDs.
+ */
+if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
+	function nw_find_tag_defs_by_ids( array $tag_ids ): array {
+		$tag_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'nw_sanitize_int_id', $tag_ids )
+				)
+			)
+		);
+
+		if ( empty( $tag_ids ) ) {
+			return array();
+		}
+
+		$rows = nw_supabase_request(
+			'GET',
+			'cyber_character_tag_defs',
+			array(
+				'select' => 'id,label,category,icon,color,description,source,gm',
+				'id'     => 'in.(' . implode( ',', $tag_ids ) . ')',
+			)
+		);
+
+		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return $rows;
+	}
+}
+
+/**
+ * Validate backstory tags as integer IDs.
  */
 if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
-	function nw_validate_backstory_tags( array $tag_labels ) {
-		if ( empty( $tag_labels ) ) {
+	function nw_validate_backstory_tags( array $tag_ids ) {
+		$requested = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'nw_sanitize_int_id', $tag_ids )
+				)
+			)
+		);
+
+		if ( empty( $requested ) ) {
 			return new WP_Error( 'backstory_tags_required', 'Backstory tags are required.', array( 'status' => 400 ) );
 		}
 
-		$defs = nw_find_tag_defs_by_labels( $tag_labels );
+		$defs  = nw_find_tag_defs_by_ids( $requested );
 		$found = array_map(
 			static function ( $row ) {
-				return (string) ( $row['label'] ?? '' );
+				return isset( $row['id'] ) ? (int) $row['id'] : 0;
 			},
 			$defs
 		);
 
-		$requested = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $tag_labels ) ) ) );
-		$missing   = array_values( array_diff( $requested, $found ) );
+		$missing = array_values( array_diff( $requested, $found ) );
 
 		if ( ! empty( $missing ) ) {
-			return new WP_Error( 'invalid_backstory_tags', 'One or more backstory tags do not exist.', array( 'status' => 400 ) );
+			return new WP_Error( 'invalid_backstory_tags', 'One or more backstory tag IDs do not exist.', array( 'status' => 400 ) );
 		}
 
 		return true;
-	}
-}
-
-/**
- * Store skills relation.
- */
-if ( ! function_exists( 'nw_store_character_skills' ) ) {
-	function nw_store_character_skills( string $character_id, array $skills ) {
-		if ( empty( $skills ) ) {
-			return true;
-		}
-
-		$payload = array();
-
-		foreach ( $skills as $skill_id ) {
-			$skill_id = sanitize_text_field( $skill_id );
-			if ( '' === $skill_id ) {
-				continue;
-			}
-
-			$payload[] = array(
-				'character_id' => $character_id,
-				'skill_id'     => $skill_id,
-				'proficiency'  => 1,
-				'source'       => 'character_creator',
-			);
-		}
-
-		if ( empty( $payload ) ) {
-			return true;
-		}
-
-		$result = nw_supabase_request( 'POST', 'cyber_character_skills', array(), $payload, false );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return true;
-	}
-}
-
-/**
- * Store backstory tags relation.
- */
-if ( ! function_exists( 'nw_store_character_backstory_tags' ) ) {
-	function nw_store_character_backstory_tags( string $character_id, array $tag_labels ) {
-		$defs = nw_find_tag_defs_by_labels( $tag_labels );
-		if ( empty( $defs ) ) {
-			return true;
-		}
-
-		$payload = array();
-
-		foreach ( $defs as $row ) {
-			if ( empty( $row['id'] ) ) {
-				continue;
-			}
-
-			$payload[] = array(
-				'character_id' => $character_id,
-				'tag_id'       => (int) $row['id'],
-			);
-		}
-
-		if ( empty( $payload ) ) {
-			return true;
-		}
-
-		$result = nw_supabase_request( 'POST', 'cyber_character_backstory_tags', array(), $payload, false );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return true;
-	}
-}
-
-/**
- * Rollback helper.
- */
-if ( ! function_exists( 'nw_delete_character_by_id' ) ) {
-	function nw_delete_character_by_id( string $character_id ) {
-		$character_id = sanitize_text_field( $character_id );
-		if ( '' === $character_id ) {
-			return false;
-		}
-
-		$result = nw_supabase_request(
-			'DELETE',
-			'cyber_characters',
-			array(
-				'id' => 'eq.' . $character_id,
-			)
-		);
-
-		return ! is_wp_error( $result );
 	}
 }
 
@@ -704,11 +738,13 @@ if ( ! function_exists( 'nw_validate_race_selection' ) ) {
 		}
 
 		$race_row = nw_find_race_by_id( $race_id_input );
+
 		if ( empty( $race_row['id'] ) || ! is_string( $race_row['id'] ) ) {
 			return new WP_Error( 'invalid_race', 'Selected race does not exist.', array( 'status' => 400 ) );
 		}
 
 		$race_parent = isset( $race_row['parent_race'] ) ? (string) $race_row['parent_race'] : '';
+
 		if ( '' !== $race_parent ) {
 			return new WP_Error( 'invalid_race', 'Selected race must be a parent race.', array( 'status' => 400 ) );
 		}
@@ -722,17 +758,24 @@ if ( ! function_exists( 'nw_validate_race_selection' ) ) {
 		}
 
 		$subrace_row = nw_find_race_by_id( $subrace_id_input );
+
 		if ( empty( $subrace_row['id'] ) || ! is_string( $subrace_row['id'] ) ) {
 			return new WP_Error( 'invalid_subrace', 'Selected subrace does not exist.', array( 'status' => 400 ) );
 		}
 
 		$subrace_parent = isset( $subrace_row['parent_race'] ) ? (string) $subrace_row['parent_race'] : '';
+
 		if ( '' === $subrace_parent ) {
-			return new WP_Error( 'invalid_subrace', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
+			re) );
 		}
 
-		if ( $subrace_parent !== $race_row['id'] ) {
-			return new WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
+		$package_tags = array_e', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
+		}
+
+		if ( $subrace_parent !) );
+		}
+
+		$package_tags = array_ew WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
 		}
 
 		return array(
@@ -740,6 +783,129 @@ if ( ! function_exists( 'nw_validate_race_selection' ) ) {
 			'race_row'       => $race_row,
 			'subrace_row'    => $subrace_row,
 		);
+	}
+}
+
+/**
+ * Store skills relation.
+ * NOTE: this keeps character_id as UUID string, matching character UUID flow.
+ */
+if ( ! function_exists( 'nw_store_character_skills' ) ) {
+	function nw_store_character_skills( string $character_id, array $skills ) {
+		$character_id = sanitize_text_field( $character_id );
+
+		if ( '' === $character_id ) {
+			return new WP_Error( 'invalid_character', 'Invalid character ID for skills.', array( 'status' => 400 ) );
+		}
+
+		$skills = array_values(
+			array_unique(
+				array_filter(
+					array_map(
+						static function ( $id ) {
+							return sanitize_text_field( (string) $id );
+						},
+						$skills
+					)
+				)
+			)
+		);
+
+		if ( empty( $skills ) ) {
+			return true;
+		}
+
+		$payload = array();
+
+		foreach ( $skills as $skill_id ) {
+			$payload[] = array(
+				'character_id' => $character_id,
+				'skill_id'     => $skill_id,
+				'proficiency'  => 1,
+				'source'       => 'character_creator',
+			);
+		}
+
+		$result = nw_supabase_request( 'POST', 'cyber_character_skills', array(), $payload, false );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return true;
+	}
+}
+
+/**
+ * Store backstory tags relation.
+ * character_id = UUID
+ * tag_id = bigint
+ */
+if ( ! function_exists( 'nw_store_character_backstory_tags' ) ) {
+	function nw_store_character_backstory_tags( string $character_id, array $tag_ids ) {
+		$character_id = sanitize_text_field( $character_id );
+
+		if ( '' === $character_id ) {
+			return new WP_Error( 'invalid_character', 'Invalid character ID for backstory tags.', array( 'status' => 400 ) );
+		}
+
+		$tag_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'nw_sanitize_int_id', $tag_ids )
+				)
+			)
+		);
+
+		if ( empty( $tag_ids ) ) {
+			return true;
+		}
+
+		$payload = array();
+
+		foreach ( $tag_ids as $tag_id ) {
+			$payload[] = array(
+				'character_id' => $character_id,
+				'tag_id'       => $tag_id,
+			);
+		}
+
+		$result = nw_supabase_request(
+			'POST',
+			'cyber_character_backstory_tags',
+			array(),
+			$payload,
+			false
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return true;
+	}
+}
+
+/**
+ * Rollback helper.
+ */
+if ( ! function_exists( 'nw_delete_character_by_id' ) ) {
+	function nw_delete_character_by_id( string $character_id ): bool {
+		$character_id = sanitize_text_field( $character_id );
+
+		if ( '' === $character_id ) {
+			return false;
+		}
+
+		$result = nw_supabase_request(
+			'DELETE',
+			'cyber_characters',
+			array(
+				'id' => 'eq.' . $character_id,
+			)
+		);
+
+		return ! is_wp_error( $result );
 	}
 }
 
@@ -759,6 +925,7 @@ if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
 		}
 
 		$max_size = 2 * 1024 * 1024;
+
 		if ( ! empty( $file['size'] ) && (int) $file['size'] > $max_size ) {
 			return new WP_Error( 'avatar_too_large', 'Avatar must be 2 MB or smaller.', array( 'status' => 400 ) );
 		}
@@ -812,9 +979,10 @@ if ( ! function_exists( 'nw_map_pronouns_to_gender' ) ) {
 		$pronouns = strtolower( trim( sanitize_text_field( $pronouns ) ) );
 
 		switch ( $pronouns ) {
-			case 'he':
-			case 'he/him':
-			case 'he-him':
+			) );
+		}
+
+		$package_tags = array_se 'he-him':
 				return 'male';
 
 			case 'she':
@@ -878,6 +1046,7 @@ if ( ! function_exists( 'neoweaver_ajax_get_subraces' ) ) {
 		}
 
 		$parent = sanitize_text_field( $_POST['parent'] ?? '' );
+
 		if ( '' === $parent ) {
 			wp_send_json_success( array() );
 		}
@@ -956,7 +1125,6 @@ if ( ! function_exists( 'neoweaver_ajax_get_skills' ) ) {
 
 /**
  * AJAX: get packages.
- * Important: frontend sends class_id in class_tag.
  */
 if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 	function neoweaver_ajax_get_packages(): void {
@@ -965,11 +1133,13 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 		}
 
 		$class_id = sanitize_text_field( $_POST['class_tag'] ?? '' );
+
 		if ( '' === $class_id ) {
 			wp_send_json_success( array() );
 		}
 
 		$class_row = nw_find_class_by_id( $class_id );
+
 		if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
 			wp_send_json_success( array() );
 		}
@@ -1000,7 +1170,7 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
  * Create character from AJAX.
  */
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
-	function nw_create_character_from_request() {
+	function nw_create_character_from_request(): void {
 		if ( ! is_user_logged_in() ) {
 			wp_send_json_error( array( 'message' => 'Login required.' ), 403 );
 		}
@@ -1014,27 +1184,48 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
 		$name             = sanitize_text_field( $_POST['character_name'] ?? '' );
 		$pronouns         = sanitize_text_field( $_POST['pronouns'] ?? '' );
 		$bio              = sanitize_textarea_field( $_POST['bio'] ?? '' );
-		$race_id_input    = sanitize_text_field( $_POST['race'] ?? '' );
-		$subrace_id_input = sanitize_text_field( $_POST['subrace'] ?? '' );
-		$class_id         = sanitize_text_field( $_POST['char_class'] ?? '' );
-		$start_pack       = sanitize_text_field( $_POST['starting_package_id'] ?? '' );
+		$race_id_input    = nw_sanitize_text_id( $_POST['race'] ?? '' );
+		$subrace_id_input = nw_sanitize_text_id( $_POST['subrace'] ?? '' );
+		$class_id         = nw_sanitize_text_id( $_POST['char_class'] ?? '' );
+		$start_pack       = nw_sanitize_text_id( $_POST['starting_package_id'] ?? '' );
 
 		$data_origin    = sanitize_text_field( $_POST['data_origin'] ?? '' );
 		$prev_operation = sanitize_text_field( $_POST['previous_operation'] ?? '' );
 		$sync_crisis    = sanitize_text_field( $_POST['sync_crisis'] ?? '' );
 
-		$skills = json_decode( wp_unslash( $_POST['skills'] ?? '[]' ), true );
-		$skills = is_array( $skills )
-			? array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $skills ) ) ) )
+		$skills_raw = json_decode( wp_unslash( $_POST['skills'] ?? '[]' ), true );
+		$skills = is_array( $skills_raw )
+			? array_values(
+				array_unique(
+					array_filter(
+						array_map(
+							static function ( $id ) {
+								return sanitize_text_field( (string) $id );
+							},
+							$skills_raw
+						)
+					)
+				)
+			)
 			: array();
 
-		$backstory_tags = json_decode( wp_unslash( $_POST['backstory_tags'] ?? '[]' ), true );
-		$backstory_tags = is_array( $backstory_tags )
-			? array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $backstory_tags ) ) ) )
+		$backstory_raw = json_decode( wp_unslash( $_POST['backstory_tags'] ?? '[]' ), true );
+		$backstory_tags = is_array( $backstory_raw )
+			? array_values(
+				array_unique(
+					array_filter(
+						array_map( 'nw_sanitize_int_id', $backstory_raw )
+					)
+				)
+			)
 			: array();
 
 		if ( '' === $name ) {
 			wp_send_json_error( array( 'message' => 'Character name is required.' ), 400 );
+		}
+
+		if ( '' === $pronouns ) {
+			wp_send_json_error( array( 'message' => 'Pronouns are required.' ), 400 );
 		}
 
 		if ( '' === $class_id ) {
@@ -1087,12 +1278,12 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
 			wp_send_json_error( array( 'message' => $avatar_upload_url->get_error_message() ), 400 );
 		}
 
-		$avatar_url_from_gallery = '';
-		if ( ! empty( $_POST['avatar_url'] ) ) {
-			$avatar_url_from_gallery = esc_url_raw( wp_unslash( $_POST['avatar_url'] ) );
-		}
+		$avatar_url_from_gallery = ! empty( $_POST['avatar_url'] )
+			? esc_url_raw( wp_unslash( $_POST['avatar_url'] ) )
+			: '';
 
 		$final_avatar_url = '';
+
 		if ( is_string( $avatar_upload_url ) && '' !== $avatar_upload_url ) {
 			$final_avatar_url = $avatar_upload_url;
 		} elseif ( '' !== $avatar_url_from_gallery ) {
@@ -1101,29 +1292,35 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
 
 		$gender = nw_map_pronouns_to_gender( $pronouns );
 
+		if ( null === $gender ) {
+			wp_send_json_error( array( 'message' => 'Pronouns value is invalid.' ), 400 );
+		}
+
 		$character_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'char_', true );
 
 		$payload = array(
-			'id'                => $character_id,
-			'name'              => $name,
-			'wp_user_id'        => $user_id,
-			'gender'            => $gender,
-			'bio'               => '' !== $bio ? $bio : null,
-			'avatar'            => '' !== $final_avatar_url ? $final_avatar_url : null,
-			'body'              => $body,
-			'reflex'            => $reflex,
-			'mind'              => $mind,
-			'spirit'            => $spirit,
-			'class_id'          => $class_id,
-			'race_id'           => $race_validation['stored_race_id'],
-			'start_pack'        => '' !== $start_pack ? $start_pack : null,
-			'is_public'         => false,
-			'gold'              => 0,
-			'world_id'          => null,
-			'world_credentials' => null,
+			'id'                 => $character_id,
+			'name'               => $name,
+			'wp_user_id'         => $user_id,
+			'gender'             => $gender,
+			'bio'                => '' !== $bio ? $bio : null,
+			'avatar'             => '' !== $final_avatar_url ? $final_avatar_url : null,
+			'body'               => $body,
+			'reflex'             => $reflex,
+			'mind'               => $mind,
+			'spirit'             => $spirit,
+			'class_id'           => $class_id,
+			'race_id'            => $race_validation['stored_race_id'],
+			'starting_package_id'=> '' !== $start_pack ? $start_pack : null,
+			'is_public'          => false,
+			'gold'               => 0,
+			'data_origin'        => $data_origin,
+			'previous_operation' => $prev_operation,
+			'sync_crisis'        => $sync_crisis,
 		);
 
 		$result = nw_supabase_request( 'POST', 'cyber_characters', array(), $payload, true );
+
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
 		}
@@ -1156,14 +1353,17 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
 /**
  * Optional REST routes.
  */
-if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
+if ( ! func) );
+		}
+
+		$package_tags = array_haracter_lookup_routes' ) ) {
 	function neoweaver_register_character_lookup_routes(): void {
 		register_rest_route(
 			'neoweaver/v1',
 			'/races',
 			array(
-				'methods'             => 'GET',
-				'callback'            => function () {
+				'methods'  => 'GET',
+				'callback' => function () {
 					$data = nw_fetch_lookup_table(
 						'cyber_races',
 						'id,name,description,tags,bonus,img_url,parent_race',
@@ -1176,7 +1376,10 @@ if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
 						return $data;
 					}
 
-					return rest_ensure_response( nw_map_race_card_shape( nw_resolve_img_urls( $data ) ) );
+					re) );
+		}
+
+		$package_tags = array_race_card_shape( nw_resolve_img_urls( $data ) ) );
 				},
 				'permission_callback' => '__return_true',
 			)
@@ -1186,9 +1389,10 @@ if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
 			'neoweaver/v1',
 			'/subraces',
 			array(
-				'methods'             => 'GET',
-				'callback'            => function ( WP_REST_Request $request ) {
+				'methods'  => 'GET',
+				'callback' => function ( WP_REST_Request $request ) {
 					$parent = sanitize_text_field( (string) $request->get_param( 'parent' ) );
+
 					if ( '' === $parent ) {
 						return rest_ensure_response( array() );
 					}
@@ -1215,8 +1419,8 @@ if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
 			'neoweaver/v1',
 			'/classes',
 			array(
-				'methods'             => 'GET',
-				'callback'            => function () {
+				'methods'  => 'GET',
+				'callback' => function () {
 					$data = nw_fetch_lookup_table(
 						'cyber_classes',
 						'id,name,description,tags,img_url,icon_slug,skill_limit,is_active',
@@ -1239,8 +1443,8 @@ if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
 			'neoweaver/v1',
 			'/skills',
 			array(
-				'methods'             => 'GET',
-				'callback'            => function () {
+				'methods'  => 'GET',
+				'callback' => function () {
 					$data = nw_fetch_lookup_table(
 						'cyber_skills',
 						'id,name,description,category,application,card_effect,img_url,tags,linked_attributes,is_active',
@@ -1263,14 +1467,16 @@ if ( ! function_exists( 'neoweaver_register_character_lookup_routes' ) ) {
 			'neoweaver/v1',
 			'/starting-packages',
 			array(
-				'methods'             => 'GET',
-				'callback'            => function ( WP_REST_Request $request ) {
+				'methods'  => 'GET',
+				'callback' => function ( WP_REST_Request $request ) {
 					$class_id = sanitize_text_field( (string) $request->get_param( 'class_tag' ) );
+
 					if ( '' === $class_id ) {
 						return rest_ensure_response( array() );
 					}
 
 					$class_row = nw_find_class_by_id( $class_id );
+
 					if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
 						return rest_ensure_response( array() );
 					}
