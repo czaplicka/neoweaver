@@ -45,127 +45,35 @@
 
   var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
   var RACES_FALLBACK = [];
-  var TW_UPLOADS_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
-  var TW_AVATAR_GALLERY = [
-    { id: 'avatar-1', name: 'Avatar', url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg' },
-    { id: 'avatar-2', name: 'Avatar 2', url: 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar-1.svg' }
-  ];
+
+  var TW_SITE_BASE = String(cfg.site_base || 'https://neoweaver.nieodparady.pl').replace(/\/+$/, '');
+  var TW_UPLOADS_BASE = String(cfg.uploads_base || (TW_SITE_BASE + '/wp-content/uploads/')).replace(/\/?$/, '/');
+  var TW_AVATAR_GALLERY = Array.isArray(cfg.avatar_gallery) && cfg.avatar_gallery.length
+    ? cfg.avatar_gallery
+    : [
+        { id: 'avatar-1', name: 'Avatar', url: TW_UPLOADS_BASE + 'Avatar.svg' },
+        { id: 'avatar-2', name: 'Avatar 2', url: TW_UPLOADS_BASE + 'Avatar-1.svg' }
+      ];
 
   var DATA_ORIGIN_OPTIONS = [
-    {
-      key: 'palace',
-      label: 'Palace',
-      desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.',
-      bonus_tag: 'Wealthy',
-      bonus_desc: '+100 Credits at initialization.',
-      flaw_tag: 'Fragile-Gear',
-      flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.'
-    },
-    {
-      key: 'slums',
-      label: 'Slums',
-      desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.',
-      bonus_tag: 'Street-Smart',
-      bonus_desc: 'Reveal hidden mechanics in locations tagged #city or #shady.',
-      flaw_tag: 'Malnourished',
-      flaw_desc: 'Max Satiety -2.'
-    },
-    {
-      key: 'void-labs',
-      label: 'Void Labs',
-      desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.',
-      bonus_tag: 'Fast-Sync',
-      bonus_desc: 'Resting recovers +2 additional Sync.',
-      flaw_tag: 'Social-Glitch',
-      flaw_desc: '-10% success rate on Social actions vs #human targets.'
-    },
-    {
-      key: 'borderlines',
-      label: 'Borderlines',
-      desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.',
-      bonus_tag: 'Scout',
-      bonus_desc: 'Travel between nodes consumes -1 Satiety.',
-      flaw_tag: 'Analog-Mind',
-      flaw_desc: 'Cannot use #Digital cards during the first 3 turns of a Deployment.'
-    }
+    { key: 'palace', label: 'Palace', desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.', bonus_tag: 'Wealthy', bonus_desc: '+100 Credits at initialization.', flaw_tag: 'Fragile-Gear', flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.' },
+    { key: 'slums', label: 'Slums', desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.', bonus_tag: 'Street-Smart', bonus_desc: 'Reveal hidden mechanics in locations tagged #city or #shady.', flaw_tag: 'Malnourished', flaw_desc: 'Max Satiety -2.' },
+    { key: 'void-labs', label: 'Void Labs', desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.', bonus_tag: 'Fast-Sync', bonus_desc: 'Resting recovers +2 additional Sync.', flaw_tag: 'Social-Glitch', flaw_desc: '-10% success rate on Social actions vs #human targets.' },
+    { key: 'borderlines', label: 'Borderlines', desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.', bonus_tag: 'Scout', bonus_desc: 'Travel between nodes consumes -1 Satiety.', flaw_tag: 'Analog-Mind', flaw_desc: 'Cannot use #Digital cards during the first 3 turns of a Deployment.' }
   ];
 
   var PREVIOUS_OPERATION_OPTIONS = [
-    {
-      key: 'repair-unit',
-      label: '[REPAIR UNIT]',
-      desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.',
-      bonus_tag: 'Technician',
-      bonus_desc: 'Utility items restore +50% more Durability.',
-      flaw_tag: 'Heavy-Handed',
-      flaw_desc: '-5% success rate on Acrobatics and Stealth tests.'
-    },
-    {
-      key: 'void-runner',
-      label: '[VOID-RUNNER]',
-      desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.',
-      bonus_tag: 'Agile',
-      bonus_desc: 'Playing a Dodge card allows drawing an extra card on the next turn.',
-      flaw_tag: 'Light-Frame',
-      flaw_desc: 'Starting Max HP -1.'
-    },
-    {
-      key: 'archive-analyst',
-      label: '[ARCHIVE ANALYST]',
-      desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.',
-      bonus_tag: 'Researcher',
-      bonus_desc: '+5% success rate on Arcana and Science tests.',
-      flaw_tag: 'Code-Bound',
-      flaw_desc: 'Cannot equip two-handed weapons.'
-    },
-    {
-      key: 'enforcer',
-      label: '[ENFORCER]',
-      desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.',
-      bonus_tag: 'Unyielding',
-      bonus_desc: 'Ignore the first Pressure or Panic card encountered in every combat.',
-      flaw_tag: 'Loud-Footsteps',
-      flaw_desc: 'Cannot obtain "First Strike" bonus from stealth.'
-    }
+    { key: 'repair-unit', label: '[REPAIR UNIT]', desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.', bonus_tag: 'Technician', bonus_desc: 'Utility items restore +50% more Durability.', flaw_tag: 'Heavy-Handed', flaw_desc: '-5% success rate on Acrobatics and Stealth tests.' },
+    { key: 'void-runner', label: '[VOID-RUNNER]', desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.', bonus_tag: 'Agile', bonus_desc: 'Playing a Dodge card allows drawing an extra card on the next turn.', flaw_tag: 'Light-Frame', flaw_desc: 'Starting Max HP -1.' },
+    { key: 'archive-analyst', label: '[ARCHIVE ANALYST]', desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.', bonus_tag: 'Researcher', bonus_desc: '+5% success rate on Arcana and Science tests.', flaw_tag: 'Code-Bound', flaw_desc: 'Cannot equip two-handed weapons.' },
+    { key: 'enforcer', label: '[ENFORCER]', desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.', bonus_tag: 'Unyielding', bonus_desc: 'Ignore the first Pressure or Panic card encountered in every combat.', flaw_tag: 'Loud-Footsteps', flaw_desc: 'Cannot obtain "First Strike" bonus from stealth.' }
   ];
 
   var SYNC_CRISIS_OPTIONS = [
-    {
-      key: 'system-stabilizer',
-      label: '[SYSTEM STABILIZER]',
-      desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.',
-      bonus_tag: 'Glitch-Learner',
-      bonus_desc: '+10% global XP gain.',
-      flaw_tag: 'System-Spasm',
-      flaw_desc: 'Every 10 turns, one random card from your hand is discarded/burned.'
-    },
-    {
-      key: 'aggressive-response',
-      label: '[AGGRESSIVE RESPONSE]',
-      desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.',
-      bonus_tag: 'Striker',
-      bonus_desc: 'Every played Attack card generates +1 additional XP for itself.',
-      flaw_tag: 'Reckless',
-      flaw_desc: 'On failure in a Physical test, lose an additional 1 Durability on armor.'
-    },
-    {
-      key: 'data-ghost-adaptation',
-      label: '[DATA-GHOST ADAPTATION]',
-      desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.',
-      bonus_tag: 'Iron-Grip',
-      bonus_desc: 'Your physical attack cards cannot be countered.',
-      flaw_tag: 'Feedback-Vulnerability',
-      flaw_desc: 'Receive double damage from enemies with the #Hacker or #Digital tag.'
-    },
-    {
-      key: 'sensory-overload',
-      label: '[SENSORY OVERLOAD]',
-      desc: 'You survived by embracing the flood of input, turning collapse into unstable power.',
-      bonus_tag: 'Wild-Card',
-      bonus_desc: 'Critical successes deal triple damage instead of double.',
-      flaw_tag: 'Magnetized',
-      flaw_desc: 'In locations tagged #High-Technology, suffer -5% to all tests.'
-    }
+    { key: 'system-stabilizer', label: '[SYSTEM STABILIZER]', desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.', bonus_tag: 'Glitch-Learner', bonus_desc: '+10% global XP gain.', flaw_tag: 'System-Spasm', flaw_desc: 'Every 10 turns, one random card from your hand is discarded/burned.' },
+    { key: 'aggressive-response', label: '[AGGRESSIVE RESPONSE]', desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.', bonus_tag: 'Striker', bonus_desc: 'Every played Attack card generates +1 additional XP for itself.', flaw_tag: 'Reckless', flaw_desc: 'On failure in a Physical test, lose an additional 1 Durability on armor.' },
+    { key: 'data-ghost-adaptation', label: '[DATA-GHOST ADAPTATION]', desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.', bonus_tag: 'Iron-Grip', bonus_desc: 'Your physical attack cards cannot be countered.', flaw_tag: 'Feedback-Vulnerability', flaw_desc: 'Receive double damage from enemies with the #Hacker or #Digital tag.' },
+    { key: 'sensory-overload', label: '[SENSORY OVERLOAD]', desc: 'You survived by embracing the flood of input, turning collapse into unstable power.', bonus_tag: 'Wild-Card', bonus_desc: 'Critical successes deal triple damage instead of double.', flaw_tag: 'Magnetized', flaw_desc: 'In locations tagged #High-Technology, suffer -5% to all tests.' }
   ];
 
   var formState = {
@@ -178,8 +86,7 @@
     character_class: '',
     class_label: '',
     avatar_file: null,
-    avatar_gallery_url: '',
-    avatar_gallery_id: '',
+    avatar_url: '',
     bio: '',
     attr_body: ATTR_MIN,
     attr_reflex: ATTR_MIN,
@@ -200,7 +107,7 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/\"/g, '&quot;')
+      .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
 
@@ -224,30 +131,18 @@
     return cfg.nonce || '';
   }
 
-  function normalizeMediaUrl(value) {
-    if (!value) return '';
-    var raw = String(value).trim();
-    if (!raw) return '';
-    if (/^https?:\/\//i.test(raw)) return raw;
-    if (raw.indexOf('//') === 0) return 'https:' + raw;
-    if (raw.indexOf('/wp-content/uploads/') === 0) return 'https://neoweaver.nieodparady.pl' + raw;
-    if (raw.indexOf('wp-content/uploads/') !== -1) {
-      return raw.charAt(0) === '/' ? 'https://neoweaver.nieodparady.pl' + raw : 'https://' + raw;
-    }
-    return TW_UPLOADS_BASE + raw.replace(/^\/+/, '');
-  }
-
-  function pickImage(item) {
-    return normalizeMediaUrl(
-      (item && (item.image_url || item.img_url || item.img || item.image || item.imageUrl || item.avatar || item.icon || item.thumbnail || item.graphic || item.file)) || ''
-    );
+  function twNormalizeMediaUrl(url) {
+    url = String(url || '').trim();
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.indexOf('/wp-content/uploads/') === 0) return TW_SITE_BASE + url;
+    return TW_UPLOADS_BASE + url.replace(/^\/+/, '');
   }
 
   function fetchPost(action, extraData) {
     var fd = new FormData();
     fd.append('action', action);
     fd.append('nonce', nonce());
-
     Object.keys(extraData || {}).forEach(function (key) {
       fd.append(key, extraData[key]);
     });
@@ -259,6 +154,190 @@
     }).then(function (r) {
       return r.json();
     });
+  }
+
+  function buildTagsHtml(tags) {
+    tags = Array.isArray(tags) ? tags.filter(Boolean) : [];
+    if (!tags.length) return '';
+    return '<div class="tw-race-tags">' + tags.map(function (tag) {
+      return '<span class="tw-race-tag">' + esc(tag) + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function buildImageHtml(url, alt, cls, placeholderCls) {
+    var normalizedUrl = twNormalizeMediaUrl(url);
+    if (normalizedUrl) {
+      return '<div class="' + esc(cls) + '"><img src="' + esc(normalizedUrl) + '" alt="' + esc(alt || '') + '" loading="lazy"></div>';
+    }
+    return '<div class="' + esc(cls) + '"><div class="' + esc(placeholderCls || (cls + '--placeholder')) + '">◎</div></div>';
+  }
+
+  function buildRaceCard(item) {
+    var img = item.image_url || item.img_url || '';
+    return '' +
+      '<button type="button" class="tw-grid-card tw-race-card" data-race-id="' + esc(item.id) + '" aria-pressed="false">' +
+        buildImageHtml(img, item.name, 'tw-race-img', 'tw-race-img--placeholder') +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(item.name) + '</h3>' +
+          buildTagsHtml(item.tags || []) +
+          '<span class="tw-race-select-hint">Select</span>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function buildSubraceCard(item) {
+    var img = item.image_url || item.img_url || '';
+    return '' +
+      '<button type="button" class="tw-grid-card tw-race-card tw-subrace-card" data-subrace-id="' + esc(item.id) + '" aria-pressed="false">' +
+        buildImageHtml(img, item.name, 'tw-race-img', 'tw-race-img--placeholder') +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(item.name) + '</h3>' +
+          buildTagsHtml(item.tags || []) +
+          '<span class="tw-race-select-hint">Select</span>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function buildClassCard(cls) {
+    var img = cls.image_url || cls.img_url || '';
+    return '' +
+      '<button type="button" class="tw-class-card" data-char-class="' + esc(cls.id) + '" data-class-name="' + esc(cls.name) + '" aria-pressed="false">' +
+        buildImageHtml(img, cls.name, 'tw-class-card__img-wrap', 'tw-class-card__img-wrap--placeholder') +
+        '<div class="tw-class-card__body">' +
+          '<h3 class="tw-class-card__name">' + esc(cls.name) + '</h3>' +
+          buildTagsHtml(cls.tags || []) +
+          '<span class="tw-race-select-hint">Select</span>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function buildSkillCard(skill) {
+    var img = skill.image_url || skill.img_url || '';
+    return '' +
+      '<button type="button" class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-skill-name="' + esc(skill.name) + '" aria-pressed="false">' +
+        buildImageHtml(img, skill.name, 'tw-race-img', 'tw-race-img--placeholder') +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(skill.name) + '</h3>' +
+          '<p class="tw-race-desc">' + esc(skill.description || '') + '</p>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function buildPackageCard(pkg) {
+    var img = pkg.image_url || pkg.img_url || '';
+    var tags = Array.isArray(pkg.tags) ? pkg.tags : [];
+    var items = Array.isArray(pkg.items) ? pkg.items : [];
+    var itemsPreview = items.length
+      ? '<div class="tw-package-items">' + items.map(function (it) {
+          return '<span class="tw-race-tag">' + esc(it) + '</span>';
+        }).join('') + '</div>'
+      : '';
+
+    return '' +
+      '<button type="button" class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id) + '" data-package-name="' + esc(pkg.name) + '" aria-pressed="false">' +
+        buildImageHtml(img, pkg.name, 'tw-race-img', 'tw-race-img--placeholder') +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(pkg.name) + '</h3>' +
+          (pkg.description ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
+          (pkg.base_armor !== undefined && pkg.base_armor !== null && pkg.base_armor !== '' ? '<span class="tw-race-tag">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
+          buildTagsHtml(tags) +
+          itemsPreview +
+          '<span class="tw-race-select-hint">Select</span>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function choiceByKey(type, key) {
+    var list = [];
+    if (type === 'data_origin') list = DATA_ORIGIN_OPTIONS;
+    if (type === 'previous_operation') list = PREVIOUS_OPERATION_OPTIONS;
+    if (type === 'sync_crisis') list = SYNC_CRISIS_OPTIONS;
+    return list.filter(function (item) { return item.key === key; })[0] || null;
+  }
+
+  function buildLoreCard(item, type) {
+    return '' +
+      '<button type="button" class="tw-lore-card tw-grid-card" data-choice-type="' + esc(type) + '" data-choice-key="' + esc(item.key) + '" aria-pressed="false">' +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(item.label) + '</h3>' +
+          '<p class="tw-race-desc">' + esc(item.desc || '') + '</p>' +
+          '<div class="tw-lore-card__effects">' +
+            '<div class="tw-lore-card__effect"><strong>' + esc(item.bonus_tag) + ':</strong> ' + esc(item.bonus_desc) + '</div>' +
+            '<div class="tw-lore-card__effect"><strong>' + esc(item.flaw_tag) + ':</strong> ' + esc(item.flaw_desc) + '</div>' +
+          '</div>' +
+          '<span class="tw-race-select-hint">Select</span>' +
+        '</div>' +
+      '</button>';
+  }
+
+  function setStatus(msg, isError) {
+    var statusEl = document.getElementById('tw-char-status');
+    if (!statusEl) return;
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('tw-char-status--error', !!isError);
+  }
+
+  function clearStepError(step) {
+    if (!step) return;
+    var box = q(step, '.tw-step-error');
+    if (!box) return;
+    box.classList.remove('visible', 'tw-step-error--shake');
+    var msg = q(box, '.tw-step-error__msg');
+    if (msg) msg.textContent = '';
+  }
+
+  function showStepError(step, msg) {
+    if (!step) return;
+    var box = q(step, '.tw-step-error');
+    if (!box) return;
+    var msgEl = q(box, '.tw-step-error__msg');
+    if (msgEl) msgEl.textContent = msg || 'Validation error.';
+    box.classList.add('visible');
+    box.classList.remove('tw-step-error--shake');
+    void box.offsetWidth;
+    box.classList.add('tw-step-error--shake');
+    NW_SFX.error();
+  }
+
+  function showSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (!section) return;
+    section.hidden = false;
+    section.style.display = '';
+  }
+
+  function hideSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (!section) return;
+    section.hidden = true;
+    section.style.display = 'none';
+  }
+
+  function resetSubraceState(wrapper) {
+    formState.subrace = '';
+    formState.subrace_label = '';
+    var grid = q(wrapper, '#tw-subrace-grid');
+    if (grid) grid.innerHTML = '';
+    hideSubraceSection(wrapper);
+  }
+
+  function selectedClassTag(wrapper) {
+    return formState.character_class || '';
+  }
+
+  function recomputeBackstoryTags() {
+    var tags = [];
+    var origin = choiceByKey('data_origin', formState.data_origin);
+    var operation = choiceByKey('previous_operation', formState.previous_operation);
+    var crisis = choiceByKey('sync_crisis', formState.sync_crisis);
+
+    [origin, operation, crisis].forEach(function (item) {
+      if (!item) return;
+      if (item.bonus_tag) tags.push(item.bonus_tag);
+      if (item.flaw_tag) tags.push(item.flaw_tag);
+    });
+
+    formState.backstory_tags = tags;
   }
 
   function makeSpinner(id, title, subtitle) {
@@ -275,7 +354,7 @@
     el.innerHTML =
       '<div class="tw-spinner-inner">' +
         '<div class="tw-spinner-ring"></div>' +
-        '<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
+        '<div class="tw-spinner-ring--2"></div>' +
         '<p class="tw-spinner-text">' + esc(title) + '</p>' +
         '<p class="tw-spinner-sub">' + esc(subtitle) + '</p>' +
       '</div>';
@@ -288,280 +367,11 @@
     };
   }
 
-  function setStatus(msg, isError) {
-    var el = document.querySelector('#tw-char-status-msg');
-    if (!el) return;
-    el.textContent = msg || '';
-    el.className = 'tw-char-status' + (isError ? ' tw-char-status--error' : '');
-  }
-
-  function getCurrentStepErrorBox(stepEl) {
-    if (!stepEl) return null;
-
-    var errEl = q(stepEl, '.tw-step-error');
-    if (!errEl) {
-      errEl = document.createElement('div');
-      errEl.className = 'tw-step-error';
-      var navRow = q(stepEl, '.tw-nav-row');
-      if (navRow) stepEl.insertBefore(errEl, navRow);
-      else stepEl.appendChild(errEl);
-    }
-
-    return errEl;
-  }
-
-  function showStepError(stepEl, msg) {
-    if (!stepEl) return;
-
-    var errEl = getCurrentStepErrorBox(stepEl);
-    if (!errEl) return;
-
-    errEl.innerHTML = '<span class="tw-step-error__icon">⚠</span><span class="tw-step-error__msg">' + esc(msg) + '</span>';
-    errEl.classList.add('visible');
-    errEl.classList.remove('tw-step-error--shake');
-    void errEl.offsetWidth;
-    errEl.classList.add('tw-step-error--shake');
-    errEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    NW_SFX.error();
-  }
-
-  function clearStepError(stepEl) {
-    if (!stepEl) return;
-    var errEl = q(stepEl, '.tw-step-error');
-    if (errEl) errEl.classList.remove('visible', 'tw-step-error--shake');
-  }
-
-  function clearAllSelected(root, selector) {
-    qa(root, selector).forEach(function (card) {
-      card.classList.remove('selected');
-      card.setAttribute('aria-pressed', 'false');
-    });
-  }
-
-  function markSelected(card) {
-    if (!card) return;
-    card.classList.add('selected');
-    card.setAttribute('aria-pressed', 'true');
-  }
-
-  function buildTagsHtml(tags) {
-    if (!tags || !tags.length) return '';
-    return '<div class="tw-race-tags">' + tags.map(function (t) {
-      return '<span class="tw-race-tag">' + esc(t.name || t) + '</span>';
-    }).join('') + '</div>';
-  }
-
-  function buildRaceCard(race) {
-    var imgSrc = pickImage(race);
-    var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(race.label || race.name) + '" loading="lazy" decoding="async"></div>'
-      : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
-
-    return '' +
-      '<div class="tw-grid-card tw-race-card"' +
-        ' data-race="' + esc(race.label || race.name || '') + '"' +
-        ' data-race-id="' + esc(race.id || '') + '"' +
-        ' role="button" tabindex="0" aria-pressed="false">' +
-        imgHtml +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(race.label || race.name) + '</h4>' +
-          buildTagsHtml(race.tags || []) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buildSubraceCard(sub) {
-    var imgSrc = pickImage(sub);
-    var imgHtml = imgSrc
-      ? '<div class="tw-race-img tw-race-img--full"><img src="' + esc(imgSrc) + '" alt="' + esc(sub.label || sub.name) + '" loading="lazy" decoding="async"></div>'
-      : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
-
-    return '' +
-      '<div class="tw-grid-card tw-race-card tw-subrace-card"' +
-        ' data-subrace="' + esc(sub.label || sub.name || '') + '"' +
-        ' data-subrace-id="' + esc(sub.id || '') + '"' +
-        ' role="button" tabindex="0" aria-pressed="false">' +
-        imgHtml +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(sub.label || sub.name) + '</h4>' +
-          buildTagsHtml(sub.tags || []) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buildLoreChoiceCard(item, kind) {
-    return '' +
-      '<div class="tw-lore-card tw-grid-card" data-choice-type="' + esc(kind) + '" data-choice-key="' + esc(item.key) + '" data-label="' + esc(item.label) + '" role="button" tabindex="0" aria-pressed="false">' +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(item.label) + '</h4>' +
-          '<p class="tw-race-desc">' + esc(item.desc || '') + '</p>' +
-          '<div class="tw-lore-card__effects">' +
-            '<div class="tw-lore-card__effect"><strong>BONUS:</strong> ' + esc(item.bonus_tag) + ' — ' + esc(item.bonus_desc || '') + '</div>' +
-            '<div class="tw-lore-card__effect"><strong>FLAW:</strong> ' + esc(item.flaw_tag) + ' — ' + esc(item.flaw_desc || '') + '</div>' +
-          '</div>' +
-          buildTagsHtml([item.bonus_tag, item.flaw_tag]) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buildClassCard(cls) {
-    var imgSrc = pickImage(cls);
-    var imgHtml = imgSrc
-      ? '<div class="tw-class-card__img-wrap"><img src="' + esc(imgSrc) + '" alt="' + esc(cls.name) + '" width="220" height="220" loading="lazy" decoding="async"></div>'
-      : '<div class="tw-class-card__img-wrap tw-class-card__img-wrap--placeholder"><span>' + esc(cls.icon_slug || '✦') + '</span></div>';
-
-    return '' +
-      '<div class="tw-class-card" data-char-class="' + esc(cls.id || cls.name) + '" data-label="' + esc(cls.name || '') + '" data-class-tag="' + esc((cls.name || '').toLowerCase()) + '" data-skilllimit="' + esc(parseInt(cls.skill_limit, 10) || 5) + '" role="button" tabindex="0" aria-pressed="false">' +
-        imgHtml +
-        '<div class="tw-class-card__body">' +
-          '<h4 class="tw-class-card__name">' + esc(cls.name || '') + '</h4>' +
-          (cls.description ? '<p class="tw-class-card__desc">' + esc(cls.description) + '</p>' : '') +
-          buildTagsHtml(cls.tags || []) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buildSkillCard(skill) {
-    var imgSrc = pickImage(skill);
-    var tags = [].concat(skill.tags || [], skill.linked_attributes || []);
-    var imgHtml = imgSrc
-      ? '<div class="tw-race-img"><img src="' + esc(imgSrc) + '" alt="' + esc(skill.name) + '" width="220" height="220" loading="lazy" decoding="async"></div>'
-      : '<div class="tw-race-img tw-race-img--placeholder"><span class="tw-race-card__icon">✦</span></div>';
-
-    return '' +
-      '<div class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-label="' + esc(skill.name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
-        imgHtml +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(skill.name || '') + '</h4>' +
-          (skill.description ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
-          buildTagsHtml(tags) +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function buildPackageCard(pkg) {
-    var tags = pkg.compatibility_tags || [];
-    var items = pkg.items_list || [];
-    var itemsPreview = Array.isArray(items) && items.length
-      ? '<div class="tw-package-items">' + items.slice(0, 5).map(function (item) {
-          return '<span class="tw-race-tag">' + esc(typeof item === 'string' ? item : (item.name || item.label || 'item')) + '</span>';
-        }).join('') + '</div>'
-      : '';
-
-    return '' +
-      '<div class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id || '') + '" data-label="' + esc(pkg.package_name || '') + '" role="button" tabindex="0" aria-pressed="false">' +
-        '<div class="tw-race-body">' +
-          '<h4 class="tw-race-name">' + esc(pkg.package_name || '') + '</h4>' +
-          (pkg.description ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
-          (pkg.base_armor != null ? '<span class="tw-race-bonus">Armor ' + esc(pkg.base_armor) + '</span>' : '') +
-          buildTagsHtml(tags) +
-          itemsPreview +
-          '<span class="tw-race-select-hint">select</span>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function choiceSet(kind) {
-    if (kind === 'data_origin') return DATA_ORIGIN_OPTIONS;
-    if (kind === 'previous_operation') return PREVIOUS_OPERATION_OPTIONS;
-    if (kind === 'sync_crisis') return SYNC_CRISIS_OPTIONS;
-    return [];
-  }
-
-  function choiceByKey(kind, key) {
-    var set = choiceSet(kind);
-    for (var i = 0; i < set.length; i++) {
-      if (set[i].key === key) return set[i];
-    }
-    return null;
-  }
-
-  function recomputeBackstoryTags() {
-    var tags = [];
-    ['data_origin', 'previous_operation', 'sync_crisis'].forEach(function (kind) {
-      var row = choiceByKey(kind, formState[kind]);
-      if (row) {
-        if (row.bonus_tag) tags.push(row.bonus_tag);
-        if (row.flaw_tag) tags.push(row.flaw_tag);
-      }
-    });
-    formState.backstory_tags = tags;
-  }
-
-  function hideSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (!section) return;
-    section.hidden = true;
-    section.style.display = 'none';
-  }
-
-  function showSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (!section) return;
-    section.hidden = false;
-    section.style.display = '';
-  }
-
-  function resetSubraceState(wrapper) {
-    formState.subrace = '';
-    formState.subrace_label = '';
-
-    var grid = q(wrapper, '#tw-subrace-grid');
-    if (grid) grid.innerHTML = '';
-    hideSubraceSection(wrapper);
-  }
-
-  function resetClassDependentState(wrapper) {
-    formState.skills = [];
-    formState.starting_package_id = '';
-    formState.starting_package_label = '';
-
-    var skillGrid = q(wrapper, '#tw-skill-grid');
-    var packageGrid = q(wrapper, '#tw-package-grid');
-
-    if (skillGrid) {
-      delete skillGrid.dataset.rendered;
-      skillGrid.innerHTML = '';
-    }
-
-    if (packageGrid) {
-      delete packageGrid.dataset.rendered;
-      packageGrid.innerHTML = '';
-    }
-  }
-
-  function selectedClassTag(wrapper) {
-    if (!formState.class_label) return '';
-    var selected = q(wrapper, '.tw-class-card.selected');
-    if (selected && selected.dataset.classTag) return String(selected.dataset.classTag).trim().toLowerCase();
-    return String(formState.class_label).trim().toLowerCase();
-  }
-
-  function renderLoreChoices(wrapper) {
-    [
-      { id: '#tw-origin-grid', kind: 'data_origin', items: DATA_ORIGIN_OPTIONS },
-      { id: '#tw-operation-grid', kind: 'previous_operation', items: PREVIOUS_OPERATION_OPTIONS },
-      { id: '#tw-crisis-grid', kind: 'sync_crisis', items: SYNC_CRISIS_OPTIONS }
-    ].forEach(function (entry) {
-      var grid = q(wrapper, entry.id);
-      if (!grid || grid.dataset.rendered) return;
-      grid.innerHTML = entry.items.map(function (item) {
-        return buildLoreChoiceCard(item, entry.kind);
-      }).join('');
-      grid.dataset.rendered = '1';
-    });
-  }
-
   function fetchRaceGrid(wrapper) {
     var grid = q(wrapper, '#tw-race-grid');
     if (!grid || grid.dataset.rendered) return;
 
-    grid.innerHTML = '<p class="tw-loading">SCANNING RACE DATABASE…</p>';
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING RACE DATABASE…</p>';
 
     fetchPost('neoweaver_get_races', {})
       .then(function (res) {
@@ -585,7 +395,7 @@
     if (!raceKey) return;
 
     showSubraceSection(wrapper);
-    grid.innerHTML = '<p class="tw-loading">SCANNING SUBRACE DATA…</p>';
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING SUBRACE DATA…</p>';
 
     fetchPost('neoweaver_get_subraces', { parent: raceKey })
       .then(function (res) {
@@ -611,13 +421,11 @@
     var grid = q(wrapper, '#tw-class-grid');
     if (!grid || grid.dataset.rendered) return;
 
-    grid.innerHTML = '<p class="tw-loading">SCANNING CLASS MATRIX…</p>';
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING CLASS MATRIX…</p>';
 
     fetchPost('neoweaver_get_classes', {})
       .then(function (res) {
-        grid.innerHTML = hasRows(res)
-          ? res.data.map(buildClassCard).join('')
-          : '<p class="tw-empty-state">No classes available.</p>';
+        grid.innerHTML = hasRows(res) ? res.data.map(buildClassCard).join('') : '<p class="tw-empty-state">No classes available.</p>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       })
@@ -628,9 +436,7 @@
 
   function updateSkillCounter(wrapper) {
     var counter = q(wrapper, '#tw-skill-counter');
-    if (counter) {
-      counter.textContent = formState.skills.length + ' / ' + (formState.skill_limit || 5) + ' skills';
-    }
+    if (counter) counter.textContent = formState.skills.length + ' / ' + (formState.skill_limit || 5) + ' skills';
   }
 
   function fetchSkillGrid(wrapper) {
@@ -643,7 +449,7 @@
       return;
     }
 
-    grid.innerHTML = '<p class="tw-loading">SCANNING SKILL ARCHIVE…</p>';
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING SKILL ARCHIVE…</p>';
 
     fetchPost('neoweaver_get_skills', {})
       .then(function (res) {
@@ -664,15 +470,15 @@
 
         var html = Object.keys(byCat).map(function (cat) {
           return '' +
-            '<div class="tw-skill-category">' +
-              '<div class="tw-skill-cat-label">' + esc(cat) + '</div>' +
+            '<section class="tw-skill-category">' +
+              '<h3 class="tw-skill-cat-label">' + esc(cat) + '</h3>' +
               '<div class="tw-skill-cat-grid">' +
                 byCat[cat].map(buildSkillCard).join('') +
               '</div>' +
-            '</div>';
+            '</section>';
         }).join('');
 
-        grid.innerHTML = html || '<p class="tw-empty-state">No skills available.</p>';
+        grid.innerHTML = html;
         grid.dataset.rendered = '1';
         updateSkillCounter(wrapper);
         restoreSelections(wrapper);
@@ -687,7 +493,6 @@
     if (!grid) return;
 
     var classTag = selectedClassTag(wrapper);
-
     if (!classTag) {
       grid.innerHTML = '<p class="tw-empty-state">Select a class first.</p>';
       return;
@@ -698,13 +503,11 @@
       return;
     }
 
-    grid.innerHTML = '<div class="tw-loading-state"><div class="tw-loading-dot"></div>FETCHING STARTING PACKAGES…</div>';
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING STARTING PACKAGE…</p>';
 
-    fetchPost('neoweaver_get_starting_packages', { class_tag: classTag })
+    fetchPost('neoweaver_get_packages', { class_tag: classTag })
       .then(function (res) {
-        grid.innerHTML = hasRows(res)
-          ? res.data.map(buildPackageCard).join('')
-          : '<p class="tw-empty-state">No starting packages available for this class.</p>';
+        grid.innerHTML = hasRows(res) ? res.data.map(buildPackageCard).join('') : '<p class="tw-empty-state">No starting packages available for this class.</p>';
         grid.dataset.rendered = classTag;
         restoreSelections(wrapper);
       })
@@ -732,73 +535,60 @@
     if (remainEl) remainEl.textContent = ATTR_POOL - used;
   }
 
-  function applyAttrPreset(wrapper, presetBtn) {
-    var valid = true;
+  function renderAvatarGallery(wrapper) {
+    var avatarGalleryEl = q(wrapper, '#tw-avatar-gallery');
+    var avatarPreviewImg = q(wrapper, '#tw-avatar-img');
+    var avatarSelectedWrap = q(wrapper, '#tw-avatar-selected');
+    var avatarPreview = q(wrapper, '#tw-avatar-preview');
+    var avatarInput = q(wrapper, '#tw-char-avatar');
 
-    ATTR_KEYS.forEach(function (key) {
-      var v = parseInt(presetBtn.dataset[key], 10);
-      if (isNaN(v) || v < ATTR_MIN || v > ATTR_MAX) valid = false;
+    if (!avatarGalleryEl) return;
+
+    avatarGalleryEl.innerHTML = TW_AVATAR_GALLERY.map(function (item) {
+      var normalizedUrl = twNormalizeMediaUrl(item.url);
+      return '' +
+        '<button type="button" class="tw-avatar-option" data-avatar-url="' + esc(normalizedUrl) + '" aria-pressed="' + (formState.avatar_url === normalizedUrl ? 'true' : 'false') + '">' +
+          '<img src="' + esc(normalizedUrl) + '" alt="' + esc(item.name || 'Avatar option') + '" loading="lazy">' +
+          '<span>' + esc(item.name || 'Avatar') + '</span>' +
+        '</button>';
+    }).join('');
+
+    qa(avatarGalleryEl, '.tw-avatar-option').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var url = twNormalizeMediaUrl(btn.dataset.avatarUrl || '');
+        formState.avatar_file = null;
+        formState.avatar_url = url;
+
+        if (avatarPreviewImg) {
+          avatarPreviewImg.src = url;
+          avatarPreviewImg.alt = 'Selected gallery avatar';
+        }
+        if (avatarPreview) avatarPreview.style.display = 'none';
+        if (avatarSelectedWrap) avatarSelectedWrap.style.display = 'grid';
+        if (avatarInput) avatarInput.value = '';
+
+        qa(avatarGalleryEl, '.tw-avatar-option').forEach(function (x) {
+          var selected = x === btn;
+          x.classList.toggle('selected', selected);
+          x.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+
+        updateSummary(wrapper);
+        NW_SFX.select();
+      });
     });
-
-    if (!valid) return;
-
-    ATTR_KEYS.forEach(function (key) {
-      formState['attr_' + key] = parseInt(presetBtn.dataset[key], 10);
-    });
-
-    qa(wrapper, '.tw-attr-preset-btn').forEach(function (btn) {
-      btn.classList.toggle('active', btn === presetBtn);
-    });
-
-    renderAttrDisplay(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.preset();
-  }
-
-  function highlightAvatarGallery(wrapper) {
-    var gallery = q(wrapper, '#tw-avatar-gallery');
-    if (!gallery) return;
-    qa(gallery, '.tw-avatar-option').forEach(function (btn) {
-      btn.classList.toggle('selected', btn.dataset.avatarId === formState.avatar_gallery_id);
-    });
-  }
-
-  function selectGalleryAvatar(wrapper, avatarId, avatarUrl, avatarName) {
-    formState.avatar_file = null;
-    formState.avatar_gallery_id = avatarId || '';
-    formState.avatar_gallery_url = avatarUrl || '';
-
-    var imgEl = q(wrapper, '#tw-avatar-img');
-    var preview = q(wrapper, '#tw-avatar-preview');
-    var selected = q(wrapper, '#tw-avatar-selected');
-    var fileInput = q(wrapper, '#tw-char-avatar');
-
-    if (imgEl) {
-      imgEl.src = avatarUrl || '';
-      imgEl.alt = avatarName || 'Selected avatar';
-    }
-    if (preview) preview.style.display = 'none';
-    if (selected) selected.style.display = 'grid';
-    if (fileInput) fileInput.value = '';
-
-    highlightAvatarGallery(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
   }
 
   function handleAvatarFile(wrapper, file) {
-    var allowed = ['image/jpeg', 'image/png', 'image/webp'];
-
+    var allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
     if (!file || allowed.indexOf(file.type) === -1 || file.size > 2 * 1024 * 1024) {
-      setStatus('ERROR: Invalid file. JPG / PNG / WEBP under 2 MB only.', true);
+      setStatus('ERROR: Invalid file. JPG / PNG / WEBP / SVG under 2 MB only.', true);
       NW_SFX.error();
       return;
     }
 
     formState.avatar_file = file;
-    formState.avatar_gallery_id = '';
-    formState.avatar_gallery_url = '';
-    highlightAvatarGallery(wrapper);
+    formState.avatar_url = '';
     NW_SFX.select();
 
     var reader = new FileReader();
@@ -806,6 +596,7 @@
       var imgEl = q(wrapper, '#tw-avatar-img');
       var preview = q(wrapper, '#tw-avatar-preview');
       var selected = q(wrapper, '#tw-avatar-selected');
+      var gallery = q(wrapper, '#tw-avatar-gallery');
 
       if (imgEl) {
         imgEl.src = ev.target.result;
@@ -813,21 +604,25 @@
       }
       if (preview) preview.style.display = 'none';
       if (selected) selected.style.display = 'grid';
+      if (gallery) qa(gallery, '.tw-avatar-option').forEach(function (x) {
+        x.classList.remove('selected');
+        x.setAttribute('aria-pressed', 'false');
+      });
+
       updateSummary(wrapper);
     };
-
     reader.readAsDataURL(file);
   }
 
   function clearAvatar(wrapper) {
     formState.avatar_file = null;
-    formState.avatar_gallery_id = '';
-    formState.avatar_gallery_url = '';
+    formState.avatar_url = '';
 
     var imgEl = q(wrapper, '#tw-avatar-img');
     var preview = q(wrapper, '#tw-avatar-preview');
     var selected = q(wrapper, '#tw-avatar-selected');
     var fileInput = q(wrapper, '#tw-char-avatar');
+    var gallery = q(wrapper, '#tw-avatar-gallery');
 
     if (imgEl) {
       imgEl.src = '';
@@ -836,25 +631,13 @@
     if (preview) preview.style.display = '';
     if (selected) selected.style.display = 'none';
     if (fileInput) fileInput.value = '';
+    if (gallery) qa(gallery, '.tw-avatar-option').forEach(function (x) {
+      x.classList.remove('selected');
+      x.setAttribute('aria-pressed', 'false');
+    });
 
-    highlightAvatarGallery(wrapper);
     updateSummary(wrapper);
     NW_SFX.back();
-  }
-
-  function renderAvatarGallery(wrapper) {
-    var gallery = q(wrapper, '#tw-avatar-gallery');
-    if (!gallery) return;
-
-    gallery.innerHTML = TW_AVATAR_GALLERY.map(function (item) {
-      return '' +
-        '<button type="button" class="tw-avatar-option" data-avatar-id="' + esc(item.id) + '" data-avatar-url="' + esc(item.url) + '" aria-label="Choose ' + esc(item.name) + '">' +
-          '<img src="' + esc(item.url) + '" alt="' + esc(item.name) + '" loading="lazy" decoding="async">' +
-          '<span class="tw-avatar-option__label">' + esc(item.name) + '</span>' +
-        '</button>';
-    }).join('');
-
-    highlightAvatarGallery(wrapper);
   }
 
   function updateSummary(wrapper) {
@@ -886,7 +669,7 @@
     var avatarEl = q(wrapper, '#tw-summary-avatar');
     if (avatarEl) {
       if (formState.avatar_file) avatarEl.textContent = formState.avatar_file.name;
-      else if (formState.avatar_gallery_id) avatarEl.textContent = 'Gallery: ' + formState.avatar_gallery_id;
+      else if (formState.avatar_url) avatarEl.textContent = formState.avatar_url.split('/').pop();
       else avatarEl.textContent = '—';
     }
   }
@@ -919,8 +702,36 @@
       card.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
     });
 
-    highlightAvatarGallery(wrapper);
     updateSkillCounter(wrapper);
+  }
+
+  function renderLoreChoices(wrapper) {
+    var originGrid = q(wrapper, '#tw-origin-grid');
+    var operationGrid = q(wrapper, '#tw-operation-grid');
+    var crisisGrid = q(wrapper, '#tw-crisis-grid');
+
+    if (originGrid && !originGrid.dataset.rendered) {
+      originGrid.innerHTML = DATA_ORIGIN_OPTIONS.map(function (item) {
+        return buildLoreCard(item, 'data_origin');
+      }).join('');
+      originGrid.dataset.rendered = '1';
+    }
+
+    if (operationGrid && !operationGrid.dataset.rendered) {
+      operationGrid.innerHTML = PREVIOUS_OPERATION_OPTIONS.map(function (item) {
+        return buildLoreCard(item, 'previous_operation');
+      }).join('');
+      operationGrid.dataset.rendered = '1';
+    }
+
+    if (crisisGrid && !crisisGrid.dataset.rendered) {
+      crisisGrid.innerHTML = SYNC_CRISIS_OPTIONS.map(function (item) {
+        return buildLoreCard(item, 'sync_crisis');
+      }).join('');
+      crisisGrid.dataset.rendered = '1';
+    }
+
+    restoreSelections(wrapper);
   }
 
   function stepPhase(step) {
@@ -929,7 +740,6 @@
 
   function validateIdentityStep(wrapper, step) {
     var nameInput = q(wrapper, '#tw-char-name');
-
     if (!nameInput || !nameInput.value.trim()) {
       if (nameInput) nameInput.focus();
       showStepError(step, 'ERROR: Agent designation is required.');
@@ -964,22 +774,29 @@
 
     var phase = stepPhase(step);
 
-    if (phase === 'RACE PROTOCOL' && !formState.race) {
-      showStepError(step, 'ERROR: Select a race to continue.');
-      setStatus('ERROR: Select a race to continue.', true);
-      return false;
+    if (phase === 'RACE PROTOCOL') {
+      if (!formState.race) {
+        showStepError(step, 'ERROR: Select a race to continue.');
+        setStatus('ERROR: Select a race to continue.', true);
+        return false;
+      }
+      return true;
     }
 
-    if (phase === 'CLASS MATRIX' && !formState.character_class) {
-      showStepError(step, 'ERROR: Select a class to continue.');
-      setStatus('ERROR: Select a class to continue.', true);
-      return false;
+    if (phase === 'CLASS MATRIX') {
+      if (!formState.character_class) {
+        showStepError(step, 'ERROR: Select a class to continue.');
+        setStatus('ERROR: Select a class to continue.', true);
+        return false;
+      }
+      return true;
     }
 
     if (phase === 'BIOMETRIC CALIBRATION') {
       var used = ATTR_KEYS.reduce(function (sum, key) {
         return sum + (formState['attr_' + key] || ATTR_MIN);
       }, 0);
+
       if (used !== ATTR_POOL) {
         showStepError(step, 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.');
         setStatus('ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true);
@@ -1002,22 +819,31 @@
       return true;
     }
 
-    if (phase === 'STARTING PACKAGE' && !formState.starting_package_id) {
-      showStepError(step, 'ERROR: Select a starting package to continue.');
-      setStatus('ERROR: Select a starting package to continue.', true);
-      return false;
+    if (phase === 'STARTING PACKAGE') {
+      if (!formState.starting_package_id) {
+        showStepError(step, 'ERROR: Select a starting package to continue.');
+        setStatus('ERROR: Select a starting package to continue.', true);
+        return false;
+      }
+      return true;
     }
 
-    if (phase === 'DATA ORIGIN' && !formState.data_origin) {
-      showStepError(step, 'ERROR: Select a data origin to continue.');
-      setStatus('ERROR: Select a data origin to continue.', true);
-      return false;
+    if (phase === 'DATA ORIGIN') {
+      if (!formState.data_origin) {
+        showStepError(step, 'ERROR: Select a data origin to continue.');
+        setStatus('ERROR: Select a data origin to continue.', true);
+        return false;
+      }
+      return true;
     }
 
-    if (phase === 'PREVIOUS OPERATION' && !formState.previous_operation) {
-      showStepError(step, 'ERROR: Select a previous operation to continue.');
-      setStatus('ERROR: Select a previous operation to continue.', true);
-      return false;
+    if (phase === 'PREVIOUS OPERATION') {
+      if (!formState.previous_operation) {
+        showStepError(step, 'ERROR: Select a previous operation to continue.');
+        setStatus('ERROR: Select a previous operation to continue.', true);
+        return false;
+      }
+      return true;
     }
 
     if (phase === 'SYNCHRONIZATION CRISIS') {
@@ -1047,13 +873,7 @@
     return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"], .tw-btn-review-return');
   }
 
-  function syncReviewReturnButtons(wrapper, currentStepIndex, reviewStepIndex, reviewReturnStepIndex) {
-    qa(wrapper, '[data-review-return], .tw-btn-review-return').forEach(function (btn) {
-      btn.hidden = !(reviewReturnStepIndex !== null && currentStepIndex !== reviewStepIndex);
-    });
-  }
-
-  function showStep(wrapper, steps, idx, reviewStepIndex, reviewReturnStepIndex) {
+  function showStep(wrapper, steps, idx) {
     steps.forEach(function (step, i) {
       step.classList.toggle('active', i === idx);
     });
@@ -1061,7 +881,7 @@
     setStatus('', false);
 
     var phase = stepPhase(steps[idx]);
-
+    if (phase === 'RACE PROTOCOL') fetchRaceGrid(wrapper);
     if (phase === 'CLASS MATRIX') fetchClassGrid(wrapper);
     if (phase === 'SKILL SELECTION') fetchSkillGrid(wrapper);
     if (phase === 'STARTING PACKAGE') fetchPackageGrid(wrapper);
@@ -1081,11 +901,10 @@
       tick.classList.toggle('active', parseInt(tick.dataset.tick, 10) <= idx + 1);
     });
 
-    syncReviewReturnButtons(wrapper, idx, reviewStepIndex, reviewReturnStepIndex);
     restoreSelections(wrapper);
   }
 
-  function submitCharacter(wrapper, steps, current, spinner) {
+  function submitCharacter(wrapper, spinner) {
     setStatus('Uploading agent profile…', false);
 
     var submitBtn = q(wrapper, '#tw-char-submit');
@@ -1111,14 +930,13 @@
     data.append('previous_operation', formState.previous_operation);
     data.append('sync_crisis', formState.sync_crisis);
     data.append('backstory_tags', JSON.stringify(formState.backstory_tags));
-    data.append('avatar_gallery_url', formState.avatar_gallery_url || '');
-    data.append('avatar_gallery_id', formState.avatar_gallery_id || '');
 
     ATTR_KEYS.forEach(function (key) {
       data.append('attr_' + key, formState['attr_' + key]);
     });
 
     if (formState.avatar_file) data.append('avatar', formState.avatar_file);
+    if (formState.avatar_url) data.append('avatar_url', formState.avatar_url);
 
     var t0 = Date.now();
 
@@ -1127,456 +945,310 @@
       credentials: 'same-origin',
       body: data
     })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (res) {
         var wait = Math.max(0, 1200 - (Date.now() - t0));
-
         setTimeout(function () {
           spinner.hide();
 
           if (res && res.success) {
             setStatus('Agent profile created. Welcome to the Grid.', false);
+            NW_SFX.deploy();
             wrapper.innerHTML =
               '<div class="tw-success">' +
                 '<p class="tw-success__msg">✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</p>' +
                 ((res.data && res.data.redirect)
-                  ? '<a href="' + esc(res.data.redirect) + '" class="tw-btn tw-btn--primary">Enter the Grid</a>'
+                  ? '<a class="tw-btn tw-btn--primary" href="' + esc(res.data.redirect) + '">Enter the Grid</a>'
                   : '') +
               '</div>';
-            NW_SFX.deploy();
             return;
           }
 
-          var errMsg = (res && res.data && res.data.message) ? res.data.message : 'Submission failed. Retry.';
-          setStatus('ERROR: ' + errMsg, true);
-          showStepError(steps[current], errMsg);
-
+          setStatus((res && res.data && res.data.message) ? res.data.message : 'ERROR: Character creation failed.', true);
           if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = '⌘ SYNCHRONIZE AGENT';
+            submitBtn.textContent = 'Create character';
           }
+          NW_SFX.error();
         }, wait);
       })
       .catch(function () {
         spinner.hide();
-        setStatus('ERROR: Connection lost. Check your link and retry.', true);
-        showStepError(steps[current], 'Connection lost. Check your link and retry.');
-        NW_SFX.error();
-
+        setStatus('ERROR: Network failure while creating character.', true);
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = '⌘ SYNCHRONIZE AGENT';
+          submitBtn.textContent = 'Create character';
         }
+        NW_SFX.error();
       });
   }
 
-  function handleRaceSelection(wrapper, card, currentStep) {
-    clearAllSelected(wrapper, '.tw-race-card:not(.tw-subrace-card)');
-    markSelected(card);
-
-    formState.race = card.dataset.raceId || '';
-    formState.race_label = q(card, '.tw-race-name') ? q(card, '.tw-race-name').textContent.trim() : '';
-
-    resetSubraceState(wrapper);
-    fetchSubraces(wrapper, card.dataset.race || '');
-
-    clearStepError(currentStep);
-    restoreSelections(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function handleSubraceSelection(wrapper, card, currentStep) {
-    clearAllSelected(wrapper, '.tw-subrace-card');
-    markSelected(card);
-
-    formState.subrace = card.dataset.subraceId || '';
-    formState.subrace_label = q(card, '.tw-race-name') ? q(card, '.tw-race-name').textContent.trim() : '';
-
-    clearStepError(currentStep);
-    restoreSelections(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function handleClassSelection(wrapper, card, currentStep) {
-    clearAllSelected(wrapper, '.tw-class-card');
-    markSelected(card);
-
-    formState.character_class = card.dataset.charClass || '';
-    formState.class_label = card.dataset.label || (q(card, '.tw-class-card__name') ? q(card, '.tw-class-card__name').textContent.trim() : '');
-    formState.skill_limit = parseInt(card.dataset.skilllimit, 10) || 5;
-
-    resetClassDependentState(wrapper);
-    fetchSkillGrid(wrapper);
-    fetchPackageGrid(wrapper);
-
-    clearStepError(currentStep);
-    restoreSelections(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function handleSkillSelection(wrapper, card, currentStep) {
-    var skillId = card.dataset.skillId;
-    if (!skillId) return;
-
-    var idx = formState.skills.indexOf(skillId);
-
-    if (idx === -1) {
-      if (formState.skills.length >= (formState.skill_limit || 5)) {
-        setStatus('ERROR: Skill limit reached for this class.', true);
-        NW_SFX.error();
-        return;
-      }
-      formState.skills.push(skillId);
-      markSelected(card);
-    } else {
-      formState.skills.splice(idx, 1);
-      card.classList.remove('selected');
-      card.setAttribute('aria-pressed', 'false');
-    }
-
-    clearStepError(currentStep);
-    updateSkillCounter(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function handlePackageSelection(wrapper, card, currentStep) {
-    clearAllSelected(wrapper, '.tw-package-card');
-    markSelected(card);
-
-    formState.starting_package_id = card.dataset.packageId || '';
-    formState.starting_package_label = card.dataset.label || (q(card, '.tw-race-name') ? q(card, '.tw-race-name').textContent.trim() : '');
-
-    clearStepError(currentStep);
-    restoreSelections(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function handleLoreSelection(wrapper, card, currentStep) {
-    var type = card.dataset.choiceType;
-    var key = card.dataset.choiceKey;
-    if (!type || !key) return;
-
-    clearAllSelected(wrapper, '.tw-lore-card[data-choice-type="' + type + '"]');
-    markSelected(card);
-
-    formState[type] = key;
-    recomputeBackstoryTags();
-
-    clearStepError(currentStep);
-    restoreSelections(wrapper);
-    updateSummary(wrapper);
-    NW_SFX.select();
-  }
-
-  function adjustAttribute(wrapper, btn, currentStep) {
-    var key = btn.dataset.attr;
-    if (ATTR_KEYS.indexOf(key) === -1) return;
-
-    var isPlus = btn.classList.contains('tw-attr-plus') || btn.dataset.dir === 'up' || btn.dataset.dir === 'plus';
-    var isMinus = btn.classList.contains('tw-attr-minus') || btn.dataset.dir === 'down' || btn.dataset.dir === 'minus';
-
-    var currentVal = formState['attr_' + key] || ATTR_MIN;
-    var used = ATTR_KEYS.reduce(function (sum, attrKey) {
-      return sum + (formState['attr_' + attrKey] || ATTR_MIN);
-    }, 0);
-
-    if (isPlus) {
-      if (currentVal >= ATTR_MAX) return;
-      if (used >= ATTR_POOL) {
-        NW_SFX.error();
-        return;
-      }
-      formState['attr_' + key] = currentVal + 1;
-    } else if (isMinus) {
-      if (currentVal <= ATTR_MIN) return;
-      formState['attr_' + key] = currentVal - 1;
-    } else {
-      return;
-    }
-
-    renderAttrDisplay(wrapper);
-    clearStepError(currentStep);
-    updateSummary(wrapper);
-    NW_SFX.nav();
-  }
-
-  function init() {
-    var wrapper = document.getElementById('tw-char-creator-wrapper');
-    if (!wrapper || wrapper.dataset.nwInit) return;
-
-    wrapper.dataset.nwInit = '1';
-
-    var steps = qa(wrapper, '.tw-step');
+  function bindEvents(wrapper, steps) {
     var current = 0;
-    var reviewReturnStep = null;
-    if (!steps.length) return;
+    var spinner = makeSpinner('tw-char-spinner', 'Synchronizing', 'Writing Field Agent profile into the Grid…');
 
-    var reviewStepIndex = steps.length - 1;
-    var spinner = makeSpinner('tw-char-spinner', 'SYNCHRONIZING AGENT…', 'Writing operative data to the NeoWeave grid.');
+    wrapper.addEventListener('click', function (ev) {
+      var nextBtn = resolveNextButton(ev.target);
+      var prevBtn = resolvePrevButton(ev.target);
 
-    function goToStep(stepIndex, fromReview) {
-      if (isNaN(stepIndex) || stepIndex < 0 || stepIndex >= steps.length) return;
-      if (fromReview) reviewReturnStep = reviewStepIndex;
-      current = stepIndex;
-      showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
-    }
-
-    function goNext() {
-      if (!validateStep(wrapper, steps, current)) return;
-      clearStepError(steps[current]);
-      setStatus('', false);
-
-      if (current < steps.length - 1) {
-        current++;
-        NW_SFX.nav();
-        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
-      }
-    }
-
-    function goPrev() {
-      clearStepError(steps[current]);
-      setStatus('', false);
-
-      if (reviewReturnStep !== null && current !== reviewStepIndex) {
-        current = reviewReturnStep;
-        reviewReturnStep = null;
-        NW_SFX.back();
-        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
-        return;
-      }
-
-      if (current > 0) {
-        current--;
-        NW_SFX.back();
-        showStep(wrapper, steps, current, reviewStepIndex, reviewReturnStep);
-      }
-    }
-
-    fetchRaceGrid(wrapper);
-    renderAttrDisplay(wrapper);
-    renderLoreChoices(wrapper);
-    renderAvatarGallery(wrapper);
-    updateSummary(wrapper);
-    resetSubraceState(wrapper);
-
-    wrapper.addEventListener('click', function (e) {
-      var target = e.target;
-      var currentStep = steps[current];
-
-      var presetBtn = target.closest('.tw-attr-preset-btn');
-      if (presetBtn) {
-        e.preventDefault();
-        applyAttrPreset(wrapper, presetBtn);
-        clearStepError(currentStep);
-        return;
-      }
-
-      var nextBtn = resolveNextButton(target);
       if (nextBtn) {
-        e.preventDefault();
-        goNext();
-        return;
-      }
-
-      var prevBtn = resolvePrevButton(target);
-      if (prevBtn) {
-        e.preventDefault();
-        goPrev();
-        return;
-      }
-
-      var submitBtn = target.closest('#tw-char-submit');
-      if (submitBtn) {
-        e.preventDefault();
-        if (validateStep(wrapper, steps, current)) submitCharacter(wrapper, steps, current, spinner);
-        return;
-      }
-
-      var raceCard = target.closest('.tw-race-card:not(.tw-subrace-card)');
-      if (raceCard) {
-        handleRaceSelection(wrapper, raceCard, currentStep);
-        return;
-      }
-
-      var subCard = target.closest('.tw-subrace-card');
-      if (subCard) {
-        handleSubraceSelection(wrapper, subCard, currentStep);
-        return;
-      }
-
-      var classCard = target.closest('.tw-class-card');
-      if (classCard) {
-        handleClassSelection(wrapper, classCard, currentStep);
-        return;
-      }
-
-      var skillCard = target.closest('.tw-skill-card');
-      if (skillCard) {
-        handleSkillSelection(wrapper, skillCard, currentStep);
-        return;
-      }
-
-      var packageCard = target.closest('.tw-package-card');
-      if (packageCard) {
-        handlePackageSelection(wrapper, packageCard, currentStep);
-        return;
-      }
-
-      var loreCard = target.closest('.tw-lore-card');
-      if (loreCard) {
-        handleLoreSelection(wrapper, loreCard, currentStep);
-        return;
-      }
-
-      var editBtn = target.closest('.tw-summary-edit');
-      if (editBtn && editBtn.dataset.goto) {
-        e.preventDefault();
-        var go = parseInt(editBtn.dataset.goto, 10);
-        if (!isNaN(go) && go >= 1 && go <= steps.length) {
-          reviewReturnStep = reviewStepIndex;
-          goToStep(go - 1, true);
+        ev.preventDefault();
+        if (!validateStep(wrapper, steps, current)) return;
+        if (current < steps.length - 1) {
+          current += 1;
+          showStep(wrapper, steps, current);
           NW_SFX.nav();
         }
         return;
       }
 
-      var avatarBtn = target.closest('.tw-avatar-option');
-      if (avatarBtn) {
-        e.preventDefault();
-        selectGalleryAvatar(wrapper, avatarBtn.dataset.avatarId || '', avatarBtn.dataset.avatarUrl || '', q(avatarBtn, '.tw-avatar-option__label') ? q(avatarBtn, '.tw-avatar-option__label').textContent.trim() : 'Selected avatar');
+      if (prevBtn) {
+        ev.preventDefault();
+        if (current > 0) {
+          current -= 1;
+          showStep(wrapper, steps, current);
+          NW_SFX.back();
+        }
         return;
       }
 
-      var clearAvatarBtn = target.closest('#tw-avatar-clear, .tw-avatar-clear');
-      if (clearAvatarBtn) {
-        e.preventDefault();
+      var raceCard = ev.target.closest('.tw-race-card:not(.tw-subrace-card)');
+      if (raceCard) {
+        formState.race = raceCard.dataset.raceId || '';
+        formState.race_label = q(raceCard, '.tw-race-name') ? q(raceCard, '.tw-race-name').textContent.trim() : formState.race;
+        formState.subrace = '';
+        formState.subrace_label = '';
+        fetchSubraces(wrapper, formState.race);
+        restoreSelections(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
+        return;
+      }
+
+      var subraceCard = ev.target.closest('.tw-subrace-card');
+      if (subraceCard) {
+        formState.subrace = subraceCard.dataset.subraceId || '';
+        formState.subrace_label = q(subraceCard, '.tw-race-name') ? q(subraceCard, '.tw-race-name').textContent.trim() : formState.subrace;
+        restoreSelections(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
+        return;
+      }
+
+      var classCard = ev.target.closest('.tw-class-card');
+      if (classCard) {
+        formState.character_class = classCard.dataset.charClass || '';
+        formState.class_label = classCard.dataset.className || '';
+        formState.starting_package_id = '';
+        formState.starting_package_label = '';
+        var pkgGrid = q(wrapper, '#tw-package-grid');
+        if (pkgGrid) pkgGrid.dataset.rendered = '';
+        restoreSelections(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
+        return;
+      }
+
+      var skillCard = ev.target.closest('.tw-skill-card');
+      if (skillCard) {
+        var skillId = skillCard.dataset.skillId;
+        var idx = formState.skills.indexOf(skillId);
+
+        if (idx === -1) {
+          if (formState.skills.length >= (formState.skill_limit || 5)) {
+            setStatus('ERROR: Skill limit reached for this class.', true);
+            NW_SFX.error();
+            return;
+          }
+          formState.skills.push(skillId);
+        } else {
+          formState.skills.splice(idx, 1);
+        }
+
+        restoreSelections(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
+        return;
+      }
+
+      var packageCard = ev.target.closest('.tw-package-card');
+      if (packageCard) {
+        formState.starting_package_id = packageCard.dataset.packageId || '';
+        formState.starting_package_label = packageCard.dataset.packageName || '';
+        restoreSelections(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
+        return;
+      }
+
+      var loreCard = ev.target.closest('.tw-lore-card');
+      if (loreCard) {
+        var type = loreCard.dataset.choiceType;
+        var key = loreCard.dataset.choiceKey;
+        if (type) {
+          formState[type] = key || '';
+          recomputeBackstoryTags();
+          restoreSelections(wrapper);
+          updateSummary(wrapper);
+          NW_SFX.select();
+        }
+        return;
+      }
+
+      var summaryEdit = ev.target.closest('.tw-summary-edit');
+      if (summaryEdit) {
+        var targetStep = parseInt(summaryEdit.dataset.editStep, 10);
+        if (!isNaN(targetStep) && targetStep >= 0 && targetStep < steps.length) {
+          current = targetStep;
+          showStep(wrapper, steps, current);
+          NW_SFX.nav();
+        }
+        return;
+      }
+
+      var submitBtn = ev.target.closest('#tw-char-submit');
+      if (submitBtn) {
+        ev.preventDefault();
+        if (!validateStep(wrapper, steps, current)) return;
+        submitCharacter(wrapper, spinner);
+        return;
+      }
+
+      var avatarTrigger = ev.target.closest('#tw-avatar-trigger');
+      if (avatarTrigger) {
+        ev.preventDefault();
+        var input = q(wrapper, '#tw-char-avatar');
+        if (input) input.click();
+        return;
+      }
+
+      var avatarClear = ev.target.closest('#tw-avatar-clear');
+      if (avatarClear) {
+        ev.preventDefault();
         clearAvatar(wrapper);
         return;
       }
 
-      var uploadTrigger = target.closest('.tw-upload-trigger');
-      if (uploadTrigger) {
-        e.preventDefault();
-        var hiddenFileInput = q(wrapper, '#tw-char-avatar');
-        if (hiddenFileInput) hiddenFileInput.click();
-        return;
-      }
+      var attrBtn = ev.target.closest('.tw-attr-btn');
+      if (attrBtn) {
+        var key = attrBtn.dataset.attrKey;
+        var action = attrBtn.dataset.attrAction;
+        if (!key || ATTR_KEYS.indexOf(key) === -1) return;
 
-      var attrBtn = target.closest('.tw-attr-btn');
-      if (attrBtn && attrBtn.dataset.attr) {
-        e.preventDefault();
-        adjustAttribute(wrapper, attrBtn, currentStep);
+        var currentVal = formState['attr_' + key] || ATTR_MIN;
+        var used = ATTR_KEYS.reduce(function (sum, item) {
+          return sum + (formState['attr_' + item] || ATTR_MIN);
+        }, 0);
+
+        if (action === 'plus') {
+          if (currentVal >= ATTR_MAX) return;
+          if (used >= ATTR_POOL) {
+            setStatus('ERROR: No attribute points remaining.', true);
+            NW_SFX.error();
+            return;
+          }
+          formState['attr_' + key] = currentVal + 1;
+        }
+
+        if (action === 'minus') {
+          if (currentVal <= ATTR_MIN) return;
+          formState['attr_' + key] = currentVal - 1;
+        }
+
+        renderAttrDisplay(wrapper);
+        updateSummary(wrapper);
+        NW_SFX.select();
       }
     });
 
-    wrapper.addEventListener('input', function (e) {
-      var t = e.target;
+    var avatarInput = q(wrapper, '#tw-char-avatar');
+    if (avatarInput) {
+      avatarInput.addEventListener('change', function () {
+        if (avatarInput.files && avatarInput.files[0]) handleAvatarFile(wrapper, avatarInput.files[0]);
+      });
+    }
 
-      if (t.id === 'tw-char-name') {
-        formState.character_name = t.value || '';
+    var bioEl = q(wrapper, '#tw-char-bio');
+    if (bioEl) {
+      bioEl.addEventListener('input', function () {
+        formState.bio = bioEl.value.trim();
         updateSummary(wrapper);
-      }
+      });
+    }
 
-      if (t.id === 'tw-char-pronouns-custom') {
-        var customRadio = q(wrapper, '.tw-pronoun-radio[value="custom"]');
-        if (customRadio && customRadio.checked) {
-          formState.pronouns = t.value.trim() || 'custom';
+    var nameEl = q(wrapper, '#tw-char-name');
+    if (nameEl) {
+      nameEl.addEventListener('input', function () {
+        formState.character_name = nameEl.value.trim();
+        updateSummary(wrapper);
+      });
+    }
+
+    qa(wrapper, '.tw-pronoun-radio').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        if (radio.checked) {
+          if (radio.value === 'custom') {
+            var customEl = q(wrapper, '#tw-char-pronouns-custom');
+            formState.pronouns = customEl && customEl.value.trim() ? customEl.value.trim() : 'custom';
+          } else {
+            formState.pronouns = radio.value;
+          }
           updateSummary(wrapper);
         }
-      }
-
-      if (t.id === 'tw-char-bio') {
-        formState.bio = t.value || '';
-        updateSummary(wrapper);
-      }
+      });
     });
 
-    wrapper.addEventListener('change', function (e) {
-      if (e.target && e.target.classList.contains('tw-pronoun-radio')) {
-        var customInput = q(wrapper, '#tw-char-pronouns-custom');
-        if (!customInput) return;
-
-        customInput.style.display = e.target.value === 'custom' ? '' : 'none';
-
-        if (e.target.value === 'custom') {
-          customInput.focus();
-          formState.pronouns = customInput.value.trim() || 'custom';
-        } else {
-          formState.pronouns = e.target.value;
+    var customPronouns = q(wrapper, '#tw-char-pronouns-custom');
+    if (customPronouns) {
+      customPronouns.addEventListener('input', function () {
+        var customRadio = q(wrapper, '.tw-pronoun-radio[value="custom"]');
+        if (customRadio && customRadio.checked) {
+          formState.pronouns = customPronouns.value.trim() || 'custom';
+          updateSummary(wrapper);
         }
+      });
+    }
 
-        updateSummary(wrapper);
-        return;
-      }
-
-      if (e.target && e.target.id === 'tw-char-avatar') {
-        if (e.target.files && e.target.files[0]) handleAvatarFile(wrapper, e.target.files[0]);
-      }
-    });
-
-    wrapper.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-
-      var card = e.target.closest('.tw-race-card, .tw-class-card, .tw-skill-card, .tw-package-card, .tw-lore-card, .tw-subrace-card, .tw-avatar-option');
-      if (!card) return;
-
-      e.preventDefault();
-      card.click();
-    });
-
-    var dropBox = q(wrapper, '#tw-avatar-drop');
-    if (dropBox) {
-      dropBox.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        dropBox.classList.add('tw-upload-box--drag');
+    var uploadBox = q(wrapper, '#tw-upload-box');
+    if (uploadBox) {
+      ['dragenter', 'dragover'].forEach(function (evtName) {
+        uploadBox.addEventListener(evtName, function (ev) {
+          ev.preventDefault();
+          uploadBox.classList.add('tw-upload-box--drag');
+        });
       });
 
-      dropBox.addEventListener('dragleave', function () {
-        dropBox.classList.remove('tw-upload-box--drag');
+      ['dragleave', 'dragend', 'drop'].forEach(function (evtName) {
+        uploadBox.addEventListener(evtName, function (ev) {
+          ev.preventDefault();
+          uploadBox.classList.remove('tw-upload-box--drag');
+        });
       });
 
-      dropBox.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropBox.classList.remove('tw-upload-box--drag');
-        var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      uploadBox.addEventListener('drop', function (ev) {
+        var file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
         if (file) handleAvatarFile(wrapper, file);
       });
     }
 
-    showStep(wrapper, steps, 0, reviewStepIndex, reviewReturnStep);
+    renderAttrDisplay(wrapper);
+    updateSummary(wrapper);
+    showStep(wrapper, steps, current);
   }
 
-  function boot() {
+  function init() {
     var wrapper = document.getElementById('tw-char-creator-wrapper');
+    if (!wrapper) return;
 
-    if (wrapper) {
-      init();
-      return;
-    }
+    var steps = qa(wrapper, '.tw-step');
+    if (!steps.length) return;
 
-    var retry = 0;
-    var poll = setInterval(function () {
-      retry++;
-
-      if (document.getElementById('tw-char-creator-wrapper')) {
-        clearInterval(poll);
-        init();
-      } else if (retry > 50) {
-        clearInterval(poll);
-      }
-    }, 100);
+    bindEvents(wrapper, steps);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    boot();
+    init();
   }
 })();
