@@ -4,7 +4,7 @@ function tw_time_ago( $timestamp ) {
     $created = strtotime( $timestamp );
     if ( ! $created ) return '';
 
-    $diff = time() - $created; // Fix: use time() instead of deprecated current_time('timestamp')
+    $diff = time() - $created;
 
     if ( $diff < 60 )    return 'just now';
     if ( $diff < 3600 )  return floor( $diff / 60 ) . ' min ago';
@@ -31,8 +31,13 @@ function tw_render_quest_card( array $quest ): string {
 
     $tags_html = '';
     if ( ! empty( $quest_tags ) ) {
-        foreach ( explode( ',', $quest_tags ) as $tag ) {
-            $tag = trim( $tag );
+        // quest_tags may be a jsonb array or a comma-delimited string.
+        $tags_list = is_array( $quest_tags )
+            ? $quest_tags
+            : explode( ',', $quest_tags );
+
+        foreach ( $tags_list as $tag ) {
+            $tag = trim( (string) $tag );
             if ( $tag !== '' ) {
                 $tags_html .= '<span class="tw-tag">' . esc_html( $tag ) . '</span>';
             }
@@ -58,6 +63,13 @@ function tw_render_quest_card( array $quest ): string {
     );
 }
 
+/**
+ * BUG-FIX: previously used TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY
+ * constants which are never defined in wp-config.php — only the helper
+ * functions tw_supabase_url() and tw_supabase_anon_key() exist.
+ * Every call to this shortcode fatalled with "Use of undefined constant".
+ * Fixed: use the project-standard helpers throughout.
+ */
 function tw_display_active_scenarios_shortcode(): string {
     $character_id = tw_get_current_character_id();
 
@@ -65,17 +77,23 @@ function tw_display_active_scenarios_shortcode(): string {
         return '<div class="echo-stream-container">// ERROR: NO ACTIVE SESSION DETECTED</div>';
     }
 
-    // Fix: sanitize character_id before using in URL
+    if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+        return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG MISSING</div>';
+    }
+
+    $anon_key = tw_supabase_anon_key();
+
     $url = add_query_arg( [
         'character_id' => 'eq.' . rawurlencode( $character_id ),
         'select'       => '*,cyber_scenarios(*,cyber_areas(*))',
-    ], 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co/rest/v1/cyber_active_quests' );
+    ], trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests' );
 
     $response = wp_remote_get( $url, [
         'headers' => [
-            'apikey'        => TW_SUPABASE_ANON_KEY,
-            'Authorization' => 'Bearer ' . TW_SUPABASE_ANON_KEY,
+            'apikey'        => $anon_key,
+            'Authorization' => 'Bearer ' . $anon_key,
         ],
+        'timeout' => 15,
     ] );
 
     $error_card = '<div class="scenario-card" style="opacity:0.5;text-align:center;border:1px dashed #444;">%s</div>';
@@ -94,13 +112,11 @@ function tw_display_active_scenarios_shortcode(): string {
         return sprintf( $error_card, 'NO OBJECTIVES' );
     }
 
-    // Group quests by status; define order explicitly
     $grouped = array_fill_keys( [ 'active', 'completed', 'failed', 'paused' ], [] );
 
     foreach ( $quests as $quest ) {
         if ( ! is_array( $quest ) ) continue;
         $status = $quest['status'] ?? 'active';
-        // Fix: drop unknown statuses into 'active' instead of silently creating ungrouped buckets
         $grouped[ array_key_exists( $status, $grouped ) ? $status : 'active' ][] = $quest;
     }
 

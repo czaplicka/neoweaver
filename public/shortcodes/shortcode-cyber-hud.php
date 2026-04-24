@@ -2,24 +2,20 @@
 /**
  * TALE WEAVER – Cyber HUD Overlay
  * Shortcode: [cyber_hud]
- * Renders the status HUD only on pages using templates/adventure.php.
  *
- * Supabase views / tables used:
- *   cyber_game_sessions       – active session (world_id, location_id, character_id)
- *   cyber_world_hud_stats     – global world stats  (was: world_status_summary_v2)
- *   cyber_location_hud_stats  – per-location stats  (was: location_status_summary)
- *   cyber_reputation          – per-character faction reputation
- *
- * Requires tw_supabase_url() and tw_supabase_anon_key() helpers to be defined.
+ * BUG-FIX: characterId from the session row can be null/undefined when no
+ * character is linked. The reputation fetch URL therefore became
+ * .../cyber_reputation?character_id=eq.null — Supabase returns an empty set
+ * or an error, leaving all three reputation bars permanently at zero.
+ * Fixed: added a safeCharId guard so the reputation fetch only fires when
+ * characterId is a non-empty, non-null string.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 function display_cyber_hud() {
-    // Opt 2 fix: is_page( 2857 ) breaks on staging / fresh installs / page duplication.
     if ( ! is_page_template( 'templates/adventure.php' ) ) return '';
 
-    // Bug 2 fix: guard uses the same source as the JS credential injection — the helper functions.
     if ( ! function_exists( 'tw_supabase_url' ) || ! tw_supabase_url() ) return '';
     if ( ! function_exists( 'tw_supabase_anon_key' ) || ! tw_supabase_anon_key() ) return '';
 
@@ -84,7 +80,6 @@ function toggleHud() {
     t.innerText = w.classList.contains('is-open') ? '\u00d7 DISCONNECT_STREAMS' : '\u203a SYSTEM_ACTIVE';
 }
 
-// Bug 7 fix: rep_chaos_order #00f2ff → #cc00ff (distinct from stealth)
 const colorMap = {
     rep_local:       '#0055ff',
     rep_world:       '#6699ff',
@@ -96,17 +91,12 @@ const colorMap = {
     rep_gold_thief:  '#ff8800'
 };
 
-// Opt 3 fix: priority order for alert colours — earlier in array = higher priority.
-// When multiple metrics are critical simultaneously the first match wins,
-// instead of the old last-write-wins behaviour that silently dropped earlier alerts.
 const ALERT_PRIORITY = ['#ff0033', '#ff8800', '#ffd700', '#cc00ff', '#adff00', '#0055ff', '#6699ff'];
 
-// Bug 1 fix: use esc_js() and centralised helper functions instead of raw constant output
 const SUPA_URL  = '<?php echo esc_js( trailingslashit( tw_supabase_url() ) . 'rest/v1' ); ?>';
 const SUPA_KEY  = '<?php echo esc_js( tw_supabase_anon_key() ); ?>';
 const SUPA_HEAD = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
-// Bug 3 fix: check res.ok before parsing JSON — fetch() only rejects on network failure.
 async function supaFetch(path) {
     const res = await fetch(SUPA_URL + path, { headers: SUPA_HEAD });
     if (!res.ok) {
@@ -116,9 +106,8 @@ async function supaFetch(path) {
     return res.json();
 }
 
-// Bug 6 fix: escape HTML special characters before inserting into innerHTML.
 function escapeHtml(str) {
-    return str
+    return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -134,14 +123,22 @@ async function updateHUD() {
         if (!sessArr?.length) return;
         const { world_id: worldId, location_id: locationId, character_id: characterId } = sessArr[0];
 
-        // Opt 3 fix: collect all triggered alert colours; resolve priority after all rows.
         const activeAlerts = [];
 
-        // Bug 4 fix: parallel fetches. Bug 5 fix: updated view names.
+        // BUG-FIX: characterId can be null/undefined when no character is linked
+        // to the session. Without this guard, the fetch URL becomes:
+        //   .../cyber_reputation?character_id=eq.null
+        // which returns empty/error and leaves all reputation bars at zero.
+        // Now only fire the reputation fetch when characterId is a real UUID string.
+        const safeCharId = characterId
+            && typeof characterId === 'string'
+            && characterId.trim() !== ''
+            && characterId !== 'null';
+
         const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
             supaFetch(`/cyber_world_hud_stats?world_id=eq.${worldId}`),
             supaFetch(`/cyber_location_hud_stats?world_id=eq.${worldId}&location_id=eq.${locationId}`),
-            characterId
+            safeCharId
                 ? supaFetch(`/cyber_reputation?character_id=eq.${characterId}&order=updated_at.desc&limit=1`)
                 : Promise.resolve([]),
         ]);
@@ -164,7 +161,6 @@ async function updateHUD() {
                     bar.style.left  = value >= 0 ? '50%' : (50 - width) + '%';
 
                     if (id === 'stealth') {
-                        // Bug 8 fix: positive = STEALTH (safe, cyan), negative = DETECT (danger, orange).
                         if (value < 0) {
                             bar.style.backgroundColor = value <= -80 ? '#ff8800' : '#ff3300';
                             if (value <= -80) activeAlerts.push('#ff8800');
@@ -228,7 +224,6 @@ async function updateHUD() {
             updateRow('rep_gold_thief',  rep.gold_vs_thief,  null, true);
         }
 
-        // Opt 3 fix: pick highest-priority alert colour from all that fired this tick.
         const topAlert = ALERT_PRIORITY.find(c => activeAlerts.includes(c)) || null;
 
         const globalAlert = document.getElementById('hud-global-alert');
@@ -247,7 +242,6 @@ async function updateHUD() {
     }
 }
 
-// Opt 1 fix: twGameStateHydrated as initial trigger; setInterval for polling.
 document.addEventListener('twGameStateHydrated', updateHUD);
 setInterval(updateHUD, 5000);
 </script>

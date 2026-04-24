@@ -37,7 +37,8 @@ add_action( 'wp_footer', function () {
 	            }
 
 	            const formData = new URLSearchParams({
-	                action: 'tw_get_scenarios_ajax',
+	                action:      'tw_get_scenarios_ajax',
+	                nonce:       window.twAdventureData?.nonce || '',
 	                campaign_id: campaignId
 	            });
 
@@ -63,7 +64,18 @@ add_action( 'wp_footer', function () {
 	            list.innerHTML = '';
 
 	            scenarios.forEach((s) => {
-	                const tags = (s.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+	                // BUG-FIX: s.tags is a jsonb array from Supabase, not a
+	                // comma-delimited string. Calling .split(',') on an array
+	                // coerces it to "[object Object],[object Object]..." and
+	                // then splits on commas inside that string, producing
+	                // garbage tag labels like "[object Object]".
+	                // Fix: handle both array (jsonb) and string (legacy) safely.
+	                let tags = [];
+	                if (Array.isArray(s.tags)) {
+	                    tags = s.tags.map(t => String(t).trim()).filter(Boolean);
+	                } else if (typeof s.tags === 'string' && s.tags) {
+	                    tags = s.tags.split(',').map(t => t.trim()).filter(Boolean);
+	                }
 
 	                const card = document.createElement('article');
 	                card.className = 'deck-card scenario-card';
@@ -80,7 +92,7 @@ add_action( 'wp_footer', function () {
 	                            <p class="scenario-goal">${s.goal || ''}</p>
 	                            <p class="scenario-tags">
 	                                ${tags.map((t) => `<span class="scenario-tag">#${t}</span>`).join('')}
-	                                ${s.is_boss ? '<span class="scenario-tag">#boss</span>' : ''}
+	                                ${s.is_boss    ? '<span class="scenario-tag">#boss</span>'    : ''}
 	                                ${s.is_key_arc ? '<span class="scenario-tag">#key_arc</span>' : ''}
 	                            </p>
 	                        </div>

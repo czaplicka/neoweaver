@@ -7,20 +7,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * TALE WEAVER - FIELD AGENT COMMAND CENTER
  * Shortcode: [tw_list_campaigns]
  *
- * Changelog:
- *  - Fixed stray "%" in inline style (text-align:right%)
- *  - Fixed esc_js() used in HTML attribute context → esc_attr()
- *  - Fixed json_decode null-check (graceful fallback instead of casting null)
- *  - Fixed game_mode int-cast with proper isset guard
- *  - Moved wp_create_nonce() inside the non-empty branch (no wasted call)
- *  - Unified wp_user_id resolution in JS (removed fragile dual-key lookup)
- *  - Extended reload delay to 1 200 ms so card fade completes reliably
- *  - Wrapped jQuery async handlers in outer try/catch so unhandled rejections surface
- *  - Guarded all early-return paths in team IIFE with consistent btn reset
- *  - BUG-FIX: $c_id was cast with (int) which collapses UUID campaign IDs to 0.
- *    All HTML attributes (data-id, id="campaign-card-*"), PHP href params, and
- *    the JS delete RPC arg p_campaign_id now use the raw UUID string via $c_id_safe.
- *  - STYLE-FIX: empty-state CSS added to match .tw-no-worlds and .tw-agents-empty.
+ * BUG-FIX: SOLO "ENTER MATRIX" posted to a hard-coded theme file path
+ * (get_stylesheet_directory_uri().'/endpoint/tw-endpoint-start-game-session.php').
+ * That file does not exist on the active theme, bypasses all WordPress auth
+ * and nonce infrastructure, and 404s on any theme change.
+ * Fixed: post to the registered REST route neoweaver/v1/session/start, which
+ * handles authentication via neoweaver_user_can_play() and its own nonce check.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -81,81 +73,17 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         }
         $active_campaigns = $decoded;
 
-        // ── Shared empty-state styles (mirrors .tw-no-worlds and .tw-agents-empty) ──
         $empty_styles = '
         <style>
-            .tw-campaigns-empty {
-                text-align: center;
-                padding: 100px 0;
-                font-family: \'Chakra Petch\', sans-serif;
-            }
-            .tw-campaigns-empty-icon {
-                font-size: 40px;
-                margin-bottom: 20px;
-                opacity: 0.3;
-                line-height: 1;
-            }
-            .tw-campaigns-empty-main {
-                font-size: 1rem;
-                color: #adff00;
-                margin: 0 0 10px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            .tw-campaigns-empty-sub {
-                display: block;
-                font-size: 0.85rem;
-                color: #fff;
-                margin: 0 0 28px;
-            }
-            .tw-campaigns-empty-actions {
-                display: flex;
-                justify-content: center;
-                gap: 12px;
-                flex-wrap: wrap;
-            }
-            .tw-campaigns-empty-actions .tw-btn-sync {
-                display: inline-block;
-                background: #adff00;
-                color: #000 !important;
-                border: none;
-                padding: 10px 22px;
-                font-weight: 900;
-                border-radius: 4px;
-                cursor: pointer;
-                text-transform: uppercase;
-                font-family: \'Chakra Petch\', sans-serif;
-                font-size: 11px;
-                letter-spacing: 0.05em;
-                text-decoration: none;
-                transition: background 0.2s, box-shadow 0.2s;
-            }
-            .tw-campaigns-empty-actions .tw-btn-sync:hover {
-                background: #fff;
-                box-shadow: 0 0 15px #adff00;
-                color: #000 !important;
-            }
-            .tw-campaigns-empty-actions .tw-btn-outline {
-                display: inline-block;
-                background: transparent;
-                color: #adff00 !important;
-                border: 1px dashed #444;
-                padding: 10px 22px;
-                font-weight: 700;
-                border-radius: 4px;
-                cursor: pointer;
-                text-transform: uppercase;
-                font-family: \'Chakra Petch\', sans-serif;
-                font-size: 11px;
-                letter-spacing: 0.05em;
-                text-decoration: none;
-                transition: border-color 0.2s, color 0.2s;
-            }
-            .tw-campaigns-empty-actions .tw-btn-outline:hover {
-                border-color: #adff00;
-                color: #fff !important;
-            }
+            .tw-campaigns-empty { text-align:center; padding:100px 0; font-family:\'Chakra Petch\',sans-serif; }
+            .tw-campaigns-empty-icon { font-size:40px; margin-bottom:20px; opacity:0.3; line-height:1; }
+            .tw-campaigns-empty-main { font-size:1rem; color:#adff00; margin:0 0 10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+            .tw-campaigns-empty-sub { display:block; font-size:.85rem; color:#fff; margin:0 0 28px; }
+            .tw-campaigns-empty-actions { display:flex; justify-content:center; gap:12px; flex-wrap:wrap; }
+            .tw-campaigns-empty-actions .tw-btn-sync { display:inline-block; background:#adff00; color:#000!important; border:none; padding:10px 22px; font-weight:900; border-radius:4px; cursor:pointer; text-transform:uppercase; font-family:\'Chakra Petch\',sans-serif; font-size:11px; letter-spacing:.05em; text-decoration:none; transition:background .2s,box-shadow .2s; }
+            .tw-campaigns-empty-actions .tw-btn-sync:hover { background:#fff; box-shadow:0 0 15px #adff00; color:#000!important; }
+            .tw-campaigns-empty-actions .tw-btn-outline { display:inline-block; background:transparent; color:#adff00!important; border:1px dashed #444; padding:10px 22px; font-weight:700; border-radius:4px; cursor:pointer; text-transform:uppercase; font-family:\'Chakra Petch\',sans-serif; font-size:11px; letter-spacing:.05em; text-decoration:none; transition:border-color .2s,color .2s; }
+            .tw-campaigns-empty-actions .tw-btn-outline:hover { border-color:#adff00; color:#fff!important; }
         </style>';
 
         if ( empty( $active_campaigns ) ) {
@@ -171,12 +99,12 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             </div>';
         }
 
-        $game_nonce = wp_create_nonce( 'tw_game_nonce' );
+        $game_nonce      = wp_create_nonce( 'tw_game_nonce' );
+        // REST nonce for the session/start endpoint (WP REST uses X-WP-Nonce).
+        $rest_nonce      = wp_create_nonce( 'wp_rest' );
+        $session_rest_url = get_rest_url( null, 'neoweaver/v1/session/start' );
 
         ob_start();
-
-        // Inject empty-state styles even on populated pages so they're ready
-        // if JS later removes all cards and reveals the empty state.
         echo $empty_styles; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         ?>
 
@@ -200,11 +128,9 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         : null;
 
                     $is_active = ! empty( $c['is_active'] );
-
                     $game_mode = isset( $c['game_mode'] ) ? (int) $c['game_mode'] : 1;
                     $mode_str  = ( $game_mode === 2 ) ? 'TEAM' : 'SOLO';
                     $is_team   = ( $game_mode === 2 );
-
                     $join_code = isset( $c['join_code'] ) ? (string) $c['join_code'] : '';
 
                     $operative_name = 'PENDING ASSIGNMENT';
@@ -253,11 +179,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:<?php echo $world_rel ? '#fff' : '#ff0055'; ?>; font-weight:bold; text-align:right;">
                                     <?php echo $world_rel ? esc_html( $world_rel['name'] ) : 'MISSING ANCHOR'; ?>
                                     <?php if ( ! $world_rel ) : ?>
-                                        <a href="/nodes/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>"
-                                           class="tw-mini-btn"
-                                           style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">
-                                            LINK NODE
-                                        </a>
+                                        <a href="/nodes/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">LINK NODE</a>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -267,11 +189,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;">
                                     <?php echo $operative_name; ?>
                                     <?php if ( ! $char_rel ) : ?>
-                                        <a href="/agents/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>"
-                                           class="tw-mini-btn"
-                                           style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">
-                                            ASSIGN AGENT
-                                        </a>
+                                        <a href="/agents/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">ASSIGN AGENT</a>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -279,9 +197,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                             <?php if ( $is_team ) : ?>
                                 <div class="tw-data-row" style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                                     <span style="font-size:0.7rem; color:#444; font-weight:bold;">DEPLOYMENT HASH:</span>
-                                    <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;"
-                                          class="tw-join-code-display"
-                                          data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>">
+                                    <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;" class="tw-join-code-display" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>">
                                         <?php echo $join_code ? esc_html( strtoupper( $join_code ) ) : 'NOT INITIALIZED'; ?>
                                     </span>
                                 </div>
@@ -289,30 +205,18 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         </div>
 
                         <div class="tw-card-footer" style="display:flex; gap:12px; align-items:center;">
-                            <div style="flex-grow:1;">
-                                <?php echo $main_btn; ?>
-                            </div>
+                            <div style="flex-grow:1;"><?php echo $main_btn; ?></div>
 
                             <?php if ( $is_team && $join_code ) : ?>
-                                <button class="tw-copy-join-btn"
-                                        data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>"
-                                        style="background:transparent; border:1px solid #adff00; color:#adff00; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">
-                                    COPY HASH
-                                </button>
+                                <button class="tw-copy-join-btn" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>" style="background:transparent; border:1px solid #adff00; color:#adff00; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">COPY HASH</button>
                             <?php endif; ?>
 
-                            <button class="tw-delete-campaign-btn"
-                                    data-id="<?php echo esc_attr( $c_id_safe ); ?>"
-                                    data-name="<?php echo esc_attr( $c_name ); ?>"
-                                    style="background:transparent; border:1px solid #222; color:#333; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">
-                                TERMINATE
-                            </button>
+                            <button class="tw-delete-campaign-btn" data-id="<?php echo esc_attr( $c_id_safe ); ?>" data-name="<?php echo esc_attr( $c_name ); ?>" style="background:transparent; border:1px solid #222; color:#333; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">TERMINATE</button>
                         </div>
 
                         <?php if ( ! $world_rel && $is_active ) : ?>
                             <div class="world-error-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; border:1px solid #ff0055; pointer-events:none; box-shadow:inset 0 0 20px rgba(255,0,85,0.15); animation:tw-pulse-border 2s infinite;"></div>
                         <?php endif; ?>
-
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -322,6 +226,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         jQuery(document).ready(function($) {
 
             const GLOBAL_NONCE = '<?php echo esc_js( $game_nonce ); ?>';
+            const REST_NONCE   = '<?php echo esc_js( $rest_nonce ); ?>';
+            // BUG-FIX: SOLO session start now posts to the proper REST endpoint
+            // instead of a non-existent theme PHP file.
+            const SESSION_START_URL = '<?php echo esc_js( $session_rest_url ); ?>';
 
             function resetBtn(btn, label) {
                 btn.prop('disabled', false).text(label).css('opacity', '1');
@@ -330,60 +238,28 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────
             $('.tw-delete-campaign-btn').on('click', async function(e) {
                 e.preventDefault();
-
                 const btn      = $(this);
                 const campId   = btn.data('id');
                 const campName = btn.data('name');
-
-                if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) {
-                    return;
-                }
-
+                if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) return;
                 btn.prop('disabled', true).text('TERMINATING...');
-
-                if (!window.twSupabase) {
-                    alert('SUPABASE CLIENT OFFLINE. CANNOT TERMINATE DEPLOYMENT.');
-                    resetBtn(btn, 'TERMINATE');
-                    return;
-                }
-
+                if (!window.twSupabase) { alert('SUPABASE CLIENT OFFLINE.'); resetBtn(btn, 'TERMINATE'); return; }
                 try {
-                    const { error } = await window.twSupabase.rpc('fn_delete_campaign', {
-                        p_campaign_id: campId
-                    });
-
-                    if (error) {
-                        console.error('SUPABASE RPC DELETE ERROR', error);
-                        alert('TERMINATION FAILED: ' + (error.message || 'Grid Denied Execution.'));
-                        resetBtn(btn, 'TERMINATE');
-                        return;
-                    }
-
+                    const { error } = await window.twSupabase.rpc('fn_delete_campaign', { p_campaign_id: campId });
+                    if (error) { console.error('DELETE ERROR', error); alert('TERMINATION FAILED: ' + (error.message || 'Grid Denied.')); resetBtn(btn, 'TERMINATE'); return; }
                     const card = $('#campaign-card-' + campId);
-                    if (card.length) {
-                        card.css({ opacity: '0', 'pointer-events': 'none' });
-                    }
+                    if (card.length) card.css({ opacity: '0', 'pointer-events': 'none' });
                     setTimeout(() => window.location.reload(), 1200);
-
-                } catch (err) {
-                    console.error('DELETE EXCEPTION', err);
-                    alert('TERMINATION FAILED: CLIENT EXCEPTION');
-                    resetBtn(btn, 'TERMINATE');
-                }
+                } catch (err) { console.error('DELETE EXCEPTION', err); alert('TERMINATION FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'TERMINATE'); }
             });
 
             // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
-
                 const btn    = $(this);
                 const campId = btn.data('id');
                 const mode   = String(btn.data('mode') || 'SOLO').toUpperCase();
-
-                if (!campId) {
-                    alert('DEPLOYMENT ERROR: Missing campaign ID.');
-                    return;
-                }
+                if (!campId) { alert('DEPLOYMENT ERROR: Missing campaign ID.'); return; }
 
                 if (mode === 'SOLO') {
                     btn.text('INITIALIZING...').css('opacity', '0.7');
@@ -392,17 +268,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     fd.append('campaign_id', campId);
                     fd.append('security',    GLOBAL_NONCE);
 
-                    const endpointUrl = '<?php echo esc_js( get_stylesheet_directory_uri() . '/endpoint/tw-endpoint-start-game-session.php' ); ?>';
-
-                    fetch(endpointUrl, {
+                    // BUG-FIX: was posting to a hard-coded theme file path that doesn't
+                    // exist and has no auth layer. Now uses the registered REST route
+                    // neoweaver/v1/session/start with a proper X-WP-Nonce header.
+                    fetch(SESSION_START_URL, {
                         method:      'POST',
+                        headers:     { 'X-WP-Nonce': REST_NONCE },
                         body:        fd,
                         credentials: 'same-origin',
                     })
-                    .then(r => {
-                        if (!r.ok) throw new Error('HTTP ' + r.status);
-                        return r.json();
-                    })
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(response => {
                         if (response.success) {
                             window.location.href = '<?php echo esc_js( home_url( '/terminal/' ) ); ?>';
@@ -416,29 +291,15 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                             }
                         }
                     })
-                    .catch(err => {
-                        console.error('SESSION INIT ERROR', err);
-                        alert('SESSION INIT FAILED: network error');
-                        resetBtn(btn, 'ENTER MATRIX');
-                    });
+                    .catch(err => { console.error('SESSION INIT ERROR', err); alert('SESSION INIT FAILED: network error'); resetBtn(btn, 'ENTER MATRIX'); });
 
                 } else {
                     btn.text('LINKING...').css('opacity', '0.7');
-
-                    if (!window.twSupabase) {
-                        alert('SUPABASE CLIENT OFFLINE. CANNOT LINK SQUAD.');
-                        resetBtn(btn, 'ENTER MATRIX');
-                        return;
-                    }
+                    if (!window.twSupabase) { alert('SUPABASE CLIENT OFFLINE.'); resetBtn(btn, 'ENTER MATRIX'); return; }
 
                     const adv = window.twAdventureData || {};
                     const currentWpUserId = adv.wp_user_id || adv.userid || null;
-
-                    if (!currentWpUserId) {
-                        alert('SIGNUP FAILED: Cannot detect current operator ID.');
-                        resetBtn(btn, 'ENTER MATRIX');
-                        return;
-                    }
+                    if (!currentWpUserId) { alert('SIGNUP FAILED: Cannot detect current operator ID.'); resetBtn(btn, 'ENTER MATRIX'); return; }
 
                     const client  = window.twSupabase;
                     const worldId = btn.data('world') || null;
@@ -446,68 +307,22 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     (async () => {
                         try {
                             let characterId = null;
-
                             if (worldId) {
-                                const { data: charRows, error: charError } = await client
-                                    .from('cyber_characters')
-                                    .select('id')
-                                    .eq('wp_user_id', currentWpUserId)
-                                    .eq('world_id', worldId)
-                                    .limit(1);
-
-                                if (charError) {
-                                    console.error('CHARACTER LOOKUP ERROR', charError);
-                                    alert('SIGNUP FAILED: Cannot resolve your Field Agent for this Node.');
-                                    resetBtn(btn, 'ENTER MATRIX');
-                                    return;
-                                }
-
+                                const { data: charRows, error: charError } = await client.from('cyber_characters').select('id').eq('wp_user_id', currentWpUserId).eq('world_id', worldId).limit(1);
+                                if (charError) { console.error('CHARACTER LOOKUP ERROR', charError); alert('SIGNUP FAILED: Cannot resolve your Field Agent.'); resetBtn(btn, 'ENTER MATRIX'); return; }
                                 characterId = (charRows && charRows.length) ? charRows[0].id : null;
                             }
+                            if (!characterId) { window.location.href = '/agents/?campaign_id=' + campId; return; }
 
-                            if (!characterId) {
-                                window.location.href = '/agents/?campaign_id=' + campId;
-                                return;
-                            }
-
-                            const { data: existingSignups, error: existingError } = await client
-                                .from('cyber_campaign_signups')
-                                .select('id')
-                                .eq('campaign_id',  campId)
-                                .eq('wp_user_id',   currentWpUserId)
-                                .limit(1);
-
-                            if (existingError) {
-                                console.error('TEAM SIGNUP CHECK ERROR', existingError);
-                                alert('SIGNUP FAILED: Cannot verify existing deployment link.');
-                                resetBtn(btn, 'ENTER MATRIX');
-                                return;
-                            }
+                            const { data: existingSignups, error: existingError } = await client.from('cyber_campaign_signups').select('id').eq('campaign_id', campId).eq('wp_user_id', currentWpUserId).limit(1);
+                            if (existingError) { console.error('SIGNUP CHECK ERROR', existingError); alert('SIGNUP FAILED: Cannot verify existing link.'); resetBtn(btn, 'ENTER MATRIX'); return; }
 
                             if (!existingSignups || !existingSignups.length) {
-                                const { error: signupError } = await client
-                                    .from('cyber_campaign_signups')
-                                    .insert({
-                                        campaign_id:  campId,
-                                        character_id: characterId,
-                                        wp_user_id:   currentWpUserId,
-                                    });
-
-                                if (signupError) {
-                                    console.error('TEAM SIGNUP ERROR', signupError);
-                                    alert('SIGNUP FAILED: ' + (signupError.message || 'Unknown interference'));
-                                    resetBtn(btn, 'ENTER MATRIX');
-                                    return;
-                                }
+                                const { error: signupError } = await client.from('cyber_campaign_signups').insert({ campaign_id: campId, character_id: characterId, wp_user_id: currentWpUserId });
+                                if (signupError) { console.error('SIGNUP ERROR', signupError); alert('SIGNUP FAILED: ' + (signupError.message || 'Unknown interference')); resetBtn(btn, 'ENTER MATRIX'); return; }
                             }
-
                             window.location.href = '<?php echo esc_js( home_url( '/lobby/?campaign_id=' ) ); ?>' + campId;
-
-                        } catch (err) {
-                            console.error('TEAM SIGNUP EXCEPTION', err);
-                            alert('SIGNUP FAILED: CLIENT EXCEPTION');
-                            resetBtn(btn, 'ENTER MATRIX');
-                        }
+                        } catch (err) { console.error('TEAM SIGNUP EXCEPTION', err); alert('SIGNUP FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'ENTER MATRIX'); }
                     })();
                 }
             });
@@ -515,15 +330,9 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             // ─── 3. COPY HASH ─────────────────────────────────────────────────
             $('.tw-copy-join-btn').on('click', async function(e) {
                 e.preventDefault();
-
                 const btn  = $(this);
                 const code = btn.data('code');
-
-                if (!code) {
-                    alert('NO HASH DETECTED IN CURRENT DEPLOYMENT.');
-                    return;
-                }
-
+                if (!code) { alert('NO HASH DETECTED.'); return; }
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(code);
@@ -534,14 +343,9 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         document.execCommand('copy');
                         temp.remove();
                     }
-
                     btn.text('HASH COPIED');
                     setTimeout(() => btn.text('COPY HASH'), 2000);
-
-                } catch (err) {
-                    console.error('CLIPBOARD ERROR', err);
-                    alert('COPY FAILED: BROWSER BLOCKED CLIPBOARD ACCESS.');
-                }
+                } catch (err) { console.error('CLIPBOARD ERROR', err); alert('COPY FAILED: BROWSER BLOCKED CLIPBOARD ACCESS.'); }
             });
         });
         </script>
