@@ -15,21 +15,6 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
 	function neoweaver_register_character_creator_assets(): void {
 		$base_url = plugin_dir_url( __FILE__ );
 
-		wp_register_style(
-			'neoweaver-character-creator',
-			$base_url . '../assets/css/tw-character-creator.css',
-			array(),
-			'4.0.0'
-		);
-
-		wp_register_script(
-			'neoweaver-character-creator',
-			$base_url . '../assets/js/tw-character-creator.js',
-			array(),
-			'4.0.0',
-			true
-		);
-
 		$uploads = wp_upload_dir();
 
 		wp_localize_script(
