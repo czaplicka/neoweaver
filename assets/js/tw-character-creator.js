@@ -66,12 +66,10 @@
 
   var TW_SITE_BASE = String(cfg.site_base || 'https://neoweaver.nieodparady.pl').replace(/\/+$/, '');
   var TW_UPLOADS_BASE = String(cfg.uploads_base || (TW_SITE_BASE + '/wp-content/uploads/')).replace(/\/?$/, '/');
-  var TW_AVATAR_GALLERY = Array.isArray(cfg.avatar_gallery) && cfg.avatar_gallery.length
-    ? cfg.avatar_gallery
-    : [
-        { id: 'avatar-1', name: 'Avatar', url: TW_UPLOADS_BASE + 'Avatar.svg' },
-        { id: 'avatar-2', name: 'Avatar 2', url: TW_UPLOADS_BASE + 'Avatar-1.svg' }
-      ];
+  var TW_AVATAR_GALLERY = Array.isArray(cfg.avatar_gallery) && cfg.avatar_gallery.length ? cfg.avatar_gallery : [
+    { id: 'avatar-1', name: 'Avatar', url: TW_UPLOADS_BASE + 'Avatar.svg' },
+    { id: 'avatar-2', name: 'Avatar 2', url: TW_UPLOADS_BASE + 'Avatar-1.svg' }
+  ];
 
   var DATA_ORIGIN_OPTIONS = [
     {
@@ -282,223 +280,60 @@
     return '';
   }
 
-  function buildTagsHtml(tags) {
-    tags = Array.isArray(tags) ? tags.map(normalizeTag).filter(Boolean) : [];
+  function uniqueStrings(list) {
+    var out = [];
+    (list || []).forEach(function (item) {
+      item = String(item || '').trim();
+      if (item && out.indexOf(item) === -1) {
+        out.push(item);
+      }
+    });
+    return out;
+  }
+
+  function buildTagsHtml(tags, cls) {
+    tags = Array.isArray(tags) ? uniqueStrings(tags.map(normalizeTag).filter(Boolean)) : [];
     if (!tags.length) return '';
-    return '<div class="tw-race-tags">' + tags.map(function (tag) {
-      return '<span class="tw-race-tag">' + esc(tag) + '</span>';
+    cls = cls || 'tw-card-tag';
+    return '<div class="tw-card-tags">' + tags.map(function (tag) {
+      return '<span class="' + esc(cls) + '">' + esc(tag) + '</span>';
     }).join('') + '</div>';
   }
 
-  function buildImageHtml(url, alt, cls, placeholderCls) {
+  function buildImageHtml(url, alt, cls, placeholderCls, placeholderLabel) {
     var normalizedUrl = twNormalizeMediaUrl(url);
+    cls = cls || 'tw-card-media-img';
+    placeholderCls = placeholderCls || 'tw-card-media-placeholder';
+    placeholderLabel = placeholderLabel || 'NO SIGNAL';
 
     if (normalizedUrl) {
-      return '<div class="' + esc(cls || '') + '">' +
-        '<img src="' + esc(normalizedUrl) + '" alt="' + esc(alt || '') + '" loading="lazy">' +
-      '</div>';
+      return (
+        '<div class="tw-card-media">' +
+          '<img class="' + esc(cls) + '" src="' + esc(normalizedUrl) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async">' +
+        '</div>'
+      );
     }
 
-    return '<div class="' + esc(cls || '') + '">' +
-      '<div class="' + esc(placeholderCls || '') + '"></div>' +
-    '</div>';
+    return (
+      '<div class="tw-card-media tw-card-media--placeholder">' +
+        '<div class="' + esc(placeholderCls) + '">' + esc(placeholderLabel) + '</div>' +
+      '</div>'
+    );
   }
 
-  function getRaceName(item) {
-    return item && (item.label || item.name || item.key || '');
-  }
-
-  function getRaceDesc(item) {
-    return item && (item.desc || item.description || '');
-  }
-
-  function getRaceBonus(item) {
-    if (!item) return '';
-    if (typeof item.bonus === 'string') return item.bonus.trim();
-    if (Array.isArray(item.bonus)) return item.bonus.map(normalizeTag).filter(Boolean).join(' · ');
-    return '';
-  }
-
-  function buildRaceCard(item) {
-    var img = item.img || item.img_url || item.image_url || '';
-    var name = getRaceName(item);
-    var desc = getRaceDesc(item);
-    var bonus = getRaceBonus(item);
-
-    return '' +
-      '<button type="button" class="tw-grid-card tw-race-card" data-race-id="' + esc(item.id) + '" aria-pressed="false">' +
-        buildImageHtml(img, name, 'tw-race-img', 'tw-race-img--placeholder') +
-        '<div class="tw-race-body">' +
-          '<h3 class="tw-race-name">' + esc(name) + '</h3>' +
-          (desc ? '<p class="tw-race-desc">' + esc(desc) + '</p>' : '') +
-          (bonus ? '<div class="tw-race-bonus">Bonus: ' + esc(bonus) + '</div>' : '') +
-          buildTagsHtml(item.tags) +
-          '<span class="tw-race-select-hint">Select</span>' +
-        '</div>' +
-      '</button>';
-  }
-
-  function buildSubraceCard(item) {
-    var img = item.img || item.img_url || item.image_url || '';
-    var name = getRaceName(item);
-    var desc = getRaceDesc(item);
-    var bonus = getRaceBonus(item);
-
-    return '' +
-      '<button type="button" class="tw-grid-card tw-race-card tw-subrace-card" data-subrace-id="' + esc(item.id) + '" aria-pressed="false">' +
-        buildImageHtml(img, name, 'tw-race-img', 'tw-race-img--placeholder') +
-        '<div class="tw-race-body">' +
-          '<h3 class="tw-race-name">' + esc(name) + '</h3>' +
-          (desc ? '<p class="tw-race-desc">' + esc(desc) + '</p>' : '') +
-          (bonus ? '<div class="tw-race-bonus">Bonus: ' + esc(bonus) + '</div>' : '') +
-          buildTagsHtml(item.tags) +
-          '<span class="tw-race-select-hint">Select</span>' +
-        '</div>' +
-      '</button>';
-  }
-
-  function buildClassCard(cls) {
-    var img = cls.img || cls.img_url || cls.image_url || '';
-    return '' +
-      '<button type="button" class="tw-class-card" data-char-class="' + esc(cls.id) + '" data-class-name="' + esc(cls.name || '') + '" aria-pressed="false">' +
-        buildImageHtml(img, cls.name || '', 'tw-class-card__img-wrap', 'tw-class-card__img-wrap--placeholder') +
-        '<div class="tw-class-card__body">' +
-          '<h3 class="tw-class-card__name">' + esc(cls.name || '') + '</h3>' +
-          (cls.description ? '<p class="tw-race-desc">' + esc(cls.description) + '</p>' : '') +
-          buildTagsHtml(cls.tags) +
-          '<span class="tw-race-select-hint">Select</span>' +
-        '</div>' +
-      '</button>';
-  }
-
-  function buildSkillCard(skill) {
-    var img = skill.img || skill.img_url || skill.image_url || '';
-
-    return '' +
-      '<button type="button" class="tw-skill-card tw-grid-card" data-skill-id="' + esc(skill.id) + '" data-skill-name="' + esc(skill.name || '') + '" aria-pressed="false">' +
-        buildImageHtml(img, skill.name || '', 'tw-race-img', 'tw-race-img--placeholder') +
-        '<div class="tw-race-body">' +
-          '<h3 class="tw-race-name">' + esc(skill.name || '') + '</h3>' +
-          (skill.description ? '<p class="tw-race-desc">' + esc(skill.description) + '</p>' : '') +
-          buildTagsHtml(skill.tags) +
-        '</div>' +
-      '</button>';
-  }
-
-  function buildPackageCard(pkg) {
-    var img = pkg.img || pkg.img_url || pkg.image_url || '';
-    var tags = Array.isArray(pkg.compatibility_tags) ? pkg.compatibility_tags : (Array.isArray(pkg.tags) ? pkg.tags : []);
-    var items = Array.isArray(pkg.items_list) ? pkg.items_list : (Array.isArray(pkg.items) ? pkg.items : []);
-    var packageName = pkg.package_name || pkg.name || '';
-
-    var itemsPreview = items.length
-      ? '<div class="tw-package-items">' + items.map(function (it) {
-          return '<span class="tw-race-tag">' + esc(it) + '</span>';
-        }).join('') + '</div>'
-      : '';
-
-    return '' +
-      '<button type="button" class="tw-package-card tw-grid-card" data-package-id="' + esc(pkg.id) + '" data-package-name="' + esc(packageName) + '" aria-pressed="false">' +
-        buildImageHtml(img, packageName, 'tw-race-img', 'tw-race-img--placeholder') +
-        '<div class="tw-race-body">' +
-          '<h3 class="tw-race-name">' + esc(packageName) + '</h3>' +
-          (pkg.description ? '<p class="tw-race-desc">' + esc(pkg.description) + '</p>' : '') +
-          (pkg.base_armor !== undefined && pkg.base_armor !== null && pkg.base_armor !== ''
-            ? '<span class="tw-race-tag">Armor ' + esc(pkg.base_armor) + '</span>'
-            : '') +
-          buildTagsHtml(tags) +
-          itemsPreview +
-          '<span class="tw-race-select-hint">Select</span>' +
-        '</div>' +
-      '</button>';
+  function getLoreConfig(type) {
+    if (type === 'data_origin') return DATA_ORIGIN_OPTIONS;
+    if (type === 'previous_operation') return PREVIOUS_OPERATION_OPTIONS;
+    if (type === 'sync_crisis') return SYNC_CRISIS_OPTIONS;
+    return [];
   }
 
   function choiceByKey(type, key) {
-    var list = [];
-    if (type === 'data_origin') list = DATA_ORIGIN_OPTIONS;
-    if (type === 'previous_operation') list = PREVIOUS_OPERATION_OPTIONS;
-    if (type === 'sync_crisis') list = SYNC_CRISIS_OPTIONS;
-
-    return list.filter(function (item) {
-      return item.key === key;
-    })[0] || null;
-  }
-
-  function buildLoreCard(item, type) {
-    return '' +
-      '<button type="button" class="tw-lore-card tw-grid-card" data-choice-type="' + esc(type) + '" data-choice-key="' + esc(item.key) + '" aria-pressed="false">' +
-        '<div class="tw-race-body">' +
-          '<h3 class="tw-race-name">' + esc(item.label) + '</h3>' +
-          '<p class="tw-race-desc">' + esc(item.desc) + '</p>' +
-          '<div class="tw-lore-card-effects">' +
-            '<div class="tw-lore-card-effect"><strong>' + esc(item.bonus_tag) + '</strong> ' + esc(item.bonus_desc) + '</div>' +
-            '<div class="tw-lore-card-effect"><strong>' + esc(item.flaw_tag) + '</strong> ' + esc(item.flaw_desc) + '</div>' +
-          '</div>' +
-          '<span class="tw-race-select-hint">Select</span>' +
-        '</div>' +
-      '</button>';
-  }
-
-  function setStatus(msg, isError) {
-    var statusEl = document.getElementById('tw-char-status');
-    if (!statusEl) return;
-    statusEl.textContent = msg || '';
-    statusEl.classList.toggle('tw-char-status--error', !!isError);
-  }
-
-  function clearStepError(step) {
-    if (!step) return;
-    var box = q(step, '.tw-step-error');
-    if (!box) return;
-
-    box.classList.remove('visible', 'tw-step-error--shake');
-
-    var msg = q(box, '.tw-step-error-msg');
-    if (msg) msg.textContent = '';
-  }
-
-  function showStepError(step, msg) {
-    if (!step) return;
-    var box = q(step, '.tw-step-error');
-    if (!box) return;
-
-    var msgEl = q(box, '.tw-step-error-msg');
-    if (msgEl) msgEl.textContent = msg || 'Validation error.';
-
-    box.classList.add('visible');
-    box.classList.remove('tw-step-error--shake');
-    void box.offsetWidth;
-    box.classList.add('tw-step-error--shake');
-
-    NW_SFX.error();
-  }
-
-  function showSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (!section) return;
-    section.hidden = false;
-    section.style.display = '';
-  }
-
-  function hideSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (!section) return;
-    section.hidden = true;
-    section.style.display = 'none';
-  }
-
-  function resetSubraceState(wrapper) {
-    formState.subrace = '';
-    formState.subrace_label = '';
-
-    var grid = q(wrapper, '#tw-subrace-grid');
-    if (grid) grid.innerHTML = '';
-
-    hideSubraceSection(wrapper);
-  }
-
-  function selectedClassTag(wrapper) {
-    return formState.character_class;
+    var options = getLoreConfig(type);
+    for (var i = 0; i < options.length; i += 1) {
+      if (options[i].key === key) return options[i];
+    }
+    return null;
   }
 
   function recomputeBackstoryTags() {
@@ -507,90 +342,272 @@
     var operation = choiceByKey('previous_operation', formState.previous_operation);
     var crisis = choiceByKey('sync_crisis', formState.sync_crisis);
 
-    [origin, operation, crisis].forEach(function (item) {
-      if (!item) return;
-      if (item.bonus_tag) tags.push(item.bonus_tag);
-      if (item.flaw_tag) tags.push(item.flaw_tag);
+    [origin, operation, crisis].forEach(function (entry) {
+      if (!entry) return;
+      if (entry.bonus_tag) tags.push(entry.bonus_tag);
+      if (entry.flaw_tag) tags.push(entry.flaw_tag);
     });
 
-    formState.backstory_tags = tags;
+    formState.backstory_tags = uniqueStrings(tags);
   }
 
-  function makeSpinner(id, title, subtitle) {
-    var existing = document.getElementById(id);
-    if (existing) {
-      return {
-        show: function () {
-          existing.classList.add('active');
-        },
-        hide: function () {
-          existing.classList.remove('active');
-        }
-      };
+  function setStatus(message, isError) {
+    qa(document, '.tw-char-status').forEach(function (el) {
+      el.textContent = message || '';
+      el.classList.toggle('is-error', !!isError);
+      el.classList.toggle('is-visible', !!message);
+    });
+  }
+
+  function showStepError(step, message) {
+    if (!step) return;
+    var box = q(step, '.tw-step-error');
+    if (box) {
+      box.textContent = message || '';
+      box.classList.add('is-visible');
+    }
+  }
+
+  function clearStepError(step) {
+    if (!step) return;
+    var box = q(step, '.tw-step-error');
+    if (box) {
+      box.textContent = '';
+      box.classList.remove('is-visible');
+    }
+  }
+
+  function clearAllStepErrors(wrapper) {
+    qa(wrapper, '.tw-step-error').forEach(function (box) {
+      box.textContent = '';
+      box.classList.remove('is-visible');
+    });
+  }
+
+  function selectedClassTag() {
+    return formState.character_class || '';
+  }
+
+  function resetSubraceState(wrapper) {
+    formState.subrace = '';
+    formState.subrace_label = '';
+    syncSingleSelection(wrapper, '.tw-subrace-card', '', 'subraceId');
+  }
+
+  function showSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (section) {
+      section.hidden = false;
+      section.style.display = '';
+    }
+  }
+
+  function hideSubraceSection(wrapper) {
+    var section = q(wrapper, '#tw-subrace-section');
+    if (section) {
+      section.hidden = true;
+      section.style.display = 'none';
+    }
+  }
+
+  function resetPackageState(wrapper) {
+    formState.starting_package_id = '';
+    formState.starting_package_label = '';
+    var grid = q(wrapper, '#tw-package-grid');
+    if (grid) {
+      grid.dataset.rendered = '';
+      grid.innerHTML = '';
+    }
+  }
+
+  function buildRaceCard(item) {
+    item = item || {};
+
+    var img = item.img_url || item.img || '';
+    var title = item.label || item.name || 'Unknown race';
+    var desc = item.desc || item.description || '';
+    var bonus = item.bonus || '';
+    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-race-tag');
+
+    return (
+      '<button type="button" class="tw-race-card" data-race-id="' + esc(item.id || item.key || '') + '" aria-pressed="false">' +
+        buildImageHtml(img, title, 'tw-race-card__img', 'tw-race-card__placeholder', 'RACE') +
+        '<div class="tw-race-card__body">' +
+          '<h3 class="tw-race-card__title">' + esc(title) + '</h3>' +
+          (tagsHtml ? tagsHtml : '') +
+          (bonus ? '<p class="tw-race-card__bonus">' + esc(bonus) + '</p>' : '') +
+          (desc ? '<p class="tw-race-card__desc">' + esc(desc) + '</p>' : '') +
+        '</div>' +
+      '</button>'
+    );
+  }
+
+  function buildSubraceCard(item) {
+    item = item || {};
+
+    var img = item.img_url || item.img || '';
+    var title = item.label || item.name || 'Unknown subrace';
+    var desc = item.desc || item.description || '';
+    var bonus = item.bonus || '';
+    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-race-tag');
+
+    return (
+      '<button type="button" class="tw-race-card tw-subrace-card" data-subrace-id="' + esc(item.id || item.key || '') + '" aria-pressed="false">' +
+        buildImageHtml(img, title, 'tw-race-card__img', 'tw-race-card__placeholder', 'SUBRACE') +
+        '<div class="tw-race-card__body">' +
+          '<h3 class="tw-race-card__title">' + esc(title) + '</h3>' +
+          (tagsHtml ? tagsHtml : '') +
+          (bonus ? '<p class="tw-race-card__bonus">' + esc(bonus) + '</p>' : '') +
+          (desc ? '<p class="tw-race-card__desc">' + esc(desc) + '</p>' : '') +
+        '</div>' +
+      '</button>'
+    );
+  }
+
+  function buildClassCard(item) {
+    item = item || {};
+
+    var title = item.name || 'Unknown class';
+    var desc = item.description || '';
+    var img = item.img_url || item.icon_slug || '';
+    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-class-tag');
+    var skillLimit = parseInt(item.skill_limit, 10);
+    if (!skillLimit || skillLimit < 1) skillLimit = 5;
+
+    return (
+      '<button type="button" class="tw-class-card" data-char-class="' + esc(item.id || '') + '" data-class-name="' + esc(title) + '" data-skill-limit="' + esc(skillLimit) + '" aria-pressed="false">' +
+        buildImageHtml(img, title, 'tw-class-card__img', 'tw-class-card__placeholder', 'CLASS') +
+        '<div class="tw-class-card__body">' +
+          '<div class="tw-class-card__head">' +
+            '<h3 class="tw-class-card__title">' + esc(title) + '</h3>' +
+            '<span class="tw-class-card__limit">' + esc(skillLimit) + ' skills</span>' +
+          '</div>' +
+          (tagsHtml ? tagsHtml : '') +
+          (desc ? '<p class="tw-class-card__desc">' + esc(desc) + '</p>' : '') +
+        '</div>' +
+      '</button>'
+    );
+  }
+
+  function buildSkillCard(item) {
+    item = item || {};
+
+    var title = item.name || 'Unknown skill';
+    var desc = item.description || '';
+    var img = item.img_url || '';
+    var category = item.category || 'Other';
+    var tags = [];
+    if (item.category) tags.push(item.category);
+    if (Array.isArray(item.linked_attributes)) {
+      tags = tags.concat(item.linked_attributes);
+    }
+    if (Array.isArray(item.tags)) {
+      tags = tags.concat(item.tags);
     }
 
-    var el = document.createElement('div');
-    el.id = id;
-    el.innerHTML = '' +
-      '<div class="tw-spinner-inner">' +
-        '<div class="tw-spinner-ring"></div>' +
-        '<div class="tw-spinner-ring tw-spinner-ring--2"></div>' +
-        '<p class="tw-spinner-text">' + esc(title) + '</p>' +
-        '<p class="tw-spinner-sub">' + esc(subtitle) + '</p>' +
-      '</div>';
+    var tagsHtml = buildTagsHtml(tags, 'tw-skill-tag');
 
-    document.body.appendChild(el);
+    return (
+      '<button type="button" class="tw-skill-card" data-skill-id="' + esc(item.id || '') + '" data-skill-name="' + esc(title) + '" aria-pressed="false">' +
+        buildImageHtml(img, title, 'tw-skill-card__img', 'tw-skill-card__placeholder', category) +
+        '<div class="tw-skill-card__body">' +
+          '<h3 class="tw-skill-card__title">' + esc(title) + '</h3>' +
+          (tagsHtml ? tagsHtml : '') +
+          (desc ? '<p class="tw-skill-card__desc">' + esc(desc) + '</p>' : '') +
+        '</div>' +
+      '</button>'
+    );
+  }
 
-    return {
-      show: function () {
-        el.classList.add('active');
-      },
-      hide: function () {
-        el.classList.remove('active');
-      }
-    };
+  function buildSkillCategoryBlock(category, items) {
+    return (
+      '<section class="tw-skill-category">' +
+        '<header class="tw-skill-category__header">' +
+          '<h3 class="tw-skill-category__title">' + esc(category) + '</h3>' +
+        '</header>' +
+        '<div class="tw-skill-category__grid">' +
+          items.map(buildSkillCard).join('') +
+        '</div>' +
+      '</section>'
+    );
+  }
+
+  function buildPackageCard(item) {
+    item = item || {};
+
+    var title = item.name || item.package_name || 'Unknown package';
+    var desc = item.description || '';
+    var items = Array.isArray(item.items) ? item.items : (Array.isArray(item.items_list) ? item.items_list : []);
+    var tagsHtml = buildTagsHtml(item.compatibility_tags || [], 'tw-package-tag');
+
+    return (
+      '<button type="button" class="tw-package-card" data-package-id="' + esc(item.id || '') + '" data-package-name="' + esc(title) + '" aria-pressed="false">' +
+        '<div class="tw-package-card__body">' +
+          '<div class="tw-package-card__head">' +
+            '<h3 class="tw-package-card__title">' + esc(title) + '</h3>' +
+            '<span class="tw-package-card__armor">Armor ' + esc(item.base_armor || 0) + '</span>' +
+          '</div>' +
+          (tagsHtml ? tagsHtml : '') +
+          (desc ? '<p class="tw-package-card__desc">' + esc(desc) + '</p>' : '') +
+          (items.length ? '<p class="tw-package-card__items">' + esc(items.join(' · ')) + '</p>' : '') +
+        '</div>' +
+      '</button>'
+    );
+  }
+
+  function buildLoreCard(item, type) {
+    return (
+      '<button type="button" class="tw-lore-card" data-choice-type="' + esc(type) + '" data-choice-key="' + esc(item.key) + '" aria-pressed="false">' +
+        '<div class="tw-lore-card__body">' +
+          '<h3 class="tw-lore-card__title">' + esc(item.label) + '</h3>' +
+          '<div class="tw-lore-card__meta">' +
+            '<span class="tw-lore-chip tw-lore-chip--bonus">' + esc(item.bonus_tag) + '</span>' +
+            '<span class="tw-lore-chip tw-lore-chip--flaw">' + esc(item.flaw_tag) + '</span>' +
+          '</div>' +
+          '<p class="tw-lore-card__desc">' + esc(item.desc) + '</p>' +
+          '<p class="tw-lore-card__sub tw-lore-card__sub--bonus"><strong>Bonus:</strong> ' + esc(item.bonus_desc) + '</p>' +
+          '<p class="tw-lore-card__sub tw-lore-card__sub--flaw"><strong>Flaw:</strong> ' + esc(item.flaw_desc) + '</p>' +
+        '</div>' +
+      '</button>'
+    );
   }
 
   function fetchRaceGrid(wrapper) {
     var grid = q(wrapper, '#tw-race-grid');
     if (!grid || grid.dataset.rendered) return;
 
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING RACE DATABASE…</p>';
+    grid.innerHTML = '<div class="tw-loading">SCANNING RACE DATABASE…</div>';
 
     fetchPost('neoweaver_get_races', {})
       .then(function (res) {
         var rows = hasRows(res) ? res.data : RACES_FALLBACK;
-        grid.innerHTML = rows.length
-          ? rows.map(buildRaceCard).join('')
-          : '<p class="tw-empty-state">No races available.</p>';
+        grid.innerHTML = rows.length ? rows.map(buildRaceCard).join('') : '<div class="tw-empty">No races available.</div>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       })
       .catch(function () {
-        grid.innerHTML = RACES_FALLBACK.length
-          ? RACES_FALLBACK.map(buildRaceCard).join('')
-          : '<p class="tw-error-msg">ERROR: Race data unavailable.</p>';
+        grid.innerHTML = RACES_FALLBACK.length ? RACES_FALLBACK.map(buildRaceCard).join('') : '<div class="tw-empty">ERROR: Race data unavailable.</div>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       });
   }
 
-  function fetchSubraces(wrapper, raceKey) {
+  function fetchSubraces(wrapper, raceId) {
     var grid = q(wrapper, '#tw-subrace-grid');
     if (!grid) return;
 
     resetSubraceState(wrapper);
 
-    if (!raceKey) {
+    if (!raceId) {
       hideSubraceSection(wrapper);
       updateSummary(wrapper);
       return;
     }
 
     showSubraceSection(wrapper);
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING SUBRACE DATA…</p>';
+    grid.innerHTML = '<div class="tw-loading">SCANNING SUBRACE DATA…</div>';
 
-    fetchPost('neoweaver_get_subraces', { parent: raceKey })
+    fetchPost('neoweaver_get_subraces', { parent: raceId })
       .then(function (res) {
         if (hasRows(res)) {
           grid.innerHTML = res.data.map(buildSubraceCard).join('');
@@ -615,18 +632,16 @@
     var grid = q(wrapper, '#tw-class-grid');
     if (!grid || grid.dataset.rendered) return;
 
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING CLASS MATRIX…</p>';
+    grid.innerHTML = '<div class="tw-loading">SCANNING CLASS MATRIX…</div>';
 
     fetchPost('neoweaver_get_classes', {})
       .then(function (res) {
-        grid.innerHTML = hasRows(res)
-          ? res.data.map(buildClassCard).join('')
-          : '<p class="tw-empty-state">No classes available.</p>';
+        grid.innerHTML = hasRows(res) ? res.data.map(buildClassCard).join('') : '<div class="tw-empty">No classes available.</div>';
         grid.dataset.rendered = '1';
         restoreSelections(wrapper);
       })
       .catch(function () {
-        grid.innerHTML = '<p class="tw-error-msg">ERROR: Class data unavailable.</p>';
+        grid.innerHTML = '<div class="tw-empty">ERROR: Class data unavailable.</div>';
       });
   }
 
@@ -647,12 +662,12 @@
       return;
     }
 
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING SKILL ARCHIVE…</p>';
+    grid.innerHTML = '<div class="tw-loading">SCANNING SKILL ARCHIVE…</div>';
 
     fetchPost('neoweaver_get_skills', {})
       .then(function (res) {
         if (!hasRows(res)) {
-          grid.innerHTML = '<p class="tw-empty-state">No skills available.</p>';
+          grid.innerHTML = '<div class="tw-empty">No skills available.</div>';
           grid.dataset.rendered = '1';
           updateSkillCounter(wrapper);
           restoreSelections(wrapper);
@@ -660,7 +675,6 @@
         }
 
         var byCat = {};
-
         res.data.forEach(function (skill) {
           var cat = skill.category || 'Other';
           if (!byCat[cat]) byCat[cat] = [];
@@ -668,13 +682,7 @@
         });
 
         var html = Object.keys(byCat).map(function (cat) {
-          return '' +
-            '<section class="tw-skill-category">' +
-              '<h3 class="tw-skill-cat-label">' + esc(cat) + '</h3>' +
-              '<div class="tw-skill-cat-grid">' +
-                byCat[cat].map(buildSkillCard).join('') +
-              '</div>' +
-            '</section>';
+          return buildSkillCategoryBlock(cat, byCat[cat]);
         }).join('');
 
         grid.innerHTML = html;
@@ -683,7 +691,7 @@
         restoreSelections(wrapper);
       })
       .catch(function () {
-        grid.innerHTML = '<p class="tw-error-msg">ERROR: Skill data unavailable.</p>';
+        grid.innerHTML = '<div class="tw-empty">ERROR: Skill data unavailable.</div>';
       });
   }
 
@@ -691,38 +699,40 @@
     var grid = q(wrapper, '#tw-package-grid');
     if (!grid) return;
 
-    var classTag = selectedClassTag(wrapper);
-
-    if (!classTag) {
-      grid.innerHTML = '<p class="tw-empty-state">Select a class first.</p>';
+    var classId = selectedClassTag();
+    if (!classId) {
+      grid.innerHTML = '<div class="tw-empty">Select a class first.</div>';
       return;
     }
 
-    if (grid.dataset.rendered && grid.dataset.rendered === classTag) {
+    if (grid.dataset.rendered && grid.dataset.rendered === classId) {
       restoreSelections(wrapper);
       return;
     }
 
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING STARTING PACKAGE…</p>';
+    grid.innerHTML = '<div class="tw-loading">SCANNING STARTING PACKAGE…</div>';
 
-    fetchPost('neoweaver_get_packages', { class_tag: classTag })
+    fetchPost('neoweaver_get_packages', { class_tag: classId })
       .then(function (res) {
-        grid.innerHTML = hasRows(res)
-          ? res.data.map(buildPackageCard).join('')
-          : '<p class="tw-empty-state">No starting packages available for this class.</p>';
-        grid.dataset.rendered = classTag;
+        grid.innerHTML = hasRows(res) ? res.data.map(buildPackageCard).join('') : '<div class="tw-empty">No starting packages available for this class.</div>';
+        grid.dataset.rendered = classId;
         restoreSelections(wrapper);
       })
       .catch(function () {
-        grid.innerHTML = '<p class="tw-error-msg">ERROR: Starting packages unavailable.</p>';
+        grid.innerHTML = '<div class="tw-empty">ERROR: Starting packages unavailable.</div>';
       });
+  }
+
+  function attrUsed() {
+    return ATTR_KEYS.reduce(function (sum, key) {
+      return sum + (parseInt(formState['attr_' + key], 10) || ATTR_MIN);
+    }, 0);
   }
 
   function renderAttrDisplay(wrapper) {
     ATTR_KEYS.forEach(function (key) {
-      var val = formState['attr_' + key] || ATTR_MIN;
+      var val = parseInt(formState['attr_' + key], 10) || ATTR_MIN;
       var inputEl = q(wrapper, '#tw-attr-' + key);
-
       if (inputEl) inputEl.value = val;
 
       qa(wrapper, '[data-attr="' + key + '"] .tw-pip').forEach(function (pip) {
@@ -730,12 +740,77 @@
       });
     });
 
-    var used = ATTR_KEYS.reduce(function (sum, key) {
-      return sum + (formState['attr_' + key] || ATTR_MIN);
-    }, 0);
-
     var remainEl = q(wrapper, '#tw-attr-remaining');
-    if (remainEl) remainEl.textContent = ATTR_POOL - used;
+    if (remainEl) {
+      remainEl.textContent = ATTR_POOL - attrUsed();
+    }
+  }
+
+  function clearPresetSelection(wrapper) {
+    qa(wrapper, '.tw-attr-preset-btn').forEach(function (btn) {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-pressed', 'false');
+    });
+  }
+
+  function setPresetActive(wrapper, presetKey) {
+    clearPresetSelection(wrapper);
+    var btn = q(wrapper, '.tw-attr-preset-btn[data-preset="' + presetKey + '"]');
+    if (btn) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+    }
+  }
+
+  function applyPreset(wrapper, presetKey) {
+    var presets = {
+      balanced: { body: 3, reflex: 3, mind: 3, spirit: 3 },
+      agile: { body: 2, reflex: 5, mind: 3, spirit: 2 },
+      tank: { body: 5, reflex: 2, mind: 2, spirit: 3 },
+      bodybuilder: { body: 5, reflex: 3, mind: 2, spirit: 2 }
+    };
+
+    var preset = presets[presetKey];
+    if (!preset) return;
+
+    ATTR_KEYS.forEach(function (key) {
+      formState['attr_' + key] = preset[key];
+    });
+
+    renderAttrDisplay(wrapper);
+    setPresetActive(wrapper, presetKey);
+    updateSummary(wrapper);
+    NW_SFX.preset();
+  }
+
+  function canSetAttr(key, nextValue) {
+    nextValue = parseInt(nextValue, 10) || ATTR_MIN;
+    if (nextValue < ATTR_MIN || nextValue > ATTR_MAX) return false;
+
+    var current = parseInt(formState['attr_' + key], 10) || ATTR_MIN;
+    var usedWithoutCurrent = attrUsed() - current;
+    return usedWithoutCurrent + nextValue <= ATTR_POOL;
+  }
+
+  function setAttrValue(wrapper, key, nextValue) {
+    nextValue = parseInt(nextValue, 10) || ATTR_MIN;
+    if (nextValue < ATTR_MIN) nextValue = ATTR_MIN;
+    if (nextValue > ATTR_MAX) nextValue = ATTR_MAX;
+
+    if (!canSetAttr(key, nextValue)) {
+      setStatus('ERROR: Attribute pool exceeded.', true);
+      NW_SFX.error();
+      renderAttrDisplay(wrapper);
+      return false;
+    }
+
+    formState['attr_' + key] = nextValue;
+    clearPresetSelection(wrapper);
+    renderAttrDisplay(wrapper);
+    updateSummary(wrapper);
+    setStatus('', false);
+    NW_SFX.select();
+    return true;
   }
 
   function renderAvatarGallery(wrapper) {
@@ -749,11 +824,12 @@
 
     avatarGalleryEl.innerHTML = TW_AVATAR_GALLERY.map(function (item) {
       var normalizedUrl = twNormalizeMediaUrl(item.url);
-      return '' +
-        '<button type="button" class="tw-avatar-option ' + (formState.avatar_url === normalizedUrl ? 'selected' : '') + '" data-avatar-url="' + esc(normalizedUrl) + '" aria-pressed="' + (formState.avatar_url === normalizedUrl ? 'true' : 'false') + '">' +
-          '<img src="' + esc(normalizedUrl) + '" alt="' + esc(item.name || 'Avatar option') + '" loading="lazy">' +
+      return (
+        '<button type="button" class="tw-avatar-option" data-avatar-url="' + esc(normalizedUrl) + '" aria-pressed="false">' +
+          '<img src="' + esc(normalizedUrl) + '" alt="' + esc(item.name || 'Avatar') + '" loading="lazy" decoding="async">' +
           '<span>' + esc(item.name || 'Avatar') + '</span>' +
-        '</button>';
+        '</button>'
+      );
     }).join('');
 
     qa(avatarGalleryEl, '.tw-avatar-option').forEach(function (btn) {
@@ -839,7 +915,6 @@
       imgEl.src = '';
       imgEl.alt = '';
     }
-
     if (preview) preview.style.display = '';
     if (selected) selected.style.display = 'none';
     if (fileInput) fileInput.value = '';
@@ -860,6 +935,8 @@
       var el = q(wrapper, '#tw-summary-' + id);
       if (el) el.textContent = val || '—';
     }
+
+    recomputeBackstoryTags();
 
     set('character-name', formState.character_name);
     set('pronouns', formState.pronouns);
@@ -922,6 +999,13 @@
     });
 
     updateSkillCounter(wrapper);
+
+    var checkedRadio = q(wrapper, '.tw-pronoun-radio:checked');
+    var customWrap = q(wrapper, '#tw-char-pronouns-custom-wrap');
+    if (customWrap) {
+      customWrap.hidden = !(checkedRadio && checkedRadio.value === 'custom');
+      customWrap.style.display = checkedRadio && checkedRadio.value === 'custom' ? '' : 'none';
+    }
   }
 
   function renderLoreChoices(wrapper) {
@@ -959,7 +1043,6 @@
 
   function validateIdentityStep(wrapper, step) {
     var nameInput = q(wrapper, '#tw-char-name');
-
     if (!nameInput || !nameInput.value.trim()) {
       if (nameInput) nameInput.focus();
       showStepError(step, 'ERROR: Agent designation is required.');
@@ -970,7 +1053,6 @@
     formState.character_name = nameInput.value.trim();
 
     var checkedRadio = q(wrapper, '.tw-pronoun-radio:checked');
-
     if (checkedRadio) {
       if (checkedRadio.value === 'custom') {
         var customEl = q(wrapper, '#tw-char-pronouns-custom');
@@ -982,6 +1064,7 @@
       formState.pronouns = '';
     }
 
+    updateSummary(wrapper);
     return true;
   }
 
@@ -1014,10 +1097,7 @@
     }
 
     if (phase === 'BIOMETRIC CALIBRATION') {
-      var used = ATTR_KEYS.reduce(function (sum, key) {
-        return sum + (formState['attr_' + key] || ATTR_MIN);
-      }, 0);
-
+      var used = attrUsed();
       if (used !== ATTR_POOL) {
         showStepError(step, 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.');
         setStatus('ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true);
@@ -1032,13 +1112,11 @@
         setStatus('ERROR: Select at least 1 skill.', true);
         return false;
       }
-
       if (formState.skills.length > (formState.skill_limit || 5)) {
         showStepError(step, 'ERROR: Too many skills selected for this class.');
         setStatus('ERROR: Too many skills selected for this class.', true);
         return false;
       }
-
       return true;
     }
 
@@ -1075,7 +1153,6 @@
         setStatus('ERROR: Select a synchronization crisis response to continue.', true);
         return false;
       }
-
       recomputeBackstoryTags();
       return true;
     }
@@ -1112,6 +1189,7 @@
     if (phase === 'STARTING PACKAGE') fetchPackageGrid(wrapper);
     if (phase === 'DATA ORIGIN' || phase === 'PREVIOUS OPERATION' || phase === 'SYNCHRONIZATION CRISIS') renderLoreChoices(wrapper);
     if (phase === 'VISUAL SIGNATURE') renderAvatarGallery(wrapper);
+    if (phase === 'BIOMETRIC CALIBRATION') renderAttrDisplay(wrapper);
     if (phase === 'SYSTEM REVIEW') updateSummary(wrapper);
 
     var fillEl = q(wrapper, '#tw-char-progress-fill');
@@ -1127,6 +1205,18 @@
     });
 
     restoreSelections(wrapper);
+  }
+
+  function createSpinner(wrapper) {
+    var el = q(wrapper, '#tw-char-spinner');
+    return {
+      show: function () {
+        if (el) el.classList.add('is-visible');
+      },
+      hide: function () {
+        if (el) el.classList.remove('is-visible');
+      }
+    };
   }
 
   function submitCharacter(wrapper, spinner) {
@@ -1154,6 +1244,8 @@
     data.append('data_origin', formState.data_origin);
     data.append('previous_operation', formState.previous_operation);
     data.append('sync_crisis', formState.sync_crisis);
+
+    recomputeBackstoryTags();
     data.append('backstory_tags', JSON.stringify(formState.backstory_tags));
 
     ATTR_KEYS.forEach(function (key) {
@@ -1183,329 +1275,337 @@
             setStatus('Agent profile created. Welcome to the Grid.', false);
             NW_SFX.deploy();
 
-            wrapper.innerHTML = '' +
-              '<div class="tw-success">' +
-                '<p class="tw-success-msg">✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</p>' +
+            wrapper.innerHTML =
+              '<div class="tw-char-success">' +
+                '<h3>✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</h3>' +
                 ((res.data && res.data.redirect)
-                  ? '<a class="tw-btn tw-btn--primary" href="' + esc(res.data.redirect) + '">Enter the Grid</a>'
+                  ? '<p><a class="tw-btn tw-btn-primary" href="' + esc(res.data.redirect) + '">Enter the Grid</a></p>'
                   : '') +
               '</div>';
 
             return;
           }
 
-          setStatus(
-            res && res.data && res.data.message
-              ? res.data.message
-              : 'ERROR: Character creation failed.',
-            true
-          );
+          var message = (res && res.data && res.data.message) ? res.data.message : 'Character creation failed.';
+          setStatus(message, true);
+          NW_SFX.error();
 
           if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Create character';
+            submitBtn.textContent = 'DEPLOY OPERATIVE';
           }
-
-          NW_SFX.error();
         }, wait);
       })
       .catch(function () {
         spinner.hide();
-        setStatus('ERROR: Network failure while creating character.', true);
+        setStatus('Network error. Character creation failed.', true);
+        NW_SFX.error();
 
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Create character';
+          submitBtn.textContent = 'DEPLOY OPERATIVE';
         }
-
-        NW_SFX.error();
       });
   }
 
-  function bindEvents(wrapper, steps) {
-    var current = 0;
-    var spinner = makeSpinner('tw-char-spinner', 'Synchronizing', 'Writing Field Agent profile into the Grid');
+  function bindEvents(wrapper, steps, spinner) {
+    var currentStep = 0;
+
+    wrapper.addEventListener('input', function (ev) {
+      var target = ev.target;
+
+      if (target.matches('#tw-char-name')) {
+        formState.character_name = target.value.trim();
+        updateSummary(wrapper);
+      }
+
+      if (target.matches('#tw-char-pronouns-custom')) {
+        var customRadio = q(wrapper, '.tw-pronoun-radio[value="custom"]');
+        if (customRadio && customRadio.checked) {
+          formState.pronouns = target.value.trim() || 'custom';
+          updateSummary(wrapper);
+        }
+      }
+
+      if (target.matches('#tw-char-bio')) {
+        formState.bio = target.value.trim();
+        updateSummary(wrapper);
+      }
+
+      if (target.matches('#tw-char-avatar')) {
+        var file = target.files && target.files[0] ? target.files[0] : null;
+        if (file) handleAvatarFile(wrapper, file);
+      }
+    });
+
+    wrapper.addEventListener('change', function (ev) {
+      var target = ev.target;
+
+      if (target.matches('.tw-pronoun-radio')) {
+        var customWrap = q(wrapper, '#tw-char-pronouns-custom-wrap');
+        var customInput = q(wrapper, '#tw-char-pronouns-custom');
+
+        if (customWrap) {
+          customWrap.hidden = target.value !== 'custom';
+          customWrap.style.display = target.value === 'custom' ? '' : 'none';
+        }
+
+        if (target.value === 'custom') {
+          formState.pronouns = customInput && customInput.value.trim() ? customInput.value.trim() : 'custom';
+          if (customInput) customInput.focus();
+        } else {
+          formState.pronouns = target.value;
+        }
+
+        updateSummary(wrapper);
+        NW_SFX.select();
+      }
+    });
 
     wrapper.addEventListener('click', function (ev) {
-      var nextBtn = resolveNextButton(ev.target);
-      var prevBtn = resolvePrevButton(ev.target);
+      var target = ev.target;
 
+      var nextBtn = resolveNextButton(target);
       if (nextBtn) {
         ev.preventDefault();
 
-        if (!validateStep(wrapper, steps, current)) return;
+        if (!validateStep(wrapper, steps, currentStep)) return;
 
-        if (current < steps.length - 1) {
-          current += 1;
-          showStep(wrapper, steps, current);
+        if (currentStep < steps.length - 1) {
+          currentStep += 1;
+          showStep(wrapper, steps, currentStep);
           NW_SFX.nav();
         }
         return;
       }
 
+      var prevBtn = resolvePrevButton(target);
       if (prevBtn) {
         ev.preventDefault();
-
-        if (current > 0) {
-          current -= 1;
-          showStep(wrapper, steps, current);
+        if (currentStep > 0) {
+          currentStep -= 1;
+          showStep(wrapper, steps, currentStep);
           NW_SFX.back();
         }
         return;
       }
 
-      var raceCard = ev.target.closest('.tw-race-card:not(.tw-subrace-card)');
+      var raceCard = target.closest('.tw-race-card:not(.tw-subrace-card)');
       if (raceCard) {
-        formState.race = String(raceCard.dataset.raceId || '').trim();
-        formState.race_label = q(raceCard, '.tw-race-name')
-          ? q(raceCard, '.tw-race-name').textContent.trim()
-          : formState.race;
+        ev.preventDefault();
 
-        formState.subrace = '';
-        formState.subrace_label = '';
-
+        formState.race = raceCard.dataset.raceId || '';
+        formState.race_label = q(raceCard, '.tw-race-card__title') ? q(raceCard, '.tw-race-card__title').textContent.trim() : '';
+        resetSubraceState(wrapper);
+        syncSingleSelection(wrapper, '.tw-race-card:not(.tw-subrace-card)', formState.race, 'raceId');
         fetchSubraces(wrapper, formState.race);
-        restoreSelections(wrapper);
         updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
 
-      var subraceCard = ev.target.closest('.tw-subrace-card');
+      var subraceCard = target.closest('.tw-subrace-card');
       if (subraceCard) {
-        formState.subrace = String(subraceCard.dataset.subraceId || '').trim();
-        formState.subrace_label = q(subraceCard, '.tw-race-name')
-          ? q(subraceCard, '.tw-race-name').textContent.trim()
-          : formState.subrace;
+        ev.preventDefault();
 
-        restoreSelections(wrapper);
+        formState.subrace = subraceCard.dataset.subraceId || '';
+        formState.subrace_label = q(subraceCard, '.tw-race-card__title') ? q(subraceCard, '.tw-race-card__title').textContent.trim() : '';
+        syncSingleSelection(wrapper, '.tw-subrace-card', formState.subrace, 'subraceId');
         updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
 
-      var classCard = ev.target.closest('.tw-class-card');
+      var classCard = target.closest('.tw-class-card');
       if (classCard) {
+        ev.preventDefault();
+
         formState.character_class = classCard.dataset.charClass || '';
         formState.class_label = classCard.dataset.className || '';
-        formState.starting_package_id = '';
-        formState.starting_package_label = '';
+        formState.skill_limit = parseInt(classCard.dataset.skillLimit, 10) || 5;
+        formState.skills = [];
+        resetPackageState(wrapper);
 
-        var pkgGrid = q(wrapper, '#tw-package-grid');
-        if (pkgGrid) {
-          pkgGrid.dataset.rendered = '';
+        syncSingleSelection(wrapper, '.tw-class-card', formState.character_class, 'charClass');
+        updateSkillCounter(wrapper);
+
+        var skillGrid = q(wrapper, '#tw-skill-grid');
+        if (skillGrid) {
+          qa(skillGrid, '.tw-skill-card').forEach(function (card) {
+            card.classList.remove('selected');
+            card.setAttribute('aria-pressed', 'false');
+          });
         }
 
-        restoreSelections(wrapper);
         updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
 
-      var skillCard = ev.target.closest('.tw-skill-card');
+      var skillCard = target.closest('.tw-skill-card');
       if (skillCard) {
-        var skillId = skillCard.dataset.skillId;
-        var idx = formState.skills.indexOf(skillId);
+        ev.preventDefault();
 
-        if (idx === -1) {
-          if (formState.skills.length >= (formState.skill_limit || 5)) {
-            setStatus('ERROR: Skill limit reached for this class.', true);
-            NW_SFX.error();
-            return;
-          }
-          formState.skills.push(skillId);
-        } else {
+        var skillId = skillCard.dataset.skillId || '';
+        if (!skillId) return;
+
+        var idx = formState.skills.indexOf(skillId);
+        if (idx !== -1) {
           formState.skills.splice(idx, 1);
+          skillCard.classList.remove('selected');
+          skillCard.setAttribute('aria-pressed', 'false');
+          updateSkillCounter(wrapper);
+          updateSummary(wrapper);
+          NW_SFX.back();
+          return;
         }
 
-        restoreSelections(wrapper);
+        if (formState.skills.length >= (formState.skill_limit || 5)) {
+          setStatus('ERROR: You can select up to ' + (formState.skill_limit || 5) + ' skills for this class.', true);
+          NW_SFX.error();
+          return;
+        }
+
+        formState.skills.push(skillId);
+        skillCard.classList.add('selected');
+        skillCard.setAttribute('aria-pressed', 'true');
+        updateSkillCounter(wrapper);
         updateSummary(wrapper);
+        setStatus('', false);
         NW_SFX.select();
         return;
       }
 
-      var packageCard = ev.target.closest('.tw-package-card');
+      var packageCard = target.closest('.tw-package-card');
       if (packageCard) {
+        ev.preventDefault();
+
         formState.starting_package_id = packageCard.dataset.packageId || '';
         formState.starting_package_label = packageCard.dataset.packageName || '';
-
-        restoreSelections(wrapper);
+        syncSingleSelection(wrapper, '.tw-package-card', formState.starting_package_id, 'packageId');
         updateSummary(wrapper);
         NW_SFX.select();
         return;
       }
 
-      var loreCard = ev.target.closest('.tw-lore-card');
+      var loreCard = target.closest('.tw-lore-card');
       if (loreCard) {
+        ev.preventDefault();
+
         var type = loreCard.dataset.choiceType;
         var key = loreCard.dataset.choiceKey;
 
-        if (type) {
+        if (type && key) {
           formState[type] = key;
+          qa(wrapper, '.tw-lore-card[data-choice-type="' + type + '"]').forEach(function (card) {
+            var selected = card === loreCard;
+            card.classList.toggle('selected', selected);
+            card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+          });
+
           recomputeBackstoryTags();
-        }
-
-        restoreSelections(wrapper);
-        updateSummary(wrapper);
-        NW_SFX.select();
-        return;
-      }
-
-      var summaryEdit = ev.target.closest('.tw-summary-edit');
-      if (summaryEdit) {
-        var targetStep = parseInt(summaryEdit.dataset.editStep, 10);
-
-        if (!isNaN(targetStep) && targetStep >= 0 && targetStep < steps.length) {
-          current = targetStep;
-          showStep(wrapper, steps, current);
-          NW_SFX.nav();
+          updateSummary(wrapper);
+          NW_SFX.select();
         }
         return;
       }
 
-      var submitBtn = ev.target.closest('#tw-char-submit');
-      if (submitBtn) {
+      var presetBtn = target.closest('.tw-attr-preset-btn');
+      if (presetBtn) {
         ev.preventDefault();
-
-        if (!validateStep(wrapper, steps, current)) return;
-
-        submitCharacter(wrapper, spinner);
+        applyPreset(wrapper, presetBtn.dataset.preset || '');
         return;
       }
 
-      var avatarTrigger = ev.target.closest('#tw-avatar-trigger');
-      if (avatarTrigger) {
+      var pip = target.closest('.tw-pip');
+      if (pip) {
         ev.preventDefault();
-        var input = q(wrapper, '#tw-char-avatar');
-        if (input) input.click();
+
+        var attrWrap = pip.closest('[data-attr]');
+        if (!attrWrap) return;
+
+        var attrKey = attrWrap.dataset.attr || '';
+        var pipVal = parseInt(pip.dataset.pip, 10) || ATTR_MIN;
+        setAttrValue(wrapper, attrKey, pipVal);
         return;
       }
 
-      var avatarClear = ev.target.closest('.tw-avatar-clear');
-      if (avatarClear) {
+      var minusBtn = target.closest('.tw-attr-minus');
+      if (minusBtn) {
+        ev.preventDefault();
+
+        var minusWrap = minusBtn.closest('[data-attr]');
+        if (!minusWrap) return;
+
+        var minusKey = minusWrap.dataset.attr || '';
+        var minusCurrent = parseInt(formState['attr_' + minusKey], 10) || ATTR_MIN;
+        setAttrValue(wrapper, minusKey, Math.max(ATTR_MIN, minusCurrent - 1));
+        return;
+      }
+
+      var plusBtn = target.closest('.tw-attr-plus');
+      if (plusBtn) {
+        ev.preventDefault();
+
+        var plusWrap = plusBtn.closest('[data-attr]');
+        if (!plusWrap) return;
+
+        var plusKey = plusWrap.dataset.attr || '';
+        var plusCurrent = parseInt(formState['attr_' + plusKey], 10) || ATTR_MIN;
+        setAttrValue(wrapper, plusKey, Math.min(ATTR_MAX, plusCurrent + 1));
+        return;
+      }
+
+      var clearAvatarBtn = target.closest('#tw-char-avatar-clear, .tw-avatar-clear');
+      if (clearAvatarBtn) {
         ev.preventDefault();
         clearAvatar(wrapper);
         return;
       }
 
-      var attrBtn = ev.target.closest('.tw-attr-btn');
-      if (attrBtn) {
-        var key = attrBtn.dataset.attrKey;
-        var action = attrBtn.dataset.attrAction;
+      var submitBtn = target.closest('#tw-char-submit');
+      if (submitBtn) {
+        ev.preventDefault();
 
-        if (!key || ATTR_KEYS.indexOf(key) === -1) return;
+        clearAllStepErrors(wrapper);
 
-        var currentVal = formState['attr_' + key] || ATTR_MIN;
-        var used = ATTR_KEYS.reduce(function (sum, item) {
-          return sum + (formState['attr_' + item] || ATTR_MIN);
-        }, 0);
-
-        if (action === 'plus') {
-          if (currentVal >= ATTR_MAX) return;
-          if (used >= ATTR_POOL) {
-            setStatus('ERROR: No attribute points remaining.', true);
-            NW_SFX.error();
-            return;
+        var valid = true;
+        for (var i = 0; i < steps.length; i += 1) {
+          if (!validateStep(wrapper, steps, i)) {
+            currentStep = i;
+            showStep(wrapper, steps, currentStep);
+            valid = false;
+            break;
           }
-          formState['attr_' + key] = currentVal + 1;
         }
 
-        if (action === 'minus') {
-          if (currentVal <= ATTR_MIN) return;
-          formState['attr_' + key] = currentVal - 1;
-        }
+        if (!valid) return;
 
-        renderAttrDisplay(wrapper);
-        updateSummary(wrapper);
-        NW_SFX.select();
+        submitCharacter(wrapper, spinner);
       }
     });
+  }
 
-    var avatarInput = q(wrapper, '#tw-char-avatar');
-    if (avatarInput) {
-      avatarInput.addEventListener('change', function () {
-        if (avatarInput.files && avatarInput.files[0]) {
-          handleAvatarFile(wrapper, avatarInput.files[0]);
-        }
-      });
-    }
+  function initOne(wrapper) {
+    var steps = qa(wrapper, '.tw-char-step');
+    if (!steps.length) return;
 
-    var bioEl = q(wrapper, '#tw-char-bio');
-    if (bioEl) {
-      bioEl.addEventListener('input', function () {
-        formState.bio = bioEl.value.trim();
-        updateSummary(wrapper);
-      });
-    }
+    var spinner = createSpinner(wrapper);
 
-    var nameEl = q(wrapper, '#tw-char-name');
-    if (nameEl) {
-      nameEl.addEventListener('input', function () {
-        formState.character_name = nameEl.value.trim();
-        updateSummary(wrapper);
-      });
-    }
-
-    qa(wrapper, '.tw-pronoun-radio').forEach(function (radio) {
-      radio.addEventListener('change', function () {
-        if (radio.checked) {
-          if (radio.value === 'custom') {
-            var customEl = q(wrapper, '#tw-char-pronouns-custom');
-            formState.pronouns = customEl && customEl.value.trim() ? customEl.value.trim() : 'custom';
-          } else {
-            formState.pronouns = radio.value;
-          }
-          updateSummary(wrapper);
-        }
-      });
-    });
-
-    var customPronouns = q(wrapper, '#tw-char-pronouns-custom');
-    if (customPronouns) {
-      customPronouns.addEventListener('input', function () {
-        var customRadio = q(wrapper, '.tw-pronoun-radio[value="custom"]');
-        if (customRadio && customRadio.checked) {
-          formState.pronouns = customPronouns.value.trim() || 'custom';
-          updateSummary(wrapper);
-        }
-      });
-    }
-
-    var uploadBox = q(wrapper, '#tw-upload-box');
-    if (uploadBox) {
-      ['dragenter', 'dragover'].forEach(function (evtName) {
-        uploadBox.addEventListener(evtName, function (ev) {
-          ev.preventDefault();
-          uploadBox.classList.add('tw-upload-box--drag');
-        });
-      });
-
-      ['dragleave', 'dragend', 'drop'].forEach(function (evtName) {
-        uploadBox.addEventListener(evtName, function (ev) {
-          ev.preventDefault();
-          uploadBox.classList.remove('tw-upload-box--drag');
-        });
-      });
-
-      uploadBox.addEventListener('drop', function (ev) {
-        var file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
-        if (file) handleAvatarFile(wrapper, file);
-      });
-    }
-
+    clearAllStepErrors(wrapper);
     renderAttrDisplay(wrapper);
+    recomputeBackstoryTags();
+    updateSkillCounter(wrapper);
     updateSummary(wrapper);
-    showStep(wrapper, steps, current);
+    hideSubraceSection(wrapper);
+    bindEvents(wrapper, steps, spinner);
+    showStep(wrapper, steps, 0);
   }
 
   function init() {
-    var wrapper = document.getElementById('tw-char-creator-wrapper');
-    if (!wrapper) return;
-
-    var steps = qa(wrapper, '.tw-step');
-    if (!steps.length) return;
-
-    bindEvents(wrapper, steps);
+    qa(document, '.tw-character-creator, #tw-character-creator, .tw-char-creator').forEach(function (wrapper) {
+      initOne(wrapper);
+    });
   }
 
   if (document.readyState === 'loading') {
