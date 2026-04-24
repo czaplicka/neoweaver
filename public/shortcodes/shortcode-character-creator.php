@@ -571,3 +571,4 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 	}
 
 	add_shortcode( 'taleweaver_character_creator', 'neoweaver_shortcode_character_creator' );
+}
