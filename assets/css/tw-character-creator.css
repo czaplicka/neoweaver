@@ -1696,3 +1696,140 @@ button[data-action="plus"]:hover:not(:disabled) {
   line-height: 1.45;
   font-size: 0.9rem;
 }
+/* ===== ALIASY POD MARKUP GENEROWANY PRZEZ JS ===== */
+
+/* CLASS */
+.tw-class-cardimg-wrap {
+  min-height: 220px;
+  max-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(173,255,0,0.06), rgba(255,255,255,0.015)) !important;
+  border-bottom: 1px solid rgba(173,255,0,0.10);
+}
+
+.tw-class-cardimg-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(173,255,0,0.14));
+}
+
+.tw-class-cardbody {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.tw-class-cardname {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.15;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tw-class-card.selected .tw-class-cardname,
+.tw-class-card.is-selected .tw-class-cardname,
+.tw-class-card[aria-pressed="true"] .tw-class-cardname {
+  color: var(--tw-acid) !important;
+  text-shadow: 0 0 8px var(--tw-acid);
+}
+
+/* SKILL */
+.tw-skill-cardimg {
+  min-height: 170px;
+  max-height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(173,255,0,0.06), rgba(255,255,255,0.015)) !important;
+  border-bottom: 1px solid rgba(173,255,0,0.10);
+}
+
+.tw-skill-cardimg img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(173,255,0,0.14));
+}
+
+.tw-skill-cardbody {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.tw-skill-cardname {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.15;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tw-skill-card.selected .tw-skill-cardname,
+.tw-skill-card.is-selected .tw-skill-cardname,
+.tw-skill-card[aria-pressed="true"] .tw-skill-cardname {
+  color: var(--tw-acid) !important;
+  text-shadow: 0 0 8px var(--tw-acid);
+}
+
+/* PACKAGE */
+.tw-package-cardbody {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.tw-package-cardtitle {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.15;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tw-package-card.selected .tw-package-cardtitle,
+.tw-package-card.is-selected .tw-package-cardtitle,
+.tw-package-card[aria-pressed="true"] .tw-package-cardtitle {
+  color: var(--tw-acid) !important;
+  text-shadow: 0 0 8px var(--tw-acid);
+}
+
+/* TAGI generowane przez buildTagPills() */
+.tw-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tw-card-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(173,255,0,0.18);
+  background: rgba(173,255,0,0.06);
+  color: #d8e6d1;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
