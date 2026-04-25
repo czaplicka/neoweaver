@@ -337,61 +337,86 @@
   }
 
   function validateStep(index) {
-    if (index === 0) {
-      state.character_name = (q('#tw-char-name', root)?.value || '').trim();
-      var checked = q('input[name="tw-char-pronouns"]:checked', root);
-      state.pronouns = checked ? checked.value : '';
-      state.pronouns_custom = (q('#tw-char-pronouns-custom', root)?.value || '').trim();
-      if (!state.character_name) return 'Character name is required.';
-      if (!state.pronouns) return 'Pronouns are required.';
-      if (state.pronouns === 'custom' && !state.pronouns_custom) return 'Custom pronouns are required.';
-    }
+  // KROK 0: tożsamość
+  if (index === 0) {
+    state.character_name = q('#tw-char-name', root)?.value.trim() || '';
+    var checked = q('input[name="tw-char-pronouns"]:checked', root);
+    state.pronouns = checked ? checked.value : '';
+    state.pronouns_custom = q('#tw-char-pronouns-custom', root)?.value.trim() || '';
 
-    if (index === 1) {
-      if (!state.race) return 'Choose a race.';
+    if (!state.character_name) return 'Character name is required.';
+    if (!state.pronouns) return 'Pronouns are required.';
+    if (state.pronouns === 'custom' && !state.pronouns_custom) {
+      return 'Custom pronouns are required.';
     }
-
-    if (index === 2) {
-      if (!state.char_class) return 'Choose a class.';
-    }
-
-    if (index === 3) {
-      if (getAttrTotal() !== ATTR_POOL) return 'Attribute total must equal 12.';
-    }
-
-    if (index === 4) {
-      if (!state.skills.length) return 'Choose at least one skill.';
-      if (state.skills.length > state.skill_limit) return 'Too many skills selected for this class.';
-    }
-
-    if (index === 5) {
-      if (!state.starting_package_id) return 'Choose a starting package.';
-    }
-
-    if (index === 6) {
-      if (!state.data_origin) return 'Choose data origin.';
-    }
-
-    if (index === 7) {
-      if (!state.previous_operation) return 'Choose previous operation.';
-    }
-
-    if (index === 8) {
-      if (!state.sync_crisis) return 'Choose sync crisis.';
-      resolveBackstoryTags();
-      if (!state.backstory_tags.length) return 'Backstory tags could not be resolved.';
-    }
-
-    if (index === 9) {
-      state.bio = (q('#tw-char-bio', root)?.value || '').trim();
-    }
-
-    if (index === 10) {
-      updateSummary();
-    }
-
-    return '';
   }
+
+  // KROK 1: rasa + subrasa
+  if (index === 1) {
+    if (!state.race) return 'Choose a race.';
+
+    // jeżeli są subrasy dla wybranej rasy – wymagamy subrasy
+    if (Array.isArray(state.subraces) && state.subraces.length > 0 && !state.subrace) {
+      return 'Choose a subrace to continue.';
+    }
+  }
+
+  // KROK 2: klasa
+  if (index === 2) {
+    if (!state.char_class) return 'Choose a class.';
+  }
+
+  // KROK 3: atrybuty
+  if (index === 3) {
+    if (getAttrTotal() !== ATTR_POOL) {
+      return 'Attribute total must equal ' + ATTR_POOL + '.';
+    }
+  }
+
+  // KROK 4: skille
+  if (index === 4) {
+    if (!state.skills.length) return 'Choose at least one skill.';
+    if (state.skills.length > state.skill_limit) {
+      return 'Too many skills selected for this class.';
+    }
+  }
+
+  // KROK 5: paczka startowa
+  if (index === 5) {
+    if (!state.starting_package_id) return 'Choose a starting package.';
+  }
+
+  // KROK 6: data origin
+  if (index === 6) {
+    if (!state.data_origin) return 'Choose data origin.';
+  }
+
+  // KROK 7: previous operation
+  if (index === 7) {
+    if (!state.previous_operation) return 'Choose previous operation.';
+  }
+
+  // KROK 8: sync crisis / backstory tags
+  if (index === 8) {
+    if (!state.sync_crisis) return 'Choose sync crisis.';
+    resolveBackstoryTags();
+    if (!state.backstory_tags.length) {
+      return 'Backstory tags could not be resolved.';
+    }
+  }
+
+  // KROK 9: bio (opcjonalne – ale odświeżamy stan)
+  if (index === 9) {
+    state.bio = q('#tw-char-bio', root)?.value.trim() || '';
+  }
+
+  // KROK 10: review – zawsze odświeżamy summary
+  if (index === 10) {
+    updateSummary();
+  }
+
+  return '';
+}
 
   function goToStep(index) {
     if (index < 0 || index >= stepEls.length) return;
@@ -619,25 +644,46 @@
     });
 
     root.addEventListener('click', function (e) {
-      var raceCard = e.target.closest('.tw-race-card');
-      if (raceCard) {
-        var mode = raceCard.getAttribute('data-mode');
-        var id = raceCard.getAttribute('data-id') || '';
-        var name = raceCard.getAttribute('data-name') || '';
-        if (mode === 'race') {
-          state.race = id;
-          state.race_label = name;
-          state.subrace = '';
-          state.subrace_label = '';
-          selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
-          loadSubraces(id);
-        } else {
-          state.subrace = id;
-          state.subrace_label = name;
-          selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
-        }
-        return;
-      }
+var raceCard = e.target.closest('.tw-race-card');
+if (raceCard) {
+  var mode = raceCard.getAttribute('data-mode');
+  var id = raceCard.getAttribute('data-id');
+  var name = raceCard.getAttribute('data-name');
+
+  if (mode === 'race') {
+    // wybór rasy bazowej
+    state.race = id;
+    state.race_label = name;
+    state.subrace = '';
+    state.subrace_label = '';
+
+    // zaznaczamy tę rasę
+    selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
+
+    // czyścimy panel subras i pokazujemy go zanim przyjdą dane
+    var subraceSection = q('#tw-subrace-section', root);
+    var subraceGrid = q('#tw-subrace-grid', root);
+
+    if (subraceGrid) {
+      subraceGrid.innerHTML = '';
+    }
+    if (subraceSection) {
+      subraceSection.hidden = false;
+      subraceSection.classList.remove('is-hidden');
+      subraceSection.classList.add('is-visible');
+      subraceSection.style.display = 'block';
+    }
+
+    loadSubraces(id);
+  } else {
+    // wybór subrasy
+    state.subrace = id;
+    state.subrace_label = name;
+    selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+  }
+
+  return;
+}
 
       var classCard = e.target.closest('.tw-class-card');
       if (classCard) {
@@ -774,26 +820,81 @@
   }
 
   function loadSubraces(parentId) {
-    var section = q('#tw-subrace-section', root);
-    var grid = q('#tw-subrace-grid', root);
-    if (!parentId) {
-      if (section) {
-        section.hidden = true;
-        section.style.display = 'none';
-      }
-      if (grid) grid.innerHTML = '';
-      return Promise.resolve();
-    }
-    return fetchPost('neoweaver_get_subraces', { parent: parentId }).then(function (res) {
-      state.subraces = res && res.success && Array.isArray(res.data) ? res.data : [];
-      if (section) {
-        section.hidden = !state.subraces.length;
-        section.style.display = state.subraces.length ? '' : 'none';
-      }
-      renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
-    });
+  var section = q('#tw-subrace-section', root);
+  var grid = q('#tw-subrace-grid', root);
+
+  // reset stanu subrasy
+  state.subrace = '';
+  state.subrace_label = '';
+  state.subraces = [];
+
+  // czyścimy grid
+  if (grid) {
+    grid.innerHTML = '';
   }
 
+  // brak parentId -> chowamy panel subras
+  if (!parentId) {
+    if (section) {
+      section.hidden = true;
+      section.classList.remove('is-visible');
+      section.classList.add('is-hidden');
+      section.style.display = 'none';
+    }
+    return Promise.resolve();
+  }
+
+  // pokaż loader / placeholder w gridzie
+  if (grid) {
+    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
+  }
+  if (section) {
+    section.hidden = false;
+    section.classList.remove('is-hidden');
+    section.classList.add('is-visible');
+    section.style.display = 'block';
+  }
+
+  return fetchPost('neoweaver_get_subraces', { parent: parentId }).then(function (res) {
+    if (!res || !res.success || !Array.isArray(res.data)) {
+      // błąd odpowiedzi – zostawiamy panel, ale pokazujemy komunikat
+      if (grid) {
+        grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
+      }
+      state.subraces = [];
+      return;
+    }
+
+    state.subraces = res.data;
+
+    if (!state.subraces.length) {
+      // brak subras dla tej rasy – chowamy panel
+      if (section) {
+        section.hidden = true;
+        section.classList.remove('is-visible');
+        section.classList.add('is-hidden');
+        section.style.display = 'none';
+      }
+      if (grid) {
+        grid.innerHTML = '';
+      }
+      return;
+    }
+
+    // mamy subrasy – renderujemy
+    if (section) {
+      section.hidden = false;
+      section.classList.remove('is-hidden');
+      section.classList.add('is-visible');
+      section.style.display = 'block';
+    }
+    renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
+  }).catch(function () {
+    if (grid) {
+      grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
+    }
+  });
+}
   function loadClasses() {
     return fetchPost('neoweaver_get_classes', {}).then(function (res) {
       state.classes = res && res.success && Array.isArray(res.data) ? res.data : [];
