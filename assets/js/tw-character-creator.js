@@ -1,202 +1,83 @@
 (function () {
   'use strict';
 
-  var NW_SFX = (function () {
-    var ctx = null;
-
-    function getCtx() {
-      if (!ctx) {
-        ctx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      return ctx;
-    }
-
-    function beep(freq, type, duration, vol) {
-      try {
-        var ac = getCtx();
-        var osc = ac.createOscillator();
-        var gain = ac.createGain();
-
-        osc.type = type || 'sine';
-        osc.frequency.value = freq || 440;
-
-        gain.gain.setValueAtTime(vol || 0.15, ac.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + (duration || 0.08));
-
-        osc.connect(gain);
-        gain.connect(ac.destination);
-
-        osc.start();
-        osc.stop(ac.currentTime + (duration || 0.08));
-      } catch (e) {}
-    }
-
-    return {
-      nav: function () {
-        beep(660, 'square', 0.06, 0.15);
-      },
-      select: function () {
-        beep(880, 'sine', 0.10, 0.20);
-      },
-      back: function () {
-        beep(330, 'sawtooth', 0.08, 0.12);
-      },
-      deploy: function () {
-        beep(440, 'square', 0.10, 0.20);
-        setTimeout(function () {
-          beep(660, 'sine', 0.15, 0.25);
-        }, 120);
-      },
-      error: function () {
-        beep(180, 'sawtooth', 0.18, 0.20);
-      },
-      preset: function () {
-        beep(740, 'sine', 0.12, 0.22);
-      }
-    };
-  })();
-
-  var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
+  var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
   var ATTR_MIN = 1;
   var ATTR_MAX = 5;
   var ATTR_POOL = 12;
+  var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
+  var TOTAL_STEPS = 11;
+  var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
 
-  var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
-  var RACES_FALLBACK = [];
-
-  var TW_SITE_BASE = String(cfg.site_base || 'https://neoweaver.nieodparady.pl').replace(/\/+$/, '');
-  var TW_UPLOADS_BASE = String(cfg.uploads_base || (TW_SITE_BASE + '/wp-content/uploads/')).replace(/\/?$/, '/');
-  var TW_AVATAR_GALLERY = Array.isArray(cfg.avatar_gallery) && cfg.avatar_gallery.length ? cfg.avatar_gallery : [
-    { id: 'avatar-1', name: 'Avatar', url: TW_UPLOADS_BASE + 'Avatar.svg' },
-    { id: 'avatar-2', name: 'Avatar 2', url: TW_UPLOADS_BASE + 'Avatar-1.svg' }
-  ];
+  var TAG_DEFS = {
+    'wealthy': 1,
+    'fragile-gear': 2,
+    'street-smart': 3,
+    'malnourished': 4,
+    'fast-sync': 5,
+    'social-glitch': 6,
+    'scout': 7,
+    'analog-mind': 8,
+    'striker': 9,
+    'reckless': 10,
+    'glitch-learner': 11,
+    'system-spasm': 12,
+    'iron-grip': 15,
+    'feedback-vulnerability': 16,
+    'wild-card': 17,
+    'magnetized': 18,
+    'technician': 19,
+    'heavy-handed': 20,
+    'agile': 21,
+    'light-frame': 22,
+    'researcher': 23,
+    'code-bound': 24,
+    'unyielding': 25,
+    'loud-footsteps': 26
+  };
 
   var DATA_ORIGIN_OPTIONS = [
-    {
-      key: 'palace',
-      label: 'Palace',
-      desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.',
-      bonus_tag: 'Wealthy',
-      bonus_desc: '+100 Credits at initialization.',
-      flaw_tag: 'Fragile-Gear',
-      flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.'
-    },
-    {
-      key: 'slums',
-      label: 'Slums',
-      desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.',
-      bonus_tag: 'Street-Smart',
-      bonus_desc: 'Reveal hidden mechanics in locations tagged #city or #shady.',
-      flaw_tag: 'Malnourished',
-      flaw_desc: 'Max Satiety -2.'
-    },
-    {
-      key: 'void-labs',
-      label: 'Void Labs',
-      desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.',
-      bonus_tag: 'Fast-Sync',
-      bonus_desc: 'Resting recovers +2 additional Sync.',
-      flaw_tag: 'Social-Glitch',
-      flaw_desc: '-10% success rate on Social actions vs #human targets.'
-    },
-    {
-      key: 'borderlines',
-      label: 'Borderlines',
-      desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.',
-      bonus_tag: 'Scout',
-      bonus_desc: 'Travel between nodes consumes -1 Satiety.',
-      flaw_tag: 'Analog-Mind',
-      flaw_desc: 'Cannot use #Digital cards during the first 3 turns of a Deployment.'
-    }
+    { key: 'palace', label: 'Palace', desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.', bonus_tag: 'Wealthy', flaw_tag: 'Fragile-Gear' },
+    { key: 'slums', label: 'Slums', desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.', bonus_tag: 'Street-Smart', flaw_tag: 'Malnourished' },
+    { key: 'void-labs', label: 'Void Labs', desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.', bonus_tag: 'Fast-Sync', flaw_tag: 'Social-Glitch' },
+    { key: 'borderlines', label: 'Borderlines', desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.', bonus_tag: 'Scout', flaw_tag: 'Analog-Mind' }
   ];
 
   var PREVIOUS_OPERATION_OPTIONS = [
-    {
-      key: 'repair-unit',
-      label: '[REPAIR UNIT]',
-      desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.',
-      bonus_tag: 'Technician',
-      bonus_desc: 'Utility items restore +50% more Durability.',
-      flaw_tag: 'Heavy-Handed',
-      flaw_desc: '-5% success rate on Acrobatics and Stealth tests.'
-    },
-    {
-      key: 'void-runner',
-      label: '[VOID-RUNNER]',
-      desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.',
-      bonus_tag: 'Agile',
-      bonus_desc: 'Playing a Dodge card allows drawing an extra card on the next turn.',
-      flaw_tag: 'Light-Frame',
-      flaw_desc: 'Starting Max HP -1.'
-    },
-    {
-      key: 'archive-analyst',
-      label: '[ARCHIVE ANALYST]',
-      desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.',
-      bonus_tag: 'Researcher',
-      bonus_desc: '+5% success rate on Arcana and Science tests.',
-      flaw_tag: 'Code-Bound',
-      flaw_desc: 'Cannot equip two-handed weapons.'
-    },
-    {
-      key: 'enforcer',
-      label: '[ENFORCER]',
-      desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.',
-      bonus_tag: 'Unyielding',
-      bonus_desc: 'Ignore the first Pressure or Panic card encountered in every combat.',
-      flaw_tag: 'Loud-Footsteps',
-      flaw_desc: 'Cannot obtain "First Strike" bonus from stealth.'
-    }
+    { key: 'repair-unit', label: '[REPAIR UNIT]', desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.', bonus_tag: 'Technician', flaw_tag: 'Heavy-Handed' },
+    { key: 'void-runner', label: '[VOID-RUNNER]', desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.', bonus_tag: 'Agile', flaw_tag: 'Light-Frame' },
+    { key: 'archive-analyst', label: '[ARCHIVE ANALYST]', desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.', bonus_tag: 'Researcher', flaw_tag: 'Code-Bound' },
+    { key: 'enforcer', label: '[ENFORCER]', desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.', bonus_tag: 'Unyielding', flaw_tag: 'Loud-Footsteps' }
   ];
 
   var SYNC_CRISIS_OPTIONS = [
-    {
-      key: 'system-stabilizer',
-      label: '[SYSTEM STABILIZER]',
-      desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.',
-      bonus_tag: 'Glitch-Learner',
-      bonus_desc: '+10% global XP gain.',
-      flaw_tag: 'System-Spasm',
-      flaw_desc: 'Every 10 turns, one random card from your hand is discarded/burned.'
-    },
-    {
-      key: 'aggressive-response',
-      label: '[AGGRESSIVE RESPONSE]',
-      desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.',
-      bonus_tag: 'Striker',
-      bonus_desc: 'Every played Attack card generates +1 additional XP for itself.',
-      flaw_tag: 'Reckless',
-      flaw_desc: 'On failure in a Physical test, lose an additional 1 Durability on armor.'
-    },
-    {
-      key: 'data-ghost-adaptation',
-      label: '[DATA-GHOST ADAPTATION]',
-      desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.',
-      bonus_tag: 'Iron-Grip',
-      bonus_desc: 'Your physical attack cards cannot be countered.',
-      flaw_tag: 'Feedback-Vulnerability',
-      flaw_desc: 'Receive double damage from enemies with the #Hacker or #Digital tag.'
-    },
-    {
-      key: 'sensory-overload',
-      label: '[SENSORY OVERLOAD]',
-      desc: 'You survived by embracing the flood of input, turning collapse into unstable power.',
-      bonus_tag: 'Wild-Card',
-      bonus_desc: 'Critical successes deal triple damage instead of double.',
-      flaw_tag: 'Magnetized',
-      flaw_desc: 'In locations tagged #High-Technology, suffer -5% to all tests.'
-    }
+    { key: 'system-stabilizer', label: '[SYSTEM STABILIZER]', desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.', bonus_tag: 'Glitch-Learner', flaw_tag: 'System-Spasm' },
+    { key: 'aggressive-response', label: '[AGGRESSIVE RESPONSE]', desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.', bonus_tag: 'Striker', flaw_tag: 'Reckless' },
+    { key: 'data-ghost-adaptation', label: '[DATA-GHOST ADAPTATION]', desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.', bonus_tag: 'Iron-Grip', flaw_tag: 'Feedback-Vulnerability' },
+    { key: 'sensory-overload', label: '[SENSORY OVERLOAD]', desc: 'You survived by embracing the flood of input, turning collapse into unstable power.', bonus_tag: 'Wild-Card', flaw_tag: 'Magnetized' }
   ];
 
-  var formState = {
+  var state = {
     character_name: '',
     pronouns: '',
+    pronouns_custom: '',
     race: '',
-    subrace: '',
     race_label: '',
+    subrace: '',
     subrace_label: '',
-    character_class: '',
+    char_class: '',
     class_label: '',
+    skill_limit: 3,
+    skills: [],
+    starting_package_id: '',
+    starting_package_label: '',
+    data_origin: '',
+    data_origin_label: '',
+    previous_operation: '',
+    previous_operation_label: '',
+    sync_crisis: '',
+    sync_crisis_label: '',
+    backstory_tags: [],
     avatar_file: null,
     avatar_url: '',
     bio: '',
@@ -204,15 +85,24 @@
     attr_reflex: ATTR_MIN,
     attr_mind: ATTR_MIN,
     attr_spirit: ATTR_MIN,
-    skills: [],
-    skill_limit: 5,
-    starting_package_id: '',
-    starting_package_label: '',
-    data_origin: '',
-    previous_operation: '',
-    sync_crisis: '',
-    backstory_tags: []
+    races: [],
+    subraces: [],
+    classes: [],
+    skills_data: [],
+    packages: []
   };
+
+  var currentStep = 0;
+  var root = null;
+  var stepEls = [];
+
+  function q(sel, ctx) {
+    return (ctx || document).querySelector(sel);
+  }
+
+  function qa(sel, ctx) {
+    return Array.prototype.slice.call((ctx || document).querySelectorAll(sel));
+  }
 
   function esc(str) {
     return String(str == null ? '' : str)
@@ -223,18 +113,6 @@
       .replace(/'/g, '&#039;');
   }
 
-  function q(root, sel) {
-    return (root || document).querySelector(sel);
-  }
-
-  function qa(root, sel) {
-    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
-  }
-
-  function hasRows(res) {
-    return !!(res && res.success && Array.isArray(res.data) && res.data.length);
-  }
-
   function ajaxUrl() {
     return cfg.ajaxurl || cfg.ajax_url || '/wp-admin/admin-ajax.php';
   }
@@ -243,23 +121,24 @@
     return cfg.nonce || '';
   }
 
-  function twNormalizeMediaUrl(url) {
+  function normalizeMediaUrl(url) {
     url = String(url || '').trim();
     if (!url) return '';
     if (/^https?:\/\//i.test(url)) return url;
-    if (url.indexOf('/wp-content/uploads/') === 0) return TW_SITE_BASE + url;
-    return TW_UPLOADS_BASE + url.replace(/^\/+/, '');
+    return IMG_BASE + url.replace(/^\/+/, '');
+  }
+
+  function slugify(str) {
+    return String(str || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
 
   function fetchPost(action, extraData) {
     var fd = new FormData();
     fd.append('action', action);
     fd.append('nonce', nonce());
-
     Object.keys(extraData || {}).forEach(function (key) {
       fd.append(key, extraData[key]);
     });
-
     return fetch(ajaxUrl(), {
       method: 'POST',
       credentials: 'same-origin',
@@ -269,1342 +148,713 @@
     });
   }
 
-  function normalizeTag(tag) {
-    if (!tag) return '';
-    if (typeof tag === 'string') return tag.trim();
-    if (typeof tag === 'object') {
-      if (typeof tag.name === 'string') return tag.name.trim();
-      if (typeof tag.label === 'string') return tag.label.trim();
-      if (typeof tag.tag === 'string') return tag.tag.trim();
-    }
-    return '';
+  function setStatus(message, type) {
+    var box = q('.tw-char-status', root);
+    if (!box) return;
+    box.className = 'tw-char-status' + (type ? ' is-' + type : '');
+    box.textContent = message || '';
   }
 
-  function uniqueStrings(list) {
-    var out = [];
-    (list || []).forEach(function (item) {
-      item = String(item || '').trim();
-      if (item && out.indexOf(item) === -1) {
-        out.push(item);
+  function clearStepErrors() {
+    qa('.tw-char-step .tw-step-error', root).forEach(function (el) {
+      el.classList.remove('is-visible');
+      var msg = q('.tw-step-error-msg', el);
+      if (msg) msg.textContent = '';
+    });
+  }
+
+  function showStepError(stepIndex, message) {
+    clearStepErrors();
+    var step = stepEls[stepIndex];
+    if (!step) return;
+    var box = q('.tw-step-error', step);
+    var msg = q('.tw-step-error-msg', step);
+    if (msg) msg.textContent = message || 'Please review this step.';
+    if (box) box.classList.add('is-visible');
+    setStatus(message || 'Validation error.', 'error');
+  }
+
+  function toggleCustomPronouns() {
+    var wrap = q('#tw-char-pronouns-custom-wrap', root);
+    if (!wrap) return;
+    var active = state.pronouns === 'custom';
+    wrap.hidden = !active;
+    wrap.style.display = active ? '' : 'none';
+  }
+
+  function updateStepUI() {
+    stepEls.forEach(function (step, index) {
+      var active = index === currentStep;
+      step.classList.toggle('active', active);
+      step.hidden = !active;
+      step.style.display = active ? '' : 'none';
+    });
+
+    var stepCurrent = q('#tw-char-step-current', root);
+    var progressFill = q('#tw-char-progress-fill', root);
+    var progressPhase = q('#tw-char-progress-phase', root);
+
+    if (stepCurrent) stepCurrent.textContent = String(currentStep + 1);
+    if (progressFill) progressFill.style.width = (((currentStep + 1) / TOTAL_STEPS) * 100) + '%';
+    if (progressPhase && stepEls[currentStep]) progressPhase.textContent = stepEls[currentStep].getAttribute('data-phase') || '';
+
+    qa('.tw-progress-tick', root).forEach(function (tick, index) {
+      tick.classList.toggle('active', index <= currentStep);
+    });
+
+    window.requestAnimationFrame(function () {
+      var rect = root.getBoundingClientRect();
+      if (rect.top < 0) {
+        window.scrollTo({ top: window.scrollY + rect.top - 16, behavior: 'smooth' });
       }
     });
-    return out;
   }
 
-  function buildTagsHtml(tags, cls) {
-    tags = Array.isArray(tags) ? uniqueStrings(tags.map(normalizeTag).filter(Boolean)) : [];
-    if (!tags.length) return '';
-    cls = cls || 'tw-card-tag';
+  function buildTagPills(tags) {
+    if (!Array.isArray(tags) || !tags.length) return '';
     return '<div class="tw-card-tags">' + tags.map(function (tag) {
-      return '<span class="' + esc(cls) + '">' + esc(tag) + '</span>';
+      var name = typeof tag === 'string' ? tag : (tag && (tag.name || tag.label) ? (tag.name || tag.label) : '');
+      return '<span class="tw-card-tag">' + esc(name) + '</span>';
     }).join('') + '</div>';
   }
 
-  function buildImageHtml(url, alt, cls, placeholderCls, placeholderLabel) {
-    var normalizedUrl = twNormalizeMediaUrl(url);
-    cls = cls || 'tw-card-media-img';
-    placeholderCls = placeholderCls || 'tw-card-media-placeholder';
-    placeholderLabel = placeholderLabel || 'NO SIGNAL';
-
-    if (normalizedUrl) {
-      return (
-        '<div class="tw-card-media">' +
-          '<img class="' + esc(cls) + '" src="' + esc(normalizedUrl) + '" alt="' + esc(alt || '') + '" loading="lazy" decoding="async">' +
-        '</div>'
-      );
+  function buildImage(url, alt, cls, placeholder) {
+    var src = normalizeMediaUrl(url);
+    if (src) {
+      return '<div class="' + esc(cls || 'tw-card-media') + '"><img src="' + esc(src) + '" alt="' + esc(alt || '') + '" loading="lazy"></div>';
     }
-
-    return (
-      '<div class="tw-card-media tw-card-media--placeholder">' +
-        '<div class="' + esc(placeholderCls) + '">' + esc(placeholderLabel) + '</div>' +
-      '</div>'
-    );
+    return '<div class="' + esc(cls || 'tw-card-media') + ' tw-card-media--placeholder"><span>' + esc(placeholder || 'NO IMAGE') + '</span></div>';
   }
 
-  function getLoreConfig(type) {
-    if (type === 'data_origin') return DATA_ORIGIN_OPTIONS;
-    if (type === 'previous_operation') return PREVIOUS_OPERATION_OPTIONS;
-    if (type === 'sync_crisis') return SYNC_CRISIS_OPTIONS;
-    return [];
-  }
-
-  function choiceByKey(type, key) {
-    var options = getLoreConfig(type);
-    for (var i = 0; i < options.length; i += 1) {
-      if (options[i].key === key) return options[i];
-    }
-    return null;
-  }
-
-  function recomputeBackstoryTags() {
-    var tags = [];
-    var origin = choiceByKey('data_origin', formState.data_origin);
-    var operation = choiceByKey('previous_operation', formState.previous_operation);
-    var crisis = choiceByKey('sync_crisis', formState.sync_crisis);
-
-    [origin, operation, crisis].forEach(function (entry) {
-      if (!entry) return;
-      if (entry.bonus_tag) tags.push(entry.bonus_tag);
-      if (entry.flaw_tag) tags.push(entry.flaw_tag);
-    });
-
-    formState.backstory_tags = uniqueStrings(tags);
-  }
-
-  function setStatus(message, isError) {
-    qa(document, '.tw-char-status').forEach(function (el) {
-      el.textContent = message || '';
-      el.classList.toggle('is-error', !!isError);
-      el.classList.toggle('is-visible', !!message);
+  function selectExclusive(selector, activeEl) {
+    qa(selector, root).forEach(function (el) {
+      el.classList.toggle('is-selected', el === activeEl);
+      el.setAttribute('aria-pressed', el === activeEl ? 'true' : 'false');
     });
   }
 
-  function showStepError(step, message) {
-    if (!step) return;
-    var box = q(step, '.tw-step-error');
-    if (box) {
-      box.textContent = message || '';
-      box.classList.add('is-visible');
-    }
-  }
-
-  function clearStepError(step) {
-    if (!step) return;
-    var box = q(step, '.tw-step-error');
-    if (box) {
-      box.textContent = '';
-      box.classList.remove('is-visible');
-    }
-  }
-
-  function clearAllStepErrors(wrapper) {
-    qa(wrapper, '.tw-step-error').forEach(function (box) {
-      box.textContent = '';
-      box.classList.remove('is-visible');
+  function resolveBackstoryTags() {
+    var ids = [];
+    [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
+      var source = index === 0 ? DATA_ORIGIN_OPTIONS : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
+      var item = source.find(function (opt) { return opt.key === key; });
+      if (!item) return;
+      [item.bonus_tag, item.flaw_tag].forEach(function (label) {
+        var id = TAG_DEFS[slugify(label)];
+        if (id && ids.indexOf(id) === -1) ids.push(id);
+      });
     });
+    state.backstory_tags = ids;
   }
 
-  function selectedClassTag() {
-    return formState.character_class || '';
+  function getAttrTotal() {
+    return Number(state.attr_body) + Number(state.attr_reflex) + Number(state.attr_mind) + Number(state.attr_spirit);
   }
 
-  function resetSubraceState(wrapper) {
-    formState.subrace = '';
-    formState.subrace_label = '';
-    syncSingleSelection(wrapper, '.tw-subrace-card', '', 'subraceId');
+  function getAttrRemaining() {
+    return ATTR_POOL - getAttrTotal();
   }
 
-  function showSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (section) {
-      section.hidden = false;
-      section.style.display = '';
-    }
-  }
-
-  function hideSubraceSection(wrapper) {
-    var section = q(wrapper, '#tw-subrace-section');
-    if (section) {
-      section.hidden = true;
-      section.style.display = 'none';
-    }
-  }
-
-  function resetPackageState(wrapper) {
-    formState.starting_package_id = '';
-    formState.starting_package_label = '';
-    var grid = q(wrapper, '#tw-package-grid');
-    if (grid) {
-      grid.dataset.rendered = '';
-      grid.innerHTML = '';
-    }
-  }
-
-  function buildRaceCard(item) {
-    item = item || {};
-
-    var img = item.img_url || item.img || '';
-    var title = item.label || item.name || 'Unknown race';
-    var desc = item.desc || item.description || '';
-    var bonus = item.bonus || '';
-    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-race-tag');
-
-    return (
-      '<button type="button" class="tw-race-card" data-race-id="' + esc(item.id || item.key || '') + '" aria-pressed="false">' +
-        buildImageHtml(img, title, 'tw-race-card__img', 'tw-race-card__placeholder', 'RACE') +
-        '<div class="tw-race-card__body">' +
-          '<h3 class="tw-race-card__title">' + esc(title) + '</h3>' +
-          (tagsHtml ? tagsHtml : '') +
-          (bonus ? '<p class="tw-race-card__bonus">' + esc(bonus) + '</p>' : '') +
-          (desc ? '<p class="tw-race-card__desc">' + esc(desc) + '</p>' : '') +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function buildSubraceCard(item) {
-    item = item || {};
-
-    var img = item.img_url || item.img || '';
-    var title = item.label || item.name || 'Unknown subrace';
-    var desc = item.desc || item.description || '';
-    var bonus = item.bonus || '';
-    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-race-tag');
-
-    return (
-      '<button type="button" class="tw-race-card tw-subrace-card" data-subrace-id="' + esc(item.id || item.key || '') + '" aria-pressed="false">' +
-        buildImageHtml(img, title, 'tw-race-card__img', 'tw-race-card__placeholder', 'SUBRACE') +
-        '<div class="tw-race-card__body">' +
-          '<h3 class="tw-race-card__title">' + esc(title) + '</h3>' +
-          (tagsHtml ? tagsHtml : '') +
-          (bonus ? '<p class="tw-race-card__bonus">' + esc(bonus) + '</p>' : '') +
-          (desc ? '<p class="tw-race-card__desc">' + esc(desc) + '</p>' : '') +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function buildClassCard(item) {
-    item = item || {};
-
-    var title = item.name || 'Unknown class';
-    var desc = item.description || '';
-    var img = item.img_url || item.icon_slug || '';
-    var tagsHtml = buildTagsHtml(item.tags || [], 'tw-class-tag');
-    var skillLimit = parseInt(item.skill_limit, 10);
-    if (!skillLimit || skillLimit < 1) skillLimit = 5;
-
-    return (
-      '<button type="button" class="tw-class-card" data-char-class="' + esc(item.id || '') + '" data-class-name="' + esc(title) + '" data-skill-limit="' + esc(skillLimit) + '" aria-pressed="false">' +
-        buildImageHtml(img, title, 'tw-class-card__img', 'tw-class-card__placeholder', 'CLASS') +
-        '<div class="tw-class-card__body">' +
-          '<div class="tw-class-card__head">' +
-            '<h3 class="tw-class-card__title">' + esc(title) + '</h3>' +
-            '<span class="tw-class-card__limit">' + esc(skillLimit) + ' skills</span>' +
-          '</div>' +
-          (tagsHtml ? tagsHtml : '') +
-          (desc ? '<p class="tw-class-card__desc">' + esc(desc) + '</p>' : '') +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function buildSkillCard(item) {
-    item = item || {};
-
-    var title = item.name || 'Unknown skill';
-    var desc = item.description || '';
-    var img = item.img_url || '';
-    var category = item.category || 'Other';
-    var tags = [];
-    if (item.category) tags.push(item.category);
-    if (Array.isArray(item.linked_attributes)) {
-      tags = tags.concat(item.linked_attributes);
-    }
-    if (Array.isArray(item.tags)) {
-      tags = tags.concat(item.tags);
-    }
-
-    var tagsHtml = buildTagsHtml(tags, 'tw-skill-tag');
-
-    return (
-      '<button type="button" class="tw-skill-card" data-skill-id="' + esc(item.id || '') + '" data-skill-name="' + esc(title) + '" aria-pressed="false">' +
-        buildImageHtml(img, title, 'tw-skill-card__img', 'tw-skill-card__placeholder', category) +
-        '<div class="tw-skill-card__body">' +
-          '<h3 class="tw-skill-card__title">' + esc(title) + '</h3>' +
-          (tagsHtml ? tagsHtml : '') +
-          (desc ? '<p class="tw-skill-card__desc">' + esc(desc) + '</p>' : '') +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function buildSkillCategoryBlock(category, items) {
-    return (
-      '<section class="tw-skill-category">' +
-        '<header class="tw-skill-category__header">' +
-          '<h3 class="tw-skill-category__title">' + esc(category) + '</h3>' +
-        '</header>' +
-        '<div class="tw-skill-category__grid">' +
-          items.map(buildSkillCard).join('') +
-        '</div>' +
-      '</section>'
-    );
-  }
-
-  function buildPackageCard(item) {
-    item = item || {};
-
-    var title = item.name || item.package_name || 'Unknown package';
-    var desc = item.description || '';
-    var items = Array.isArray(item.items) ? item.items : (Array.isArray(item.items_list) ? item.items_list : []);
-    var tagsHtml = buildTagsHtml(item.compatibility_tags || [], 'tw-package-tag');
-
-    return (
-      '<button type="button" class="tw-package-card" data-package-id="' + esc(item.id || '') + '" data-package-name="' + esc(title) + '" aria-pressed="false">' +
-        '<div class="tw-package-card__body">' +
-          '<div class="tw-package-card__head">' +
-            '<h3 class="tw-package-card__title">' + esc(title) + '</h3>' +
-            '<span class="tw-package-card__armor">Armor ' + esc(item.base_armor || 0) + '</span>' +
-          '</div>' +
-          (tagsHtml ? tagsHtml : '') +
-          (desc ? '<p class="tw-package-card__desc">' + esc(desc) + '</p>' : '') +
-          (items.length ? '<p class="tw-package-card__items">' + esc(items.join(' · ')) + '</p>' : '') +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function buildLoreCard(item, type) {
-    return (
-      '<button type="button" class="tw-lore-card" data-choice-type="' + esc(type) + '" data-choice-key="' + esc(item.key) + '" aria-pressed="false">' +
-        '<div class="tw-lore-card__body">' +
-          '<h3 class="tw-lore-card__title">' + esc(item.label) + '</h3>' +
-          '<div class="tw-lore-card__meta">' +
-            '<span class="tw-lore-chip tw-lore-chip--bonus">' + esc(item.bonus_tag) + '</span>' +
-            '<span class="tw-lore-chip tw-lore-chip--flaw">' + esc(item.flaw_tag) + '</span>' +
-          '</div>' +
-          '<p class="tw-lore-card__desc">' + esc(item.desc) + '</p>' +
-          '<p class="tw-lore-card__sub tw-lore-card__sub--bonus"><strong>Bonus:</strong> ' + esc(item.bonus_desc) + '</p>' +
-          '<p class="tw-lore-card__sub tw-lore-card__sub--flaw"><strong>Flaw:</strong> ' + esc(item.flaw_desc) + '</p>' +
-        '</div>' +
-      '</button>'
-    );
-  }
-
-  function fetchRaceGrid(wrapper) {
-    var grid = q(wrapper, '#tw-race-grid');
-    if (!grid || grid.dataset.rendered) return;
-
-    grid.innerHTML = '<div class="tw-loading">SCANNING RACE DATABASE…</div>';
-
-    fetchPost('neoweaver_get_races', {})
-      .then(function (res) {
-        var rows = hasRows(res) ? res.data : RACES_FALLBACK;
-        grid.innerHTML = rows.length ? rows.map(buildRaceCard).join('') : '<div class="tw-empty">No races available.</div>';
-        grid.dataset.rendered = '1';
-        restoreSelections(wrapper);
-      })
-      .catch(function () {
-        grid.innerHTML = RACES_FALLBACK.length ? RACES_FALLBACK.map(buildRaceCard).join('') : '<div class="tw-empty">ERROR: Race data unavailable.</div>';
-        grid.dataset.rendered = '1';
-        restoreSelections(wrapper);
-      });
-  }
-
-  function fetchSubraces(wrapper, raceId) {
-    var grid = q(wrapper, '#tw-subrace-grid');
-    if (!grid) return;
-
-    resetSubraceState(wrapper);
-
-    if (!raceId) {
-      hideSubraceSection(wrapper);
-      updateSummary(wrapper);
-      return;
-    }
-
-    showSubraceSection(wrapper);
-    grid.innerHTML = '<div class="tw-loading">SCANNING SUBRACE DATA…</div>';
-
-    fetchPost('neoweaver_get_subraces', { parent: raceId })
-      .then(function (res) {
-        if (hasRows(res)) {
-          grid.innerHTML = res.data.map(buildSubraceCard).join('');
-          showSubraceSection(wrapper);
-        } else {
-          grid.innerHTML = '';
-          hideSubraceSection(wrapper);
-        }
-
-        restoreSelections(wrapper);
-        updateSummary(wrapper);
-      })
-      .catch(function () {
-        grid.innerHTML = '';
-        hideSubraceSection(wrapper);
-        restoreSelections(wrapper);
-        updateSummary(wrapper);
-      });
-  }
-
-  function fetchClassGrid(wrapper) {
-    var grid = q(wrapper, '#tw-class-grid');
-    if (!grid || grid.dataset.rendered) return;
-
-    grid.innerHTML = '<div class="tw-loading">SCANNING CLASS MATRIX…</div>';
-
-    fetchPost('neoweaver_get_classes', {})
-      .then(function (res) {
-        grid.innerHTML = hasRows(res) ? res.data.map(buildClassCard).join('') : '<div class="tw-empty">No classes available.</div>';
-        grid.dataset.rendered = '1';
-        restoreSelections(wrapper);
-      })
-      .catch(function () {
-        grid.innerHTML = '<div class="tw-empty">ERROR: Class data unavailable.</div>';
-      });
-  }
-
-  function updateSkillCounter(wrapper) {
-    var counter = q(wrapper, '#tw-skill-counter');
-    if (counter) {
-      counter.textContent = formState.skills.length + ' / ' + (formState.skill_limit || 5) + ' skills';
-    }
-  }
-
-  function fetchSkillGrid(wrapper) {
-    var grid = q(wrapper, '#tw-skill-grid');
-    if (!grid) return;
-
-    if (grid.dataset.rendered) {
-      updateSkillCounter(wrapper);
-      restoreSelections(wrapper);
-      return;
-    }
-
-    grid.innerHTML = '<div class="tw-loading">SCANNING SKILL ARCHIVE…</div>';
-
-    fetchPost('neoweaver_get_skills', {})
-      .then(function (res) {
-        if (!hasRows(res)) {
-          grid.innerHTML = '<div class="tw-empty">No skills available.</div>';
-          grid.dataset.rendered = '1';
-          updateSkillCounter(wrapper);
-          restoreSelections(wrapper);
-          return;
-        }
-
-        var byCat = {};
-        res.data.forEach(function (skill) {
-          var cat = skill.category || 'Other';
-          if (!byCat[cat]) byCat[cat] = [];
-          byCat[cat].push(skill);
-        });
-
-        var html = Object.keys(byCat).map(function (cat) {
-          return buildSkillCategoryBlock(cat, byCat[cat]);
-        }).join('');
-
-        grid.innerHTML = html;
-        grid.dataset.rendered = '1';
-        updateSkillCounter(wrapper);
-        restoreSelections(wrapper);
-      })
-      .catch(function () {
-        grid.innerHTML = '<div class="tw-empty">ERROR: Skill data unavailable.</div>';
-      });
-  }
-
-  function fetchPackageGrid(wrapper) {
-    var grid = q(wrapper, '#tw-package-grid');
-    if (!grid) return;
-
-    var classId = selectedClassTag();
-    if (!classId) {
-      grid.innerHTML = '<div class="tw-empty">Select a class first.</div>';
-      return;
-    }
-
-    if (grid.dataset.rendered && grid.dataset.rendered === classId) {
-      restoreSelections(wrapper);
-      return;
-    }
-
-    grid.innerHTML = '<div class="tw-loading">SCANNING STARTING PACKAGE…</div>';
-
-    fetchPost('neoweaver_get_packages', { class_tag: classId })
-      .then(function (res) {
-        grid.innerHTML = hasRows(res) ? res.data.map(buildPackageCard).join('') : '<div class="tw-empty">No starting packages available for this class.</div>';
-        grid.dataset.rendered = classId;
-        restoreSelections(wrapper);
-      })
-      .catch(function () {
-        grid.innerHTML = '<div class="tw-empty">ERROR: Starting packages unavailable.</div>';
-      });
-  }
-
-  function attrUsed() {
-    return ATTR_KEYS.reduce(function (sum, key) {
-      return sum + (parseInt(formState['attr_' + key], 10) || ATTR_MIN);
-    }, 0);
-  }
-
-  function renderAttrDisplay(wrapper) {
+  function updateAttrUI() {
     ATTR_KEYS.forEach(function (key) {
-      var val = parseInt(formState['attr_' + key], 10) || ATTR_MIN;
-      var inputEl = q(wrapper, '#tw-attr-' + key);
-      if (inputEl) inputEl.value = val;
-
-      qa(wrapper, '[data-attr="' + key + '"] .tw-pip').forEach(function (pip) {
-        pip.classList.toggle('active', parseInt(pip.dataset.pip, 10) <= val);
-      });
+      var value = Number(state['attr_' + key]);
+      var input = q('#tw-attr-' + key, root);
+      if (input) input.value = String(value);
+      var row = q('.tw-attr-row[data-attr="' + key + '"]', root);
+      if (row) {
+        qa('.tw-pip', row).forEach(function (pip, index) {
+          pip.classList.toggle('active', index < value);
+        });
+      }
     });
-
-    var remainEl = q(wrapper, '#tw-attr-remaining');
-    if (remainEl) {
-      remainEl.textContent = ATTR_POOL - attrUsed();
-    }
+    var rem = q('#tw-attr-remaining', root);
+    if (rem) rem.textContent = String(getAttrRemaining());
   }
 
-  function clearPresetSelection(wrapper) {
-    qa(wrapper, '.tw-attr-preset-btn').forEach(function (btn) {
-      btn.classList.remove('active');
-      btn.setAttribute('aria-pressed', 'false');
-    });
+  function setAttr(key, next) {
+    next = Math.max(ATTR_MIN, Math.min(ATTR_MAX, next));
+    var current = Number(state['attr_' + key]);
+    var totalWithout = getAttrTotal() - current;
+    if (totalWithout + next > ATTR_POOL) return;
+    state['attr_' + key] = next;
+    updateAttrUI();
   }
 
-  function setPresetActive(wrapper, presetKey) {
-    clearPresetSelection(wrapper);
-    var btn = q(wrapper, '.tw-attr-preset-btn[data-preset="' + presetKey + '"]');
-    if (btn) {
-      btn.classList.add('active');
-      btn.setAttribute('aria-pressed', 'true');
-    }
-  }
-
-  function applyPreset(wrapper, presetKey) {
+  function applyPreset(name) {
     var presets = {
       balanced: { body: 3, reflex: 3, mind: 3, spirit: 3 },
-      agile: { body: 2, reflex: 5, mind: 3, spirit: 2 },
+      agile: { body: 2, reflex: 4, mind: 3, spirit: 3 },
       tank: { body: 5, reflex: 2, mind: 2, spirit: 3 },
       bodybuilder: { body: 5, reflex: 3, mind: 2, spirit: 2 }
     };
-
-    var preset = presets[presetKey];
-    if (!preset) return;
-
+    if (!presets[name]) return;
     ATTR_KEYS.forEach(function (key) {
-      formState['attr_' + key] = preset[key];
+      state['attr_' + key] = presets[name][key];
     });
-
-    renderAttrDisplay(wrapper);
-    setPresetActive(wrapper, presetKey);
-    updateSummary(wrapper);
-    NW_SFX.preset();
+    updateAttrUI();
+    qa('.tw-attr-preset-btn', root).forEach(function (btn) {
+      btn.setAttribute('aria-pressed', btn.getAttribute('data-preset') === name ? 'true' : 'false');
+    });
   }
 
-  function canSetAttr(key, nextValue) {
-    nextValue = parseInt(nextValue, 10) || ATTR_MIN;
-    if (nextValue < ATTR_MIN || nextValue > ATTR_MAX) return false;
-
-    var current = parseInt(formState['attr_' + key], 10) || ATTR_MIN;
-    var usedWithoutCurrent = attrUsed() - current;
-    return usedWithoutCurrent + nextValue <= ATTR_POOL;
+  function updateSkillCounter() {
+    var el = q('#tw-skill-counter', root);
+    if (el) el.textContent = state.skills.length + ' / ' + state.skill_limit + ' skills';
   }
 
-  function setAttrValue(wrapper, key, nextValue) {
-    nextValue = parseInt(nextValue, 10) || ATTR_MIN;
-    if (nextValue < ATTR_MIN) nextValue = ATTR_MIN;
-    if (nextValue > ATTR_MAX) nextValue = ATTR_MAX;
+  function updateSummary() {
+    resolveBackstoryTags();
+    var raceText = state.subrace_label ? (state.race_label + ' / ' + state.subrace_label) : state.race_label;
+    var skillsText = state.skills.map(function (id) {
+      var item = state.skills_data.find(function (s) { return s.id === id; });
+      return item ? item.name : id;
+    }).join(', ');
+    var tagsText = state.backstory_tags.map(function (id) {
+      var pair = Object.keys(TAG_DEFS).find(function (key) { return TAG_DEFS[key] === id; }) || String(id);
+      return pair;
+    }).join(', ');
 
-    if (!canSetAttr(key, nextValue)) {
-      setStatus('ERROR: Attribute pool exceeded.', true);
-      NW_SFX.error();
-      renderAttrDisplay(wrapper);
-      return false;
+    var map = {
+      '#tw-summary-character-name': state.character_name || '—',
+      '#tw-summary-pronouns': state.pronouns === 'custom' ? (state.pronouns_custom || 'custom') : (state.pronouns || '—'),
+      '#tw-summary-race': raceText || '—',
+      '#tw-summary-class': state.class_label || '—',
+      '#tw-summary-attrs': 'Body ' + state.attr_body + ' · Reflex ' + state.attr_reflex + ' · Mind ' + state.attr_mind + ' · Spirit ' + state.attr_spirit,
+      '#tw-summary-skills': skillsText || '—',
+      '#tw-summary-package': state.starting_package_label || '—',
+      '#tw-summary-origin': state.data_origin_label || '—',
+      '#tw-summary-operation': state.previous_operation_label || '—',
+      '#tw-summary-crisis': state.sync_crisis_label || '—',
+      '#tw-summary-tag-bundle': tagsText || '—',
+      '#tw-summary-bio': state.bio || '—',
+      '#tw-summary-avatar': (state.avatar_file ? state.avatar_file.name : (state.avatar_url ? 'Gallery avatar selected' : '—'))
+    };
+
+    Object.keys(map).forEach(function (selector) {
+      var el = q(selector, root);
+      if (el) el.textContent = map[selector];
+    });
+  }
+
+  function validateStep(index) {
+    if (index === 0) {
+      state.character_name = (q('#tw-char-name', root)?.value || '').trim();
+      var checked = q('input[name="tw-char-pronouns"]:checked', root);
+      state.pronouns = checked ? checked.value : '';
+      state.pronouns_custom = (q('#tw-char-pronouns-custom', root)?.value || '').trim();
+      if (!state.character_name) return 'Character name is required.';
+      if (!state.pronouns) return 'Pronouns are required.';
+      if (state.pronouns === 'custom' && !state.pronouns_custom) return 'Custom pronouns are required.';
     }
 
-    formState['attr_' + key] = nextValue;
-    clearPresetSelection(wrapper);
-    renderAttrDisplay(wrapper);
-    updateSummary(wrapper);
-    setStatus('', false);
-    NW_SFX.select();
-    return true;
+    if (index === 1) {
+      if (!state.race) return 'Choose a race.';
+    }
+
+    if (index === 2) {
+      if (!state.char_class) return 'Choose a class.';
+    }
+
+    if (index === 3) {
+      if (getAttrTotal() !== ATTR_POOL) return 'Attribute total must equal 12.';
+    }
+
+    if (index === 4) {
+      if (!state.skills.length) return 'Choose at least one skill.';
+      if (state.skills.length > state.skill_limit) return 'Too many skills selected for this class.';
+    }
+
+    if (index === 5) {
+      if (!state.starting_package_id) return 'Choose a starting package.';
+    }
+
+    if (index === 6) {
+      if (!state.data_origin) return 'Choose data origin.';
+    }
+
+    if (index === 7) {
+      if (!state.previous_operation) return 'Choose previous operation.';
+    }
+
+    if (index === 8) {
+      if (!state.sync_crisis) return 'Choose sync crisis.';
+      resolveBackstoryTags();
+      if (!state.backstory_tags.length) return 'Backstory tags could not be resolved.';
+    }
+
+    if (index === 9) {
+      state.bio = (q('#tw-char-bio', root)?.value || '').trim();
+    }
+
+    if (index === 10) {
+      updateSummary();
+    }
+
+    return '';
   }
 
-  function renderAvatarGallery(wrapper) {
-    var avatarGalleryEl = q(wrapper, '#tw-avatar-gallery');
-    var avatarPreviewImg = q(wrapper, '#tw-avatar-img');
-    var avatarSelectedWrap = q(wrapper, '#tw-avatar-selected');
-    var avatarPreview = q(wrapper, '#tw-avatar-preview');
-    var avatarInput = q(wrapper, '#tw-char-avatar');
+  function goToStep(index) {
+    if (index < 0 || index >= stepEls.length) return;
+    currentStep = index;
+    updateStepUI();
+    if (currentStep === 10) updateSummary();
+  }
 
-    if (!avatarGalleryEl) return;
+  function nextStep() {
+    var error = validateStep(currentStep);
+    if (error) {
+      showStepError(currentStep, error);
+      return;
+    }
+    clearStepErrors();
+    setStatus('', '');
+    if (currentStep < stepEls.length - 1) goToStep(currentStep + 1);
+  }
 
-    avatarGalleryEl.innerHTML = TW_AVATAR_GALLERY.map(function (item) {
-      var normalizedUrl = twNormalizeMediaUrl(item.url);
-      return (
-        '<button type="button" class="tw-avatar-option" data-avatar-url="' + esc(normalizedUrl) + '" aria-pressed="false">' +
-          '<img src="' + esc(normalizedUrl) + '" alt="' + esc(item.name || 'Avatar') + '" loading="lazy" decoding="async">' +
-          '<span>' + esc(item.name || 'Avatar') + '</span>' +
-        '</button>'
-      );
+  function prevStep() {
+    clearStepErrors();
+    setStatus('', '');
+    if (currentStep > 0) goToStep(currentStep - 1);
+  }
+
+  function renderRaceGrid(rows, targetSel, mode) {
+    var target = q(targetSel, root);
+    if (!target) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      target.innerHTML = '<div class="tw-empty-state">No options available.</div>';
+      return;
+    }
+    target.innerHTML = rows.map(function (row) {
+      var tags = Array.isArray(row.tags) ? row.tags : [];
+      var img = buildImage(row.img_url || row.img, row.name || row.label, 'tw-race-img', 'RACE');
+      return '' +
+        '<button type="button" class="tw-race-card" data-mode="' + esc(mode) + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.label || '') + '">' +
+          img +
+          '<div class="tw-race-body">' +
+            '<h3 class="tw-race-name">' + esc(row.name || row.label || '') + '</h3>' +
+            buildTagPills(tags) +
+          '</div>' +
+        '</button>';
     }).join('');
+  }
 
-    qa(avatarGalleryEl, '.tw-avatar-option').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var url = twNormalizeMediaUrl(btn.dataset.avatarUrl || '');
+  function renderClassGrid(rows) {
+    var target = q('#tw-class-grid', root);
+    if (!target) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      target.innerHTML = '<div class="tw-empty-state">No classes available.</div>';
+      return;
+    }
+    target.innerHTML = rows.map(function (row) {
+      return '' +
+        '<button type="button" class="tw-class-card" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || '') + '" data-limit="' + esc(row.skill_limit || 3) + '">' +
+          buildImage(row.img_url || row.icon_slug, row.name || '', 'tw-class-cardimg-wrap', 'CLASS') +
+          '<div class="tw-class-cardbody">' +
+            '<h3 class="tw-class-cardname">' + esc(row.name || '') + '</h3>' +
+            buildTagPills(row.tags || []) +
+          '</div>' +
+        '</button>';
+    }).join('');
+  }
 
-        formState.avatar_file = null;
-        formState.avatar_url = url;
+  function renderSkills(rows) {
+    var target = q('#tw-skill-grid', root);
+    if (!target) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      target.innerHTML = '<div class="tw-empty-state">No skills available.</div>';
+      return;
+    }
+    target.innerHTML = rows.map(function (row) {
+      var selected = state.skills.indexOf(row.id) !== -1;
+      return '' +
+        '<button type="button" class="tw-skill-card' + (selected ? ' is-selected' : '') + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || '') + '">' +
+          buildImage(row.img_url, row.name || '', 'tw-skill-cardimg', 'SKILL') +
+          '<div class="tw-skill-cardbody">' +
+            '<h3 class="tw-skill-cardname">' + esc(row.name || '') + '</h3>' +
+            buildTagPills(row.tags || []) +
+          '</div>' +
+        '</button>';
+    }).join('');
+    updateSkillCounter();
+  }
 
-        if (avatarPreviewImg) {
-          avatarPreviewImg.src = url;
-          avatarPreviewImg.alt = 'Selected gallery avatar';
-        }
+  function renderPackages(rows) {
+    var target = q('#tw-package-grid', root);
+    if (!target) return;
+    if (!Array.isArray(rows) || !rows.length) {
+      target.innerHTML = '<div class="tw-empty-state">No packages available for this class.</div>';
+      return;
+    }
+    target.innerHTML = rows.map(function (row) {
+      var selected = state.starting_package_id === row.id;
+      return '' +
+        '<button type="button" class="tw-package-card' + (selected ? ' is-selected' : '') + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.package_name || '') + '">' +
+          '<div class="tw-package-cardbody">' +
+            '<h3 class="tw-package-cardtitle">' + esc(row.name || row.package_name || '') + '</h3>' +
+            buildTagPills(row.compatibility_tags || []) +
+          '</div>' +
+        '</button>';
+    }).join('');
+  }
 
-        if (avatarPreview) avatarPreview.style.display = 'none';
-        if (avatarSelectedWrap) avatarSelectedWrap.style.display = 'grid';
-        if (avatarInput) avatarInput.value = '';
+  function renderLoreOptions(targetSel, rows, typeKey) {
+    var target = q(targetSel, root);
+    if (!target) return;
+    target.innerHTML = rows.map(function (row) {
+      var selected = state[typeKey] === row.key;
+      return '' +
+        '<button type="button" class="tw-lore-card' + (selected ? ' is-selected' : '') + '" data-kind="' + esc(typeKey) + '" data-key="' + esc(row.key) + '" data-label="' + esc(row.label) + '">' +
+          '<div class="tw-lore-cardbody">' +
+            '<h3 class="tw-lore-cardtitle">' + esc(row.label) + '</h3>' +
+            '<div class="tw-lore-cardmeta">' +
+              '<span class="tw-card-tag">' + esc(row.bonus_tag) + '</span>' +
+              '<span class="tw-card-tag">' + esc(row.flaw_tag) + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</button>';
+    }).join('');
+  }
 
-        qa(avatarGalleryEl, '.tw-avatar-option').forEach(function (x) {
-          var selected = x === btn;
-          x.classList.toggle('selected', selected);
-          x.setAttribute('aria-pressed', selected ? 'true' : 'false');
-        });
+  function renderAvatarGallery() {
+    var target = q('#tw-avatar-gallery', root);
+    if (!target) return;
+    var gallery = Array.isArray(cfg.avatar_gallery) ? cfg.avatar_gallery : [];
+    target.innerHTML = gallery.map(function (item) {
+      var selected = state.avatar_url === item.url;
+      return '' +
+        '<button type="button" class="tw-avatar-card' + (selected ? ' is-selected' : '') + '" data-url="' + esc(item.url) + '">' +
+          '<img src="' + esc(item.url) + '" alt="' + esc(item.name || 'Avatar') + '" loading="lazy">' +
+        '</button>';
+    }).join('');
+  }
 
-        updateSummary(wrapper);
-        NW_SFX.select();
+  function updateAvatarPreview() {
+    var wrap = q('#tw-avatar-selected', root);
+    var img = q('#tw-avatar-img', root);
+    if (!wrap || !img) return;
+    if (state.avatar_file) {
+      img.src = URL.createObjectURL(state.avatar_file);
+      img.alt = state.avatar_file.name || 'Uploaded avatar';
+      wrap.style.display = '';
+      return;
+    }
+    if (state.avatar_url) {
+      img.src = state.avatar_url;
+      img.alt = 'Selected avatar';
+      wrap.style.display = '';
+      return;
+    }
+    img.src = '';
+    img.alt = '';
+    wrap.style.display = 'none';
+  }
+
+  function bindStaticEvents() {
+    q('#tw-char-name', root)?.addEventListener('input', function (e) {
+      state.character_name = e.target.value;
+    });
+
+    qa('input[name="tw-char-pronouns"]', root).forEach(function (input) {
+      input.addEventListener('change', function () {
+        state.pronouns = input.value;
+        toggleCustomPronouns();
       });
+    });
+
+    q('#tw-char-pronouns-custom', root)?.addEventListener('input', function (e) {
+      state.pronouns_custom = e.target.value;
+    });
+
+    q('#tw-char-bio', root)?.addEventListener('input', function (e) {
+      state.bio = e.target.value;
+    });
+
+    qa('.tw-btn-next', root).forEach(function (btn) {
+      btn.addEventListener('click', nextStep);
+    });
+
+    qa('.tw-btn-prev', root).forEach(function (btn) {
+      btn.addEventListener('click', prevStep);
+    });
+
+    q('#tw-char-submit', root)?.addEventListener('click', submitCharacter);
+
+    qa('.tw-attr-row', root).forEach(function (row) {
+      var key = row.getAttribute('data-attr');
+      q('.tw-attr-minus', row)?.addEventListener('click', function () {
+        setAttr(key, Number(state['attr_' + key]) - 1);
+      });
+      q('.tw-attr-plus', row)?.addEventListener('click', function () {
+        setAttr(key, Number(state['attr_' + key]) + 1);
+      });
+      qa('.tw-pip', row).forEach(function (pip) {
+        pip.addEventListener('click', function () {
+          var val = Number(pip.getAttribute('data-pip')) || ATTR_MIN;
+          setAttr(key, val);
+        });
+      });
+    });
+
+    qa('.tw-attr-preset-btn', root).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        applyPreset(btn.getAttribute('data-preset'));
+      });
+    });
+
+    q('#tw-char-avatar', root)?.addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+      state.avatar_file = file;
+      if (file) state.avatar_url = '';
+      renderAvatarGallery();
+      updateAvatarPreview();
+    });
+
+    q('#tw-char-avatar-clear', root)?.addEventListener('click', function () {
+      state.avatar_file = null;
+      state.avatar_url = '';
+      var input = q('#tw-char-avatar', root);
+      if (input) input.value = '';
+      renderAvatarGallery();
+      updateAvatarPreview();
+    });
+
+    root.addEventListener('click', function (e) {
+      var raceCard = e.target.closest('.tw-race-card');
+      if (raceCard) {
+        var mode = raceCard.getAttribute('data-mode');
+        var id = raceCard.getAttribute('data-id') || '';
+        var name = raceCard.getAttribute('data-name') || '';
+        if (mode === 'race') {
+          state.race = id;
+          state.race_label = name;
+          state.subrace = '';
+          state.subrace_label = '';
+          selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
+          loadSubraces(id);
+        } else {
+          state.subrace = id;
+          state.subrace_label = name;
+          selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+        }
+        return;
+      }
+
+      var classCard = e.target.closest('.tw-class-card');
+      if (classCard) {
+        state.char_class = classCard.getAttribute('data-id') || '';
+        state.class_label = classCard.getAttribute('data-name') || '';
+        state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
+        state.skills = [];
+        state.starting_package_id = '';
+        state.starting_package_label = '';
+        selectExclusive('.tw-class-card', classCard);
+        renderSkills(state.skills_data);
+        loadPackages(state.char_class);
+        return;
+      }
+
+      var skillCard = e.target.closest('.tw-skill-card');
+      if (skillCard) {
+        var skillId = skillCard.getAttribute('data-id') || '';
+        var idx = state.skills.indexOf(skillId);
+        if (idx !== -1) {
+          state.skills.splice(idx, 1);
+        } else if (state.skills.length < state.skill_limit) {
+          state.skills.push(skillId);
+        }
+        renderSkills(state.skills_data);
+        return;
+      }
+
+      var packageCard = e.target.closest('.tw-package-card');
+      if (packageCard) {
+        state.starting_package_id = packageCard.getAttribute('data-id') || '';
+        state.starting_package_label = packageCard.getAttribute('data-name') || '';
+        selectExclusive('.tw-package-card', packageCard);
+        return;
+      }
+
+      var loreCard = e.target.closest('.tw-lore-card');
+      if (loreCard) {
+        var kind = loreCard.getAttribute('data-kind') || '';
+        var key = loreCard.getAttribute('data-key') || '';
+        var label = loreCard.getAttribute('data-label') || '';
+        if (kind === 'data_origin') {
+          state.data_origin = key;
+          state.data_origin_label = label;
+          selectExclusive('.tw-lore-card[data-kind="data_origin"]', loreCard);
+        }
+        if (kind === 'previous_operation') {
+          state.previous_operation = key;
+          state.previous_operation_label = label;
+          selectExclusive('.tw-lore-card[data-kind="previous_operation"]', loreCard);
+        }
+        if (kind === 'sync_crisis') {
+          state.sync_crisis = key;
+          state.sync_crisis_label = label;
+          selectExclusive('.tw-lore-card[data-kind="sync_crisis"]', loreCard);
+        }
+        resolveBackstoryTags();
+        return;
+      }
+
+      var avatarCard = e.target.closest('.tw-avatar-card');
+      if (avatarCard) {
+        state.avatar_file = null;
+        state.avatar_url = avatarCard.getAttribute('data-url') || '';
+        var input = q('#tw-char-avatar', root);
+        if (input) input.value = '';
+        renderAvatarGallery();
+        updateAvatarPreview();
+      }
     });
   }
 
-  function handleAvatarFile(wrapper, file) {
-    var allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
-
-    if (!file || allowed.indexOf(file.type) === -1 || file.size > 2 * 1024 * 1024) {
-      setStatus('ERROR: Invalid file. JPG / PNG / WEBP / SVG under 2 MB only.', true);
-      NW_SFX.error();
+  function submitCharacter() {
+    var error = validateStep(10);
+    if (error) {
+      showStepError(10, error);
       return;
     }
 
-    formState.avatar_file = file;
-    formState.avatar_url = '';
-    NW_SFX.select();
-
-    var reader = new FileReader();
-    reader.onload = function (ev) {
-      var imgEl = q(wrapper, '#tw-avatar-img');
-      var preview = q(wrapper, '#tw-avatar-preview');
-      var selected = q(wrapper, '#tw-avatar-selected');
-      var gallery = q(wrapper, '#tw-avatar-gallery');
-
-      if (imgEl) {
-        imgEl.src = ev.target.result;
-        imgEl.alt = file.name || 'Uploaded avatar';
-      }
-
-      if (preview) preview.style.display = 'none';
-      if (selected) selected.style.display = 'grid';
-
-      if (gallery) {
-        qa(gallery, '.tw-avatar-option').forEach(function (x) {
-          x.classList.remove('selected');
-          x.setAttribute('aria-pressed', 'false');
-        });
-      }
-
-      updateSummary(wrapper);
-    };
-
-    reader.readAsDataURL(file);
-  }
-
-  function clearAvatar(wrapper) {
-    formState.avatar_file = null;
-    formState.avatar_url = '';
-
-    var imgEl = q(wrapper, '#tw-avatar-img');
-    var preview = q(wrapper, '#tw-avatar-preview');
-    var selected = q(wrapper, '#tw-avatar-selected');
-    var fileInput = q(wrapper, '#tw-char-avatar');
-    var gallery = q(wrapper, '#tw-avatar-gallery');
-
-    if (imgEl) {
-      imgEl.src = '';
-      imgEl.alt = '';
-    }
-    if (preview) preview.style.display = '';
-    if (selected) selected.style.display = 'none';
-    if (fileInput) fileInput.value = '';
-
-    if (gallery) {
-      qa(gallery, '.tw-avatar-option').forEach(function (x) {
-        x.classList.remove('selected');
-        x.setAttribute('aria-pressed', 'false');
-      });
-    }
-
-    updateSummary(wrapper);
-    NW_SFX.back();
-  }
-
-  function updateSummary(wrapper) {
-    function set(id, val) {
-      var el = q(wrapper, '#tw-summary-' + id);
-      if (el) el.textContent = val || '—';
-    }
-
-    recomputeBackstoryTags();
-
-    set('character-name', formState.character_name);
-    set('pronouns', formState.pronouns);
-    set('race', [formState.race_label, formState.subrace_label].filter(Boolean).join(' / ') || formState.race || '—');
-    set('class', formState.class_label || formState.character_class || '—');
-    set('attrs', ATTR_KEYS.map(function (key) {
-      return key.toUpperCase() + ' ' + formState['attr_' + key];
-    }).join(' · '));
-    set('skills', formState.skills.length ? (formState.skills.length + ' / ' + (formState.skill_limit || 5)) : '—');
-    set('package', formState.starting_package_label || '—');
-
-    var origin = choiceByKey('data_origin', formState.data_origin);
-    var operation = choiceByKey('previous_operation', formState.previous_operation);
-    var crisis = choiceByKey('sync_crisis', formState.sync_crisis);
-
-    set('origin', origin ? origin.label : '—');
-    set('operation', operation ? operation.label : '—');
-    set('crisis', crisis ? crisis.label : '—');
-    set('tag-bundle', formState.backstory_tags.length ? formState.backstory_tags.join(' · ') : '—');
-    set('bio', formState.bio ? (formState.bio.length > 80 ? formState.bio.substring(0, 80) + '…' : formState.bio) : '—');
-
-    var avatarEl = q(wrapper, '#tw-summary-avatar');
-    if (avatarEl) {
-      if (formState.avatar_file) {
-        avatarEl.textContent = formState.avatar_file.name;
-      } else if (formState.avatar_url) {
-        avatarEl.textContent = formState.avatar_url.split('/').pop();
-      } else {
-        avatarEl.textContent = '—';
-      }
-    }
-  }
-
-  function syncSingleSelection(wrapper, selector, selectedId, dataAttr) {
-    qa(wrapper, selector).forEach(function (card) {
-      var isMatch = !!selectedId && String(card.dataset[dataAttr]) === String(selectedId);
-      card.classList.toggle('selected', isMatch);
-      card.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
-    });
-  }
-
-  function restoreSelections(wrapper) {
-    syncSingleSelection(wrapper, '.tw-race-card:not(.tw-subrace-card)', formState.race, 'raceId');
-    syncSingleSelection(wrapper, '.tw-subrace-card', formState.subrace, 'subraceId');
-    syncSingleSelection(wrapper, '.tw-class-card', formState.character_class, 'charClass');
-    syncSingleSelection(wrapper, '.tw-package-card', formState.starting_package_id, 'packageId');
-
-    qa(wrapper, '.tw-skill-card').forEach(function (card) {
-      var isMatch = formState.skills.indexOf(card.dataset.skillId) !== -1;
-      card.classList.toggle('selected', isMatch);
-      card.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
-    });
-
-    qa(wrapper, '.tw-lore-card').forEach(function (card) {
-      var type = card.dataset.choiceType;
-      var key = card.dataset.choiceKey;
-      var isMatch = !!type && formState[type] === key;
-      card.classList.toggle('selected', isMatch);
-      card.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
-    });
-
-    updateSkillCounter(wrapper);
-
-    var checkedRadio = q(wrapper, '.tw-pronoun-radio:checked');
-    var customWrap = q(wrapper, '#tw-char-pronouns-custom-wrap');
-    if (customWrap) {
-      customWrap.hidden = !(checkedRadio && checkedRadio.value === 'custom');
-      customWrap.style.display = checkedRadio && checkedRadio.value === 'custom' ? '' : 'none';
-    }
-  }
-
-  function renderLoreChoices(wrapper) {
-    var originGrid = q(wrapper, '#tw-origin-grid');
-    var operationGrid = q(wrapper, '#tw-operation-grid');
-    var crisisGrid = q(wrapper, '#tw-crisis-grid');
-
-    if (originGrid && !originGrid.dataset.rendered) {
-      originGrid.innerHTML = DATA_ORIGIN_OPTIONS.map(function (item) {
-        return buildLoreCard(item, 'data_origin');
-      }).join('');
-      originGrid.dataset.rendered = '1';
-    }
-
-    if (operationGrid && !operationGrid.dataset.rendered) {
-      operationGrid.innerHTML = PREVIOUS_OPERATION_OPTIONS.map(function (item) {
-        return buildLoreCard(item, 'previous_operation');
-      }).join('');
-      operationGrid.dataset.rendered = '1';
-    }
-
-    if (crisisGrid && !crisisGrid.dataset.rendered) {
-      crisisGrid.innerHTML = SYNC_CRISIS_OPTIONS.map(function (item) {
-        return buildLoreCard(item, 'sync_crisis');
-      }).join('');
-      crisisGrid.dataset.rendered = '1';
-    }
-
-    restoreSelections(wrapper);
-  }
-
-  function stepPhase(step) {
-    return step ? (step.dataset.phase || '') : '';
-  }
-
-  function validateIdentityStep(wrapper, step) {
-    var nameInput = q(wrapper, '#tw-char-name');
-    if (!nameInput || !nameInput.value.trim()) {
-      if (nameInput) nameInput.focus();
-      showStepError(step, 'ERROR: Agent designation is required.');
-      setStatus('ERROR: Agent designation is required.', true);
-      return false;
-    }
-
-    formState.character_name = nameInput.value.trim();
-
-    var checkedRadio = q(wrapper, '.tw-pronoun-radio:checked');
-    if (checkedRadio) {
-      if (checkedRadio.value === 'custom') {
-        var customEl = q(wrapper, '#tw-char-pronouns-custom');
-        formState.pronouns = customEl && customEl.value.trim() ? customEl.value.trim() : 'custom';
-      } else {
-        formState.pronouns = checkedRadio.value;
-      }
-    } else {
-      formState.pronouns = '';
-    }
-
-    updateSummary(wrapper);
-    return true;
-  }
-
-  function validateStep(wrapper, steps, idx) {
-    var step = steps[idx];
-    if (!step) return true;
-
-    clearStepError(step);
-
-    if (idx === 0) return validateIdentityStep(wrapper, step);
-
-    var phase = stepPhase(step);
-
-    if (phase === 'RACE PROTOCOL') {
-      if (!formState.race) {
-        showStepError(step, 'ERROR: Select a race to continue.');
-        setStatus('ERROR: Select a race to continue.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'CLASS MATRIX') {
-      if (!formState.character_class) {
-        showStepError(step, 'ERROR: Select a class to continue.');
-        setStatus('ERROR: Select a class to continue.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'BIOMETRIC CALIBRATION') {
-      var used = attrUsed();
-      if (used !== ATTR_POOL) {
-        showStepError(step, 'ERROR: Distribute all ' + ATTR_POOL + ' attribute points.');
-        setStatus('ERROR: Distribute all ' + ATTR_POOL + ' attribute points.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'SKILL SELECTION') {
-      if (!formState.skills.length) {
-        showStepError(step, 'ERROR: Select at least 1 skill.');
-        setStatus('ERROR: Select at least 1 skill.', true);
-        return false;
-      }
-      if (formState.skills.length > (formState.skill_limit || 5)) {
-        showStepError(step, 'ERROR: Too many skills selected for this class.');
-        setStatus('ERROR: Too many skills selected for this class.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'STARTING PACKAGE') {
-      if (!formState.starting_package_id) {
-        showStepError(step, 'ERROR: Select a starting package to continue.');
-        setStatus('ERROR: Select a starting package to continue.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'DATA ORIGIN') {
-      if (!formState.data_origin) {
-        showStepError(step, 'ERROR: Select a data origin to continue.');
-        setStatus('ERROR: Select a data origin to continue.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'PREVIOUS OPERATION') {
-      if (!formState.previous_operation) {
-        showStepError(step, 'ERROR: Select a previous operation to continue.');
-        setStatus('ERROR: Select a previous operation to continue.', true);
-        return false;
-      }
-      return true;
-    }
-
-    if (phase === 'SYNCHRONIZATION CRISIS') {
-      if (!formState.sync_crisis) {
-        showStepError(step, 'ERROR: Select a synchronization crisis response to continue.');
-        setStatus('ERROR: Select a synchronization crisis response to continue.', true);
-        return false;
-      }
-      recomputeBackstoryTags();
-      return true;
-    }
-
-    if (phase === 'VISUAL SIGNATURE') {
-      var bioEl = q(wrapper, '#tw-char-bio');
-      formState.bio = bioEl ? bioEl.value.trim() : '';
-      return true;
-    }
-
-    return true;
-  }
-
-  function resolveNextButton(target) {
-    return target.closest('#tw-char-step1-next, .tw-btn-next, .tw-btn-nav[data-dir="next"]');
-  }
-
-  function resolvePrevButton(target) {
-    return target.closest('.tw-btn-prev, .tw-btn-nav[data-dir="prev"], .tw-btn-review-return');
-  }
-
-  function showStep(wrapper, steps, idx) {
-    steps.forEach(function (step, i) {
-      step.classList.toggle('active', i === idx);
-    });
-
-    setStatus('', false);
-
-    var phase = stepPhase(steps[idx]);
-
-    if (phase === 'RACE PROTOCOL') fetchRaceGrid(wrapper);
-    if (phase === 'CLASS MATRIX') fetchClassGrid(wrapper);
-    if (phase === 'SKILL SELECTION') fetchSkillGrid(wrapper);
-    if (phase === 'STARTING PACKAGE') fetchPackageGrid(wrapper);
-    if (phase === 'DATA ORIGIN' || phase === 'PREVIOUS OPERATION' || phase === 'SYNCHRONIZATION CRISIS') renderLoreChoices(wrapper);
-    if (phase === 'VISUAL SIGNATURE') renderAvatarGallery(wrapper);
-    if (phase === 'BIOMETRIC CALIBRATION') renderAttrDisplay(wrapper);
-    if (phase === 'SYSTEM REVIEW') updateSummary(wrapper);
-
-    var fillEl = q(wrapper, '#tw-char-progress-fill');
-    var stepElCounter = q(wrapper, '#tw-char-step-current');
-    var phaseEl = q(wrapper, '#tw-char-progress-phase');
-
-    if (fillEl) fillEl.style.width = Math.round(((idx + 1) / steps.length) * 100) + '%';
-    if (stepElCounter) stepElCounter.textContent = idx + 1;
-    if (phaseEl) phaseEl.textContent = phase;
-
-    qa(wrapper, '.tw-progress-tick').forEach(function (tick) {
-      tick.classList.toggle('active', parseInt(tick.dataset.tick, 10) <= idx + 1);
-    });
-
-    restoreSelections(wrapper);
-  }
-
-  function createSpinner(wrapper) {
-    var el = q(wrapper, '#tw-char-spinner');
-    return {
-      show: function () {
-        if (el) el.classList.add('is-visible');
-      },
-      hide: function () {
-        if (el) el.classList.remove('is-visible');
-      }
-    };
-  }
-
-  function submitCharacter(wrapper, spinner) {
-    setStatus('Uploading agent profile…', false);
-
-    var submitBtn = q(wrapper, '#tw-char-submit');
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = '⏳ SYNCHRONIZING…';
-    }
-
-    spinner.show();
-
-    var data = new FormData();
-    data.append('action', 'neoweaver_create_character');
-    data.append('nonce', nonce());
-    data.append('character_name', formState.character_name);
-    data.append('pronouns', formState.pronouns);
-    data.append('bio', formState.bio);
-    data.append('race', formState.race);
-    data.append('subrace', formState.subrace);
-    data.append('char_class', formState.character_class);
-    data.append('starting_package_id', formState.starting_package_id);
-    data.append('skills', JSON.stringify(formState.skills));
-    data.append('data_origin', formState.data_origin);
-    data.append('previous_operation', formState.previous_operation);
-    data.append('sync_crisis', formState.sync_crisis);
-
-    recomputeBackstoryTags();
-    data.append('backstory_tags', JSON.stringify(formState.backstory_tags));
-
-    ATTR_KEYS.forEach(function (key) {
-      data.append('attr_' + key, formState['attr_' + key]);
-    });
-
-    if (formState.avatar_file) data.append('avatar', formState.avatar_file);
-    if (formState.avatar_url) data.append('avatar_url', formState.avatar_url);
-
-    var t0 = Date.now();
+    var spinner = q('#tw-char-spinner', root);
+    if (spinner) spinner.classList.add('is-visible');
+    setStatus('Creating character…', 'info');
+
+    var fd = new FormData();
+    fd.append('action', 'neoweaver_create_character');
+    fd.append('nonce', nonce());
+    fd.append('character_name', state.character_name);
+    fd.append('pronouns', state.pronouns === 'custom' ? 'custom' : state.pronouns);
+    fd.append('bio', state.bio || '');
+    fd.append('race', state.race || '');
+    fd.append('subrace', state.subrace || '');
+    fd.append('char_class', state.char_class || '');
+    fd.append('starting_package_id', state.starting_package_id || '');
+    fd.append('data_origin', state.data_origin || '');
+    fd.append('previous_operation', state.previous_operation || '');
+    fd.append('sync_crisis', state.sync_crisis || '');
+    fd.append('skills', JSON.stringify(state.skills));
+    fd.append('backstory_tags', JSON.stringify(state.backstory_tags));
+    fd.append('attr_body', String(state.attr_body));
+    fd.append('attr_reflex', String(state.attr_reflex));
+    fd.append('attr_mind', String(state.attr_mind));
+    fd.append('attr_spirit', String(state.attr_spirit));
+    if (state.avatar_url) fd.append('avatar_url', state.avatar_url);
+    if (state.avatar_file) fd.append('avatar', state.avatar_file, state.avatar_file.name);
 
     fetch(ajaxUrl(), {
       method: 'POST',
       credentials: 'same-origin',
-      body: data
+      body: fd
     })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (res) {
-        var wait = Math.max(0, 1200 - (Date.now() - t0));
-
-        setTimeout(function () {
-          spinner.hide();
-
-          if (res && res.success) {
-            setStatus('Agent profile created. Welcome to the Grid.', false);
-            NW_SFX.deploy();
-
-            wrapper.innerHTML =
-              '<div class="tw-char-success">' +
-                '<h3>✓ ' + esc((res.data && res.data.message) || 'Character created!') + '</h3>' +
-                ((res.data && res.data.redirect)
-                  ? '<p><a class="tw-btn tw-btn-primary" href="' + esc(res.data.redirect) + '">Enter the Grid</a></p>'
-                  : '') +
-              '</div>';
-
-            return;
-          }
-
-          var message = (res && res.data && res.data.message) ? res.data.message : 'Character creation failed.';
-          setStatus(message, true);
-          NW_SFX.error();
-
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'DEPLOY OPERATIVE';
-          }
-        }, wait);
-      })
-      .catch(function () {
-        spinner.hide();
-        setStatus('Network error. Character creation failed.', true);
-        NW_SFX.error();
-
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'DEPLOY OPERATIVE';
+        if (!res || !res.success) {
+          throw new Error(res && res.data && res.data.message ? res.data.message : 'Character creation failed.');
         }
+        setStatus(res.data && res.data.message ? res.data.message : 'Character created.', 'success');
+        if (res.data && res.data.redirect) {
+          window.location.href = res.data.redirect;
+        }
+      })
+      .catch(function (err) {
+        showStepError(10, err && err.message ? err.message : 'Character creation failed.');
+      })
+      .finally(function () {
+        if (spinner) spinner.classList.remove('is-visible');
       });
   }
 
-  function bindEvents(wrapper, steps, spinner) {
-    var currentStep = 0;
-
-    wrapper.addEventListener('input', function (ev) {
-      var target = ev.target;
-
-      if (target.matches('#tw-char-name')) {
-        formState.character_name = target.value.trim();
-        updateSummary(wrapper);
-      }
-
-      if (target.matches('#tw-char-pronouns-custom')) {
-        var customRadio = q(wrapper, '.tw-pronoun-radio[value="custom"]');
-        if (customRadio && customRadio.checked) {
-          formState.pronouns = target.value.trim() || 'custom';
-          updateSummary(wrapper);
-        }
-      }
-
-      if (target.matches('#tw-char-bio')) {
-        formState.bio = target.value.trim();
-        updateSummary(wrapper);
-      }
-
-      if (target.matches('#tw-char-avatar')) {
-        var file = target.files && target.files[0] ? target.files[0] : null;
-        if (file) handleAvatarFile(wrapper, file);
-      }
-    });
-
-    wrapper.addEventListener('change', function (ev) {
-      var target = ev.target;
-
-      if (target.matches('.tw-pronoun-radio')) {
-        var customWrap = q(wrapper, '#tw-char-pronouns-custom-wrap');
-        var customInput = q(wrapper, '#tw-char-pronouns-custom');
-
-        if (customWrap) {
-          customWrap.hidden = target.value !== 'custom';
-          customWrap.style.display = target.value === 'custom' ? '' : 'none';
-        }
-
-        if (target.value === 'custom') {
-          formState.pronouns = customInput && customInput.value.trim() ? customInput.value.trim() : 'custom';
-          if (customInput) customInput.focus();
-        } else {
-          formState.pronouns = target.value;
-        }
-
-        updateSummary(wrapper);
-        NW_SFX.select();
-      }
-    });
-
-    wrapper.addEventListener('click', function (ev) {
-      var target = ev.target;
-
-      var nextBtn = resolveNextButton(target);
-      if (nextBtn) {
-        ev.preventDefault();
-
-        if (!validateStep(wrapper, steps, currentStep)) return;
-
-        if (currentStep < steps.length - 1) {
-          currentStep += 1;
-          showStep(wrapper, steps, currentStep);
-          NW_SFX.nav();
-        }
-        return;
-      }
-
-      var prevBtn = resolvePrevButton(target);
-      if (prevBtn) {
-        ev.preventDefault();
-        if (currentStep > 0) {
-          currentStep -= 1;
-          showStep(wrapper, steps, currentStep);
-          NW_SFX.back();
-        }
-        return;
-      }
-
-      var raceCard = target.closest('.tw-race-card:not(.tw-subrace-card)');
-      if (raceCard) {
-        ev.preventDefault();
-
-        formState.race = raceCard.dataset.raceId || '';
-        formState.race_label = q(raceCard, '.tw-race-card__title') ? q(raceCard, '.tw-race-card__title').textContent.trim() : '';
-        resetSubraceState(wrapper);
-        syncSingleSelection(wrapper, '.tw-race-card:not(.tw-subrace-card)', formState.race, 'raceId');
-        fetchSubraces(wrapper, formState.race);
-        updateSummary(wrapper);
-        NW_SFX.select();
-        return;
-      }
-
-      var subraceCard = target.closest('.tw-subrace-card');
-      if (subraceCard) {
-        ev.preventDefault();
-
-        formState.subrace = subraceCard.dataset.subraceId || '';
-        formState.subrace_label = q(subraceCard, '.tw-race-card__title') ? q(subraceCard, '.tw-race-card__title').textContent.trim() : '';
-        syncSingleSelection(wrapper, '.tw-subrace-card', formState.subrace, 'subraceId');
-        updateSummary(wrapper);
-        NW_SFX.select();
-        return;
-      }
-
-      var classCard = target.closest('.tw-class-card');
-      if (classCard) {
-        ev.preventDefault();
-
-        formState.character_class = classCard.dataset.charClass || '';
-        formState.class_label = classCard.dataset.className || '';
-        formState.skill_limit = parseInt(classCard.dataset.skillLimit, 10) || 5;
-        formState.skills = [];
-        resetPackageState(wrapper);
-
-        syncSingleSelection(wrapper, '.tw-class-card', formState.character_class, 'charClass');
-        updateSkillCounter(wrapper);
-
-        var skillGrid = q(wrapper, '#tw-skill-grid');
-        if (skillGrid) {
-          qa(skillGrid, '.tw-skill-card').forEach(function (card) {
-            card.classList.remove('selected');
-            card.setAttribute('aria-pressed', 'false');
-          });
-        }
-
-        updateSummary(wrapper);
-        NW_SFX.select();
-        return;
-      }
-
-      var skillCard = target.closest('.tw-skill-card');
-      if (skillCard) {
-        ev.preventDefault();
-
-        var skillId = skillCard.dataset.skillId || '';
-        if (!skillId) return;
-
-        var idx = formState.skills.indexOf(skillId);
-        if (idx !== -1) {
-          formState.skills.splice(idx, 1);
-          skillCard.classList.remove('selected');
-          skillCard.setAttribute('aria-pressed', 'false');
-          updateSkillCounter(wrapper);
-          updateSummary(wrapper);
-          NW_SFX.back();
-          return;
-        }
-
-        if (formState.skills.length >= (formState.skill_limit || 5)) {
-          setStatus('ERROR: You can select up to ' + (formState.skill_limit || 5) + ' skills for this class.', true);
-          NW_SFX.error();
-          return;
-        }
-
-        formState.skills.push(skillId);
-        skillCard.classList.add('selected');
-        skillCard.setAttribute('aria-pressed', 'true');
-        updateSkillCounter(wrapper);
-        updateSummary(wrapper);
-        setStatus('', false);
-        NW_SFX.select();
-        return;
-      }
-
-      var packageCard = target.closest('.tw-package-card');
-      if (packageCard) {
-        ev.preventDefault();
-
-        formState.starting_package_id = packageCard.dataset.packageId || '';
-        formState.starting_package_label = packageCard.dataset.packageName || '';
-        syncSingleSelection(wrapper, '.tw-package-card', formState.starting_package_id, 'packageId');
-        updateSummary(wrapper);
-        NW_SFX.select();
-        return;
-      }
-
-      var loreCard = target.closest('.tw-lore-card');
-      if (loreCard) {
-        ev.preventDefault();
-
-        var type = loreCard.dataset.choiceType;
-        var key = loreCard.dataset.choiceKey;
-
-        if (type && key) {
-          formState[type] = key;
-          qa(wrapper, '.tw-lore-card[data-choice-type="' + type + '"]').forEach(function (card) {
-            var selected = card === loreCard;
-            card.classList.toggle('selected', selected);
-            card.setAttribute('aria-pressed', selected ? 'true' : 'false');
-          });
-
-          recomputeBackstoryTags();
-          updateSummary(wrapper);
-          NW_SFX.select();
-        }
-        return;
-      }
-
-      var presetBtn = target.closest('.tw-attr-preset-btn');
-      if (presetBtn) {
-        ev.preventDefault();
-        applyPreset(wrapper, presetBtn.dataset.preset || '');
-        return;
-      }
-
-      var pip = target.closest('.tw-pip');
-      if (pip) {
-        ev.preventDefault();
-
-        var attrWrap = pip.closest('[data-attr]');
-        if (!attrWrap) return;
-
-        var attrKey = attrWrap.dataset.attr || '';
-        var pipVal = parseInt(pip.dataset.pip, 10) || ATTR_MIN;
-        setAttrValue(wrapper, attrKey, pipVal);
-        return;
-      }
-
-      var minusBtn = target.closest('.tw-attr-minus');
-      if (minusBtn) {
-        ev.preventDefault();
-
-        var minusWrap = minusBtn.closest('[data-attr]');
-        if (!minusWrap) return;
-
-        var minusKey = minusWrap.dataset.attr || '';
-        var minusCurrent = parseInt(formState['attr_' + minusKey], 10) || ATTR_MIN;
-        setAttrValue(wrapper, minusKey, Math.max(ATTR_MIN, minusCurrent - 1));
-        return;
-      }
-
-      var plusBtn = target.closest('.tw-attr-plus');
-      if (plusBtn) {
-        ev.preventDefault();
-
-        var plusWrap = plusBtn.closest('[data-attr]');
-        if (!plusWrap) return;
-
-        var plusKey = plusWrap.dataset.attr || '';
-        var plusCurrent = parseInt(formState['attr_' + plusKey], 10) || ATTR_MIN;
-        setAttrValue(wrapper, plusKey, Math.min(ATTR_MAX, plusCurrent + 1));
-        return;
-      }
-
-      var clearAvatarBtn = target.closest('#tw-char-avatar-clear, .tw-avatar-clear');
-      if (clearAvatarBtn) {
-        ev.preventDefault();
-        clearAvatar(wrapper);
-        return;
-      }
-
-      var submitBtn = target.closest('#tw-char-submit');
-      if (submitBtn) {
-        ev.preventDefault();
-
-        clearAllStepErrors(wrapper);
-
-        var valid = true;
-        for (var i = 0; i < steps.length; i += 1) {
-          if (!validateStep(wrapper, steps, i)) {
-            currentStep = i;
-            showStep(wrapper, steps, currentStep);
-            valid = false;
-            break;
-          }
-        }
-
-        if (!valid) return;
-
-        submitCharacter(wrapper, spinner);
-      }
+  function loadRaces() {
+    return fetchPost('neoweaver_get_races', {}).then(function (res) {
+      state.races = res && res.success && Array.isArray(res.data) ? res.data : [];
+      renderRaceGrid(state.races, '#tw-race-grid', 'race');
     });
   }
 
-  function initOne(wrapper) {
-    var steps = qa(wrapper, '.tw-char-step');
-    if (!steps.length) return;
+  function loadSubraces(parentId) {
+    var section = q('#tw-subrace-section', root);
+    var grid = q('#tw-subrace-grid', root);
+    if (!parentId) {
+      if (section) {
+        section.hidden = true;
+        section.style.display = 'none';
+      }
+      if (grid) grid.innerHTML = '';
+      return Promise.resolve();
+    }
+    return fetchPost('neoweaver_get_subraces', { parent: parentId }).then(function (res) {
+      state.subraces = res && res.success && Array.isArray(res.data) ? res.data : [];
+      if (section) {
+        section.hidden = !state.subraces.length;
+        section.style.display = state.subraces.length ? '' : 'none';
+      }
+      renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
+    });
+  }
 
-    var spinner = createSpinner(wrapper);
+  function loadClasses() {
+    return fetchPost('neoweaver_get_classes', {}).then(function (res) {
+      state.classes = res && res.success && Array.isArray(res.data) ? res.data : [];
+      renderClassGrid(state.classes);
+    });
+  }
 
-    clearAllStepErrors(wrapper);
-    renderAttrDisplay(wrapper);
-    recomputeBackstoryTags();
-    updateSkillCounter(wrapper);
-    updateSummary(wrapper);
-    hideSubraceSection(wrapper);
-    bindEvents(wrapper, steps, spinner);
-    showStep(wrapper, steps, 0);
+  function loadSkills() {
+    return fetchPost('neoweaver_get_skills', {}).then(function (res) {
+      state.skills_data = res && res.success && Array.isArray(res.data) ? res.data : [];
+      renderSkills(state.skills_data);
+    });
+  }
+
+  function loadPackages(classId) {
+    if (!classId) {
+      state.packages = [];
+      renderPackages([]);
+      return Promise.resolve();
+    }
+    return fetchPost('neoweaver_get_packages', { class_tag: classId }).then(function (res) {
+      state.packages = res && res.success && Array.isArray(res.data) ? res.data : [];
+      renderPackages(state.packages);
+    });
+  }
+
+  function initLoreSections() {
+    renderLoreOptions('#tw-origin-grid', DATA_ORIGIN_OPTIONS, 'data_origin');
+    renderLoreOptions('#tw-operation-grid', PREVIOUS_OPERATION_OPTIONS, 'previous_operation');
+    renderLoreOptions('#tw-crisis-grid', SYNC_CRISIS_OPTIONS, 'sync_crisis');
   }
 
   function init() {
-    qa(document, '.tw-character-creator, #tw-character-creator, .tw-char-creator').forEach(function (wrapper) {
-      initOne(wrapper);
+    root = document.getElementById('tw-char-creator-wrapper');
+    if (!root) return;
+
+    stepEls = qa('.tw-char-step', root);
+    if (!stepEls.length) return;
+
+    stepEls.forEach(function (step, index) {
+      var active = index === 0;
+      step.classList.toggle('active', active);
+      step.hidden = !active;
+      step.style.display = active ? '' : 'none';
+    });
+
+    clearStepErrors();
+    bindStaticEvents();
+    initLoreSections();
+    renderAvatarGallery();
+    updateAvatarPreview();
+    updateAttrUI();
+    updateSkillCounter();
+    updateStepUI();
+
+    Promise.all([
+      loadRaces(),
+      loadClasses(),
+      loadSkills()
+    ]).catch(function () {
+      setStatus('Some creator data could not be loaded.', 'error');
     });
   }
 
