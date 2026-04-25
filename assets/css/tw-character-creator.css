@@ -1355,3 +1355,159 @@ Scoped to: #tw-char-creator-wrapper
 .tw-package-card .tw-race-tag {
   display: inline-flex !important;
 }
+/* ===== PATCH: class cards + stronger error states ===== */
+
+/* Klasy — obsługa kilku wariantów markupu */
+.tw-class-card .tw-class-card__body,
+.tw-class-card .tw-race-body,
+.tw-class-card .tw-card-body,
+.tw-class-card [class*="cardbody"] {
+  display: flex !important;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tw-class-card .tw-class-card__name,
+.tw-class-card .tw-race-name,
+.tw-class-card .tw-card-title,
+.tw-class-card [class*="cardtitle"],
+.tw-class-card [class*="cardname"] {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.15 !important;
+  color: #fff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tw-class-card.selected .tw-class-card__name,
+.tw-class-card.selected .tw-race-name,
+.tw-class-card.selected .tw-card-title,
+.tw-class-card.selected [class*="cardtitle"],
+.tw-class-card.selected [class*="cardname"],
+.tw-class-card.is-selected .tw-class-card__name,
+.tw-class-card.is-selected .tw-race-name,
+.tw-class-card.is-selected .tw-card-title,
+.tw-class-card.is-selected [class*="cardtitle"],
+.tw-class-card.is-selected [class*="cardname"],
+.tw-class-card[aria-pressed="true"] .tw-class-card__name,
+.tw-class-card[aria-pressed="true"] .tw-race-name,
+.tw-class-card[aria-pressed="true"] .tw-card-title,
+.tw-class-card[aria-pressed="true"] [class*="cardtitle"],
+.tw-class-card[aria-pressed="true"] [class*="cardname"] {
+  color: var(--tw-acid) !important;
+  text-shadow: 0 0 8px var(--tw-acid);
+}
+
+.tw-class-card .tw-race-tags,
+.tw-class-card .tw-class-tags,
+.tw-class-card .tw-card-tags,
+.tw-class-card [class*="tags"] {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.tw-class-card .tw-race-tag,
+.tw-class-card .tw-class-tag,
+.tw-class-card .tw-tag,
+.tw-class-card [class*="tag"] {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(173,255,0,0.18);
+  background: rgba(173,255,0,0.06);
+  color: var(--tw-text-dim);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+/* Errory — zgodnie z JS: .is-error oraz .is-visible */
+.tw-char-status.is-error,
+.tw-char-status--error {
+  color: #ffe8ee !important;
+  border: 1px solid rgba(255, 68, 68, 0.7) !important;
+  background:
+    linear-gradient(180deg, rgba(90, 0, 0, 0.32), rgba(40, 0, 0, 0.72)) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 68, 68, 0.22) inset,
+    0 0 24px rgba(255, 68, 68, 0.22) !important;
+  text-shadow: 0 0 10px rgba(255, 90, 90, 0.2);
+}
+
+.tw-step-error,
+.tw-step-error.is-visible,
+.tw-step-error.visible {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 68, 68, 0.72) !important;
+  border-left: 5px solid #ff4444 !important;
+  background:
+    linear-gradient(180deg, rgba(70, 0, 0, 0.35), rgba(28, 0, 0, 0.82)) !important;
+  color: #fff1f3 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 68, 68, 0.16) inset,
+    0 0 26px rgba(255, 68, 68, 0.18);
+  animation: twErrorAlert 0.35s ease, twErrorPulse 1.6s ease-in-out 0.35s 2;
+}
+
+.tw-step-error-msg,
+.tw-step-error__msg {
+  color: #fff1f3 !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tw-step-error::before,
+.tw-step-error.is-visible::before,
+.tw-step-error.visible::before {
+  content: '⚠';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  color: #fff;
+  background: #ff4444;
+  box-shadow: 0 0 14px rgba(255, 68, 68, 0.45);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.tw-input--error,
+input.tw-input--error,
+textarea.tw-input--error,
+select.tw-input--error {
+  border-color: #ff4444 !important;
+  border-left-color: #ff4444 !important;
+  background: rgba(55, 0, 0, 0.35) !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 68, 68, 0.16),
+    0 0 18px rgba(255, 68, 68, 0.18) !important;
+}
+
+.tw-card--error,
+.tw-dynamic-grid.tw-card--error,
+.tw-option-grid.tw-card--error {
+  border-color: #ff4444 !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 68, 68, 0.14),
+    0 0 18px rgba(255, 68, 68, 0.14) inset !important;
+}
+
+@keyframes twErrorAlert {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes twErrorPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,68,68,0.16) inset, 0 0 18px rgba(255,68,68,0.12); }
+  50% { box-shadow: 0 0 0 1px rgba(255,68,68,0.24) inset, 0 0 30px rgba(255,68,68,0.28); }
+}
