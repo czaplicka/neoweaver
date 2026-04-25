@@ -1511,3 +1511,162 @@ select.tw-input--error {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255,68,68,0.16) inset, 0 0 18px rgba(255,68,68,0.12); }
   50% { box-shadow: 0 0 0 1px rgba(255,68,68,0.24) inset, 0 0 30px rgba(255,68,68,0.28); }
 }
+/* ===== PATCH: attribute presets + steppers ===== */
+
+/* Kontener presetów */
+.tw-attr-presets,
+.tw-attr-presets-wrap,
+.tw-attr-preset-list,
+[data-role="attr-presets"] {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 18px !important;
+  align-items: center;
+}
+
+/* Wszystkie przyciski presetów pokazujemy domyślnie */
+.tw-attr-preset-btn,
+.tw-attr-presets button,
+.tw-attr-presets .tw-btn,
+.tw-attr-presets [data-preset],
+.tw-attr-presets [data-attr-preset] {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(173,255,0,0.18);
+  background: rgba(255,255,255,0.03);
+  color: var(--tw-text-dim);
+  cursor: pointer;
+  transition: all 180ms ease;
+  font-family: inherit;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Hover / active */
+.tw-attr-preset-btn:hover,
+.tw-attr-presets button:hover,
+.tw-attr-presets .tw-btn:hover,
+.tw-attr-presets [data-preset]:hover,
+.tw-attr-presets [data-attr-preset]:hover,
+.tw-attr-preset-btn.active,
+.tw-attr-presets button.active,
+.tw-attr-presets .tw-btn.active,
+.tw-attr-presets [data-preset].active,
+.tw-attr-presets [data-attr-preset].active {
+  border-color: var(--tw-acid) !important;
+  background: rgba(173,255,0,0.08) !important;
+  color: var(--tw-acid) !important;
+  box-shadow: 0 0 18px rgba(173,255,0,0.18);
+}
+
+/* Ukrywamy tylko Agile i Tank */
+.tw-attr-preset-btn[data-preset="agile"],
+.tw-attr-preset-btn[data-preset="tank"],
+.tw-attr-presets [data-preset="agile"],
+.tw-attr-presets [data-preset="tank"],
+.tw-attr-presets [data-attr-preset="agile"],
+.tw-attr-presets [data-attr-preset="tank"] {
+  display: none !important;
+}
+
+/* Wymuszamy widoczność Gunslinger / Genius / Warlock */
+.tw-attr-preset-btn[data-preset="gunslinger"],
+.tw-attr-preset-btn[data-preset="genius"],
+.tw-attr-preset-btn[data-preset="warlock"],
+.tw-attr-presets [data-preset="gunslinger"],
+.tw-attr-presets [data-preset="genius"],
+.tw-attr-presets [data-preset="warlock"],
+.tw-attr-presets [data-attr-preset="gunslinger"],
+.tw-attr-presets [data-attr-preset="genius"],
+.tw-attr-presets [data-attr-preset="warlock"] {
+  display: inline-flex !important;
+}
+
+/* Jeśli preset labels są zwykłymi tekstami */
+.tw-attr-presets button[aria-label*="gunslinger" i],
+.tw-attr-presets button[aria-label*="genius" i],
+.tw-attr-presets button[aria-label*="warlock" i],
+.tw-attr-presets button[title*="gunslinger" i],
+.tw-attr-presets button[title*="genius" i],
+.tw-attr-presets button[title*="warlock" i] {
+  display: inline-flex !important;
+}
+
+/* Stepper atrybutów */
+.tw-attr-controls,
+.tw-attr-stepper,
+[data-role="attr-stepper"] {
+  display: flex !important;
+}
+
+.tw-attr-controls {
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  min-width: 150px;
+}
+
+.tw-attr-stepper,
+[data-role="attr-stepper"] {
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: nowrap;
+}
+
+/* Plus/minus */
+.tw-attr-btn,
+.tw-attr-stepper button,
+[data-role="attr-stepper"] button,
+button[data-action="minus"],
+button[data-action="plus"],
+button[aria-label*="minus" i],
+button[aria-label*="plus" i] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  border: 1px solid rgba(173,255,0,0.18) !important;
+  background: rgba(255,255,255,0.03) !important;
+  color: var(--tw-acid) !important;
+  cursor: pointer !important;
+  font-size: 1.2rem !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.tw-attr-btn:hover:not(:disabled),
+.tw-attr-stepper button:hover:not(:disabled),
+[data-role="attr-stepper"] button:hover:not(:disabled),
+button[data-action="minus"]:hover:not(:disabled),
+button[data-action="plus"]:hover:not(:disabled) {
+  background: rgba(173,255,0,0.10) !important;
+  border-color: rgba(173,255,0,0.32) !important;
+  box-shadow: 0 0 14px rgba(173,255,0,0.16);
+}
+
+.tw-attr-btn:disabled,
+.tw-attr-stepper button:disabled,
+[data-role="attr-stepper"] button:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+}
+
+/* Pole wartości zostaje widoczne */
+.tw-attr-val,
+.tw-attr-stepper input,
+[data-role="attr-stepper"] input {
+  display: inline-block !important;
+  width: 64px !important;
+  text-align: center !important;
+}
