@@ -1257,3 +1257,101 @@ Scoped to: #tw-char-creator-wrapper
     max-height: 130px;
   }
 }
+/* ===== PATCH: race selection + subrace + tags/bonus ===== */
+
+.tw-race-card.selected,
+.tw-subrace-card.selected,
+.tw-race-card.is-selected,
+.tw-subrace-card.is-selected,
+.tw-race-card[aria-pressed="true"],
+.tw-subrace-card[aria-pressed="true"],
+.tw-race-card[data-selected="true"],
+.tw-subrace-card[data-selected="true"] {
+  border-color: var(--tw-acid) !important;
+  background: rgba(173,255,0,0.08) !important;
+  box-shadow: 0 0 28px rgba(173,255,0,0.18) inset, 0 0 14px rgba(173,255,0,0.22) !important;
+}
+
+.tw-race-card.selected .tw-race-name,
+.tw-subrace-card.selected .tw-race-name,
+.tw-race-card.is-selected .tw-race-name,
+.tw-subrace-card.is-selected .tw-race-name,
+.tw-race-card[aria-pressed="true"] .tw-race-name,
+.tw-subrace-card[aria-pressed="true"] .tw-race-name,
+.tw-race-card[data-selected="true"] .tw-race-name,
+.tw-subrace-card[data-selected="true"] .tw-race-name {
+  color: var(--tw-acid) !important;
+  text-shadow: 0 0 8px var(--tw-acid);
+}
+
+.tw-race-card.selected::after,
+.tw-subrace-card.selected::after,
+.tw-race-card.is-selected::after,
+.tw-subrace-card.is-selected::after,
+.tw-race-card[aria-pressed="true"]::after,
+.tw-subrace-card[aria-pressed="true"]::after,
+.tw-race-card[data-selected="true"]::after,
+.tw-subrace-card[data-selected="true"]::after {
+  content: '✓';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tw-acid);
+  color: #000;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(173,255,0,0.42);
+  z-index: 2;
+}
+
+.tw-subrace-section,
+#tw-subrace-section,
+[data-role="subrace-section"] {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(173,255,0,0.12);
+}
+
+.tw-subrace-section[hidden],
+#tw-subrace-section[hidden],
+[data-role="subrace-section"][hidden],
+.tw-subrace-section.is-hidden,
+#tw-subrace-section.is-hidden,
+[data-role="subrace-section"].is-hidden {
+  display: none !important;
+}
+
+.tw-subrace-section:not([hidden]),
+#tw-subrace-section:not([hidden]),
+[data-role="subrace-section"]:not([hidden]),
+.tw-subrace-section.is-visible,
+#tw-subrace-section.is-visible,
+[data-role="subrace-section"].is-visible {
+  display: block !important;
+}
+
+.tw-race-tags {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tw-race-bonus {
+  display: block !important;
+  margin: 0;
+  color: #a9b3ab;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.tw-race-card .tw-race-tag,
+.tw-subrace-card .tw-race-tag,
+.tw-class-card .tw-race-tag,
+.tw-package-card .tw-race-tag {
+  display: inline-flex !important;
+}
