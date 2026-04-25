@@ -58,40 +58,40 @@
   ];
 
   var state = {
-    character_name: '',
-    pronouns: '',
-    pronouns_custom: '',
-    race: '',
-    race_label: '',
-    subrace: '',
-    subrace_label: '',
-    char_class: '',
-    class_label: '',
-    skill_limit: 3,
-    skills: [],
-    starting_package_id: '',
-    starting_package_label: '',
-    data_origin: '',
-    data_origin_label: '',
-    previous_operation: '',
-    previous_operation_label: '',
-    sync_crisis: '',
-    sync_crisis_label: '',
-    backstory_tags: [],
-    avatar_file: null,
-    avatar_url: '',
-    bio: '',
-    attr_body: ATTR_MIN,
-    attr_reflex: ATTR_MIN,
-    attr_mind: ATTR_MIN,
-    attr_spirit: ATTR_MIN,
-    races: [],
-    subraces: [],
-    classes: [],
-    skills_data: [],
-    packages: []
-  };
-
+  character_name: '',
+  pronouns: '',
+  pronouns_custom: '',
+  race: '',
+  race_label: '',
+  subrace: '',
+  subrace_label: '',
+  char_class: '',
+  class_label: '',
+  class_slug: '',
+  skill_limit: 3,
+  skills: [],
+  starting_package_id: '',
+  starting_package_label: '',
+  data_origin: '',
+  data_origin_label: '',
+  previous_operation: '',
+  previous_operation_label: '',
+  sync_crisis: '',
+  sync_crisis_label: '',
+  backstory_tags: [],
+  avatar_file: null,
+  avatar_url: '',
+  bio: '',
+  attr_body: ATTR_MIN,
+  attr_reflex: ATTR_MIN,
+  attr_mind: ATTR_MIN,
+  attr_spirit: ATTR_MIN,
+  races: [],
+  subraces: [],
+  classes: [],
+  skills_data: [],
+  packages: []
+};
   var currentStep = 0;
   var root = null;
   var stepEls = [];
@@ -463,24 +463,26 @@
     }).join('');
   }
 
-  function renderClassGrid(rows) {
-    var target = q('#tw-class-grid', root);
-    if (!target) return;
-    if (!Array.isArray(rows) || !rows.length) {
-      target.innerHTML = '<div class="tw-empty-state">No classes available.</div>';
-      return;
-    }
-    target.innerHTML = rows.map(function (row) {
-      return '' +
-        '<button type="button" class="tw-class-card" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || '') + '" data-limit="' + esc(row.skill_limit || 3) + '">' +
-          buildImage(row.img_url || row.icon_slug, row.name || '', 'tw-class-cardimg-wrap', 'CLASS') +
-          '<div class="tw-class-cardbody">' +
-            '<h3 class="tw-class-cardname">' + esc(row.name || '') + '</h3>' +
-            buildTagPills(row.tags || []) +
-          '</div>' +
-        '</button>';
-    }).join('');
+function renderClassGrid(rows) {
+  var target = q('#tw-class-grid', root);
+  if (!target) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    target.innerHTML = '<div class="tw-empty-state">No classes available.</div>';
+    return;
   }
+
+  target.innerHTML = rows.map(function (row) {
+    var className = row.name || '';
+    return '' +
+      '<button type="button" class="tw-class-card" data-id="' + esc(row.id) + '" data-name="' + esc(className) + '" data-slug="' + esc(slugify(className)) + '" data-limit="' + esc(row.skill_limit || 3) + '">' +
+        buildImage(row.img_url || row.icon_slug, className, 'tw-class-cardimg-wrap', 'CLASS') +
+        '<div class="tw-class-cardbody">' +
+          '<h3 class="tw-class-cardname">' + esc(className) + '</h3>' +
+          buildTagPills(row.tags || []) +
+        '</div>' +
+      '</button>';
+  }).join('');
+}
 
   function renderSkills(rows) {
     var target = q('#tw-skill-grid', root);
@@ -647,26 +649,25 @@
 var raceCard = e.target.closest('.tw-race-card');
 if (raceCard) {
   var mode = raceCard.getAttribute('data-mode');
-  var id = raceCard.getAttribute('data-id');
-  var name = raceCard.getAttribute('data-name');
+  var id = raceCard.getAttribute('data-id') || '';
+  var name = raceCard.getAttribute('data-name') || '';
 
   if (mode === 'race') {
-    // wybór rasy bazowej
     state.race = id;
     state.race_label = name;
     state.subrace = '';
     state.subrace_label = '';
+    state.subraces = [];
 
-    // zaznaczamy tę rasę
     selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
 
-    // czyścimy panel subras i pokazujemy go zanim przyjdą dane
     var subraceSection = q('#tw-subrace-section', root);
     var subraceGrid = q('#tw-subrace-grid', root);
 
     if (subraceGrid) {
-      subraceGrid.innerHTML = '';
+      subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
     }
+
     if (subraceSection) {
       subraceSection.hidden = false;
       subraceSection.classList.remove('is-hidden');
@@ -674,30 +675,43 @@ if (raceCard) {
       subraceSection.style.display = 'block';
     }
 
-    loadSubraces(id);
-  } else {
-    // wybór subrasy
+    loadSubraces(id, name);
+  } else if (mode === 'subrace') {
     state.subrace = id;
     state.subrace_label = name;
     selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+    setStatus('', '');
   }
 
   return;
 }
 
-      var classCard = e.target.closest('.tw-class-card');
-      if (classCard) {
-        state.char_class = classCard.getAttribute('data-id') || '';
-        state.class_label = classCard.getAttribute('data-name') || '';
-        state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
-        state.skills = [];
-        state.starting_package_id = '';
-        state.starting_package_label = '';
-        selectExclusive('.tw-class-card', classCard);
-        renderSkills(state.skills_data);
-        loadPackages(state.char_class);
-        return;
-      }
+var classCard = e.target.closest('.tw-class-card');
+if (classCard) {
+  state.char_class = classCard.getAttribute('data-id') || '';
+  state.class_label = classCard.getAttribute('data-name') || '';
+  state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
+  state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
+
+  state.skills = [];
+  state.starting_package_id = '';
+  state.starting_package_label = '';
+  state.packages = [];
+
+  selectExclusive('.tw-class-card', classCard);
+  renderSkills(state.skills_data);
+  renderPackages([]);
+
+  loadPackages(state.char_class).then(function () {
+    if (!state.packages.length) {
+      setStatus('No starting packages found for class: ' + state.class_label, 'error');
+    } else {
+      setStatus('', '');
+    }
+  });
+
+  return;
+}
 
       var skillCard = e.target.closest('.tw-skill-card');
       if (skillCard) {
@@ -819,41 +833,102 @@ if (raceCard) {
     });
   }
 
-  function loadSubraces(parentId) {
+  function loadSubraces(parentId, parentName) {
   var section = q('#tw-subrace-section', root);
   var grid = q('#tw-subrace-grid', root);
 
-  // reset stanu subrasy
   state.subrace = '';
   state.subrace_label = '';
   state.subraces = [];
 
-  // czyścimy grid
   if (grid) {
     grid.innerHTML = '';
   }
 
-  // brak parentId -> chowamy panel subras
-  if (!parentId) {
+  if (!parentId && !parentName) {
     if (section) {
       section.hidden = true;
       section.classList.remove('is-visible');
       section.classList.add('is-hidden');
       section.style.display = 'none';
     }
-    return Promise.resolve();
+    return Promise.resolve([]);
   }
 
-  // pokaż loader / placeholder w gridzie
   if (grid) {
     grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
   }
+
   if (section) {
     section.hidden = false;
     section.classList.remove('is-hidden');
     section.classList.add('is-visible');
     section.style.display = 'block';
   }
+
+  function applyRows(rows) {
+    state.subraces = Array.isArray(rows) ? rows : [];
+
+    if (!state.subraces.length) {
+      if (section) {
+        section.hidden = true;
+        section.classList.remove('is-visible');
+        section.classList.add('is-hidden');
+        section.style.display = 'none';
+      }
+      if (grid) {
+        grid.innerHTML = '';
+      }
+      return [];
+    }
+
+    if (section) {
+      section.hidden = false;
+      section.classList.remove('is-hidden');
+      section.classList.add('is-visible');
+      section.style.display = 'block';
+    }
+
+    renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
+    return state.subraces;
+  }
+
+  function fetchByParent(parentValue) {
+    if (!parentValue) return Promise.resolve([]);
+    return fetchPost('neoweaver_get_subraces', { parent: parentValue })
+      .then(function (res) {
+        if (res && res.success && Array.isArray(res.data)) {
+          return res.data;
+        }
+        return [];
+      })
+      .catch(function () {
+        return [];
+      });
+  }
+
+  return fetchByParent(parentId)
+    .then(function (rows) {
+      if (Array.isArray(rows) && rows.length) {
+        return applyRows(rows);
+      }
+      return fetchByParent(parentName).then(applyRows);
+    })
+    .then(function (rows) {
+      if (!rows.length) {
+        setStatus('', '');
+      }
+      return rows;
+    })
+    .catch(function () {
+      state.subraces = [];
+      if (grid) {
+        grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
+      }
+      setStatus('Could not load subraces.', 'error');
+      return [];
+    });
+}
 
   return fetchPost('neoweaver_get_subraces', { parent: parentId }).then(function (res) {
     if (!res || !res.success || !Array.isArray(res.data)) {
@@ -909,17 +984,42 @@ if (raceCard) {
     });
   }
 
-  function loadPackages(classId) {
-    if (!classId) {
+function loadPackages(classId) {
+  if (!classId) {
+    state.packages = [];
+    renderPackages([]);
+    return Promise.resolve([]);
+  }
+
+  return fetchPost('neoweaver_get_packages', { class_tag: classId })
+    .then(function (res) {
+      var rows = [];
+
+      if (res && res.success && Array.isArray(res.data)) {
+        rows = res.data;
+      } else if (res && Array.isArray(res.data)) {
+        rows = res.data;
+      } else if (res && res.success && res.data && Array.isArray(res.data.rows)) {
+        rows = res.data.rows;
+      }
+
+      state.packages = rows;
+      renderPackages(state.packages);
+
+      return rows;
+    })
+    .catch(function (err) {
       state.packages = [];
       renderPackages([]);
-      return Promise.resolve();
-    }
-    return fetchPost('neoweaver_get_packages', { class_tag: classId }).then(function (res) {
-      state.packages = res && res.success && Array.isArray(res.data) ? res.data : [];
-      renderPackages(state.packages);
+      setStatus(
+        err && err.message
+          ? err.message
+          : 'Could not load starting packages.',
+        'error'
+      );
+      return [];
     });
-  }
+}
 
   function initLoreSections() {
     renderLoreOptions('#tw-origin-grid', DATA_ORIGIN_OPTIONS, 'data_origin');
