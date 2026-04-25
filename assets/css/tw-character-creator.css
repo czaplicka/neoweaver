@@ -1670,3 +1670,20 @@ button[data-action="plus"]:hover:not(:disabled) {
   width: 64px !important;
   text-align: center !important;
 }
+/* FIX 1: step error ma być ukryty domyślnie */
+.tw-step-error {
+  display: none !important;
+}
+
+.tw-step-error.is-visible,
+.tw-step-error.visible {
+  display: flex !important;
+}
+.tw-step-error {
+  display: none !important;
+}
+
+.tw-step-error.is-visible,
+.tw-step-error.visible {
+  display: flex !important;
+}
