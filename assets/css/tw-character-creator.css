@@ -1670,7 +1670,6 @@ button[data-action="plus"]:hover:not(:disabled) {
   width: 64px !important;
   text-align: center !important;
 }
-/* FIX 1: step error ma być ukryty domyślnie */
 .tw-step-error {
   display: none !important;
 }
@@ -1679,11 +1678,21 @@ button[data-action="plus"]:hover:not(:disabled) {
 .tw-step-error.visible {
   display: flex !important;
 }
-.tw-step-error {
+/* Rasy: ma być nazwa + tagi + bonus, bez opisów */
+.tw-race-name {
+  display: block !important;
+  color: #fff !important;
+}
+
+.tw-race-desc {
   display: none !important;
 }
 
-.tw-step-error.is-visible,
-.tw-step-error.visible {
-  display: flex !important;
+/* Bonus ma być widoczny */
+.tw-race-bonus {
+  display: block !important;
+  margin: 0;
+  color: #a9b3ab;
+  line-height: 1.45;
+  font-size: 0.9rem;
 }
