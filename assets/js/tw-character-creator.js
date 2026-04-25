@@ -58,40 +58,41 @@
   ];
 
   var state = {
-  character_name: '',
-  pronouns: '',
-  pronouns_custom: '',
-  race: '',
-  race_label: '',
-  subrace: '',
-  subrace_label: '',
-  char_class: '',
-  class_label: '',
-  class_slug: '',
-  skill_limit: 3,
-  skills: [],
-  starting_package_id: '',
-  starting_package_label: '',
-  data_origin: '',
-  data_origin_label: '',
-  previous_operation: '',
-  previous_operation_label: '',
-  sync_crisis: '',
-  sync_crisis_label: '',
-  backstory_tags: [],
-  avatar_file: null,
-  avatar_url: '',
-  bio: '',
-  attr_body: ATTR_MIN,
-  attr_reflex: ATTR_MIN,
-  attr_mind: ATTR_MIN,
-  attr_spirit: ATTR_MIN,
-  races: [],
-  subraces: [],
-  classes: [],
-  skills_data: [],
-  packages: []
-};
+    character_name: '',
+    pronouns: '',
+    pronouns_custom: '',
+    race: '',
+    race_label: '',
+    subrace: '',
+    subrace_label: '',
+    char_class: '',
+    class_label: '',
+    class_slug: '',
+    skill_limit: 3,
+    skills: [],
+    starting_package_id: '',
+    starting_package_label: '',
+    data_origin: '',
+    data_origin_label: '',
+    previous_operation: '',
+    previous_operation_label: '',
+    sync_crisis: '',
+    sync_crisis_label: '',
+    backstory_tags: [],
+    avatar_file: null,
+    avatar_url: '',
+    bio: '',
+    attr_body: ATTR_MIN,
+    attr_reflex: ATTR_MIN,
+    attr_mind: ATTR_MIN,
+    attr_spirit: ATTR_MIN,
+    races: [],
+    subraces: [],
+    classes: [],
+    skills_data: [],
+    packages: []
+  };
+
   var currentStep = 0;
   var root = null;
   var stepEls = [];
@@ -129,7 +130,12 @@
   }
 
   function slugify(str) {
-    return String(str || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    return String(str || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
   function fetchPost(action, extraData) {
@@ -196,7 +202,9 @@
 
     if (stepCurrent) stepCurrent.textContent = String(currentStep + 1);
     if (progressFill) progressFill.style.width = (((currentStep + 1) / TOTAL_STEPS) * 100) + '%';
-    if (progressPhase && stepEls[currentStep]) progressPhase.textContent = stepEls[currentStep].getAttribute('data-phase') || '';
+    if (progressPhase && stepEls[currentStep]) {
+      progressPhase.textContent = stepEls[currentStep].getAttribute('data-phase') || '';
+    }
 
     qa('.tw-progress-tick', root).forEach(function (tick, index) {
       tick.classList.toggle('active', index <= currentStep);
@@ -213,7 +221,9 @@
   function buildTagPills(tags) {
     if (!Array.isArray(tags) || !tags.length) return '';
     return '<div class="tw-card-tags">' + tags.map(function (tag) {
-      var name = typeof tag === 'string' ? tag : (tag && (tag.name || tag.label) ? (tag.name || tag.label) : '');
+      var name = typeof tag === 'string'
+        ? tag
+        : (tag && (tag.name || tag.label) ? (tag.name || tag.label) : '');
       return '<span class="tw-card-tag">' + esc(name) + '</span>';
     }).join('') + '</div>';
   }
@@ -228,22 +238,31 @@
 
   function selectExclusive(selector, activeEl) {
     qa(selector, root).forEach(function (el) {
-      el.classList.toggle('is-selected', el === activeEl);
-      el.setAttribute('aria-pressed', el === activeEl ? 'true' : 'false');
+      var selected = el === activeEl;
+      el.classList.toggle('is-selected', selected);
+      el.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
   }
 
   function resolveBackstoryTags() {
     var ids = [];
     [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
-      var source = index === 0 ? DATA_ORIGIN_OPTIONS : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
-      var item = source.find(function (opt) { return opt.key === key; });
+      var source = index === 0
+        ? DATA_ORIGIN_OPTIONS
+        : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
+
+      var item = source.find(function (opt) {
+        return opt.key === key;
+      });
+
       if (!item) return;
+
       [item.bonus_tag, item.flaw_tag].forEach(function (label) {
         var id = TAG_DEFS[slugify(label)];
         if (id && ids.indexOf(id) === -1) ids.push(id);
       });
     });
+
     state.backstory_tags = ids;
   }
 
@@ -260,6 +279,7 @@
       var value = Number(state['attr_' + key]);
       var input = q('#tw-attr-' + key, root);
       if (input) input.value = String(value);
+
       var row = q('.tw-attr-row[data-attr="' + key + '"]', root);
       if (row) {
         qa('.tw-pip', row).forEach(function (pip, index) {
@@ -267,6 +287,7 @@
         });
       }
     });
+
     var rem = q('#tw-attr-remaining', root);
     if (rem) rem.textContent = String(getAttrRemaining());
   }
@@ -285,13 +306,20 @@
       balanced: { body: 3, reflex: 3, mind: 3, spirit: 3 },
       agile: { body: 2, reflex: 4, mind: 3, spirit: 3 },
       tank: { body: 5, reflex: 2, mind: 2, spirit: 3 },
-      bodybuilder: { body: 5, reflex: 3, mind: 2, spirit: 2 }
+      bodybuilder: { body: 5, reflex: 3, mind: 2, spirit: 2 },
+      gunslinger: { body: 2, reflex: 5, mind: 3, spirit: 2 },
+      genius: { body: 2, reflex: 2, mind: 5, spirit: 3 },
+      warlock: { body: 2, reflex: 2, mind: 3, spirit: 5 }
     };
+
     if (!presets[name]) return;
+
     ATTR_KEYS.forEach(function (key) {
       state['attr_' + key] = presets[name][key];
     });
+
     updateAttrUI();
+
     qa('.tw-attr-preset-btn', root).forEach(function (btn) {
       btn.setAttribute('aria-pressed', btn.getAttribute('data-preset') === name ? 'true' : 'false');
     });
@@ -304,11 +332,16 @@
 
   function updateSummary() {
     resolveBackstoryTags();
-    var raceText = state.subrace_label ? (state.race_label + ' / ' + state.subrace_label) : state.race_label;
+
+    var raceText = state.subrace_label
+      ? (state.race_label + ' / ' + state.subrace_label)
+      : state.race_label;
+
     var skillsText = state.skills.map(function (id) {
       var item = state.skills_data.find(function (s) { return s.id === id; });
       return item ? item.name : id;
     }).join(', ');
+
     var tagsText = state.backstory_tags.map(function (id) {
       var pair = Object.keys(TAG_DEFS).find(function (key) { return TAG_DEFS[key] === id; }) || String(id);
       return pair;
@@ -327,7 +360,7 @@
       '#tw-summary-crisis': state.sync_crisis_label || '—',
       '#tw-summary-tag-bundle': tagsText || '—',
       '#tw-summary-bio': state.bio || '—',
-      '#tw-summary-avatar': (state.avatar_file ? state.avatar_file.name : (state.avatar_url ? 'Gallery avatar selected' : '—'))
+      '#tw-summary-avatar': state.avatar_file ? state.avatar_file.name : (state.avatar_url ? 'Gallery avatar selected' : '—')
     };
 
     Object.keys(map).forEach(function (selector) {
@@ -337,86 +370,73 @@
   }
 
   function validateStep(index) {
-  // KROK 0: tożsamość
-  if (index === 0) {
-    state.character_name = q('#tw-char-name', root)?.value.trim() || '';
-    var checked = q('input[name="tw-char-pronouns"]:checked', root);
-    state.pronouns = checked ? checked.value : '';
-    state.pronouns_custom = q('#tw-char-pronouns-custom', root)?.value.trim() || '';
+    if (index === 0) {
+      state.character_name = q('#tw-char-name', root) ? q('#tw-char-name', root).value.trim() : '';
+      var checked = q('input[name="tw-char-pronouns"]:checked', root);
+      state.pronouns = checked ? checked.value : '';
+      state.pronouns_custom = q('#tw-char-pronouns-custom', root) ? q('#tw-char-pronouns-custom', root).value.trim() : '';
 
-    if (!state.character_name) return 'Character name is required.';
-    if (!state.pronouns) return 'Pronouns are required.';
-    if (state.pronouns === 'custom' && !state.pronouns_custom) {
-      return 'Custom pronouns are required.';
+      if (!state.character_name) return 'Character name is required.';
+      if (!state.pronouns) return 'Pronouns are required.';
+      if (state.pronouns === 'custom' && !state.pronouns_custom) {
+        return 'Custom pronouns are required.';
+      }
     }
-  }
 
-  // KROK 1: rasa + subrasa
-  if (index === 1) {
-    if (!state.race) return 'Choose a race.';
-
-    // jeżeli są subrasy dla wybranej rasy – wymagamy subrasy
-    if (Array.isArray(state.subraces) && state.subraces.length > 0 && !state.subrace) {
-      return 'Choose a subrace to continue.';
+    if (index === 1) {
+      if (!state.race) return 'Choose a race.';
+      if (Array.isArray(state.subraces) && state.subraces.length > 0 && !state.subrace) {
+        return 'Choose a subrace to continue.';
+      }
     }
-  }
 
-  // KROK 2: klasa
-  if (index === 2) {
-    if (!state.char_class) return 'Choose a class.';
-  }
-
-  // KROK 3: atrybuty
-  if (index === 3) {
-    if (getAttrTotal() !== ATTR_POOL) {
-      return 'Attribute total must equal ' + ATTR_POOL + '.';
+    if (index === 2) {
+      if (!state.char_class) return 'Choose a class.';
     }
-  }
 
-  // KROK 4: skille
-  if (index === 4) {
-    if (!state.skills.length) return 'Choose at least one skill.';
-    if (state.skills.length > state.skill_limit) {
-      return 'Too many skills selected for this class.';
+    if (index === 3) {
+      if (getAttrTotal() !== ATTR_POOL) {
+        return 'Attribute total must equal ' + ATTR_POOL + '.';
+      }
     }
-  }
 
-  // KROK 5: paczka startowa
-  if (index === 5) {
-    if (!state.starting_package_id) return 'Choose a starting package.';
-  }
-
-  // KROK 6: data origin
-  if (index === 6) {
-    if (!state.data_origin) return 'Choose data origin.';
-  }
-
-  // KROK 7: previous operation
-  if (index === 7) {
-    if (!state.previous_operation) return 'Choose previous operation.';
-  }
-
-  // KROK 8: sync crisis / backstory tags
-  if (index === 8) {
-    if (!state.sync_crisis) return 'Choose sync crisis.';
-    resolveBackstoryTags();
-    if (!state.backstory_tags.length) {
-      return 'Backstory tags could not be resolved.';
+    if (index === 4) {
+      if (!state.skills.length) return 'Choose at least one skill.';
+      if (state.skills.length > state.skill_limit) {
+        return 'Too many skills selected for this class.';
+      }
     }
-  }
 
-  // KROK 9: bio (opcjonalne – ale odświeżamy stan)
-  if (index === 9) {
-    state.bio = q('#tw-char-bio', root)?.value.trim() || '';
-  }
+    if (index === 5) {
+      if (!state.starting_package_id) return 'Choose a starting package.';
+    }
 
-  // KROK 10: review – zawsze odświeżamy summary
-  if (index === 10) {
-    updateSummary();
-  }
+    if (index === 6) {
+      if (!state.data_origin) return 'Choose data origin.';
+    }
 
-  return '';
-}
+    if (index === 7) {
+      if (!state.previous_operation) return 'Choose previous operation.';
+    }
+
+    if (index === 8) {
+      if (!state.sync_crisis) return 'Choose sync crisis.';
+      resolveBackstoryTags();
+      if (!state.backstory_tags.length) {
+        return 'Backstory tags could not be resolved.';
+      }
+    }
+
+    if (index === 9) {
+      state.bio = q('#tw-char-bio', root) ? q('#tw-char-bio', root).value.trim() : '';
+    }
+
+    if (index === 10) {
+      updateSummary();
+    }
+
+    return '';
+  }
 
   function goToStep(index) {
     if (index < 0 || index >= stepEls.length) return;
@@ -445,52 +465,60 @@
   function renderRaceGrid(rows, targetSel, mode) {
     var target = q(targetSel, root);
     if (!target) return;
+
     if (!Array.isArray(rows) || !rows.length) {
       target.innerHTML = '<div class="tw-empty-state">No options available.</div>';
       return;
     }
+
     target.innerHTML = rows.map(function (row) {
       var tags = Array.isArray(row.tags) ? row.tags : [];
       var img = buildImage(row.img_url || row.img, row.name || row.label, 'tw-race-img', 'RACE');
+      var bonus = Array.isArray(row.bonus) ? row.bonus.join(', ') : '';
+
       return '' +
         '<button type="button" class="tw-race-card" data-mode="' + esc(mode) + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.label || '') + '">' +
           img +
           '<div class="tw-race-body">' +
             '<h3 class="tw-race-name">' + esc(row.name || row.label || '') + '</h3>' +
+            (bonus ? '<p class="tw-race-bonus">' + esc(bonus) + '</p>' : '') +
             buildTagPills(tags) +
           '</div>' +
         '</button>';
     }).join('');
   }
 
-function renderClassGrid(rows) {
-  var target = q('#tw-class-grid', root);
-  if (!target) return;
-  if (!Array.isArray(rows) || !rows.length) {
-    target.innerHTML = '<div class="tw-empty-state">No classes available.</div>';
-    return;
-  }
+  function renderClassGrid(rows) {
+    var target = q('#tw-class-grid', root);
+    if (!target) return;
 
-  target.innerHTML = rows.map(function (row) {
-    var className = row.name || '';
-    return '' +
-      '<button type="button" class="tw-class-card" data-id="' + esc(row.id) + '" data-name="' + esc(className) + '" data-slug="' + esc(slugify(className)) + '" data-limit="' + esc(row.skill_limit || 3) + '">' +
-        buildImage(row.img_url || row.icon_slug, className, 'tw-class-cardimg-wrap', 'CLASS') +
-        '<div class="tw-class-cardbody">' +
-          '<h3 class="tw-class-cardname">' + esc(className) + '</h3>' +
-          buildTagPills(row.tags || []) +
-        '</div>' +
-      '</button>';
-  }).join('');
-}
+    if (!Array.isArray(rows) || !rows.length) {
+      target.innerHTML = '<div class="tw-empty-state">No classes available.</div>';
+      return;
+    }
+
+    target.innerHTML = rows.map(function (row) {
+      var className = row.name || '';
+      return '' +
+        '<button type="button" class="tw-class-card" data-id="' + esc(row.id) + '" data-name="' + esc(className) + '" data-slug="' + esc(slugify(className)) + '" data-limit="' + esc(row.skill_limit || 3) + '">' +
+          buildImage(row.img_url || row.icon_slug, className, 'tw-class-cardimg-wrap', 'CLASS') +
+          '<div class="tw-class-cardbody">' +
+            '<h3 class="tw-class-cardname">' + esc(className) + '</h3>' +
+            buildTagPills(row.tags || []) +
+          '</div>' +
+        '</button>';
+    }).join('');
+  }
 
   function renderSkills(rows) {
     var target = q('#tw-skill-grid', root);
     if (!target) return;
+
     if (!Array.isArray(rows) || !rows.length) {
       target.innerHTML = '<div class="tw-empty-state">No skills available.</div>';
       return;
     }
+
     target.innerHTML = rows.map(function (row) {
       var selected = state.skills.indexOf(row.id) !== -1;
       return '' +
@@ -502,16 +530,19 @@ function renderClassGrid(rows) {
           '</div>' +
         '</button>';
     }).join('');
+
     updateSkillCounter();
   }
 
   function renderPackages(rows) {
     var target = q('#tw-package-grid', root);
     if (!target) return;
+
     if (!Array.isArray(rows) || !rows.length) {
       target.innerHTML = '<div class="tw-empty-state">No packages available for this class.</div>';
       return;
     }
+
     target.innerHTML = rows.map(function (row) {
       var selected = state.starting_package_id === row.id;
       return '' +
@@ -527,6 +558,7 @@ function renderClassGrid(rows) {
   function renderLoreOptions(targetSel, rows, typeKey) {
     var target = q(targetSel, root);
     if (!target) return;
+
     target.innerHTML = rows.map(function (row) {
       var selected = state[typeKey] === row.key;
       return '' +
@@ -545,7 +577,9 @@ function renderClassGrid(rows) {
   function renderAvatarGallery() {
     var target = q('#tw-avatar-gallery', root);
     if (!target) return;
+
     var gallery = Array.isArray(cfg.avatar_gallery) ? cfg.avatar_gallery : [];
+
     target.innerHTML = gallery.map(function (item) {
       var selected = state.avatar_url === item.url;
       return '' +
@@ -559,27 +593,33 @@ function renderClassGrid(rows) {
     var wrap = q('#tw-avatar-selected', root);
     var img = q('#tw-avatar-img', root);
     if (!wrap || !img) return;
+
     if (state.avatar_file) {
       img.src = URL.createObjectURL(state.avatar_file);
       img.alt = state.avatar_file.name || 'Uploaded avatar';
       wrap.style.display = '';
       return;
     }
+
     if (state.avatar_url) {
       img.src = state.avatar_url;
       img.alt = 'Selected avatar';
       wrap.style.display = '';
       return;
     }
+
     img.src = '';
     img.alt = '';
     wrap.style.display = 'none';
   }
 
   function bindStaticEvents() {
-    q('#tw-char-name', root)?.addEventListener('input', function (e) {
-      state.character_name = e.target.value;
-    });
+    var nameInput = q('#tw-char-name', root);
+    if (nameInput) {
+      nameInput.addEventListener('input', function (e) {
+        state.character_name = e.target.value;
+      });
+    }
 
     qa('input[name="tw-char-pronouns"]', root).forEach(function (input) {
       input.addEventListener('change', function () {
@@ -588,13 +628,19 @@ function renderClassGrid(rows) {
       });
     });
 
-    q('#tw-char-pronouns-custom', root)?.addEventListener('input', function (e) {
-      state.pronouns_custom = e.target.value;
-    });
+    var customPronouns = q('#tw-char-pronouns-custom', root);
+    if (customPronouns) {
+      customPronouns.addEventListener('input', function (e) {
+        state.pronouns_custom = e.target.value;
+      });
+    }
 
-    q('#tw-char-bio', root)?.addEventListener('input', function (e) {
-      state.bio = e.target.value;
-    });
+    var bioInput = q('#tw-char-bio', root);
+    if (bioInput) {
+      bioInput.addEventListener('input', function (e) {
+        state.bio = e.target.value;
+      });
+    }
 
     qa('.tw-btn-next', root).forEach(function (btn) {
       btn.addEventListener('click', nextStep);
@@ -604,16 +650,28 @@ function renderClassGrid(rows) {
       btn.addEventListener('click', prevStep);
     });
 
-    q('#tw-char-submit', root)?.addEventListener('click', submitCharacter);
+    var submitBtn = q('#tw-char-submit', root);
+    if (submitBtn) {
+      submitBtn.addEventListener('click', submitCharacter);
+    }
 
     qa('.tw-attr-row', root).forEach(function (row) {
       var key = row.getAttribute('data-attr');
-      q('.tw-attr-minus', row)?.addEventListener('click', function () {
-        setAttr(key, Number(state['attr_' + key]) - 1);
-      });
-      q('.tw-attr-plus', row)?.addEventListener('click', function () {
-        setAttr(key, Number(state['attr_' + key]) + 1);
-      });
+
+      var minus = q('.tw-attr-minus', row);
+      if (minus) {
+        minus.addEventListener('click', function () {
+          setAttr(key, Number(state['attr_' + key]) - 1);
+        });
+      }
+
+      var plus = q('.tw-attr-plus', row);
+      if (plus) {
+        plus.addEventListener('click', function () {
+          setAttr(key, Number(state['attr_' + key]) + 1);
+        });
+      }
+
       qa('.tw-pip', row).forEach(function (pip) {
         pip.addEventListener('click', function () {
           var val = Number(pip.getAttribute('data-pip')) || ATTR_MIN;
@@ -628,100 +686,108 @@ function renderClassGrid(rows) {
       });
     });
 
-    q('#tw-char-avatar', root)?.addEventListener('change', function (e) {
-      var file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-      state.avatar_file = file;
-      if (file) state.avatar_url = '';
-      renderAvatarGallery();
-      updateAvatarPreview();
-    });
+    var avatarInput = q('#tw-char-avatar', root);
+    if (avatarInput) {
+      avatarInput.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+        state.avatar_file = file;
+        if (file) state.avatar_url = '';
+        renderAvatarGallery();
+        updateAvatarPreview();
+      });
+    }
 
-    q('#tw-char-avatar-clear', root)?.addEventListener('click', function () {
-      state.avatar_file = null;
-      state.avatar_url = '';
-      var input = q('#tw-char-avatar', root);
-      if (input) input.value = '';
-      renderAvatarGallery();
-      updateAvatarPreview();
-    });
+    var avatarClear = q('#tw-char-avatar-clear', root);
+    if (avatarClear) {
+      avatarClear.addEventListener('click', function () {
+        state.avatar_file = null;
+        state.avatar_url = '';
+        var input = q('#tw-char-avatar', root);
+        if (input) input.value = '';
+        renderAvatarGallery();
+        updateAvatarPreview();
+      });
+    }
 
     root.addEventListener('click', function (e) {
-var raceCard = e.target.closest('.tw-race-card');
-if (raceCard) {
-  var mode = raceCard.getAttribute('data-mode');
-  var id = raceCard.getAttribute('data-id') || '';
-  var name = raceCard.getAttribute('data-name') || '';
+      var raceCard = e.target.closest('.tw-race-card');
+      if (raceCard) {
+        var mode = raceCard.getAttribute('data-mode');
+        var id = raceCard.getAttribute('data-id') || '';
+        var name = raceCard.getAttribute('data-name') || '';
 
-  if (mode === 'race') {
-    state.race = id;
-    state.race_label = name;
-    state.subrace = '';
-    state.subrace_label = '';
-    state.subraces = [];
+        if (mode === 'race') {
+          state.race = id;
+          state.race_label = name;
+          state.subrace = '';
+          state.subrace_label = '';
+          state.subraces = [];
 
-    selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
+          selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
 
-    var subraceSection = q('#tw-subrace-section', root);
-    var subraceGrid = q('#tw-subrace-grid', root);
+          var subraceSection = q('#tw-subrace-section', root);
+          var subraceGrid = q('#tw-subrace-grid', root);
 
-    if (subraceGrid) {
-      subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
-    }
+          if (subraceGrid) {
+            subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
+          }
 
-    if (subraceSection) {
-      subraceSection.hidden = false;
-      subraceSection.classList.remove('is-hidden');
-      subraceSection.classList.add('is-visible');
-      subraceSection.style.display = 'block';
-    }
+          if (subraceSection) {
+            subraceSection.hidden = false;
+            subraceSection.classList.remove('is-hidden');
+            subraceSection.classList.add('is-visible');
+            subraceSection.style.display = 'block';
+          }
 
-    loadSubraces(id, name);
-  } else if (mode === 'subrace') {
-    state.subrace = id;
-    state.subrace_label = name;
-    selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
-    setStatus('', '');
-  }
+          loadSubraces(id, name);
+        } else if (mode === 'subrace') {
+          state.subrace = id;
+          state.subrace_label = name;
+          selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+          setStatus('', '');
+        }
 
-  return;
-}
+        return;
+      }
 
-var classCard = e.target.closest('.tw-class-card');
-if (classCard) {
-  state.char_class = classCard.getAttribute('data-id') || '';
-  state.class_label = classCard.getAttribute('data-name') || '';
-  state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
-  state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
+      var classCard = e.target.closest('.tw-class-card');
+      if (classCard) {
+        state.char_class = classCard.getAttribute('data-id') || '';
+        state.class_label = classCard.getAttribute('data-name') || '';
+        state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
+        state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
 
-  state.skills = [];
-  state.starting_package_id = '';
-  state.starting_package_label = '';
-  state.packages = [];
+        state.skills = [];
+        state.starting_package_id = '';
+        state.starting_package_label = '';
+        state.packages = [];
 
-  selectExclusive('.tw-class-card', classCard);
-  renderSkills(state.skills_data);
-  renderPackages([]);
+        selectExclusive('.tw-class-card', classCard);
+        renderSkills(state.skills_data);
+        renderPackages([]);
 
-  loadPackages(state.char_class).then(function () {
-    if (!state.packages.length) {
-      setStatus('No starting packages found for class: ' + state.class_label, 'error');
-    } else {
-      setStatus('', '');
-    }
-  });
+        loadPackages(state.char_class).then(function (rows) {
+          if (!rows.length) {
+            setStatus('No starting packages found for class: ' + state.class_label, 'error');
+          } else {
+            setStatus('', '');
+          }
+        });
 
-  return;
-}
+        return;
+      }
 
       var skillCard = e.target.closest('.tw-skill-card');
       if (skillCard) {
         var skillId = skillCard.getAttribute('data-id') || '';
         var idx = state.skills.indexOf(skillId);
+
         if (idx !== -1) {
           state.skills.splice(idx, 1);
         } else if (state.skills.length < state.skill_limit) {
           state.skills.push(skillId);
         }
+
         renderSkills(state.skills_data);
         return;
       }
@@ -739,21 +805,25 @@ if (classCard) {
         var kind = loreCard.getAttribute('data-kind') || '';
         var key = loreCard.getAttribute('data-key') || '';
         var label = loreCard.getAttribute('data-label') || '';
+
         if (kind === 'data_origin') {
           state.data_origin = key;
           state.data_origin_label = label;
           selectExclusive('.tw-lore-card[data-kind="data_origin"]', loreCard);
         }
+
         if (kind === 'previous_operation') {
           state.previous_operation = key;
           state.previous_operation_label = label;
           selectExclusive('.tw-lore-card[data-kind="previous_operation"]', loreCard);
         }
+
         if (kind === 'sync_crisis') {
           state.sync_crisis = key;
           state.sync_crisis_label = label;
           selectExclusive('.tw-lore-card[data-kind="sync_crisis"]', loreCard);
         }
+
         resolveBackstoryTags();
         return;
       }
@@ -800,6 +870,7 @@ if (classCard) {
     fd.append('attr_reflex', String(state.attr_reflex));
     fd.append('attr_mind', String(state.attr_mind));
     fd.append('attr_spirit', String(state.attr_spirit));
+
     if (state.avatar_url) fd.append('avatar_url', state.avatar_url);
     if (state.avatar_file) fd.append('avatar', state.avatar_file, state.avatar_file.name);
 
@@ -813,7 +884,9 @@ if (classCard) {
         if (!res || !res.success) {
           throw new Error(res && res.data && res.data.message ? res.data.message : 'Character creation failed.');
         }
+
         setStatus(res.data && res.data.message ? res.data.message : 'Character created.', 'success');
+
         if (res.data && res.data.redirect) {
           window.location.href = res.data.redirect;
         }
@@ -834,52 +907,29 @@ if (classCard) {
   }
 
   function loadSubraces(parentId, parentName) {
-  var section = q('#tw-subrace-section', root);
-  var grid = q('#tw-subrace-grid', root);
+    var section = q('#tw-subrace-section', root);
+    var grid = q('#tw-subrace-grid', root);
 
-  state.subrace = '';
-  state.subrace_label = '';
-  state.subraces = [];
+    state.subrace = '';
+    state.subrace_label = '';
+    state.subraces = [];
 
-  if (grid) {
-    grid.innerHTML = '';
-  }
-
-  if (!parentId && !parentName) {
-    if (section) {
-      section.hidden = true;
-      section.classList.remove('is-visible');
-      section.classList.add('is-hidden');
-      section.style.display = 'none';
+    if (grid) {
+      grid.innerHTML = '';
     }
-    return Promise.resolve([]);
-  }
 
-  if (grid) {
-    grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
-  }
-
-  if (section) {
-    section.hidden = false;
-    section.classList.remove('is-hidden');
-    section.classList.add('is-visible');
-    section.style.display = 'block';
-  }
-
-  function applyRows(rows) {
-    state.subraces = Array.isArray(rows) ? rows : [];
-
-    if (!state.subraces.length) {
+    if (!parentId && !parentName) {
       if (section) {
         section.hidden = true;
         section.classList.remove('is-visible');
         section.classList.add('is-hidden');
         section.style.display = 'none';
       }
-      if (grid) {
-        grid.innerHTML = '';
-      }
-      return [];
+      return Promise.resolve([]);
+    }
+
+    if (grid) {
+      grid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
     }
 
     if (section) {
@@ -889,87 +939,70 @@ if (classCard) {
       section.style.display = 'block';
     }
 
-    renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
-    return state.subraces;
-  }
+    function applyRows(rows) {
+      state.subraces = Array.isArray(rows) ? rows : [];
 
-  function fetchByParent(parentValue) {
-    if (!parentValue) return Promise.resolve([]);
-    return fetchPost('neoweaver_get_subraces', { parent: parentValue })
-      .then(function (res) {
-        if (res && res.success && Array.isArray(res.data)) {
-          return res.data;
+      if (!state.subraces.length) {
+        if (section) {
+          section.hidden = true;
+          section.classList.remove('is-visible');
+          section.classList.add('is-hidden');
+          section.style.display = 'none';
+        }
+        if (grid) {
+          grid.innerHTML = '';
         }
         return [];
+      }
+
+      if (section) {
+        section.hidden = false;
+        section.classList.remove('is-hidden');
+        section.classList.add('is-visible');
+        section.style.display = 'block';
+      }
+
+      renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
+      return state.subraces;
+    }
+
+    function fetchByParent(parentValue) {
+      if (!parentValue) return Promise.resolve([]);
+      return fetchPost('neoweaver_get_subraces', { parent: parentValue })
+        .then(function (res) {
+          if (res && res.success && Array.isArray(res.data)) {
+            return res.data;
+          }
+          return [];
+        })
+        .catch(function () {
+          return [];
+        });
+    }
+
+    return fetchByParent(parentId)
+      .then(function (rows) {
+        if (Array.isArray(rows) && rows.length) {
+          return applyRows(rows);
+        }
+        return fetchByParent(parentName).then(applyRows);
+      })
+      .then(function (rows) {
+        if (!rows.length) {
+          setStatus('', '');
+        }
+        return rows;
       })
       .catch(function () {
+        state.subraces = [];
+        if (grid) {
+          grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
+        }
+        setStatus('Could not load subraces.', 'error');
         return [];
       });
   }
 
-  return fetchByParent(parentId)
-    .then(function (rows) {
-      if (Array.isArray(rows) && rows.length) {
-        return applyRows(rows);
-      }
-      return fetchByParent(parentName).then(applyRows);
-    })
-    .then(function (rows) {
-      if (!rows.length) {
-        setStatus('', '');
-      }
-      return rows;
-    })
-    .catch(function () {
-      state.subraces = [];
-      if (grid) {
-        grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
-      }
-      setStatus('Could not load subraces.', 'error');
-      return [];
-    });
-}
-
-  return fetchPost('neoweaver_get_subraces', { parent: parentId }).then(function (res) {
-    if (!res || !res.success || !Array.isArray(res.data)) {
-      // błąd odpowiedzi – zostawiamy panel, ale pokazujemy komunikat
-      if (grid) {
-        grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
-      }
-      state.subraces = [];
-      return;
-    }
-
-    state.subraces = res.data;
-
-    if (!state.subraces.length) {
-      // brak subras dla tej rasy – chowamy panel
-      if (section) {
-        section.hidden = true;
-        section.classList.remove('is-visible');
-        section.classList.add('is-hidden');
-        section.style.display = 'none';
-      }
-      if (grid) {
-        grid.innerHTML = '';
-      }
-      return;
-    }
-
-    // mamy subrasy – renderujemy
-    if (section) {
-      section.hidden = false;
-      section.classList.remove('is-hidden');
-      section.classList.add('is-visible');
-      section.style.display = 'block';
-    }
-    renderRaceGrid(state.subraces, '#tw-subrace-grid', 'subrace');
-  }).catch(function () {
-    if (grid) {
-      grid.innerHTML = '<p class="tw-error-msg">Could not load subraces.</p>';
-    }
-  });
-}
   function loadClasses() {
     return fetchPost('neoweaver_get_classes', {}).then(function (res) {
       state.classes = res && res.success && Array.isArray(res.data) ? res.data : [];
@@ -984,42 +1017,36 @@ if (classCard) {
     });
   }
 
-function loadPackages(classId) {
-  if (!classId) {
-    state.packages = [];
-    renderPackages([]);
-    return Promise.resolve([]);
-  }
-
-  return fetchPost('neoweaver_get_packages', { class_tag: classId })
-    .then(function (res) {
-      var rows = [];
-
-      if (res && res.success && Array.isArray(res.data)) {
-        rows = res.data;
-      } else if (res && Array.isArray(res.data)) {
-        rows = res.data;
-      } else if (res && res.success && res.data && Array.isArray(res.data.rows)) {
-        rows = res.data.rows;
-      }
-
-      state.packages = rows;
-      renderPackages(state.packages);
-
-      return rows;
-    })
-    .catch(function (err) {
+  function loadPackages(classId) {
+    if (!classId) {
       state.packages = [];
       renderPackages([]);
-      setStatus(
-        err && err.message
-          ? err.message
-          : 'Could not load starting packages.',
-        'error'
-      );
-      return [];
-    });
-}
+      return Promise.resolve([]);
+    }
+
+    return fetchPost('neoweaver_get_packages', { class_tag: classId })
+      .then(function (res) {
+        var rows = [];
+
+        if (res && res.success && Array.isArray(res.data)) {
+          rows = res.data;
+        } else if (res && Array.isArray(res.data)) {
+          rows = res.data;
+        } else if (res && res.success && res.data && Array.isArray(res.data.rows)) {
+          rows = res.data.rows;
+        }
+
+        state.packages = rows;
+        renderPackages(state.packages);
+        return rows;
+      })
+      .catch(function (err) {
+        state.packages = [];
+        renderPackages([]);
+        setStatus(err && err.message ? err.message : 'Could not load starting packages.', 'error');
+        return [];
+      });
+  }
 
   function initLoreSections() {
     renderLoreOptions('#tw-origin-grid', DATA_ORIGIN_OPTIONS, 'data_origin');
@@ -1049,6 +1076,7 @@ function loadPackages(classId) {
     updateAttrUI();
     updateSkillCounter();
     updateStepUI();
+    toggleCustomPronouns();
 
     Promise.all([
       loadRaces(),
