@@ -95,12 +95,12 @@
     return cfg.nonce || '';
   }
 
-  function normalizeMediaUrl(url) {
-    url = String(url || '').trim();
-    if (!url) return '';
-    if (/^https?:\/\/\//i.test(url)) return url;
-    return IMG_BASE + url.replace(/^\//+/, '');
-  }
+function normalizeMediaUrl(url) {
+  url = String(url || '').trim();
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return IMG_BASE + url.replace(/^\/+/, '');
+}
 
   function slugify(str) {
     return String(str || '')
