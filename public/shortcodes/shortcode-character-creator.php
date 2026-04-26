@@ -33,7 +33,7 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.5',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.6',
             true
         );
 
@@ -228,7 +228,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
                 <div class="tw-attr-grid">
                     <div class="tw-attr-row" data-attr="body">
-                        <div class="tw-attr-icon" aria-hidden="true"></div>
+                        <div class="tw-attr-icon" aria-hidden="true">⬢</div>
                         <div class="tw-attr-info">
                             <h4>Body <small>BODY</small></h4>
                             <span>Strength, endurance, damage soak.</span>
@@ -250,7 +250,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                     </div>
 
                     <div class="tw-attr-row" data-attr="reflex">
-                        <div class="tw-attr-icon" aria-hidden="true"></div>
+                        <div class="tw-attr-icon" aria-hidden="true">⬡</div>
                         <div class="tw-attr-info">
                             <h4>Reflex <small>REFLEX</small></h4>
                             <span>Speed, initiative, evasion.</span>
@@ -272,7 +272,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                     </div>
 
                     <div class="tw-attr-row" data-attr="mind">
-                        <div class="tw-attr-icon" aria-hidden="true"></div>
+                        <div class="tw-attr-icon" aria-hidden="true">◈</div>
                         <div class="tw-attr-info">
                             <h4>Mind <small>MIND</small></h4>
                             <span>Logic, analysis, arcane-tech control.</span>
@@ -294,7 +294,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                     </div>
 
                     <div class="tw-attr-row" data-attr="spirit">
-                        <div class="tw-attr-icon" aria-hidden="true"></div>
+                        <div class="tw-attr-icon" aria-hidden="true">✦</div>
                         <div class="tw-attr-info">
                             <h4>Spirit <small>SPIRIT</small></h4>
                             <span>Will, sync stability, magical resonance.</span>
