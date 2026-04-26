@@ -462,31 +462,32 @@
     if (currentStep > 0) goToStep(currentStep - 1);
   }
 
-  function renderRaceGrid(rows, targetSel, mode) {
-    var target = q(targetSel, root);
-    if (!target) return;
+function renderRaceGrid(rows, targetSel, mode) {
+  var target = q(targetSel, root);
+  if (!target) return;
 
-    if (!Array.isArray(rows) || !rows.length) {
-      target.innerHTML = '<div class="tw-empty-state">No options available.</div>';
-      return;
-    }
-
-    target.innerHTML = rows.map(function (row) {
-      var tags = Array.isArray(row.tags) ? row.tags : [];
-      var img = buildImage(row.img_url || row.img, row.name || row.label, 'tw-race-img', 'RACE');
-      var bonus = Array.isArray(row.bonus) ? row.bonus.join(', ') : '';
-
-      return '' +
-        '<button type="button" class="tw-race-card" data-mode="' + esc(mode) + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.label || '') + '">' +
-          img +
-          '<div class="tw-race-body">' +
-            '<h3 class="tw-race-name">' + esc(row.name || row.label || '') + '</h3>' +
-            (bonus ? '<p class="tw-race-bonus">' + esc(bonus) + '</p>' : '') +
-            buildTagPills(tags) +
-          '</div>' +
-        '</button>';
-    }).join('');
+  if (!Array.isArray(rows) || !rows.length) {
+    target.innerHTML = '<div class="tw-empty-state">No options available.</div>';
+    return;
   }
+
+  target.innerHTML = rows.map(function (row) {
+    var tags = Array.isArray(row.tags) ? row.tags : [];
+    var img = buildImage(row.img_url || row.img, row.name || row.label, 'tw-race-img', 'RACE');
+    var bonusText = row.bonus || '';
+
+    return (
+      '<button type="button" class="tw-race-card" data-mode="' + esc(mode) + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.label) + '">' +
+        img +
+        '<div class="tw-race-body">' +
+          '<h3 class="tw-race-name">' + esc(row.name || row.label) + '</h3>' +
+          (bonusText ? '<p class="tw-race-bonus">' + esc(bonusText) + '</p>' : '') +
+          buildTagPills(tags) +
+        '</div>' +
+      '</button>'
+    );
+  }).join('');
+}
 
   function renderClassGrid(rows) {
     var target = q('#tw-class-grid', root);
@@ -510,29 +511,54 @@
     }).join('');
   }
 
-  function renderSkills(rows) {
-    var target = q('#tw-skill-grid', root);
-    if (!target) return;
+function renderSkills(rows) {
+  var target = q('#tw-skill-grid', root);
+  if (!target) return;
 
-    if (!Array.isArray(rows) || !rows.length) {
-      target.innerHTML = '<div class="tw-empty-state">No skills available.</div>';
-      return;
-    }
+  if (!Array.isArray(rows) || !rows.length) {
+    target.innerHTML = '<div class="tw-empty-state">No skills available.</div>';
+    updateSkillCounter();
+    return;
+  }
 
-    target.innerHTML = rows.map(function (row) {
+  // Grupowanie po category
+  var byCat = {};
+  rows.forEach(function (row) {
+    var cat = (row.category || 'Other').trim() || 'Other';
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(row);
+  });
+
+  var html = Object.keys(byCat).map(function (cat) {
+    var skillsInCat = byCat[cat];
+    var cards = skillsInCat.map(function (row) {
       var selected = state.skills.indexOf(row.id) !== -1;
-      return '' +
-        '<button type="button" class="tw-skill-card' + (selected ? ' is-selected' : '') + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || '') + '">' +
-          buildImage(row.img_url, row.name || '', 'tw-skill-cardimg', 'SKILL') +
+      var img = buildImage(row.img_url, row.name, 'tw-skill-cardimg', 'SKILL');
+      var tags = buildTagPills(row.tags);
+
+      return (
+        '<button type="button" class="tw-skill-card' + (selected ? ' is-selected' : '') + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name) + '">' +
+          img +
           '<div class="tw-skill-cardbody">' +
-            '<h3 class="tw-skill-cardname">' + esc(row.name || '') + '</h3>' +
-            buildTagPills(row.tags || []) +
+            '<h3 class="tw-skill-cardname">' + esc(row.name) + '</h3>' +
+            (row.description ? '<p class="tw-race-desc">' + esc(row.description) + '</p>' : '') +
+            tags +
           '</div>' +
-        '</button>';
+        '</button>'
+      );
     }).join('');
 
-    updateSkillCounter();
-  }
+    return (
+      '<section class="tw-skill-category">' +
+        '<h3 class="tw-skill-cat-label">' + esc(cat) + '</h3>' +
+        '<div class="tw-skill-cat-grid">' + cards + '</div>' +
+      '</section>'
+    );
+  }).join('');
+
+  target.innerHTML = html;
+  updateSkillCounter();
+}
 
   function renderPackages(rows) {
     var target = q('#tw-package-grid', root);
