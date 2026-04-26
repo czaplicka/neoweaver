@@ -552,12 +552,6 @@ select.tw-input--error {
   font-size: 0.92rem;
 }
 
-.tw-skill-card .tw-race-tags,
-.tw-skill-card .tw-race-bonus,
-.tw-skill-card .tw-race-select-hint {
-  display: none !important;
-}
-
 .tw-race-tags,
 .tw-package-items,
 .tw-class-tags,
