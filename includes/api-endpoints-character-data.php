@@ -1,14 +1,4 @@
 <?php
-/**
- * NeoWeaver Character Creator API Endpoints
- * Production version aligned with Space instructions:
- * - cyber_characters stores only real character columns
- * - lore choices (data origin / previous operation / sync crisis) are NOT stored in cyber_characters
- * - their effects are persisted only as backstory tag IDs in cyber_character_backstory_tags
- * - start pack is stored in cyber_characters.start_pack
- * - stored race_id is subrace when selected, otherwise parent race
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -905,22 +895,7 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
         wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
     }
 
-    // Tu poprawiamy: obsłuż class_tag (aktualny JS) i ewentualny stary classtag
-    $class_id = sanitize_text_field(
-        $_POST['class_tag'] ?? $_POST['classtag'] ?? ''
-    );
-
-    if ( '' === $class_id ) {
-        wp_send_json_success( array() );
-    }
-
-    $class_row = nw_find_class_by_id( $class_id );
-    if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
-        wp_send_json_success( array() );
-    }
-
-    $class_name = strtolower( trim( (string) $class_row['name'] ) );
-
+    // DEBUG: na razie ignorujemy klasę i zwracamy wszystkie paczki is_player_selectable = true
     $data = nw_fetch_lookup_table(
         'cyber_starting_packages',
         'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
@@ -933,10 +908,9 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
         wp_send_json_error( array( 'message' => $data->get_error_message() ) );
     }
 
-    $data = nw_filter_packages_by_class_name( $data, $class_name );
-
-    wp_send_json_success( nw_map_starting_package_shape( $data, $class_name ) );
-    }
+    // Bez filtrowania po klasie – tylko mapowanie do kart
+    wp_send_json_success( nw_map_starting_package_shape( $data, '' ) );
+}
     add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
     add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
 }
