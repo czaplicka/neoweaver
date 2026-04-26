@@ -244,27 +244,29 @@
     });
   }
 
-  function resolveBackstoryTags() {
-    var ids = [];
-    [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
-      var source = index === 0
-        ? DATA_ORIGIN_OPTIONS
-        : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
+function resolveBackstoryTags() {
+  var labels = [];
 
-      var item = source.find(function (opt) {
-        return opt.key === key;
-      });
+  [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
+    var source = index === 0
+      ? DATA_ORIGIN_OPTIONS
+      : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
 
-      if (!item) return;
-
-      [item.bonus_tag, item.flaw_tag].forEach(function (label) {
-        var id = TAG_DEFS[slugify(label)];
-        if (id && ids.indexOf(id) === -1) ids.push(id);
-      });
+    var item = source.find(function (opt) {
+      return opt.key === key;
     });
 
-    state.backstory_tags = ids;
-  }
+    if (!item) return;
+
+    [item.bonus_tag, item.flaw_tag].forEach(function (label) {
+      if (label && labels.indexOf(label) === -1) {
+        labels.push(label);
+      }
+    });
+  });
+
+  state.backstory_tags = labels;
+}
 
   function getAttrTotal() {
     return Number(state.attr_body) + Number(state.attr_reflex) + Number(state.attr_mind) + Number(state.attr_spirit);
@@ -581,24 +583,39 @@ function renderSkills(rows) {
     }).join('');
   }
 
-  function renderLoreOptions(targetSel, rows, typeKey) {
-    var target = q(targetSel, root);
-    if (!target) return;
+function renderLoreOptions(targetSel, rows, typeKey) {
+  var target = q(targetSel, root);
+  if (!target) return;
 
-    target.innerHTML = rows.map(function (row) {
-      var selected = state[typeKey] === row.key;
-      return '' +
-        '<button type="button" class="tw-lore-card' + (selected ? ' is-selected' : '') + '" data-kind="' + esc(typeKey) + '" data-key="' + esc(row.key) + '" data-label="' + esc(row.label) + '">' +
-          '<div class="tw-lore-cardbody">' +
-            '<h3 class="tw-lore-cardtitle">' + esc(row.label) + '</h3>' +
-            '<div class="tw-lore-cardmeta">' +
-              '<span class="tw-card-tag">' + esc(row.bonus_tag) + '</span>' +
-              '<span class="tw-card-tag">' + esc(row.flaw_tag) + '</span>' +
-            '</div>' +
-          '</div>' +
-        '</button>';
-    }).join('');
-  }
+  target.innerHTML = rows.map(function (row) {
+    var selected = state[typeKey] === row.key;
+
+    return ''
+      + '<button type="button" class="tw-lore-card' + (selected ? ' is-selected' : '') + '"'
+      + ' data-kind="' + esc(typeKey) + '"'
+      + ' data-key="' + esc(row.key) + '"'
+      + ' data-label="' + esc(row.label) + '">'
+        + '<div class="tw-lore-cardbody">'
+          + '<h3 class="tw-lore-cardtitle">' + esc(row.label) + '</h3>'
+          // główny opis
+          + (row.desc
+              ? '<p class="tw-lore-desc">' + esc(row.desc) + '</p>'
+              : '')
+          // chipy bonus / flaw
+          + '<div class="tw-lore-cardmeta">'
+            + '<span class="tw-card-tag tw-card-tag--bonus">' + esc(row.bonus_tag) + '</span>'
+            + (row.bonus_desc
+                 ? '<span class="tw-card-tagdesc">' + esc(row.bonus_desc) + '</span>'
+                 : '')
+            + '<span class="tw-card-tag tw-card-tag--flaw">' + esc(row.flaw_tag) + '</span>'
+            + (row.flaw_desc
+                 ? '<span class="tw-card-tagdesc">' + esc(row.flaw_desc) + '</span>'
+                 : '')
+          + '</div>'
+        + '</div>'
+      + '</button>';
+  }).join('');
+}
 
   function renderAvatarGallery() {
     var target = q('#tw-avatar-gallery', root);
@@ -653,7 +670,15 @@ function renderSkills(rows) {
         toggleCustomPronouns();
       });
     });
-
+  var editBtn = e.target.closest('.tw-btn-review-edit');
+  if (editBtn) {
+    var targetStep = parseInt(editBtn.getAttribute('data-target-step'), 10);
+    if (!isNaN(targetStep) && stepEls[targetStep]) {
+      currentStep = targetStep;
+      updateStepUI(); // albo showStep, zależnie jak masz to zorganizowane
+    }
+    return;
+  }
     var customPronouns = q('#tw-char-pronouns-custom', root);
     if (customPronouns) {
       customPronouns.addEventListener('input', function (e) {
