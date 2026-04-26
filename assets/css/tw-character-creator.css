@@ -927,7 +927,7 @@ button[data-action="plus"]:hover:not(:disabled) {
   object-fit: cover;
   border-radius: 18px;
   border: 1px solid rgba(173,255,0,0.18);
-  background: rgba(255,255,255,0.03);
+  background: transparent;
 }
 
 /* ===== BUTTONS ===== */
