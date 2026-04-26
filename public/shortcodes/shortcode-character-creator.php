@@ -26,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $css_handle,
             $css_url,
             array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.9'
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.10'
         );
 
         wp_register_script(
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.4',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.5',
             true
         );
 
@@ -217,13 +217,14 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                     <span class="tw-attr-remaining-label">Remaining <strong id="tw-attr-remaining">8</strong></span>
                 </p>
 
-                <div class="tw-attr-presets">
-                    <span class="tw-attr-presets-label">Presets</span>
-                    <button type="button" class="tw-attr-preset-btn" data-preset="balanced" aria-pressed="false">Balanced</button>
-                    <button type="button" class="tw-attr-preset-btn" data-preset="agile" aria-pressed="false">Agile</button>
-                    <button type="button" class="tw-attr-preset-btn" data-preset="tank" aria-pressed="false">Tank</button>
-                    <button type="button" class="tw-attr-preset-btn" data-preset="bodybuilder" aria-pressed="false">Body Builder</button>
-                </div>
+<div class="tw-attr-presets">
+  <span class="tw-attr-presets-label">Presets</span>
+  <button type="button" class="tw-attr-preset-btn" data-preset="balanced" aria-pressed="false">Balanced</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="gunslinger" aria-pressed="false">Gunslinger</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="genius" aria-pressed="false">Genius</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="warlock" aria-pressed="false">Warlock</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="bodybuilder" aria-pressed="false">Body Builder</button>
+</div>
 
                 <div class="tw-attr-grid">
                     <div class="tw-attr-row" data-attr="body">
@@ -234,9 +235,9 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                         </div>
                         <div class="tw-attr-controls">
                             <div class="tw-attr-stepper">
-                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Body"></button>
-                                <input type="number" id="tw-attr-body" class="tw-attr-val" value="1" min="1" max="5" readonly>
-                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Body"></button>
+<button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Body">−</button>
+<input type="number" id="tw-attr-body" class="tw-attr-val" value="1" min="1" max="5" readonly>
+<button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Body">+</button>
                             </div>
                             <div class="tw-attr-pips" aria-hidden="true">
                                 <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Body to 1"></button>
@@ -256,9 +257,9 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                         </div>
                         <div class="tw-attr-controls">
                             <div class="tw-attr-stepper">
-                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Reflex"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Reflex">-</button>
                                 <input type="number" id="tw-attr-reflex" class="tw-attr-val" value="1" min="1" max="5" readonly>
-                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Reflex"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Reflex">=</button>
                             </div>
                             <div class="tw-attr-pips" aria-hidden="true">
                                 <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Reflex to 1"></button>
@@ -278,9 +279,9 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                         </div>
                         <div class="tw-attr-controls">
                             <div class="tw-attr-stepper">
-                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Mind"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Mind">-</button>
                                 <input type="number" id="tw-attr-mind" class="tw-attr-val" value="1" min="1" max="5" readonly>
-                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Mind"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Mind">+</button>
                             </div>
                             <div class="tw-attr-pips" aria-hidden="true">
                                 <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Mind to 1"></button>
@@ -300,9 +301,9 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                         </div>
                         <div class="tw-attr-controls">
                             <div class="tw-attr-stepper">
-                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Spirit"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Spirit">-</button>
                                 <input type="number" id="tw-attr-spirit" class="tw-attr-val" value="1" min="1" max="5" readonly>
-                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Spirit"></button>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Spirit">+</button>
                             </div>
                             <div class="tw-attr-pips" aria-hidden="true">
                                 <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Spirit to 1"></button>
