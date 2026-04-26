@@ -10,24 +10,24 @@
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
 
   var DATA_ORIGIN_OPTIONS = [
-    { key: 'palace', label: 'Palace', desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.', bonus_tag: 'Wealthy', flaw_tag: 'Fragile-Gear' },
-    { key: 'slums', label: 'Slums', desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.', bonus_tag: 'Street-Smart', flaw_tag: 'Malnourished' },
-    { key: 'void-labs', label: 'Void Labs', desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.', bonus_tag: 'Fast-Sync', flaw_tag: 'Social-Glitch' },
-    { key: 'borderlines', label: 'Borderlines', desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.', bonus_tag: 'Scout', flaw_tag: 'Analog-Mind' }
+    { key: 'palace', label: 'Palace', desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.', bonus_tag: 'Wealthy', bonus_desc: '+100 Credits at initialization.', flaw_tag: 'Fragile-Gear', flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.' },
+    { key: 'slums', label: 'Slums', desc: 'Your core pattern held together in the noise of city rubble, scarcity, and improvised survival.', bonus_tag: 'Street-Smart', bonus_desc: 'Reveal hidden mechanics in locations tagged #city or #shady.', flaw_tag: 'Malnourished', flaw_desc: 'Max Satiety -2.' },
+    { key: 'void-labs', label: 'Void Labs', desc: 'Your consciousness was first stabilized in isolated research arrays and experimental sync chambers.', bonus_tag: 'Fast-Sync', bonus_desc: 'Resting recovers +2 additional Sync.', flaw_tag: 'Social-Glitch', flaw_desc: '-10% success rate on Social actions vs #human targets.' },
+    { key: 'borderlines', label: 'Borderlines', desc: 'Your first stable thoughts formed on the edge of mapped zones, between signal, wasteland, and frontier.', bonus_tag: 'Scout', bonus_desc: 'Travel between nodes consumes -1 Satiety.', flaw_tag: 'Analog-Mind', flaw_desc: 'Cannot use #Digital cards during the first 3 turns of a Deployment.' }
   ];
 
   var PREVIOUS_OPERATION_OPTIONS = [
-    { key: 'repair-unit', label: '[REPAIR UNIT]', desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.', bonus_tag: 'Technician', flaw_tag: 'Heavy-Handed' },
-    { key: 'void-runner', label: '[VOID-RUNNER]', desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.', bonus_tag: 'Agile', flaw_tag: 'Light-Frame' },
-    { key: 'archive-analyst', label: '[ARCHIVE ANALYST]', desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.', bonus_tag: 'Researcher', flaw_tag: 'Code-Bound' },
-    { key: 'enforcer', label: '[ENFORCER]', desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.', bonus_tag: 'Unyielding', flaw_tag: 'Loud-Footsteps' }
+    { key: 'repair-unit', label: '[REPAIR UNIT]', desc: 'You were built to restore, patch, and keep fractured systems functional under pressure.', bonus_tag: 'Technician', bonus_desc: 'Utility items restore +50% more Durability.', flaw_tag: 'Heavy-Handed', flaw_desc: '-5% success rate on Acrobatics and Stealth tests.' },
+    { key: 'void-runner', label: '[VOID-RUNNER]', desc: 'Your primary function was speed, transit, and surviving dangerous movement through unstable space.', bonus_tag: 'Agile', bonus_desc: 'Playing a Dodge card allows drawing an extra card on the next turn.', flaw_tag: 'Light-Frame', flaw_desc: 'Starting Max HP -1.' },
+    { key: 'archive-analyst', label: '[ARCHIVE ANALYST]', desc: 'You processed forbidden knowledge, recovered fragmented data, and interpreted arcane or scientific records.', bonus_tag: 'Researcher', bonus_desc: '+5% success rate on Arcana and Science tests.', flaw_tag: 'Code-Bound', flaw_desc: 'Cannot equip two-handed weapons.' },
+    { key: 'enforcer', label: '[ENFORCER]', desc: 'You existed to apply force, hold the line, and suppress escalation when systems failed.', bonus_tag: 'Unyielding', bonus_desc: 'Ignore the first Pressure or Panic card encountered in every combat.', flaw_tag: 'Loud-Footsteps', flaw_desc: 'Cannot obtain "First Strike" bonus from stealth.' }
   ];
 
   var SYNC_CRISIS_OPTIONS = [
-    { key: 'system-stabilizer', label: '[SYSTEM STABILIZER]', desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.', bonus_tag: 'Glitch-Learner', flaw_tag: 'System-Spasm' },
-    { key: 'aggressive-response', label: '[AGGRESSIVE RESPONSE]', desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.', bonus_tag: 'Striker', flaw_tag: 'Reckless' },
-    { key: 'data-ghost-adaptation', label: '[DATA-GHOST ADAPTATION]', desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.', bonus_tag: 'Iron-Grip', flaw_tag: 'Feedback-Vulnerability' },
-    { key: 'sensory-overload', label: '[SENSORY OVERLOAD]', desc: 'You survived by embracing the flood of input, turning collapse into unstable power.', bonus_tag: 'Wild-Card', flaw_tag: 'Magnetized' }
+    { key: 'system-stabilizer', label: '[SYSTEM STABILIZER]', desc: 'You answered the first touch of Entropy by reinforcing the pattern and learning from the breach.', bonus_tag: 'Glitch-Learner', bonus_desc: '+10% global XP gain.', flaw_tag: 'System-Spasm', flaw_desc: 'Every 10 turns, one random card from your hand is discarded/burned.' },
+    { key: 'aggressive-response', label: '[AGGRESSIVE RESPONSE]', desc: 'You met the Fray by pushing back harder, turning survival into pressure and violence.', bonus_tag: 'Striker', bonus_desc: 'Every played Attack card generates +1 additional XP for itself.', flaw_tag: 'Reckless', flaw_desc: 'On failure in a Physical test, lose an additional 1 Durability on armor.' },
+    { key: 'data-ghost-adaptation', label: '[DATA-GHOST ADAPTATION]', desc: 'You adapted by becoming difficult to hold, half-solid in action and difficult to disrupt.', bonus_tag: 'Iron-Grip', bonus_desc: 'Your physical attack cards cannot be countered.', flaw_tag: 'Feedback-Vulnerability', flaw_desc: 'Receive double damage from enemies with the #Hacker or #Digital tag.' },
+    { key: 'sensory-overload', label: '[SENSORY OVERLOAD]', desc: 'You survived by embracing the flood of input, turning collapse into unstable power.', bonus_tag: 'Wild-Card', bonus_desc: 'Critical successes deal triple damage instead of double.', flaw_tag: 'Magnetized', flaw_desc: 'In locations tagged #High-Technology, suffer -5% to all tests.' }
   ];
 
   var state = {
@@ -554,30 +554,36 @@ function normalizeMediaUrl(url) {
   }
 
   function renderLoreOptions(targetSel, rows, typeKey) {
-    var target = q(targetSel, root);
-    if (!target) return;
+  var target = q(targetSel, root);
+  if (!target) return;
 
-    target.innerHTML = rows.map(function (row) {
-      var selected = state[typeKey] === row.key;
+  target.innerHTML = rows.map(function (row) {
+    var selected = state[typeKey] === row.key;
+    var bonusTag = row.bonus_tag || row.bonustag || '';
+    var bonusDesc = row.bonus_desc || row.bonusdesc || '';
+    var flawTag = row.flaw_tag || row.flawtag || '';
+    var flawDesc = row.flaw_desc || row.flawdesc || '';
 
-      return ''
-        + '<button type="button" class="tw-lore-card' + (selected ? ' is-selected' : '') + '"'
-        + ' data-kind="' + esc(typeKey) + '"'
-        + ' data-key="' + esc(row.key) + '"'
-        + ' data-label="' + esc(row.label) + '">'
-          + '<div class="tw-lore-cardbody">'
-            + '<h3 class="tw-lore-cardtitle">' + esc(row.label) + '</h3>'
-            + (row.desc
-                ? '<p class="tw-lore-desc">' + esc(row.desc) + '</p>'
-                : '')
-            + '<div class="tw-lore-cardmeta">'
-              + '<span class="tw-card-tag tw-card-tag--bonus">' + esc(row.bonus_tag) + '</span>'
-              + '<span class="tw-card-tag tw-card-tag--flaw">' + esc(row.flaw_tag) + '</span>'
-            + '</div>'
+    return ''
+      + '<button type="button" class="tw-lore-card tw-grid-card' + (selected ? ' is-selected' : '') + '"'
+      + ' data-kind="' + esc(typeKey) + '"'
+      + ' data-key="' + esc(row.key) + '"'
+      + ' data-label="' + esc(row.label) + '"'
+      + ' aria-pressed="' + (selected ? 'true' : 'false') + '">'
+        + '<div class="tw-race-body">'
+          + '<h3 class="tw-race-name">' + esc(row.label) + '</h3>'
+          + (row.desc
+              ? '<p class="tw-race-desc">' + esc(row.desc) + '</p>'
+              : '')
+          + '<div class="tw-lore-card__effects">'
+            + '<div class="tw-lore-card__effect"><strong>' + esc(bonusTag) + ':</strong> ' + esc(bonusDesc) + '</div>'
+            + '<div class="tw-lore-card__effect"><strong>' + esc(flawTag) + ':</strong> ' + esc(flawDesc) + '</div>'
           + '</div>'
-        + '</button>';
-    }).join('');
-  }
+          + '<span class="tw-race-select-hint">Select</span>'
+        + '</div>'
+      + '</button>';
+  }).join('');
+}
 
   function renderAvatarGallery() {
     var target = q('#tw-avatar-gallery', root);
