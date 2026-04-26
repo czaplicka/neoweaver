@@ -457,22 +457,85 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 <h2>System Review</h2>
                 <p class="tw-question-text">Review the full configuration before deployment.</p>
 
-                <div class="tw-summary-grid">
-                    <div class="tw-summary-row"><div class="tw-summary-key">Name</div><div class="tw-summary-val" id="tw-summary-character-name"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Pronouns</div><div class="tw-summary-val" id="tw-summary-pronouns"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Race / subrace</div><div class="tw-summary-val" id="tw-summary-race"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Class</div><div class="tw-summary-val" id="tw-summary-class"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Attributes</div><div class="tw-summary-val" id="tw-summary-attrs"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Skills</div><div class="tw-summary-val" id="tw-summary-skills"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Package</div><div class="tw-summary-val" id="tw-summary-package"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Data origin</div><div class="tw-summary-val" id="tw-summary-origin"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Previous operation</div><div class="tw-summary-val" id="tw-summary-operation"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Sync crisis</div><div class="tw-summary-val" id="tw-summary-crisis"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Backstory tags</div><div class="tw-summary-val" id="tw-summary-tag-bundle"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Bio</div><div class="tw-summary-val" id="tw-summary-bio"></div></div>
-                    <div class="tw-summary-row"><div class="tw-summary-key">Portrait</div><div class="tw-summary-val" id="tw-summary-avatar"></div></div>
-                </div>
+<div class="tw-summary-grid">
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Name</div>
+        <div class="tw-summary-val" id="tw-summary-character-name"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="0">Edit</button>
+    </div>
 
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Pronouns</div>
+        <div class="tw-summary-val" id="tw-summary-pronouns"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="0">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Race / subrace</div>
+        <div class="tw-summary-val" id="tw-summary-race"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="1">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Class</div>
+        <div class="tw-summary-val" id="tw-summary-class"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="2">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Attributes</div>
+        <div class="tw-summary-val" id="tw-summary-attrs"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="3">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Skills</div>
+        <div class="tw-summary-val" id="tw-summary-skills"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="4">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Package</div>
+        <div class="tw-summary-val" id="tw-summary-package"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="5">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Data origin</div>
+        <div class="tw-summary-val" id="tw-summary-origin"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="6">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Previous operation</div>
+        <div class="tw-summary-val" id="tw-summary-operation"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="7">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Sync crisis</div>
+        <div class="tw-summary-val" id="tw-summary-crisis"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="8">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Backstory tags</div>
+        <div class="tw-summary-val" id="tw-summary-tag-bundle"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="8">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Bio</div>
+        <div class="tw-summary-val" id="tw-summary-bio"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="9">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Portrait</div>
+        <div class="tw-summary-val" id="tw-summary-avatar"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="9">Edit</button>
+    </div>
+</div>
                 <div class="tw-nav-row">
                     <button type="button" class="tw-btn-nav tw-btn-prev tw-btn-review-return" data-dir="prev">Back</button>
                     <button type="button" id="tw-char-submit" class="tw-btn tw-btn--primary">DEPLOY OPERATIVE</button>
