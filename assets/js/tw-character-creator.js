@@ -1047,7 +1047,10 @@ function normalizeMediaUrl(url) {
       return Promise.resolve([]);
     }
 
-    return fetchPost('neoweaver_get_packages', { class_tag: classId })
+return fetchPost('neoweaver_get_packages', {
+  class_tag: classId,
+  class_slug: state.class_slug || slugify(state.class_label || '')
+})
       .then(function (res) {
         var rows = [];
 
