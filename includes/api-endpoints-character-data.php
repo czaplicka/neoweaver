@@ -2,7 +2,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 if ( ! function_exists( 'nw_decode_jsonb_array' ) ) {
     function nw_decode_jsonb_array( $value ): array {
         if ( is_array( $value ) ) {
