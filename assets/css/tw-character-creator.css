@@ -33,6 +33,7 @@ Scoped to: #tw-char-creator-wrapper
 #tw-char-creator-wrapper,
 #tw-char-creator-wrapper * {
   box-sizing: border-box;
+  overflow: visible;
 }
 
 #tw-char-creator-wrapper {
@@ -1319,4 +1320,24 @@ button[data-action="plus"]:hover:not(:disabled) {
     grid-row: 1 / 3;
     align-self: center;
   }
+}
+#tw-char-creator-wrapper {
+  overflow: visible;
+}
+
+#tw-skill-grid,
+.tw-skill-category,
+.tw-skill-cat-grid {
+  overflow: visible;
+}
+
+.tw-skill-cardimg,
+.tw-skill-card .tw-race-img {
+  min-height: 120px;
+  max-height: none;
+  aspect-ratio: 16 / 10;
+}
+
+.tw-skill-cardbody {
+  min-height: auto;
 }
