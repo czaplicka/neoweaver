@@ -398,39 +398,64 @@ if ( ! function_exists( 'nw_find_starting_package_by_id' ) ) {
 }
 
 if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
-    function nw_validate_starting_package_selection( string $class_id, string $package_id ) {
-        if ( '' === $package_id ) {
-            return true;
-        }
+	function nw_validate_starting_package_selection( string $class_id, string $package_id ) {
+		if ( ! $package_id ) {
+			return true;
+		}
 
-        $class_row = nw_find_class_by_id( $class_id );
-        if ( empty( $class_row ) || empty( $class_row['id'] ) || empty( $class_row['is_active'] ) ) {
-            return new WP_Error( 'invalid_class', 'Selected class does not exist or is inactive.', array( 'status' => 400 ) );
-        }
+		$class_row = nw_find_class_by_id( $class_id );
+		if ( empty( $class_row ) || empty( $class_row['id'] ) || empty( $class_row['is_active'] ) ) {
+			return new WP_Error(
+				'invalid_class',
+				'Selected class does not exist or is inactive.',
+				array( 'status' => 400 )
+			);
+		}
 
-        $package_row = nw_find_starting_package_by_id( $package_id );
-        if ( empty( $package_row ) || empty( $package_row['id'] ) ) {
-            return new WP_Error( 'invalid_starting_package', 'Selected starting package does not exist or is not player selectable.', array( 'status' => 400 ) );
-        }
+		$package_row = nw_find_starting_package_by_id( $package_id );
+		if ( empty( $package_row ) || empty( $package_row['id'] ) ) {
+			return new WP_Error(
+				'invalid_starting_package',
+				'Selected starting package does not exist or is not player selectable.',
+				array( 'status' => 400 )
+			);
+		}
 
-        $class_name = strtolower( trim( (string) ( $class_row['name'] ?? '' ) ) );
-        if ( '' === $class_name ) {
-            return new WP_Error( 'invalid_class', 'Selected class has no valid name.', array( 'status' => 400 ) );
-        }
+		$class_name = strtolower( trim( (string) ( $class_row['name'] ?? '' ) ) );
+		$class_slug = sanitize_title( $class_row['name'] ?? '' );
 
-        $package_tags = array_map( 'strtolower', nw_decode_jsonb_array( $package_row['compatibility_tags'] ?? array() ) );
-        if ( empty( $package_tags ) ) {
-            return new WP_Error( 'invalid_starting_package', 'Selected starting package has no compatibility tags.', array( 'status' => 400 ) );
-        }
+		if ( ! $class_name ) {
+			return new WP_Error(
+				'invalid_class',
+				'Selected class has no valid name.',
+				array( 'status' => 400 )
+			);
+		}
 
-        if ( ! in_array( $class_name, $package_tags, true ) ) {
-            return new WP_Error( 'starting_package_mismatch', 'Selected starting package is not compatible with this class.', array( 'status' => 400 ) );
-        }
+		$package_tags = array_map(
+			'strtolower',
+			nw_decode_jsonb_array( $package_row['compatibility_tags'] ?? array() )
+		);
 
-        return true;
-    }
+		if ( empty( $package_tags ) ) {
+			return new WP_Error(
+				'invalid_starting_package',
+				'Selected starting package has no compatibility tags.',
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! in_array( $class_name, $package_tags, true ) && ! in_array( $class_slug, $package_tags, true ) ) {
+			return new WP_Error(
+				'starting_package_mismatch',
+				'Selected starting package is not compatible with this class.',
+				array( 'status' => 400 )
+			);
+		}
+
+		return true;
+	}
 }
-
 if ( ! function_exists( 'nw_find_skills_by_ids' ) ) {
     function nw_find_skills_by_ids( array $skill_ids ): array {
         $skill_ids = array_values(
@@ -900,63 +925,61 @@ if ( ! function_exists( 'neoweaver_ajax_get_skills' ) ) {
     add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
 }
 if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
-    function neoweaver_ajax_get_packages(): void {
-        if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
-            wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
-        }
+	function neoweaver_ajax_get_packages(): void {
+		if ( false === check_ajax_referer( 'neoweaver-nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
+		}
 
-        $class_id = sanitize_text_field(
-            $_POST['class_tag'] ?? $_POST['classtag'] ?? $_POST['classId'] ?? ''
-        );
+		$class_id = sanitize_text_field( $_POST['classtag'] ?? $_POST['classId'] ?? '' );
 
-        if ( '' === $class_id ) {
-            wp_send_json_success( array() );
-        }
+		if ( ! $class_id ) {
+			wp_send_json_success( array() );
+		}
 
-        $class_row = nw_find_class_by_id( $class_id );
-        if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
-            wp_send_json_success( array() );
-        }
+		$class_row = nw_find_class_by_id( $class_id );
 
-        $class_name = strtolower( trim( (string) $class_row['name'] ) );
+		if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
+			wp_send_json_success( array() );
+		}
 
-        $data = nw_fetch_lookup_table(
-            'cyber_starting_packages',
-            'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
-            'package_name.asc',
-            300,
-            array(
-                'is_player_selectable' => 'eq.true',
-            )
-        );
+		$class_name = strtolower( trim( (string) $class_row['name'] ) );
+		$class_slug = sanitize_title( $class_row['name'] );
 
-        if ( is_wp_error( $data ) ) {
-            wp_send_json_error( array( 'message' => $data->get_error_message() ) );
-        }
+		$data = nw_fetch_lookup_table(
+			'cyber_starting_packages',
+			'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
+			'package_name.asc',
+			300,
+			array(
+				'is_player_selectable' => 'eq.true',
+			)
+		);
 
-        $data = array_values(
-            array_filter(
-                $data,
-                static function ( $row ) use ( $class_name ) {
-                    $tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
-                    $tags = array_map(
-                        static function ( $tag ) {
-                            return strtolower( trim( (string) $tag ) );
-                        },
-                        $tags
-                    );
+		if ( is_wp_error( $data ) ) {
+			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
+		}
 
-                    return in_array( $class_name, $tags, true );
-                }
-            )
-        );
+		$data = array_values(
+			array_filter(
+				$data,
+				static function ( $row ) use ( $class_name, $class_slug ) {
+					$tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
+					$tags = array_map(
+						static function ( $tag ) {
+							return strtolower( trim( (string) $tag ) );
+						},
+						$tags
+					);
 
-        wp_send_json_success( nw_map_starting_package_shape( $data, $class_name ) );
-    }
+					return in_array( $class_name, $tags, true ) || in_array( $class_slug, $tags, true );
+				}
+			)
+		);
 
-    add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
-    add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
+		wp_send_json_success( nw_map_starting_package_shape( $data, $class_slug ) );
+	}
 }
+
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
     function nw_create_character_from_request(): void {
         if ( ! is_user_logged_in() ) {
