@@ -896,10 +896,10 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
         }
 
         $class_id = sanitize_text_field(
-    $_POST['class_tag'] ?? $_POST['classtag'] ?? $_POST['classId'] ?? ''
-);
+            $_POST['class_tag'] ?? $_POST['classtag'] ?? $_POST['classId'] ?? ''
+        );
 
-        if ( ! $class_id ) {
+        if ( '' === $class_id ) {
             wp_send_json_success( array() );
         }
 
@@ -924,7 +924,7 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
             wp_send_json_error( array( 'message' => $data->get_error_message() ) );
         }
 
-        $data = nw_filter_packages_by_classname( $data, $class_name );
+        $data = nw_filter_packages_by_class_name( $data, $class_name );
 
         wp_send_json_success( nw_map_starting_package_shape( $data, $class_name ) );
     }
@@ -932,7 +932,6 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
     add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
     add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
 }
-
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
     function nw_create_character_from_request(): void {
         if ( ! is_user_logged_in() ) {
