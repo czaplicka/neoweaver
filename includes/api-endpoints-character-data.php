@@ -295,21 +295,33 @@ if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
 
 if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
     function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
-        $class_name = strtolower( trim( $class_name ) );
-        if ( '' === $class_name ) {
-            return array();
-        }
+        $class_name = strtolower( trim( (string) $class_name ) );
 
-        return array_values(
+        error_log( 'NW class_name = ' . $class_name );
+        error_log( 'NW packages raw = ' . print_r( $rows, true ) );
+
+        $filtered = array_values(
             array_filter(
                 $rows,
                 static function ( $row ) use ( $class_name ) {
                     $tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
-                    $tags = array_map( 'strtolower', $tags );
+                    $tags = array_map(
+                        static function ( $tag ) {
+                            return strtolower( trim( (string) $tag ) );
+                        },
+                        $tags
+                    );
+
+                    error_log( 'NW package ' . ( $row['package_name'] ?? 'NO_NAME' ) . ' tags = ' . wp_json_encode( $tags ) );
+
                     return in_array( $class_name, $tags, true );
                 }
             )
         );
+
+        error_log( 'NW filtered count = ' . count( $filtered ) );
+
+        return $filtered;
     }
 }
 
