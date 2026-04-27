@@ -8,6 +8,40 @@
   var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
   var TOTAL_STEPS = 11;
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
+  var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMGBASE);
+
+var sndTuning = new Audio(uploads + '/tuning.mp3');
+var sndDeploy = new Audio(uploads + '/create-world.mp3');
+var audioUnlocked = false;
+
+sndTuning.preload = 'auto';
+sndDeploy.preload = 'auto';
+
+function playSound(audio) {
+	try {
+		audio.currentTime = 0;
+		audio.play().catch(function(){});
+	} catch(e){}
+}
+
+function unlockAudio() {
+	if (audioUnlocked) return;
+	audioUnlocked = true;
+
+	[sndTuning, sndDeploy].forEach(function(audio) {
+		try {
+			audio.volume = 0.01;
+			var p = audio.play();
+			if (p && typeof p.then === 'function') {
+				p.then(function() {
+					audio.pause();
+					audio.currentTime = 0;
+					audio.volume = 1;
+				}).catch(function(){});
+			}
+		} catch(e){}
+	});
+}
 
   var DATA_ORIGIN_OPTIONS = [
     { key: 'palace', label: 'Palace', desc: 'Your consciousness was stabilized among luxury systems, court protocols, and prototype-grade environments.', bonus_tag: 'Wealthy', bonus_desc: '+100 Credits at initialization.', flaw_tag: 'Fragile-Gear', flaw_desc: 'Base Durability of starting gear -2; using expensive but delicate prototypes.' },
@@ -418,18 +452,20 @@ function normalizeMediaUrl(url) {
     if (currentStep === 10) updateSummary();
   }
 
-  function nextStep() {
-    var error = validateStep(currentStep);
-    if (error) {
-      showStepError(currentStep, error);
-      return;
-    }
-    clearStepErrors();
-    setStatus('', '');
-    if (currentStep < stepEls.length - 1) goToStep(currentStep + 1);
-  }
+function nextStep() {
+	var error = validateStep(currentStep);
+	if (error) {
+		showStepError(currentStep, error);
+		return;
+	}
+	playSound(sndTuning);
+	clearStepErrors();
+	setStatus('', '');
+	if (currentStep < stepEls.length - 1) goToStep(currentStep + 1);
+}
 
   function prevStep() {
+    	playSound(sndTuning);
     clearStepErrors();
     setStatus('', '');
     if (currentStep > 0) goToStep(currentStep - 1);
@@ -625,6 +661,7 @@ function normalizeMediaUrl(url) {
   }
 
   function bindStaticEvents() {
+    	document.addEventListener('click', unlockAudio, { once: true });
     var nameInput = q('#tw-char-name', root);
     if (nameInput) {
       nameInput.addEventListener('input', function (e) {
@@ -641,6 +678,7 @@ function normalizeMediaUrl(url) {
 
     var customPronouns = q('#tw-char-pronouns-custom', root);
     if (customPronouns) {
+      playSound(sndTuning);
       customPronouns.addEventListener('input', function (e) {
         state.pronouns_custom = e.target.value;
       });
@@ -734,6 +772,7 @@ function normalizeMediaUrl(url) {
 
       var raceCard = e.target.closest('.tw-race-card');
       if (raceCard) {
+        playSound(sndTuning);
         var mode = raceCard.getAttribute('data-mode');
         var id = raceCard.getAttribute('data-id') || '';
         var name = raceCard.getAttribute('data-name') || '';
@@ -774,6 +813,7 @@ function normalizeMediaUrl(url) {
 
       var classCard = e.target.closest('.tw-class-card');
       if (classCard) {
+        playSound(sndTuning);
         state.char_class = classCard.getAttribute('data-id') || '';
         state.class_label = classCard.getAttribute('data-name') || '';
         state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
@@ -802,6 +842,7 @@ function normalizeMediaUrl(url) {
 
       var skillCard = e.target.closest('.tw-skill-card');
       if (skillCard) {
+        playSound(sndTuning);
         var skillId = skillCard.getAttribute('data-id') || '';
         var idx = state.skills.indexOf(skillId);
 
@@ -817,6 +858,7 @@ function normalizeMediaUrl(url) {
 
       var packageCard = e.target.closest('.tw-package-card');
       if (packageCard) {
+        playSound(sndTuning);
         state.starting_package_id = packageCard.getAttribute('data-id') || '';
         state.starting_package_label = packageCard.getAttribute('data-name') || '';
         selectExclusive('.tw-package-card', packageCard);
@@ -825,6 +867,7 @@ function normalizeMediaUrl(url) {
 
       var loreCard = e.target.closest('.tw-lore-card');
       if (loreCard) {
+        playSound(sndTuning);
         var kind = loreCard.getAttribute('data-kind') || '';
         var key = loreCard.getAttribute('data-key') || '';
         var label = loreCard.getAttribute('data-label') || '';
@@ -853,6 +896,7 @@ function normalizeMediaUrl(url) {
 
       var avatarCard = e.target.closest('.tw-avatar-card');
       if (avatarCard) {
+        playSound(sndTuning);
         state.avatar_file = null;
         state.avatar_url = avatarCard.getAttribute('data-url') || '';
         var input = q('#tw-char-avatar', root);
@@ -869,7 +913,7 @@ function normalizeMediaUrl(url) {
       showStepError(10, error);
       return;
     }
-
+playSound(sndDeploy);
     var spinner = q('#tw-char-spinner', root);
     if (spinner) spinner.classList.add('is-visible');
     setStatus('Creating character…', 'info');
