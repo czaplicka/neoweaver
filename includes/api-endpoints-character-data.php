@@ -901,6 +901,10 @@ if ( ! function_exists( 'neoweaver_ajax_get_skills' ) ) {
     add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
 }
 if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
+        function neoweaver_ajax_get_packages(): void {
+        if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
+            wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
+        }
 $class_slug = sanitize_text_field( $_POST['class_slug'] ?? '' );
 
 if ( '' === $class_slug ) {
