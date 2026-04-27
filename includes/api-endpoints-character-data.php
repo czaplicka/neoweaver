@@ -900,50 +900,35 @@ if ( ! function_exists( 'neoweaver_ajax_get_skills' ) ) {
     add_action( 'wp_ajax_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
     add_action( 'wp_ajax_nopriv_neoweaver_get_skills', 'neoweaver_ajax_get_skills' );
 }
-
 if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
-    function neoweaver_ajax_get_packages(): void {
-        if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
-            wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
-        }
+$class_slug = sanitize_text_field( $_POST['class_slug'] ?? '' );
 
-        $class_id = sanitize_text_field(
-            $_POST['class_tag'] ?? $_POST['classtag'] ?? $_POST['classId'] ?? ''
-        );
-
-        if ( '' === $class_id ) {
-            wp_send_json_success( array() );
-        }
-
-        $class_row = nw_find_class_by_id( $class_id );
-        if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
-            wp_send_json_success( array() );
-        }
-
-        $class_name = strtolower( trim( (string) $class_row['name'] ) );
-
-        $data = nw_fetch_lookup_table(
-            'cyber_starting_packages',
-            'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
-            'package_name.asc',
-            300,
-            array(
-                'is_player_selectable' => 'eq.true',
-            )
-        );
-
-        if ( is_wp_error( $data ) ) {
-            wp_send_json_error( array( 'message' => $data->get_error_message() ) );
-        }
-
-        $data = nw_filter_packages_by_class_name( $data, $class_name );
-
-        wp_send_json_success( nw_map_starting_package_shape( $data, $class_name ) );
+if ( '' === $class_slug ) {
+    $class_row = nw_find_class_by_id( $class_id );
+    if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
+        wp_send_json_success( array() );
     }
-
-    add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
-    add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
+    $class_slug = strtolower( trim( (string) $class_row['name'] ) );
 }
+
+$class_slug = strtolower( trim( $class_slug ) );
+
+$data = array_values(
+    array_filter(
+        $data,
+        static function ( $row ) use ( $class_slug ) {
+            $tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
+            $tags = array_map(
+                static function ( $tag ) {
+                    return strtolower( trim( (string) $tag ) );
+                },
+                $tags
+            );
+
+            return in_array( $class_slug, $tags, true );
+        }
+    )
+);
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
     function nw_create_character_from_request(): void {
         if ( ! is_user_logged_in() ) {
