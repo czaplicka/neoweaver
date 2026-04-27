@@ -257,22 +257,27 @@ if ( ! function_exists( 'nw_map_skill_card_shape' ) ) {
 }
 
 if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
-    function nw_map_starting_package_shape( array $rows, string $class_name = '' ): array {
-        $class_name = strtolower( trim( $class_name ) );
-
-        return array_map(
-            static function ( $row ) use ( $class_name ) {
-                $compatibility_tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
-                if ( '' !== $class_name ) {
-                    $compatibility_tags = array_values(
-                        array_filter(
-                            $compatibility_tags,
-                            static function ( $tag ) use ( $class_name ) {
-                                return strtolower( trim( (string) $tag ) ) !== $class_name;
-                            }
-                        )
-                    );
-                }
+	function nw_map_starting_package_shape( array $rows, string $class_name = '' ): array {
+		return array_map(
+			static function ( $row ) {
+				return array(
+					'id'                 => (string) ( $row['id'] ?? '' ),
+					'name'               => (string) ( $row['package_name'] ?? '' ),
+					'packagename'        => (string) ( $row['package_name'] ?? '' ),
+					'description'        => (string) ( $row['description'] ?? '' ),
+					'items'              => nw_decode_jsonb_array( $row['items_list'] ?? array() ),
+					'itemslist'          => nw_decode_jsonb_array( $row['items_list'] ?? array() ),
+					'compatibilitytags'  => nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() ),
+					'compatibleclassids' => nw_decode_jsonb_array( $row['compatible_class_ids'] ?? array() ),
+					'attackcardspool'    => nw_decode_jsonb_array( $row['attack_cards_pool'] ?? array() ),
+					'defensecardspool'   => nw_decode_jsonb_array( $row['defense_cards_pool'] ?? array() ),
+					'basearmor'          => isset( $row['base_armor'] ) ? (int) $row['base_armor'] : 0,
+				);
+			},
+			$rows
+		);
+	}
+}
 
                 return array(
                     'id'                => (string) ( $row['id'] ?? '' ),
@@ -373,28 +378,29 @@ if ( ! function_exists( 'nw_find_class_by_id' ) ) {
 }
 
 if ( ! function_exists( 'nw_find_starting_package_by_id' ) ) {
-    function nw_find_starting_package_by_id( string $package_id ) {
-        $package_id = sanitize_text_field( $package_id );
-        if ( '' === $package_id ) {
-            return null;
-        }
+	function nw_find_starting_package_by_id( string $package_id ) {
+		$package_id = sanitize_text_field( $package_id );
+		if ( ! $package_id ) {
+			return null;
+		}
 
-        $rows = nw_supabase_request(
-            'GET',
-            'cyber_starting_packages',
-            array(
-                'select'                 => 'id,package_name,compatibility_tags,is_player_selectable',
-                'id'                     => 'eq.' . $package_id,
-                'is_player_selectable'   => 'eq.true',
-                'limit'                  => 1,
-            )
-        );
+		$rows = nw_supabase_request(
+			'GET',
+			'cyber_starting_packages',
+			array(
+				'select'               => 'id,package_name,compatibility_tags,compatible_class_ids,is_player_selectable',
+				'id'                   => 'eq.' . $package_id,
+				'is_player_selectable' => 'eq.true',
+				'limit'                => 1,
+			)
+		);
 
-        if ( is_wp_error( $rows ) || empty( $rows[0] ) || ! is_array( $rows[0] ) ) {
-            return null;
-        }
-        return $rows[0];
-    }
+		if ( is_wp_error( $rows ) || empty( $rows[0] ) || ! is_array( $rows[0] ) ) {
+			return null;
+		}
+
+		return $rows[0];
+	}
 }
 
 if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
@@ -421,31 +427,22 @@ if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
 			);
 		}
 
-		$class_name = strtolower( trim( (string) ( $class_row['name'] ?? '' ) ) );
-		$class_slug = sanitize_title( $class_row['name'] ?? '' );
-
-		if ( ! $class_name ) {
-			return new WP_Error(
-				'invalid_class',
-				'Selected class has no valid name.',
-				array( 'status' => 400 )
-			);
-		}
-
-		$package_tags = array_map(
-			'strtolower',
-			nw_decode_jsonb_array( $package_row['compatibility_tags'] ?? array() )
+		$package_class_ids = array_map(
+			static function ( $id ) {
+				return sanitize_text_field( (string) $id );
+			},
+			nw_decode_jsonb_array( $package_row['compatible_class_ids'] ?? array() )
 		);
 
-		if ( empty( $package_tags ) ) {
+		if ( empty( $package_class_ids ) ) {
 			return new WP_Error(
 				'invalid_starting_package',
-				'Selected starting package has no compatibility tags.',
+				'Selected starting package has no compatible class IDs.',
 				array( 'status' => 400 )
 			);
 		}
 
-		if ( ! in_array( $class_name, $package_tags, true ) && ! in_array( $class_slug, $package_tags, true ) ) {
+		if ( ! in_array( $class_id, $package_class_ids, true ) ) {
 			return new WP_Error(
 				'starting_package_mismatch',
 				'Selected starting package is not compatible with this class.',
@@ -936,18 +933,9 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 			wp_send_json_success( array() );
 		}
 
-		$class_row = nw_find_class_by_id( $class_id );
-
-		if ( empty( $class_row ) || empty( $class_row['name'] ) ) {
-			wp_send_json_success( array() );
-		}
-
-		$class_name = strtolower( trim( (string) $class_row['name'] ) );
-		$class_slug = sanitize_title( $class_row['name'] );
-
 		$data = nw_fetch_lookup_table(
 			'cyber_starting_packages',
-			'id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
+			'id,package_name,description,items_list,compatibility_tags,compatible_class_ids,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable',
 			'package_name.asc',
 			300,
 			array(
@@ -962,22 +950,25 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 		$data = array_values(
 			array_filter(
 				$data,
-				static function ( $row ) use ( $class_name, $class_slug ) {
-					$tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
-					$tags = array_map(
-						static function ( $tag ) {
-							return strtolower( trim( (string) $tag ) );
+				static function ( $row ) use ( $class_id ) {
+					$class_ids = nw_decode_jsonb_array( $row['compatible_class_ids'] ?? array() );
+					$class_ids = array_map(
+						static function ( $id ) {
+							return sanitize_text_field( (string) $id );
 						},
-						$tags
+						$class_ids
 					);
 
-					return in_array( $class_name, $tags, true ) || in_array( $class_slug, $tags, true );
+					return in_array( $class_id, $class_ids, true );
 				}
 			)
 		);
 
-		wp_send_json_success( nw_map_starting_package_shape( $data, $class_slug ) );
+		wp_send_json_success( nw_map_starting_package_shape( $data, $class_id ) );
 	}
+	    add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
+    add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
+}
 }
 
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
