@@ -1341,3 +1341,69 @@ button[data-action="plus"]:hover:not(:disabled) {
 .tw-skill-cardbody {
   min-height: auto;
 }
+html, body {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: auto !important;
+}
+
+body.page, 
+body.post-type-page,
+.site,
+.site-content,
+.entry-content,
+.elementor,
+.elementor-section,
+.elementor-container,
+.elementor-widget,
+.elementor-widget-container {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+#tw-char-creator-wrapper,
+.tw-char-creator-wrapper,
+.tw-char-step,
+.tw-step,
+.tw-skill-grid,
+#tw-skill-grid,
+.tw-skill-category,
+.tw-skill-cat-grid {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.tw-char-step.active,
+.tw-step.active {
+  display: block !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.tw-nav-row {
+  position: static !important;
+}
+
+#tw-skill-grid {
+  display: block !important;
+}
+
+.tw-skill-category {
+  display: block !important;
+  margin-bottom: 24px !important;
+}
+
+.tw-skill-cat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+  gap: 16px !important;
+}
+
+@media (max-width: 640px) {
+  .tw-skill-cat-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
