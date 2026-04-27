@@ -279,24 +279,6 @@ if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
 	}
 }
 
-                return array(
-                    'id'                => (string) ( $row['id'] ?? '' ),
-                    'name'              => (string) ( $row['package_name'] ?? '' ),
-                    'package_name'      => (string) ( $row['package_name'] ?? '' ),
-                    'description'       => (string) ( $row['description'] ?? '' ),
-                    'items'             => nw_decode_jsonb_array( $row['items_list'] ?? array() ),
-                    'items_list'        => nw_decode_jsonb_array( $row['items_list'] ?? array() ),
-                    'compatibility_tags'=> $compatibility_tags,
-                    'attack_cards_pool' => nw_decode_jsonb_array( $row['attack_cards_pool'] ?? array() ),
-                    'defense_cards_pool'=> nw_decode_jsonb_array( $row['defense_cards_pool'] ?? array() ),
-                    'base_armor'        => isset( $row['base_armor'] ) ? (int) $row['base_armor'] : 0,
-                );
-            },
-            $rows
-        );
-    }
-}
-
 if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
     function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
         $class_name = strtolower( trim( (string) $class_name ) );
@@ -923,13 +905,13 @@ if ( ! function_exists( 'neoweaver_ajax_get_skills' ) ) {
 }
 if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 	function neoweaver_ajax_get_packages(): void {
-		if ( false === check_ajax_referer( 'neoweaver-nonce', 'nonce', false ) ) {
+		if ( false === check_ajax_referer( 'neoweaver_nonce', 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
 		}
 
 		$class_id = sanitize_text_field( $_POST['classtag'] ?? $_POST['classId'] ?? '' );
 
-		if ( ! $class_id ) {
+		if ( '' === $class_id ) {
 			wp_send_json_success( array() );
 		}
 
@@ -966,9 +948,9 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 
 		wp_send_json_success( nw_map_starting_package_shape( $data, $class_id ) );
 	}
-	    add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
-    add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
-}
+
+	add_action( 'wp_ajax_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
+	add_action( 'wp_ajax_nopriv_neoweaver_get_packages', 'neoweaver_ajax_get_packages' );
 }
 
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
