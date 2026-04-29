@@ -34,6 +34,11 @@ Scoped to: #tw-char-creator-wrapper
 #tw-char-creator-wrapper * {
   box-sizing: border-box;
 }
+#tw-char-creator-wrapper .tw-char-step { display: none !important; }
+#tw-char-creator-wrapper .tw-char-step.active { display: block !important; }
+#tw-char-creator-wrapper .tw-char-step[hidden] { display: none !important; }
+#tw-char-creator-wrapper .tw-char-step.active[hidden] { display: block !important; }
+#tw-char-creator-wrapper .tw-step { display: block; }
 
 #tw-char-creator-wrapper {
   font-family: 'Chakra Petch', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
