@@ -16,7 +16,6 @@ if ( ! function_exists( 'nw_decode_jsonb_array' ) ) {
                 )
             );
         }
-
         if ( is_string( $value ) ) {
             $value = trim( $value );
             if ( '' === $value ) {
