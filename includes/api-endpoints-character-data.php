@@ -908,7 +908,7 @@ if ( ! function_exists( 'neoweaver_ajax_get_packages' ) ) {
 			wp_send_json_error( array( 'message' => 'Security check failed.' ), 403 );
 		}
 
-		$class_id = sanitize_text_field( $_POST['classtag'] ?? $_POST['classId'] ?? '' );
+		$class_id = sanitize_text_field( $_POST['classtag'] ?? $_POST['class_tag'] ?? $_POST['classId'] ?? '' );
 
 		if ( '' === $class_id ) {
 			wp_send_json_success( array() );
