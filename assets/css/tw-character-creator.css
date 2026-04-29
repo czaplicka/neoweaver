@@ -920,19 +920,24 @@ button[data-action="plus"]:hover:not(:disabled) {
 
 .tw-avatar-selected {
   display: grid;
-  gap: 14px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 #tw-avatar-img {
-  width: min(100%, 360px);
+  display: block;
+  width: 96px !important;
+  height: 96px !important;
+  min-width: 96px !important;
+  min-height: 96px !important;
+  max-width: 96px !important;
+  max-height: 96px !important;
   aspect-ratio: 1 / 1;
   object-fit: cover;
-    object-position: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 18px;
-  border: 1px solid rgba(173,255,0,0.18);
-  background: transparent;
+  object-position: center;
+  border-radius: 999px;
+  border: 2px solid rgba(173,255,0,0.32);
+  background: rgba(255,255,255,0.03);
 }
 
 /* ===== BUTTONS ===== */
@@ -1416,6 +1421,7 @@ body.post-type-page,
   grid-template-columns: repeat(auto-fit, minmax(92px, 92px));
   gap: 14px;
   align-items: start;
+  margin-bottom: 22px;
 }
 
 .tw-avatar-card {
@@ -1476,6 +1482,7 @@ body.post-type-page,
   .tw-avatar-grid {
     grid-template-columns: repeat(auto-fit, minmax(76px, 76px));
     gap: 12px;
+    margin-bottom: 18px;
   }
 
   .tw-avatar-card {
