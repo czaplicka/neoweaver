@@ -394,6 +394,7 @@ function normalizeMediaUrl(url) {
 
     if (index === 1) {
       if (!state.race) return 'Choose a race.';
+if (!state.subrace) return 'Choose a subrace.';
       if (Array.isArray(state.subraces) && state.subraces.length > 0 && !state.subrace) {
         return 'Choose a subrace to continue.';
       }
