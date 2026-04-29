@@ -26,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $css_handle,
             $css_url,
             array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.14'
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.15'
         );
 
         wp_register_script(
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.13',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.14',
             true
         );
 
