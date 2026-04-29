@@ -1327,9 +1327,6 @@ button[data-action="plus"]:hover:not(:disabled) {
     align-self: center;
   }
 }
-#tw-char-creator-wrapper {
-  overflow: visible;
-}
 
 #tw-skill-grid,
 .tw-skill-category,
@@ -1378,7 +1375,6 @@ body.post-type-page,
 .tw-skill-cat-grid {
   height: auto !important;
   max-height: none !important;
-  overflow: visible !important;
 }
 
 .tw-char-step.active,
@@ -1490,4 +1486,14 @@ body.post-type-page,
     width: 76px;
     height: 76px;
   }
+}
+.tw-summary-value,
+.tw-summary-val,
+.tw-summary-text,
+.tw-summary-bio,
+#tw-char-summary,
+#tw-char-summary * {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
