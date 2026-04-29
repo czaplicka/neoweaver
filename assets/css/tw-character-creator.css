@@ -935,9 +935,10 @@ button[data-action="plus"]:hover:not(:disabled) {
   aspect-ratio: 1 / 1;
   object-fit: cover;
   object-position: center;
-  border-radius: 999px;
+  border-radius: 999px !important;
   border: 2px solid rgba(173,255,0,0.32);
-  background: rgba(255,255,255,0.03);
+  background: transparent;
+  overflow: hidden;
 }
 
 /* ===== BUTTONS ===== */
@@ -1418,8 +1419,8 @@ body.post-type-page,
 .tw-avatar-gallery,
 .tw-avatar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 92px));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, 92px);
+  gap: 8px;
   align-items: start;
   margin-bottom: 22px;
 }
@@ -1480,10 +1481,11 @@ body.post-type-page,
 @media (max-width: 640px) {
   .tw-avatar-gallery,
   .tw-avatar-grid {
-    grid-template-columns: repeat(auto-fit, minmax(76px, 76px));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, 76px);
+    gap: 8px;
     margin-bottom: 18px;
   }
+}
 
   .tw-avatar-card {
     width: 76px;
