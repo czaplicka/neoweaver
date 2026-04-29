@@ -98,8 +98,6 @@ function unlockAudio() {
     classes: [],
     skills_data: [],
     packages: [],
-	  editing_from_summary: false,
-summary_step_index: TOTAL_STEPS - 1
   };
 
   var currentStep = 0;
@@ -699,12 +697,11 @@ function renderPackages(rows) {
     });
 
     var customPronouns = q('#tw-char-pronouns-custom', root);
-    if (customPronouns) {
-      playSound(sndTuning);
-      customPronouns.addEventListener('input', function (e) {
-        state.pronouns_custom = e.target.value;
-      });
-    }
+if (customPronouns) {
+  customPronouns.addEventListener('input', function (e) {
+    state.pronouns_custom = e.target.value;
+  });
+}
 
     var bioInput = q('#tw-char-bio', root);
     if (bioInput) {
@@ -780,162 +777,161 @@ function renderPackages(rows) {
       });
     }
 
-var editBtn = e.target.closest('.tw-btn-review-edit');
-if (editBtn) {
-  var targetStep = parseInt(editBtn.getAttribute('data-target-step'), 10);
-  if (!isNaN(targetStep) && stepEls[targetStep]) {
-    returnToReviewStep = 10;
-    goToStep(targetStep);
+root.addEventListener('click', function (e) {
+  var editBtn = e.target.closest('.tw-btn-review-edit');
+  if (editBtn) {
+    var targetStep = parseInt(editBtn.getAttribute('data-target-step'), 10);
+    if (!isNaN(targetStep) && stepEls[targetStep]) {
+      returnToReviewStep = 10;
+      goToStep(targetStep);
+    }
+    return;
   }
-  return;
-}
 
-var summaryEdit = e.target.closest('.tw-summary-edit');
-if (summaryEdit) {
-  var targetStep = Number(summaryEdit.getAttribute('data-step'));
-  if (!isNaN(targetStep) && stepEls[targetStep]) {
-    returnToReviewStep = 10;
-    goToStep(targetStep);
+  var summaryEdit = e.target.closest('.tw-summary-edit');
+  if (summaryEdit) {
+    var targetStep = Number(summaryEdit.getAttribute('data-step'));
+    if (!isNaN(targetStep) && stepEls[targetStep]) {
+      returnToReviewStep = 10;
+      goToStep(targetStep);
+    }
+    return;
   }
-  return;
-}
 
-      var raceCard = e.target.closest('.tw-race-card');
-      if (raceCard) {
-        playSound(sndTuning);
-        var mode = raceCard.getAttribute('data-mode');
-        var id = raceCard.getAttribute('data-id') || '';
-        var name = raceCard.getAttribute('data-name') || '';
+  var raceCard = e.target.closest('.tw-race-card');
+  if (raceCard) {
+    playSound(sndTuning);
+    var mode = raceCard.getAttribute('data-mode');
+    var id = raceCard.getAttribute('data-id') || '';
+    var name = raceCard.getAttribute('data-name') || '';
 
-        if (mode === 'race') {
-          state.race = id;
-          state.race_label = name;
-          state.subrace = '';
-          state.subrace_label = '';
-          state.subraces = [];
+    if (mode === 'race') {
+      state.race = id;
+      state.race_label = name;
+      state.subrace = '';
+      state.subrace_label = '';
+      state.subraces = [];
 
-          selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
+      selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
 
-          var subraceSection = q('#tw-subrace-section', root);
-          var subraceGrid = q('#tw-subrace-grid', root);
+      var subraceSection = q('#tw-subrace-section', root);
+      var subraceGrid = q('#tw-subrace-grid', root);
 
-          if (subraceGrid) {
-            subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
-          }
-
-          if (subraceSection) {
-            subraceSection.hidden = false;
-            subraceSection.classList.remove('is-hidden');
-            subraceSection.classList.add('is-visible');
-            subraceSection.style.display = 'block';
-          }
-
-          loadSubraces(id, name);
-        } else if (mode === 'subrace') {
-          state.subrace = id;
-          state.subrace_label = name;
-          selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
-          setStatus('', '');
-        }
-
-        return;
+      if (subraceGrid) {
+        subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
       }
 
-      var classCard = e.target.closest('.tw-class-card');
-      if (classCard) {
-        playSound(sndTuning);
-        state.char_class = classCard.getAttribute('data-id') || '';
-        state.class_label = classCard.getAttribute('data-name') || '';
-        state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
-        state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
-
-        state.skills = [];
-        state.starting_package_id = '';
-        state.starting_package_label = '';
-        state.packages = [];
-
-        selectExclusive('.tw-class-card', classCard);
-        renderSkills(state.skills_data);
-        renderPackages([]);
-
-        // UWAGA: tutaj możesz podmienić classId -> class_label jeśli chcesz tagami
-        loadPackages(state.char_class).then(function (rows) {
-          if (!rows.length) {
-            setStatus('No starting packages found for class: ' + state.class_label, 'error');
-          } else {
-            setStatus('', '');
-          }
-        });
-
-        return;
+      if (subraceSection) {
+        subraceSection.hidden = false;
+        subraceSection.classList.remove('is-hidden');
+        subraceSection.classList.add('is-visible');
+        subraceSection.style.display = 'block';
       }
 
-      var skillCard = e.target.closest('.tw-skill-card');
-      if (skillCard) {
-        playSound(sndTuning);
-        var skillId = skillCard.getAttribute('data-id') || '';
-        var idx = state.skills.indexOf(skillId);
+      loadSubraces(id, name);
+    } else if (mode === 'subrace') {
+      state.subrace = id;
+      state.subrace_label = name;
+      selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+      setStatus('', '');
+    }
 
-        if (idx !== -1) {
-          state.skills.splice(idx, 1);
-        } else if (state.skills.length < state.skill_limit) {
-          state.skills.push(skillId);
-        }
+    return;
+  }
 
-        renderSkills(state.skills_data);
-        return;
-      }
+  var classCard = e.target.closest('.tw-class-card');
+  if (classCard) {
+    playSound(sndTuning);
+    state.char_class = classCard.getAttribute('data-id') || '';
+    state.class_label = classCard.getAttribute('data-name') || '';
+    state.class_slug = classCard.getAttribute('data-slug') || slugify(state.class_label);
+    state.skill_limit = Number(classCard.getAttribute('data-limit')) || 3;
 
-      var packageCard = e.target.closest('.tw-package-card');
-      if (packageCard) {
-        playSound(sndTuning);
-        state.starting_package_id = packageCard.getAttribute('data-id') || '';
-        state.starting_package_label = packageCard.getAttribute('data-name') || '';
-        selectExclusive('.tw-package-card', packageCard);
-        return;
-      }
+    state.skills = [];
+    state.starting_package_id = '';
+    state.starting_package_label = '';
+    state.packages = [];
 
-      var loreCard = e.target.closest('.tw-lore-card');
-      if (loreCard) {
-        playSound(sndTuning);
-        var kind = loreCard.getAttribute('data-kind') || '';
-        var key = loreCard.getAttribute('data-key') || '';
-        var label = loreCard.getAttribute('data-label') || '';
+    selectExclusive('.tw-class-card', classCard);
+    renderSkills(state.skills_data);
+    renderPackages([]);
 
-        if (kind === 'data_origin') {
-          state.data_origin = key;
-          state.data_origin_label = label;
-          selectExclusive('.tw-lore-card[data-kind="data_origin"]', loreCard);
-        }
-
-        if (kind === 'previous_operation') {
-          state.previous_operation = key;
-          state.previous_operation_label = label;
-          selectExclusive('.tw-lore-card[data-kind="previous_operation"]', loreCard);
-        }
-
-        if (kind === 'sync_crisis') {
-          state.sync_crisis = key;
-          state.sync_crisis_label = label;
-          selectExclusive('.tw-lore-card[data-kind="sync_crisis"]', loreCard);
-        }
-
-        resolveBackstoryTags();
-        return;
-      }
-
-      var avatarCard = e.target.closest('.tw-avatar-card');
-      if (avatarCard) {
-        playSound(sndTuning);
-        state.avatar_file = null;
-        state.avatar_url = avatarCard.getAttribute('data-url') || '';
-        var input = q('#tw-char-avatar', root);
-        if (input) input.value = '';
-        renderAvatarGallery();
-        updateAvatarPreview();
+    loadPackages(state.char_class).then(function (rows) {
+      if (!rows.length) {
+        setStatus('No starting packages found for class: ' + state.class_label, 'error');
+      } else {
+        setStatus('', '');
       }
     });
+
+    return;
   }
+
+  var skillCard = e.target.closest('.tw-skill-card');
+  if (skillCard) {
+    playSound(sndTuning);
+    var skillId = skillCard.getAttribute('data-id') || '';
+    var idx = state.skills.indexOf(skillId);
+
+    if (idx !== -1) {
+      state.skills.splice(idx, 1);
+    } else if (state.skills.length < state.skill_limit) {
+      state.skills.push(skillId);
+    }
+
+    renderSkills(state.skills_data);
+    return;
+  }
+
+  var packageCard = e.target.closest('.tw-package-card');
+  if (packageCard) {
+    playSound(sndTuning);
+    state.starting_package_id = packageCard.getAttribute('data-id') || '';
+    state.starting_package_label = packageCard.getAttribute('data-name') || '';
+    selectExclusive('.tw-package-card', packageCard);
+    return;
+  }
+
+  var loreCard = e.target.closest('.tw-lore-card');
+  if (loreCard) {
+    playSound(sndTuning);
+    var kind = loreCard.getAttribute('data-kind') || '';
+    var key = loreCard.getAttribute('data-key') || '';
+    var label = loreCard.getAttribute('data-label') || '';
+
+    if (kind === 'data_origin') {
+      state.data_origin = key;
+      state.data_origin_label = label;
+      selectExclusive('.tw-lore-card[data-kind="data_origin"]', loreCard);
+    }
+
+    if (kind === 'previous_operation') {
+      state.previous_operation = key;
+      state.previous_operation_label = label;
+      selectExclusive('.tw-lore-card[data-kind="previous_operation"]', loreCard);
+    }
+
+    if (kind === 'sync_crisis') {
+      state.sync_crisis = key;
+      state.sync_crisis_label = label;
+      selectExclusive('.tw-lore-card[data-kind="sync_crisis"]', loreCard);
+    }
+
+    resolveBackstoryTags();
+    return;
+  }
+
+  var avatarCard = e.target.closest('.tw-avatar-card');
+  if (avatarCard) {
+    playSound(sndTuning);
+    state.avatar_file = null;
+    state.avatar_url = avatarCard.getAttribute('data-url') || '';
+    var input = q('#tw-char-avatar', root);
+    if (input) input.value = '';
+    renderAvatarGallery();
+    updateAvatarPreview();
+  }
+});
 
   function submitCharacter() {
     var error = validateStep(10);
