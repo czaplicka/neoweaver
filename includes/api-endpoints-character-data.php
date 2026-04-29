@@ -579,52 +579,47 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
     }
 }
 
-if ( ! function_exists( 'nw_validate_race_selection' ) ) {
-    function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
-        $race_id_input    = sanitize_text_field( $race_id_input );
-        $subrace_id_input = sanitize_text_field( $subrace_id_input );
+function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
+	$race_id_input    = sanitize_text_field( $race_id_input );
+	$subrace_id_input = sanitize_text_field( $subrace_id_input );
 
-        if ( '' === $race_id_input ) {
-            return new WP_Error( 'race_required', 'Race is required.', array( 'status' => 400 ) );
-        }
+	if ( '' === $race_id_input ) {
+		return new WP_Error( 'race_required', 'Parent race is required.', array( 'status' => 400 ) );
+	}
 
-        $race_row = nw_find_race_by_id( $race_id_input );
-        if ( empty( $race_row['id'] ) || ! is_string( $race_row['id'] ) ) {
-            return new WP_Error( 'invalid_race', 'Selected race does not exist.', array( 'status' => 400 ) );
-        }
+	if ( '' === $subrace_id_input ) {
+		return new WP_Error( 'subrace_required', 'Subrace is required.', array( 'status' => 400 ) );
+	}
 
-        $race_parent = isset( $race_row['parent_race'] ) ? (string) $race_row['parent_race'] : '';
-        if ( '' !== $race_parent ) {
-            return new WP_Error( 'invalid_race', 'Selected race must be a parent race.', array( 'status' => 400 ) );
-        }
+	$race_row = nw_find_race_by_id( $race_id_input );
+	if ( empty( $race_row['id'] ) || ! is_string( $race_row['id'] ) ) {
+		return new WP_Error( 'invalid_race', 'Selected parent race does not exist.', array( 'status' => 400 ) );
+	}
 
-if ( '' === $subrace_id_input ) {
-	return new WP_Error(
-		'subrace_required',
-		'Subrace is required.',
-		array( 'status' => 400 )
+	$race_parent = isset( $race_row['parent_race'] ) ? (string) $race_row['parent_race'] : '';
+	if ( '' !== $race_parent ) {
+		return new WP_Error( 'invalid_race', 'Selected race must be a parent race.', array( 'status' => 400 ) );
+	}
+
+	$subrace_row = nw_find_race_by_id( $subrace_id_input );
+	if ( empty( $subrace_row['id'] ) || ! is_string( $subrace_row['id'] ) ) {
+		return new WP_Error( 'invalid_subrace', 'Selected subrace does not exist.', array( 'status' => 400 ) );
+	}
+
+	$subrace_parent = isset( $subrace_row['parent_race'] ) ? (string) $subrace_row['parent_race'] : '';
+	if ( '' === $subrace_parent ) {
+		return new WP_Error( 'invalid_subrace', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
+	}
+
+	if ( $subrace_parent !== $race_row['name'] && $subrace_parent !== $race_row['id'] ) {
+		return new WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
+	}
+
+	return array(
+		'stored_race_id' => $subrace_row['id'],
+		'race_row'       => $race_row,
+		'subrace_row'    => $subrace_row,
 	);
-}
-
-        $subrace_row = nw_find_race_by_id( $subrace_id_input );
-        if ( empty( $subrace_row['id'] ) || ! is_string( $subrace_row['id'] ) ) {
-            return new WP_Error( 'invalid_subrace', 'Selected subrace does not exist.', array( 'status' => 400 ) );
-        }
-
-        $subrace_parent = isset( $subrace_row['parent_race'] ) ? (string) $subrace_row['parent_race'] : '';
-        if ( '' === $subrace_parent ) {
-            return new WP_Error( 'invalid_subrace', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
-        }
-        if ( $subrace_parent !== $race_row['name'] && $subrace_parent !== $race_row['id'] ) {
-            return new WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
-        }
-
-        return array(
-            'stored_race_id' => $subrace_row['id'],
-            'race_row'       => $race_row,
-            'subrace_row'    => $subrace_row,
-        );
-    }
 }
 
 if ( ! function_exists( 'nw_store_character_skills' ) ) {
