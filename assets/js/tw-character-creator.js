@@ -103,6 +103,7 @@ summary_step_index: TOTAL_STEPS - 1
   };
 
   var currentStep = 0;
+	var returnToReviewStep = null;
   var root = null;
   var stepEls = [];
 
@@ -466,9 +467,10 @@ function nextStep() {
   clearStepErrors();
   setStatus('', '');
 
-  if (state.editing_from_summary && currentStep !== state.summary_step_index) {
-    state.editing_from_summary = false;
-    goToStep(state.summary_step_index);
+  if (returnToReviewStep !== null && currentStep < returnToReviewStep) {
+    var target = returnToReviewStep;
+    returnToReviewStep = null;
+    goToStep(target);
     return;
   }
 
@@ -778,22 +780,21 @@ function renderPackages(rows) {
       });
     }
 
-    // GŁÓWNY handler clicków (w tym EDIT)
-    root.addEventListener('click', function (e) {
-      var editBtn = e.target.closest('.tw-btn-review-edit');
-      if (editBtn) {
-        var targetStep = parseInt(editBtn.getAttribute('data-target-step'), 10);
-        if (!isNaN(targetStep) && stepEls[targetStep]) {
-          currentStep = targetStep;
-          updateStepUI();
-        }
-        return;
-      }
-		var summaryEdit = e.target.closest('.tw-summary-edit');
+var editBtn = e.target.closest('.tw-btn-review-edit');
+if (editBtn) {
+  var targetStep = parseInt(editBtn.getAttribute('data-target-step'), 10);
+  if (!isNaN(targetStep) && stepEls[targetStep]) {
+    returnToReviewStep = 10;
+    goToStep(targetStep);
+  }
+  return;
+}
+
+var summaryEdit = e.target.closest('.tw-summary-edit');
 if (summaryEdit) {
   var targetStep = Number(summaryEdit.getAttribute('data-step'));
-  if (!isNaN(targetStep)) {
-    state.editing_from_summary = true;
+  if (!isNaN(targetStep) && stepEls[targetStep]) {
+    returnToReviewStep = 10;
     goToStep(targetStep);
   }
   return;
