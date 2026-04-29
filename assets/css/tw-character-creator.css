@@ -33,7 +33,6 @@ Scoped to: #tw-char-creator-wrapper
 #tw-char-creator-wrapper,
 #tw-char-creator-wrapper * {
   box-sizing: border-box;
-  overflow: visible;
 }
 
 #tw-char-creator-wrapper {
