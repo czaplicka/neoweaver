@@ -26,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $css_handle,
             $css_url,
             array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.15'
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.16'
         );
 
         wp_register_script(
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.15',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.16',
             true
         );
 
@@ -120,7 +120,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 </div>
 
                 <h2>Identity Sync</h2>
-                <p class="tw-question-text">Define your operative signal, visible identity, and pronoun channel before entering the Grid.</p>
+                <p class="tw-question-text">Define your operative signal, visible identity, and pronoun channel before entering the Node.</p>
 
                 <label class="tw-field-label" for="tw-char-name">
                     <span>Character name <span class="tw-required">*</span></span>
@@ -398,7 +398,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 </div>
 
                 <h2>Synchronization Crisis</h2>
-                <p class="tw-question-text">Select your crisis response profile. The three lore choices together define the backstory tags saved for the character.</p>
+                <p class="tw-question-text">Select your crisis response profile.</p>
 
                 <div id="tw-crisis-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
@@ -435,7 +435,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 <div class="tw-avatar-gallery-wrap">
                     <p class="tw-question-text">Or choose from gallery.</p>
                     <div id="tw-avatar-gallery" class="tw-dynamic-grid" aria-live="polite"></div>
-                </div>
+                </div><br>
 
                 <label class="tw-field-label" for="tw-char-bio">
                     <span>Short bio</span>
