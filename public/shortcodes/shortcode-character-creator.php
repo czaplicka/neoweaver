@@ -26,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $css_handle,
             $css_url,
             array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.18'
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.19'
         );
 
         wp_register_script(
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.16',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.17',
             true
         );
 
@@ -173,7 +173,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 </div>
 
                 <h2>Race Protocol</h2>
-                <p class="tw-question-text">Choose your parent race first. Then, if available, pick a subrace. Only the subrace is stored in the character record.</p>
+                <p class="tw-question-text">Choose your race first. Then pick a subrace. Only the subrace is stored in the character record.</p>
 
                 <div id="tw-race-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
