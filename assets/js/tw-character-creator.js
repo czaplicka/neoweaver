@@ -8,7 +8,7 @@
   var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
   var TOTAL_STEPS = 11;
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
-  var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMGBASE);
+  var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMG_BASE);
 
 var sndTuning = new Audio(uploads + '/tuning.mp3');
 var sndDeploy = new Audio(uploads + '/create-world.mp3');
@@ -1091,10 +1091,7 @@ playSound(sndDeploy);
       return Promise.resolve([]);
     }
 
-return fetchPost('neoweaver_get_packages', {
-  class_tag: classId,
-  class_slug: state.class_slug || slugify(state.class_label || '')
-})
+return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId })
       .then(function (res) {
         var rows = [];
 
