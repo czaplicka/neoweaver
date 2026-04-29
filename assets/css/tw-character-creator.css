@@ -641,6 +641,7 @@ select.tw-input--error {
   border-radius: 14px;
   border: 1px solid rgba(173,255,0,0.10);
   background: rgba(255,255,255,0.03);
+   color: var(--tw-text-dim);
 }
 
 .tw-lore-card__effect strong,
