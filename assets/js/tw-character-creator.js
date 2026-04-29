@@ -8,7 +8,7 @@
   var ATTR_KEYS = ['body', 'reflex', 'mind', 'spirit'];
   var TOTAL_STEPS = 11;
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
-  var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMG_BASE);
+var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMG_BASE.replace(/\/$/, ''));
 
 var sndTuning = new Audio(uploads + '/tuning.mp3');
 var sndDeploy = new Audio(uploads + '/create-world.mp3');
@@ -97,7 +97,9 @@ function unlockAudio() {
     subraces: [],
     classes: [],
     skills_data: [],
-    packages: []
+    packages: [],
+	  editing_from_summary: false,
+summary_step_index: TOTAL_STEPS - 1
   };
 
   var currentStep = 0;
@@ -453,15 +455,25 @@ function normalizeMediaUrl(url) {
   }
 
 function nextStep() {
-	var error = validateStep(currentStep);
-	if (error) {
-		showStepError(currentStep, error);
-		return;
-	}
-	playSound(sndTuning);
-	clearStepErrors();
-	setStatus('', '');
-	if (currentStep < stepEls.length - 1) goToStep(currentStep + 1);
+  var error = validateStep(currentStep);
+  if (error) {
+    showStepError(currentStep, error);
+    return;
+  }
+
+  playSound(sndTuning);
+  clearStepErrors();
+  setStatus('', '');
+
+  if (state.editing_from_summary && currentStep !== state.summary_step_index) {
+    state.editing_from_summary = false;
+    goToStep(state.summary_step_index);
+    return;
+  }
+
+  if (currentStep < stepEls.length - 1) {
+    goToStep(currentStep + 1);
+  }
 }
 
   function prevStep() {
@@ -776,6 +788,15 @@ function renderPackages(rows) {
         }
         return;
       }
+		var summaryEdit = e.target.closest('.tw-summary-edit');
+if (summaryEdit) {
+  var targetStep = Number(summaryEdit.getAttribute('data-step'));
+  if (!isNaN(targetStep)) {
+    state.editing_from_summary = true;
+    goToStep(targetStep);
+  }
+  return;
+}
 
       var raceCard = e.target.closest('.tw-race-card');
       if (raceCard) {
