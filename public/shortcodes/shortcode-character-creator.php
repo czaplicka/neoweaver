@@ -26,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $css_handle,
             $css_url,
             array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.19'
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.20'
         );
 
         wp_register_script(
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.17',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.18',
             true
         );
 
@@ -547,7 +547,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                     <div class="tw-spinner-ring"></div>
                     <div class="tw-spinner-ring tw-spinner-ring--2"></div>
                     <p class="tw-spinner-text">Synchronizing operative profile</p>
-                    <p class="tw-spinner-sub">Writing race, subrace, class, skills, package, avatar, and backstory tags to the Grid.</p>
+                    <p class="tw-spinner-sub">Writing race, subrace, class, skills, package, avatar, and backstory tags to the Node.</p>
                 </div>
             </div>
         </div>
