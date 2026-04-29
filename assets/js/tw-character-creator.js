@@ -568,26 +568,33 @@ function nextStep() {
     updateSkillCounter();
   }
 
-  function renderPackages(rows) {
-    var target = q('#tw-package-grid', root);
-    if (!target) return;
+function renderPackages(rows) {
+  var grid = q('#tw-package-grid', root);
+  if (!grid) return;
 
-    if (!Array.isArray(rows) || !rows.length) {
-      target.innerHTML = '<div class="tw-empty-state">No packages available for this class.</div>';
-      return;
-    }
-
-    target.innerHTML = rows.map(function (row) {
-      var selected = state.starting_package_id === row.id;
-      return '' +
-        '<button type="button" class="tw-package-card' + (selected ? ' is-selected' : '') + '" data-id="' + esc(row.id) + '" data-name="' + esc(row.name || row.package_name || '') + '">' +
-          '<div class="tw-package-cardbody">' +
-            '<h3 class="tw-package-cardtitle">' + esc(row.name || row.package_name || '') + '</h3>' +
-            buildTagPills(row.compatibility_tags || []) +
-          '</div>' +
-        '</button>';
-    }).join('');
+  if (!Array.isArray(rows) || !rows.length) {
+    grid.innerHTML = '<div class="tw-empty-state">No starting packages available.</div>';
+    return;
   }
+
+  grid.innerHTML = rows.map(function (pkg) {
+    var selected = state.starting_package_id === String(pkg.id || '');
+    var tagsHtml = buildTagPills(pkg.compatibilitytags || []);
+    var items = Array.isArray(pkg.itemslist) ? pkg.itemslist : (Array.isArray(pkg.items) ? pkg.items : []);
+
+    return '' +
+      '<button type="button" class="tw-package-card' + (selected ? ' selected' : '') + '" ' +
+      'data-id="' + esc(pkg.id || '') + '" ' +
+      'data-name="' + esc(pkg.name || pkg.packagename || '') + '">' +
+        '<div class="tw-package-cardbody">' +
+          '<h3 class="tw-package-cardtitle">' + esc(pkg.name || pkg.packagename || '') + '</h3>' +
+          tagsHtml +
+          (pkg.description ? '<p class="tw-package-desc">' + esc(pkg.description) + '</p>' : '') +
+          (items.length ? '<div class="tw-package-items">' + buildTagPills(items) + '</div>' : '') +
+        '</div>' +
+      '</button>';
+  }).join('');
+}
 
   function renderLoreOptions(targetSel, rows, typeKey) {
   var target = q(targetSel, root);
