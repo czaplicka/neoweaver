@@ -941,7 +941,7 @@ root.addEventListener('click', function (e) {
     }
 playSound(sndDeploy);
     var spinner = q('#tw-char-spinner', root);
-    if (spinner) spinner.classList.add('is-visible');
+    if (spinner) spinner.classList.add('active');
     setStatus('Creating character…', 'info');
 
     var fd = new FormData();
@@ -988,7 +988,7 @@ playSound(sndDeploy);
         showStepError(10, err && err.message ? err.message : 'Character creation failed.');
       })
       .finally(function () {
-        if (spinner) spinner.classList.remove('is-visible');
+        if (spinner) spinner.classList.remove('active');
       });
   }
 
