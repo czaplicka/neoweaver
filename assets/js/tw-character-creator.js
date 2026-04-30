@@ -1176,21 +1176,9 @@ function init() {
     });
   }
 
-  if (document.readyState === 'loading') {
+   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-	  // Guard: upewniamy się, że aktywny krok ma display:block
-document.addEventListener('click', function(e) {
-  if (e.target.closest('.tw-btn-next') || e.target.closest('.tw-btn-prev')) {
-    setTimeout(function() {
-      var activeStep = root && root.querySelector('.tw-char-step.active, .tw-step.active');
-      if (activeStep) {
-        activeStep.style.display = 'block';
-        activeStep.hidden = false;
-      }
-    }, 50);
-  }
-});
 })();
