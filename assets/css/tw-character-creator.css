@@ -1449,3 +1449,158 @@ button[data-action="plus"]:hover:not(:disabled) {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+/* ===== FIX: Pełna widoczność skilli ===== */
+
+#tw-char-creator-wrapper {
+  overflow: visible !important;
+  /* usuń overflow: hidden */
+}
+
+.tw-step {
+  overflow: visible !important;
+  min-height: auto !important;
+  height: auto !important;
+}
+
+#tw-skill-grid,
+.tw-skill-category,
+.tw-skill-cat-grid {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+/* Nawigacja musi być PONIŻEJ skilli wizualnie, ale z z-index wyższym tylko przy hover */
+.tw-nav-row {
+  position: relative;
+  z-index: 10;
+  margin-top: 24px;
+  background: var(--tw-bg);
+  padding-top: 16px;
+  border-top: 1px solid rgba(173,255,0,0.12);
+}
+
+/* Przyciski nawigacji ponad wszystkim tylko przy interakcji */
+.tw-btn-nav,
+.tw-btn {
+  position: relative;
+  z-index: 1;
+}
+
+.tw-btn-nav:hover,
+.tw-btn:hover,
+.tw-btn-nav:focus,
+.tw-btn:focus {
+  z-index: 20;
+}
+
+/* Status też nie może być sticky/fixed */
+.tw-char-status {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+
+/* Kategorie skilli — flex column zamiast grid dla pewności */
+.tw-skill-category {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  overflow: visible !important;
+}
+
+.tw-skill-cat-label {
+  margin: 0 0 10px;
+  color: var(--tw-acid);
+  font-size: 0.96rem;
+}
+
+/* Grid skilli w kategorii */
+.tw-skill-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  overflow: visible !important;
+  grid-auto-rows: minmax(min-content, max-content);
+}
+
+/* Karty skilli */
+.tw-skill-card {
+  display: flex;
+  flex-direction: column;
+  min-height: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.tw-skill-cardimg {
+  min-height: 140px;
+  max-height: 140px;
+  aspect-ratio: 16 / 10;
+  flex-shrink: 0;
+}
+
+.tw-skill-cardbody {
+  min-height: auto !important;
+  flex: 1;
+  padding: 18px;
+}
+
+/* Wrapper całego kreatora nie może mieć fixed height */
+#tw-char-creator-wrapper::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Wszystkie główne kontenery muszą rosnąć z contentem */
+.tw-char-step,
+.tw-step {
+  display: none;
+  overflow: visible !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+.tw-char-step.active,
+.tw-step.active {
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* Krok ze skillami konkretnie */
+[data-step="4"],
+.tw-step[data-step="4"],
+#tw-step-skills,
+.tw-char-step--skills {
+  overflow: visible !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding-bottom: 32px;
+}
+
+/* Mobile fix */
+@media (max-width: 900px) {
+  .tw-skill-cat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  
+  .tw-skill-cardimg {
+    min-height: 130px;
+    max-height: 130px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tw-skill-cat-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tw-skill-cardimg {
+    min-height: 120px;
+    max-height: 120px;
+  }
+}
