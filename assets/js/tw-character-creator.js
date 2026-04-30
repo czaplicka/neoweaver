@@ -964,64 +964,77 @@ state.subrace = '';
 });
   }
 
-  function submitCharacter() {
-    var error = validateStep(10);
-    if (error) {
-      showStepError(10, error);
-      return;
-    }
-playSound(sndDeploy);
-    var spinner = q('#tw-char-spinner', root);
-    if (spinner) spinner.classList.add('active');
-    setStatus('Creating character…', 'info');
+  function submitCharacter(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
 
-    var fd = new FormData();
-    fd.append('action', 'neoweaver_create_character');
-    fd.append('nonce', nonce());
-    fd.append('character_name', state.character_name);
-    fd.append('pronouns', state.pronouns === 'custom' ? 'custom' : state.pronouns);
-    fd.append('bio', state.bio || '');
-fd.append('race', state.race);         // UUID parent race
-fd.append('subrace', state.subrace);   // UUID subrasy
-    fd.append('char_class', state.char_class || '');
-    fd.append('starting_package_id', state.starting_package_id || '');
-    fd.append('data_origin', state.data_origin || '');
-    fd.append('previous_operation', state.previous_operation || '');
-    fd.append('sync_crisis', state.sync_crisis || '');
-    fd.append('skills', JSON.stringify(state.skills));
-    fd.append('backstory_tags', JSON.stringify(state.backstory_tags));
-    fd.append('attr_body', String(state.attr_body));
-    fd.append('attr_reflex', String(state.attr_reflex));
-    fd.append('attr_mind', String(state.attr_mind));
-    fd.append('attr_spirit', String(state.attr_spirit));
+  var submitBtn = q('#tw-char-submit', root);
+  if (submitBtn) submitBtn.disabled = true;
 
-    if (state.avatar_url) fd.append('avatar_url', state.avatar_url);
-    if (state.avatar_file) fd.append('avatar', state.avatar_file, state.avatar_file.name);
-
-    fetch(ajaxUrl(), {
-      method: 'POST',
-      credentials: 'same-origin',
-      body: fd
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (res) {
-        if (!res || !res.success) {
-          throw new Error(res && res.data && res.data.message ? res.data.message : 'Character creation failed.');
-        }
-
-        setStatus(res.data && res.data.message ? res.data.message : 'Character created.', 'success');
-
-        if (res.data && res.data.redirect) {
-          window.location.href = res.data.redirect;
-        }
-      })
-      .catch(function (err) {
-        showStepError(10, err && err.message ? err.message : 'Character creation failed.');
-      })
-      .finally(function () {
-        if (spinner) spinner.classList.remove('active');
-      });
+  var error = validateStep(10);
+  if (error) {
+    isSubmitting = false;
+    if (submitBtn) submitBtn.disabled = false;
+    showStepError(10, error);
+    return;
   }
+
+  playSound(sndDeploy);
+
+  var spinner = q('#tw-char-spinner', root);
+  if (spinner) spinner.classList.add('active');
+  setStatus('Creating character…', 'info');
+
+  var fd = new FormData();
+  fd.append('action', 'neoweaver_create_character');
+  fd.append('nonce', nonce());
+  fd.append('character_name', state.character_name);
+  fd.append('pronouns', state.pronouns === 'custom' ? 'custom' : state.pronouns);
+  fd.append('bio', state.bio || '');
+  fd.append('race', state.race);
+  fd.append('subrace', state.subrace);
+  fd.append('char_class', state.char_class || '');
+  fd.append('starting_package_id', state.starting_package_id || '');
+  fd.append('data_origin', state.data_origin || '');
+  fd.append('previous_operation', state.previous_operation || '');
+  fd.append('sync_crisis', state.sync_crisis || '');
+  fd.append('skills', JSON.stringify(state.skills));
+  fd.append('backstory_tags', JSON.stringify(state.backstory_tags));
+  fd.append('attr_body', String(state.attr_body));
+  fd.append('attr_reflex', String(state.attr_reflex));
+  fd.append('attr_mind', String(state.attr_mind));
+  fd.append('attr_spirit', String(state.attr_spirit));
+
+  if (state.avatar_url) fd.append('avatar_url', state.avatar_url);
+  if (state.avatar_file) fd.append('avatar', state.avatar_file, state.avatar_file.name);
+
+  fetch(ajaxUrl(), {
+    method: 'POST',
+    credentials: 'same-origin',
+    body: fd
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res || !res.success) {
+        throw new Error(res && res.data && res.data.message ? res.data.message : 'Character creation failed.');
+      }
+
+      setStatus(res.data && res.data.message ? res.data.message : 'Character created.', 'success');
+
+      if (res.data && res.data.redirect) {
+        window.location.href = res.data.redirect;
+      }
+    })
+    .catch(function (err) {
+      showStepError(10, err && err.message ? err.message : 'Character creation failed.');
+    })
+    .finally(function () {
+      isSubmitting = false;
+      if (submitBtn) submitBtn.disabled = false;
+      if (spinner) spinner.classList.remove('active');
+    });
+}
 
   function loadRaces() {
     return fetchPost('neoweaver_get_races', {}).then(function (res) {
@@ -1177,8 +1190,11 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
     renderLoreOptions('#tw-operation-grid', PREVIOUS_OPERATION_OPTIONS, 'previous_operation');
     renderLoreOptions('#tw-crisis-grid', SYNC_CRISIS_OPTIONS, 'sync_crisis');
   }
-
+	var isInitialized = false;
+var isSubmitting = false;
 function init() {
+	  if (isInitialized) return;
+  isInitialized = true;
   root = document.getElementById('tw-char-creator-wrapper');
   if (!root) return;
   stepEls = qa('.tw-char-step', root);
