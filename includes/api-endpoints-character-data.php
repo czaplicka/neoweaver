@@ -174,9 +174,8 @@ if ( ! function_exists( 'nw_resolve_backstory_tag_ids' ) ) {
     }
 }
 if ( ! function_exists( 'nw_supabase_request' ) ) {
-    function nw_supabase_request( string $method, string $table, array $query = [], $body = null, bool $return_representation = false ) {
+    function nw_supabase_request( string $method, string $table, array $query = array(), $body = null, bool $return_representation = false ) {
 
-        // Użyj globalnego helpera zamiast tw_supabase_rest_url/tw_supabase_headers
         if ( ! function_exists( 'tw_supabase_rest_base' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
             return new WP_Error( 'config_missing', 'Supabase REST configuration missing.', array( 'status' => 500 ) );
         }
@@ -190,6 +189,11 @@ if ( ! function_exists( 'nw_supabase_request' ) ) {
 
         if ( ! empty( $query ) ) {
             $url = add_query_arg( $query, $url );
+        }
+
+        error_log( 'NW SUPABASE REQUEST: ' . $method . ' ' . $url );
+        if ( ! empty( $query ) ) {
+            error_log( 'NW SUPABASE QUERY ARGS: ' . wp_json_encode( $query ) );
         }
 
         $headers = array(
@@ -217,17 +221,22 @@ if ( ! function_exists( 'nw_supabase_request' ) ) {
 
         if ( null !== $body ) {
             $args['body'] = wp_json_encode( $body );
+            error_log( 'NW SUPABASE BODY: ' . wp_json_encode( $body ) );
         }
 
         $response = wp_remote_request( $url, $args );
 
         if ( is_wp_error( $response ) ) {
+            error_log( 'NW SUPABASE WP ERROR: ' . $response->get_error_message() );
             return $response;
         }
 
         $code = (int) wp_remote_retrieve_response_code( $response );
         $raw  = wp_remote_retrieve_body( $response );
         $data = $raw ? json_decode( $raw, true ) : array();
+
+        error_log( 'NW SUPABASE RESPONSE CODE: ' . $code );
+        error_log( 'NW SUPABASE RESPONSE RAW: ' . $raw );
 
         if ( $code < 200 || $code >= 300 ) {
             return new WP_Error(
@@ -644,20 +653,27 @@ if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
             return array();
         }
 
-        $rows = nw_supabase_request(
-            'GET',
-            'cyber_character_tag_defs',
-            array(
-                'select' => 'id,label,category,icon,color,description,source,gm',
-                'id'     => 'in.(' . implode( ',', $tag_ids ) . ')',
-            )
-        );
+        $rows_out = array();
 
-        if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
-            return array();
+        foreach ( $tag_ids as $tag_id ) {
+            $rows = nw_supabase_request(
+                'GET',
+                'cyber_character_tag_defs',
+                array(
+                    'select' => 'id,label,category,icon,color,description,source,gm',
+                    'id'     => 'eq.' . $tag_id,
+                    'limit'  => 1,
+                )
+            );
+
+            error_log( 'NW TAG DEF eq test for ID ' . $tag_id . ': ' . wp_json_encode( $rows ) );
+
+            if ( is_array( $rows ) && ! empty( $rows[0] ) ) {
+                $rows_out[] = $rows[0];
+            }
         }
 
-        return $rows;
+        return $rows_out;
     }
 }
 
