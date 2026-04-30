@@ -3,14 +3,9 @@
  * NeoWeaver Character Creator shortcode
  * File: public/shortcodes/shortcode-character-creator.php
  */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
-/**
- * Register assets.
- */
 if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
     function neoweaver_register_character_creator_assets(): void {
         $css_handle = 'neoweaver-character-creator';
