@@ -201,7 +201,7 @@ function normalizeMediaUrl(url) {
       var active = index === currentStep;
       step.classList.toggle('active', active);
       step.hidden = !active;
-      step.style.display = active ? '' : 'none';
+      step.style.display = active ? 'block' : 'none';
     });
 
     var stepCurrent = q('#tw-char-step-current', root);
@@ -1158,7 +1158,7 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
       var active = index === 0;
       step.classList.toggle('active', active);
       step.hidden = !active;
-      step.style.display = active ? '' : 'none';
+      step.style.display = active ? 'block' : 'none';
     });
 
     clearStepErrors();
@@ -1184,47 +1184,5 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
-  }
-})();
-(function(){
-  function applyStepVisibility(root){
-    if(!root) return;
-    var steps = Array.prototype.slice.call(root.querySelectorAll('.tw-char-step'));
-    if(!steps.length) return;
-
-    var activeIndex = steps.findIndex(function(step){
-      return step.classList.contains('active');
-    });
-
-    if (activeIndex === -1) activeIndex = 0;
-
-    steps.forEach(function(step, index){
-      var active = index === activeIndex;
-      step.hidden = !active;
-      step.style.display = active ? 'block' : 'none';
-    });
-  }
-
-  function initHotfix(){
-    var root = document.getElementById('tw-char-creator-wrapper');
-    if(!root) return;
-
-    applyStepVisibility(root);
-
-    var observer = new MutationObserver(function(){
-      applyStepVisibility(root);
-    });
-
-    observer.observe(root, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'hidden', 'style']
-    });
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', initHotfix);
-  } else {
-    initHotfix();
   }
 })();
