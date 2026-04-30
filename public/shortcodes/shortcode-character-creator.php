@@ -31,7 +31,7 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.26',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.27',
             true
         );
 
