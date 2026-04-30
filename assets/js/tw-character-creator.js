@@ -113,14 +113,14 @@ function unlockAudio() {
     return Array.prototype.slice.call((ctx || document).querySelectorAll(sel));
   }
 
-  function esc(str) {
-    return String(str == null ? '' : str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
+function esc(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
   function ajaxUrl() {
     return cfg.ajaxurl || cfg.ajax_url || '/wp-admin/admin-ajax.php';
