@@ -26,7 +26,7 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
             $js_handle,
             $js_url,
             array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.33',
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.34',
             true
         );
 
@@ -539,8 +539,8 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 <div class="tw-spinner-inner">
                     <div class="tw-spinner-ring"></div>
                     <div class="tw-spinner-ring tw-spinner-ring--2"></div>
-                    <p class="tw-spinner-text">Synchronizing operative profile</p>
-                    <p class="tw-spinner-sub">Writing race, subrace, class, skills, package, avatar, and backstory tags to the Node.</p>
+                    <p class="tw-spinner-text">Synchronizing field agent profile</p>
+                    <p class="tw-spinner-sub">Finding agent in the database.</p>
                 </div>
             </div>
         </div>
