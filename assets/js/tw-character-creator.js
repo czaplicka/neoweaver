@@ -97,6 +97,33 @@ function unlockAudio() {
     packages: [],
   };
 
+		var TAG_DEFS = {
+  'wealthy': 1,
+  'fragile-gear': 2,
+  'street-smart': 3,
+  'malnourished': 4,
+  'fast-sync': 5,
+  'social-glitch': 6,
+  'scout': 7,
+  'analog-mind': 8,
+  'striker': 9,
+  'reckless': 10,
+  'glitch-learner': 11,
+  'system-spasm': 12,
+  'iron-grip': 15,
+  'feedback-vulnerability': 16,
+  'wild-card': 17,
+  'magnetized': 18,
+  'technician': 19,
+  'heavy-handed': 20,
+  'agile': 21,
+  'light-frame': 22,
+  'researcher': 23,
+  'code-bound': 24,
+  'unyielding': 25,
+  'loud-footsteps': 26
+};
+
   var currentStep = 0;
 	var returnToReviewStep = null;
   var root = null;
@@ -132,6 +159,39 @@ function normalizeMediaUrl(url) {
   if (!url) return '';
   if (/^https?:\/\//i.test(url)) return url;
   return IMG_BASE + url.replace(/^\/+/, '');
+}
+
+	function slugifyTagLabel(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\- ]+/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/\-+/g, '-')
+    .replace(/^\-|\-$/g, '');
+}
+
+function resolveBackstoryTags() {
+  var ids = [];
+  [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
+    var source = index === 0
+      ? DATA_ORIGIN_OPTIONS
+      : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
+
+    var item = source.find(function (opt) {
+      return opt.key === key;
+    });
+
+    if (!item) return;
+
+    [item.bonus_tag, item.flaw_tag].forEach(function (label) {
+      var slug = slugifyTagLabel(label);
+      var id = TAG_DEFS[slug];
+      if (id && ids.indexOf(id) === -1) ids.push(id);
+    });
+  });
+
+  state.backstory_tags = ids;
 }
 
   function slugify(str) {
@@ -247,31 +307,6 @@ function updateStepUI() {
       el.classList.toggle('is-selected', selected);
       el.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
-  }
-
-  // BACKSTORY: zapisujemy labelki, nie ID
-  function resolveBackstoryTags() {
-    var labels = [];
-
-    [state.data_origin, state.previous_operation, state.sync_crisis].forEach(function (key, index) {
-      var source = index === 0
-        ? DATA_ORIGIN_OPTIONS
-        : (index === 1 ? PREVIOUS_OPERATION_OPTIONS : SYNC_CRISIS_OPTIONS);
-
-      var item = source.find(function (opt) {
-        return opt.key === key;
-      });
-
-      if (!item) return;
-
-      [item.bonus_tag, item.flaw_tag].forEach(function (label) {
-        if (label && labels.indexOf(label) === -1) {
-          labels.push(label);
-        }
-      });
-    });
-
-    state.backstory_tags = labels;
   }
 
   function getAttrTotal() {
