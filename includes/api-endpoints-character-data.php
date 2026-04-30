@@ -656,15 +656,25 @@ if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
         if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
             return array();
         }
+
         return $rows;
     }
 }
 
 if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
     function nw_validate_backstory_tags( array $tag_ids ) {
+        // DEBUG START
+        error_log( 'NW BACKSTORY: raw tag_ids = ' . wp_json_encode( $tag_ids ) );
+        // DEBUG END
+
         $requested = nw_resolve_backstory_tag_ids( $tag_ids );
 
+        // DEBUG: po resolverze (powinny być czyste ID)
+        error_log( 'NW BACKSTORY: requested (after resolve) = ' . wp_json_encode( $requested ) );
+
         if ( empty( $requested ) ) {
+            error_log( 'NW BACKSTORY: requested is empty → backstory_tags_required' );
+
             return new WP_Error(
                 'backstory_tags_required',
                 'Backstory tags are required.',
@@ -673,14 +683,26 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
         }
 
         $defs = nw_find_tag_defs_by_ids( $requested );
+
+        // DEBUG: co przyszło z Supabase
+        if ( is_wp_error( $defs ) ) {
+            error_log( 'NW BACKSTORY: nw_find_tag_defs_by_ids returned WP_Error: ' . $defs->get_error_message() );
+        } else {
+            error_log( 'NW BACKSTORY: defs from Supabase = ' . wp_json_encode( $defs ) );
+        }
+
         $found = array_map(
             static function ( $row ) {
                 return isset( $row['id'] ) ? (int) $row['id'] : 0;
             },
-            $defs
+            is_array( $defs ) ? $defs : array()
         );
 
         $missing = array_values( array_diff( $requested, $found ) );
+
+        // DEBUG: jakie ID są uznane za brakujące
+        error_log( 'NW BACKSTORY: found IDs = ' . wp_json_encode( $found ) );
+        error_log( 'NW BACKSTORY: missing IDs = ' . wp_json_encode( $missing ) );
 
         if ( ! empty( $missing ) ) {
             return new WP_Error(
@@ -696,6 +718,7 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
         return true;
     }
 }
+
 function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
     $race_id_input    = sanitize_text_field( $race_id_input );
     $subrace_id_input = sanitize_text_field( $subrace_id_input );
