@@ -196,13 +196,13 @@ function normalizeMediaUrl(url) {
     wrap.style.display = active ? '' : 'none';
   }
 
-  function updateStepUI() {
-    stepEls.forEach(function (step, index) {
-      var active = index === currentStep;
-      step.classList.toggle('active', active);
-      step.hidden = !active;
-      step.style.display = active ? 'block' : 'none';
-    });
+function updateStepUI() {
+  stepEls.forEach(function (step, index) {
+    var active = index === currentStep;
+    step.classList.toggle('active', active);
+    step.hidden = !active;
+    step.style.display = active ? 'block' : 'none';
+  });
 
     var stepCurrent = q('#tw-char-step-current', root);
     var progressFill = q('#tw-char-progress-fill', root);
@@ -1147,19 +1147,17 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
     renderLoreOptions('#tw-crisis-grid', SYNC_CRISIS_OPTIONS, 'sync_crisis');
   }
 
-  function init() {
-    root = document.getElementById('tw-char-creator-wrapper');
-    if (!root) return;
-
-    stepEls = qa('.tw-char-step', root);
-    if (!stepEls.length) return;
-
-    stepEls.forEach(function (step, index) {
-      var active = index === 0;
-      step.classList.toggle('active', active);
-      step.hidden = !active;
-      step.style.display = active ? 'block' : 'none';
-    });
+function init() {
+  root = document.getElementById('tw-char-creator-wrapper');
+  if (!root) return;
+  stepEls = qa('.tw-char-step', root);
+  if (!stepEls.length) return;
+  stepEls.forEach(function (step, index) {
+    var active = index === 0;
+    step.classList.toggle('active', active);
+    step.hidden = !active;
+    step.style.display = active ? 'block' : 'none';  // ← 'block' zamiast ''
+  });
 
     clearStepErrors();
     bindStaticEvents();
@@ -1185,4 +1183,16 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
   } else {
     init();
   }
+	  // Guard: upewniamy się, że aktywny krok ma display:block
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.tw-btn-next') || e.target.closest('.tw-btn-prev')) {
+    setTimeout(function() {
+      var activeStep = root && root.querySelector('.tw-char-step.active, .tw-step.active');
+      if (activeStep) {
+        activeStep.style.display = 'block';
+        activeStep.hidden = false;
+      }
+    }, 50);
+  }
+});
 })();
