@@ -316,6 +316,8 @@ if ( ! function_exists( 'nw_find_race_by_id' ) ) {
         if ( '' === $race_id ) {
             return null;
         }
+		  error_log('=== NW_FIND_RACE_BY_ID ===');
+  error_log('Looking for race_id: ' . $race_id);
 
         $rows = nw_supabase_request(
             'GET',
@@ -326,10 +328,12 @@ if ( ! function_exists( 'nw_find_race_by_id' ) ) {
                 'limit'  => 1,
             )
         );
-
+ error_log('Supabase response: ' . print_r($rows, true));
         if ( is_wp_error( $rows ) || empty( $rows[0] ) || ! is_array( $rows[0] ) ) {
+			    error_log('Race NOT FOUND or error');
             return null;
         }
+		  error_log('Race FOUND: ' . print_r($rows[0], true));
         return $rows[0];
     }
 }
@@ -579,37 +583,37 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
     }
 }
 
-function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
-	$race_id_input    = sanitize_text_field( $race_id_input );
-	$subrace_id_input = sanitize_text_field( $subrace_id_input );
+function nw_validate_race_selection(string $race_id_input, string $subrace_id_input) {
+  $race_id_input = sanitize_text_field($race_id_input);
+  $subrace_id_input = sanitize_text_field($subrace_id_input);
 
-	if ( '' === $race_id_input ) {
-		return new WP_Error( 'race_required', 'Parent race is required.', array( 'status' => 400 ) );
-	}
+  error_log('=== RACE VALIDATION START ===');
+  error_log('race_id_input: ' . $race_id_input);
+  error_log('subrace_id_input: ' . $subrace_id_input);
 
-	if ( '' === $subrace_id_input ) {
-		return new WP_Error( 'subrace_required', 'Subrace is required.', array( 'status' => 400 ) );
-	}
+  if (!$race_id_input) {
+    return new WP_Error('race_required', 'Parent race is required.', array('status' => 400));
+  }
 
-	$race_row = nw_find_race_by_id( $race_id_input );
-	if ( empty( $race_row['id'] ) || ! is_string( $race_row['id'] ) ) {
-		return new WP_Error( 'invalid_race', 'Selected parent race does not exist.', array( 'status' => 400 ) );
-	}
+  if (!$subrace_id_input) {
+    return new WP_Error('subrace_required', 'Subrace is required.', array('status' => 400));
+  }
 
-	$race_parent = isset( $race_row['parent_race'] ) ? (string) $race_row['parent_race'] : '';
-	if ( '' !== $race_parent ) {
-		return new WP_Error( 'invalid_race', 'Selected race must be a parent race.', array( 'status' => 400 ) );
-	}
+  $race_row = nw_find_race_by_id($race_id_input);
+  error_log('race_row after nw_find_race_by_id: ' . print_r($race_row, true));
 
-	$subrace_row = nw_find_race_by_id( $subrace_id_input );
-	if ( empty( $subrace_row['id'] ) || ! is_string( $subrace_row['id'] ) ) {
-		return new WP_Error( 'invalid_subrace', 'Selected subrace does not exist.', array( 'status' => 400 ) );
-	}
+  if (empty($race_row['id']) || !is_string($race_row['id'])) {
+    error_log('ERROR: race_row is empty or invalid');
+    return new WP_Error('invalid_race', 'Selected parent race does not exist.', array('status' => 400));
+  }
 
-	$subrace_parent = isset( $subrace_row['parent_race'] ) ? (string) $subrace_row['parent_race'] : '';
-	if ( '' === $subrace_parent ) {
-		return new WP_Error( 'invalid_subrace', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
-	}
+  $race_parent = isset($race_row['parent_race']) ? (string) $race_row['parent_race'] : '';
+  error_log('race_parent value: ' . $race_parent);
+
+  if ('' !== $race_parent) {
+    error_log('ERROR: race_parent is not empty — this is NOT a parent race');
+    return new WP_Error('invalid_race', 'Selected race must be a parent race.', array('status' => 400));
+  }
 
 	if ( $subrace_parent !== $race_row['name'] && $subrace_parent !== $race_row['id'] ) {
 		return new WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
