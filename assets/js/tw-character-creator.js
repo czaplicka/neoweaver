@@ -796,45 +796,43 @@ root.addEventListener('click', function (e) {
   }
 
   var raceCard = e.target.closest('.tw-race-card');
-  if (raceCard) {
-    playSound(sndTuning);
-    var mode = raceCard.getAttribute('data-mode');
-    var id = raceCard.getAttribute('data-id') || '';
-    var name = raceCard.getAttribute('data-name') || '';
+if (raceCard) {
+  playSound(sndTuning);
+  var mode = raceCard.getAttribute('data-mode');
+  var id = raceCard.getAttribute('data-id');
+  var name = raceCard.getAttribute('data-name');
 
-    if (mode === 'race') {
-      state.race = id;
-      state.race_label = name;
-      state.subrace = '';
-      state.subrace_label = '';
-      state.subraces = [];
+  if (mode === 'race') {
+    // ZMIENIONA LOGIKA: zapisz UUID parent race w osobnym polu
+    state.race = id;
+    state.race_label = name;
+    // NIE czyść subrasy tutaj — pozwól użytkownikowi wybrać
+    state.subraces = [];
+    selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
 
-      selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
-
-      var subraceSection = q('#tw-subrace-section', root);
-      var subraceGrid = q('#tw-subrace-grid', root);
-
-      if (subraceGrid) {
-        subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces…</span></p>';
-      }
-
-      if (subraceSection) {
-        subraceSection.hidden = false;
-        subraceSection.classList.remove('is-hidden');
-        subraceSection.classList.add('is-visible');
-        subraceSection.style.display = 'block';
-      }
-
-      loadSubraces(id, name);
-    } else if (mode === 'subrace') {
-      state.subrace = id;
-      state.subrace_label = name;
-      selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
-      setStatus('', '');
+    var subraceSection = q('#tw-subrace-section', root);
+    var subraceGrid = q('#tw-subrace-grid', root);
+    if (subraceGrid) {
+      subraceGrid.innerHTML = '<p class="tw-loading-state"><span class="tw-loading-dot"></span><span>Loading subraces</span></p>';
+    }
+    if (subraceSection) {
+      subraceSection.hidden = false;
+      subraceSection.classList.remove('is-hidden');
+      subraceSection.classList.add('is-visible');
+      subraceSection.style.display = 'block';
     }
 
-    return;
+    loadSubraces(id, name);
+  } else if (mode === 'subrace') {
+    // ZMIENIONA LOGIKA: zapisz UUID subrasy w osobnym polu
+    // NIE nadpisuj state.race — to jest UUID parent race
+    state.subrace = id;
+    state.subrace_label = name;
+    selectExclusive('.tw-race-card[data-mode="subrace"]', raceCard);
+    setStatus('', '');
   }
+  return;
+}
 
   var classCard = e.target.closest('.tw-class-card');
   if (classCard) {
@@ -948,8 +946,8 @@ playSound(sndDeploy);
     fd.append('character_name', state.character_name);
     fd.append('pronouns', state.pronouns === 'custom' ? 'custom' : state.pronouns);
     fd.append('bio', state.bio || '');
-    fd.append('race', state.race || '');
-    fd.append('subrace', state.subrace || '');
+fd.append('race', state.race);         // UUID parent race
+fd.append('subrace', state.subrace);   // UUID subrasy
     fd.append('char_class', state.char_class || '');
     fd.append('starting_package_id', state.starting_package_id || '');
     fd.append('data_origin', state.data_origin || '');
