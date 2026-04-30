@@ -84,53 +84,66 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 }
 
 if ( ! function_exists( 'nw_supabase_request' ) ) {
-    function nw_supabase_request( string $method, string $table, array $query = array(), $body = null, bool $return_representation = false ) {
-        if ( ! function_exists( 'tw_supabase_rest_url' ) || ! function_exists( 'tw_supabase_headers' ) ) {
+    function nw_supabase_request( string $method, string $table, array $query = [], $body = null, bool $return_representation = false ) {
+
+        // Użyj globalnego helpera zamiast tw_supabase_rest_url/tw_supabase_headers
+        if ( ! function_exists( 'tw_supabase_rest_base' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
             return new WP_Error( 'config_missing', 'Supabase REST configuration missing.', array( 'status' => 500 ) );
         }
 
-        $url = trailingslashit( tw_supabase_rest_url() ) . ltrim( $table, '/' );
+        $base = tw_supabase_rest_base();
+        if ( empty( $base ) ) {
+            return new WP_Error( 'config_missing', 'Supabase REST URL is empty.', array( 'status' => 500 ) );
+        }
+
+        $url = trailingslashit( $base ) . ltrim( $table, '/' );
+
         if ( ! empty( $query ) ) {
             $url = add_query_arg( $query, $url );
         }
 
-        $headers = tw_supabase_headers();
+        $headers = array(
+            'apikey'        => tw_supabase_anon_key(),
+            'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+        );
+
         if ( $return_representation ) {
             $headers['Prefer'] = 'return=representation';
         }
 
         $method = strtoupper( $method );
-        if ( in_array( $method, array( 'POST', 'PATCH' ), true ) ) {
-            $headers['Content-Type'] = 'application/json';
-        }
 
         $args = array(
-            'method'  => $method,
-            'headers' => $headers,
-            'timeout' => 30,
+            'method'    => $method,
+            'headers'   => $headers,
+            'timeout'   => 30,
+            'sslverify' => true,
         );
+
+        if ( in_array( $method, array( 'POST', 'PATCH' ), true ) ) {
+            $headers['Content-Type'] = 'application/json';
+            $args['headers']         = $headers;
+        }
 
         if ( null !== $body ) {
             $args['body'] = wp_json_encode( $body );
         }
 
         $response = wp_remote_request( $url, $args );
+
         if ( is_wp_error( $response ) ) {
             return $response;
         }
 
         $code = (int) wp_remote_retrieve_response_code( $response );
         $raw  = wp_remote_retrieve_body( $response );
-        $data = '' !== $raw ? json_decode( $raw, true ) : array();
+        $data = $raw ? json_decode( $raw, true ) : array();
 
         if ( $code < 200 || $code >= 300 ) {
             return new WP_Error(
                 'supabase_http_error',
-                ( is_array( $data ) && ! empty( $data['message'] ) ) ? $data['message'] : 'Supabase request failed.',
-                array(
-                    'status' => $code,
-                    'body'   => $data,
-                )
+                is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'Supabase request failed.',
+                array( 'status' => $code, 'body' => $data )
             );
         }
 
