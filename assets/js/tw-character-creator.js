@@ -1,6 +1,5 @@
 (function () {
   'use strict';
-
   var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
   var ATTR_MIN = 1;
   var ATTR_MAX = 5;
@@ -9,7 +8,6 @@
   var TOTAL_STEPS = 11;
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
 var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMG_BASE.replace(/\/$/, ''));
-
 var sndTuning = new Audio(uploads + '/tuning.mp3');
 var sndDeploy = new Audio(uploads + '/create-world.mp3');
 var audioUnlocked = false;
