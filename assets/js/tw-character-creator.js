@@ -806,8 +806,8 @@ if (raceCard) {
     // ZMIENIONA LOGIKA: zapisz UUID parent race w osobnym polu
     state.race = id;
     state.race_label = name;
-    // NIE czyść subrasy tutaj — pozwól użytkownikowi wybrać
-    state.subraces = [];
+state.subrace = ''; 
+	  state.subrace_label = '';
     selectExclusive('.tw-race-card[data-mode="race"]', raceCard);
 
     var subraceSection = q('#tw-subrace-section', root);
