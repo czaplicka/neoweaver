@@ -82,7 +82,97 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
         return nw_supabase_request( 'GET', $table, $query );
     }
 }
+if ( ! function_exists( 'nw_normalize_tag_label' ) ) {
+    function nw_normalize_tag_label( $value ) {
+        $value = sanitize_text_field( (string) $value );
+        $value = strtolower( $value );
+        $value = preg_replace( '/[^a-z0-9\-\s]+/', '', $value );
+        $value = preg_replace( '/[\s\-]+/', '-', $value );
+        return trim( $value, '-' );
+    }
+}
+if ( ! function_exists( 'nw_find_tag_defs_by_labels' ) ) {
+    function nw_find_tag_defs_by_labels( array $labels ) {
+        $normalized = array_values(
+            array_unique(
+                array_filter(
+                    array_map( 'nw_normalize_tag_label', $labels )
+                )
+            )
+        );
 
+        if ( empty( $normalized ) ) {
+            return array();
+        }
+
+        $or_filters = array_map(
+            static function ( $label ) {
+                return 'label.ilike.' . rawurlencode( $label );
+            },
+            $normalized
+        );
+
+        $rows = nw_supabase_request(
+            'GET',
+            'cyber_character_tag_defs',
+            array(
+                'select' => 'id,label,category,icon,color,description,source,gm',
+                'or'     => '(' . implode( ',', $or_filters ) . ')',
+                'limit'  => count( $normalized ),
+            )
+        );
+
+        if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+            return array();
+        }
+
+        return array_values(
+            array_filter(
+                $rows,
+                static function ( $row ) use ( $normalized ) {
+                    $label = isset( $row['label'] ) ? nw_normalize_tag_label( $row['label'] ) : '';
+                    return in_array( $label, $normalized, true );
+                }
+            )
+        );
+    }
+}
+
+if ( ! function_exists( 'nw_resolve_backstory_tag_ids' ) ) {
+    function nw_resolve_backstory_tag_ids( array $tags ) {
+        $ids    = array();
+        $labels = array();
+
+        foreach ( $tags as $tag ) {
+            if ( is_numeric( $tag ) ) {
+                $id = (int) $tag;
+                if ( $id > 0 ) {
+                    $ids[] = $id;
+                }
+                continue;
+            }
+
+            $label = nw_normalize_tag_label( $tag );
+            if ( $label !== '' ) {
+                $labels[] = $label;
+            }
+        }
+
+        $ids = array_values( array_unique( $ids ) );
+
+        if ( ! empty( $labels ) ) {
+            $defs = nw_find_tag_defs_by_labels( $labels );
+
+            foreach ( $defs as $row ) {
+                if ( isset( $row['id'] ) ) {
+                    $ids[] = (int) $row['id'];
+                }
+            }
+        }
+
+        return array_values( array_unique( array_filter( $ids ) ) );
+    }
+}
 if ( ! function_exists( 'nw_supabase_request' ) ) {
     function nw_supabase_request( string $method, string $table, array $query = [], $body = null, bool $return_representation = false ) {
 
@@ -572,30 +662,40 @@ if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
 
 if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
     function nw_validate_backstory_tags( array $tag_ids ) {
-        $requested = array_values(
-            array_unique(
-                array_filter(
-                    array_map( 'nw_sanitize_int_id', $tag_ids )
-                )
-            )
-        );
+        $requested = nw_resolve_backstory_tag_ids( $tag_ids );
 
         if ( empty( $requested ) ) {
-            return new WP_Error( 'backstory_tags_required', 'Backstory tags are required.', array( 'status' => 400 ) );
+            return new WP_Error(
+                'backstory_tags_required',
+                'Backstory tags are required.',
+                array( 'status' => 400 )
+            );
         }
 
-        $defs   = nw_find_tag_defs_by_ids( $requested );
-        $found  = array_map( static function ( $row ) { return isset( $row['id'] ) ? (int) $row['id'] : 0; }, $defs );
+        $defs = nw_find_tag_defs_by_ids( $requested );
+        $found = array_map(
+            static function ( $row ) {
+                return isset( $row['id'] ) ? (int) $row['id'] : 0;
+            },
+            $defs
+        );
+
         $missing = array_values( array_diff( $requested, $found ) );
 
         if ( ! empty( $missing ) ) {
-            return new WP_Error( 'invalid_backstory_tags', 'One or more backstory tag IDs do not exist.', array( 'status' => 400 ) );
+            return new WP_Error(
+                'invalid_backstory_tags',
+                'One or more backstory tag IDs do not exist.',
+                array(
+                    'status'  => 400,
+                    'missing' => $missing,
+                )
+            );
         }
 
         return true;
     }
 }
-
 function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
     $race_id_input    = sanitize_text_field( $race_id_input );
     $subrace_id_input = sanitize_text_field( $subrace_id_input );
@@ -995,8 +1095,18 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
         $skills_raw       = json_decode( wp_unslash( $_POST['skills'] ?? '[]' ), true );
         $skills           = is_array( $skills_raw ) ? array_values( array_unique( array_filter( array_map( 'nw_sanitize_text_id', $skills_raw ) ) ) ) : array();
 
-        $backstory_raw    = json_decode( wp_unslash( $_POST['backstorytags'] ?? $_POST['backstory_tags'] ?? '[]' ), true );
-        $backstory_tags   = is_array( $backstory_raw ) ? array_values( array_unique( array_filter( array_map( 'nw_sanitize_int_id', $backstory_raw ) ) ) ) : array();
+        $backstoryraw = json_decode( wp_unslash( $_POST['backstorytags'] ?? $_POST['backstory_tags'] ?? '[]' ), true );
+
+$backstorytags = is_array( $backstoryraw )
+    ? array_values( array_unique( array_filter(
+        array_map(
+            static function ( $item ) {
+                return is_scalar( $item ) ? trim( (string) $item ) : '';
+            },
+            $backstoryraw
+        )
+    ) ) )
+    : array();
 
         if ( '' === $name ) {
             wp_send_json_error( array( 'message' => 'Character name is required.' ), 400 );
@@ -1032,10 +1142,12 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
             wp_send_json_error( array( 'message' => $package_validation->get_error_message() ), 400 );
         }
 
-        $tags_validation = nw_validate_backstory_tags( $backstory_tags );
-        if ( is_wp_error( $tags_validation ) ) {
-            wp_send_json_error( array( 'message' => $tags_validation->get_error_message() ), 400 );
-        }
+$resolved_backstory_tag_ids = nw_resolve_backstory_tag_ids( $backstorytags );
+
+$tagsvalidation = nw_validate_backstory_tags( $resolved_backstory_tag_ids );
+if ( is_wp_error( $tagsvalidation ) ) {
+    wp_send_json_error( array( 'message' => $tagsvalidation->get_error_message() ), 400 );
+}
 
         $avatar_upload_url = nw_handle_avatar_upload_strict();
         if ( is_wp_error( $avatar_upload_url ) ) {
@@ -1086,11 +1198,11 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
             wp_send_json_error( array( 'message' => 'Character could not be saved with skills.' ), 500 );
         }
 
-        $tags_store = nw_store_character_backstory_tags( $character_id, $backstory_tags );
-        if ( is_wp_error( $tags_store ) ) {
-            nw_delete_character_by_id( $character_id );
-            wp_send_json_error( array( 'message' => 'Character could not be saved with backstory tags.' ), 500 );
-        }
+$tags_store = nw_store_character_backstory_tags( $character_id, $resolved_backstory_tag_ids );
+if ( is_wp_error( $tags_store ) ) {
+    nw_delete_character_by_id( $character_id );
+    wp_send_json_error( array( 'message' => 'Character could not be saved with backstory tags.' ), 500 );
+}
 
         $redirect = home_url( '/character/' . rawurlencode( $character_id ) . '/' );
         wp_send_json_success(
