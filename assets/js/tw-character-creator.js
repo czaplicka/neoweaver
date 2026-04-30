@@ -929,6 +929,7 @@ root.addEventListener('click', function (e) {
     updateAvatarPreview();
   }
 });
+  }
 
   function submitCharacter() {
     var error = validateStep(10);
