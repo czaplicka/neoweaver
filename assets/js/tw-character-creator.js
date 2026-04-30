@@ -11,7 +11,6 @@ var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '
 var sndTuning = new Audio(uploads + '/tuning.mp3');
 var sndDeploy = new Audio(uploads + '/create-world.mp3');
 var audioUnlocked = false;
-
 sndTuning.preload = 'auto';
 sndDeploy.preload = 'auto';
 
