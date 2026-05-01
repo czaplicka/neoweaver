@@ -46,37 +46,37 @@ function render_player_achievements( $atts ) {
 
     $output = '<div class="achievements-grid">';
 
-    foreach ( $results as $ach ) {
-        $percent = ! empty( $ach->is_unlocked ) ? 100 : (float) $ach->progress_percent;
+foreach ( $results as $ach ) {
+    $is_unlocked = ! empty( $ach->is_unlocked );
+    $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0 );
 
-        $legacy_class = ''; // na razie puste, dodamy jak będzie pole w widoku
+    $legacy_class = '';
 
-        $scope       = $ach->scope ?? 'account';
-        $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
+    $scope       = $ach->scope ?? 'account';
+    $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
 
-        $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
-        $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
+    $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
+    $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
-        $status = $ach->css_status ?? '';
-        $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
+    $status = $ach->css_status ?? '';
+    $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
+    $title  = $ach->display_title ?? ( $status === 'status-hidden' ? 'Hidden achievement' : 'Untitled achievement' );
 
-        $output .= '<div class="ach-card ' . esc_attr( $status . ' ' . $shape_class . ' ' . $legacy_class ) . '" style="' . esc_attr( $style ) . '">';
+    $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+    $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '"></i></div>';
+    $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
-        $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '"></i></div>';
-
-        $output .= '<div class="ach-title">' . esc_html( $ach->display_title ) . '</div>';
-
-        $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
-        if ( empty( $ach->is_unlocked ) && $status !== 'status-hidden' && $goal > 1 ) {
-            $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
-            $output .= '<div class="ach-progress">' . esc_html( $current . '/' . $goal ) . '</div>';
-        }
-
-        $output .= '</div>';
+    $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
+    if ( ! $is_unlocked && $status !== 'status-hidden' && $goal > 1 ) {
+        $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
+        $output .= '<div class="ach-progress">' . esc_html( $current . '/' . $goal ) . '</div>';
     }
 
     $output .= '</div>';
+}
 
-    return $output;
+$output .= '</div>';
+
+return $output;
 }
 add_shortcode( 'achievements', 'render_player_achievements' );
