@@ -41,9 +41,6 @@ class Neoweaver_Public {
 	/** @var Neoweaver_Agents_List */
 	protected Neoweaver_Agents_List $agents_list;
 
-	/** @var Neoweaver_Agents_Creator */
-	protected Neoweaver_Agents_Creator $agents_creator;
-
 	/** @var Neoweaver_Deployments_Creator */
 	protected Neoweaver_Deployments_Creator $deployments_creator;
 
@@ -57,7 +54,6 @@ class Neoweaver_Public {
 		Neoweaver_Nodes_Creator $nodes_creator
 	) {
 		$this->agents_list         = $agents_list;
-		$this->agents_creator      = $agents_creator;
 		$this->deployments_creator = $deployments_creator;
 		$this->nodes_creator       = $nodes_creator;
 
