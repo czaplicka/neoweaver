@@ -6,73 +6,66 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
-    function neoweaver_character_creator_config(): void {
-        $js_handle = 'neoweaver-character-creator';
 
-        if ( ! wp_script_is( $js_handle, 'registered' ) ) {
-            return;
-        }
+/**
+ * Register assets.
+ */
+if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
+    function neoweaver_register_character_creator_assets(): void {
+        $css_handle = 'neoweaver-character-creator';
+        $js_handle  = 'neoweaver-character-creator';
 
-        $uploads = wp_get_upload_dir();
+        $css_path = plugin_dir_path( __FILE__ ) . '../../assets/css/tw-character-creator.css';
+        $js_path  = plugin_dir_path( __FILE__ ) . '../../assets/js/tw-character-creator.js';
+
+        $css_url = plugin_dir_url( __FILE__ ) . '../../assets/css/tw-character-creator.css';
+        $js_url  = plugin_dir_url( __FILE__ ) . '../../assets/js/tw-character-creator.js';
+
+        wp_register_style(
+            $css_handle,
+            $css_url,
+            array(),
+            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
         );
 
-        $config = array(
-            'ajaxurl'        => admin_url( 'admin-ajax.php' ),
-            'ajax_url'       => admin_url( 'admin-ajax.php' ),
-            'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
-            'sitebase'       => home_url(),
-            'site_base'      => home_url(),
-        );
-
-        wp_add_inline_script(
+        wp_register_script(
             $js_handle,
-            'window.twCharCreatorConfig = Object.assign({}, window.twCharCreatorConfig || {}, ' . wp_json_encode( $config ) . ');',
-            'before'
+            $js_url,
+            array(),
+            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
+            true
         );
-    }
-}
-add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_config', 100 );
-consol.log("gallery");
-if ( ! function_exists( 'neoweaver_character_creator_gallery_config' ) ) {
-    function neoweaver_character_creator_gallery_config(): void {
-        $js_handle = 'neoweaver-character-creator';
-
-        if ( ! wp_script_is( $js_handle, 'registered' ) ) {
-            return;
-        }
 
         $uploads = wp_get_upload_dir();
 
-        $gallery = array(
-            array(
-                'id'   => 'avatar-1',
-                'name' => 'Avatar',
-                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
-            ),
-            array(
-                'id'   => 'avatar-2',
-                'name' => 'Avatar 2',
-                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
-            ),
-        );
-
-        $config = array(
-            'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
-            'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
-            'avatar_gallery' => $gallery,
-            'avatarGallery'  => $gallery,
-            'avatargallery'  => $gallery,
-        );
-
-        wp_add_inline_script(
+        wp_localize_script(
             $js_handle,
-            'window.twCharCreatorGalleryConfig = ' . wp_json_encode( $config ) . ';',
-            'before'
+            'twCharCreatorConfig',
+            array(
+                'ajaxurl'        => admin_url( 'admin-ajax.php' ),
+                'ajax_url'       => admin_url( 'admin-ajax.php' ),
+                'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
+                'sitebase'       => home_url(),
+                'site_base'      => home_url(),
+                'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
+                'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
+                'avatar_gallery' => array(
+                    array(
+                        'id'   => 'avatar-1',
+                        'name' => 'Avatar',
+                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
+                    ),
+                    array(
+                        'id'   => 'avatar-2',
+                        'name' => 'Avatar 2',
+                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
+                    ),
+                ),
+            )
         );
     }
 }
-add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_gallery_config', 100 );
+add_action( 'wp_enqueue_scripts', 'neoweaver_register_character_creator_assets' );
 /**
  * Shortcode renderer.
  */
