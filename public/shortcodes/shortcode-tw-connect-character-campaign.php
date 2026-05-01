@@ -382,7 +382,7 @@ function tw_connect_character_campaign_direct_v2() {
             const payload = {
                 campaign_id:   selCamp.value,   // FIX #2 – stay as string (Supabase handles int coercion)
                 character_id:  selChar.value,
-                creator_wp_id: config.uid
+                wp_user_id: config.uid
             };
 
             try {
