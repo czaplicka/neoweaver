@@ -6,7 +6,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 /**
  * Register assets.
  */
@@ -14,12 +13,6 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
     function neoweaver_register_character_creator_assets(): void {
         $css_handle = 'neoweaver-character-creator';
         $js_handle  = 'neoweaver-character-creator';
-
-        $css_path = plugin_dir_path( __FILE__ ) . '../../assets/css/tw-character-creator.css';
-        $js_path  = plugin_dir_path( __FILE__ ) . '../../assets/js/tw-character-creator.js';
-
-        $css_url = plugin_dir_url( __FILE__ ) . '../../assets/css/tw-character-creator.css';
-        $js_url  = plugin_dir_url( __FILE__ ) . '../../assets/js/tw-character-creator.js';
 
         wp_register_style(
             $css_handle,
