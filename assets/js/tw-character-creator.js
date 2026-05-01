@@ -675,20 +675,23 @@ function renderPackages(rows) {
   }).join('');
 }
 
-  function renderAvatarGallery() {
-    var target = q('#tw-avatar-gallery', root);
-    if (!target) return;
+function renderAvatarGallery() {
+  var target = q('#tw-avatar-gallery', root);
+  if (!target) return;
 
-    var gallery = Array.isArray(cfg.avatar_gallery) ? cfg.avatar_gallery : [];
+  var gallery =
+    Array.isArray(cfg.avatar_gallery) ? cfg.avatar_gallery :
+    Array.isArray(cfg.avatarGallery) ? cfg.avatarGallery :
+    Array.isArray(cfg.avatargallery) ? cfg.avatargallery :
+    [];
 
-    target.innerHTML = gallery.map(function (item) {
-      var selected = state.avatar_url === item.url;
-      return '' +
-        '<button type="button" class="tw-avatar-card' + (selected ? ' is-selected' : '') + '" data-url="' + esc(item.url) + '">' +
-          '<img src="' + esc(item.url) + '" alt="' + esc(item.name || 'Avatar') + '" loading="lazy">' +
-        '</button>';
-    }).join('');
-  }
+  target.innerHTML = gallery.map(function (item) {
+    var selected = (state.avatarurl || state.avatar_url) === item.url;
+    return '<button type="button" class="tw-avatar-card' + (selected ? ' is-selected' : '') + '" data-url="' + esc(item.url) + '">' +
+      '<img src="' + esc(item.url) + '" alt="' + esc(item.name || 'Avatar') + '" loading="lazy">' +
+    '</button>';
+  }).join('');
+}
 
   function updateAvatarPreview() {
     var wrap = q('#tw-avatar-selected', root);
