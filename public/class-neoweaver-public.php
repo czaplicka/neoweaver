@@ -49,7 +49,6 @@ class Neoweaver_Public {
 
 	public function __construct(
 		Neoweaver_Agents_List $agents_list,
-		Neoweaver_Agents_Creator $agents_creator,
 		Neoweaver_Deployments_Creator $deployments_creator,
 		Neoweaver_Nodes_Creator $nodes_creator
 	) {
