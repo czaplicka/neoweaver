@@ -60,7 +60,7 @@ foreach ( $results as $ach ) {
 
     $status = $ach->css_status ?? '';
     $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
-    $title  = $ach->display_title ?? ( $status === 'status-hidden' ? 'Hidden achievement' : 'Untitled achievement' );
+    $title  = $ach->display_title ?? ( $status === 'status-hidden' ? 'Hidden achievement' : 'Find the achievement' );
 
     $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
     $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '"></i></div>';
