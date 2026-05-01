@@ -76,10 +76,6 @@ foreach ( $results as $ach ) {
 }
 
 $output .= '</div>';
-
-return $output;
-}
-add_shortcode( 'achievements', 'render_player_achievements' );
 ?>
 <style>
     .achievements-grid {
@@ -238,3 +234,7 @@ add_shortcode( 'achievements', 'render_player_achievements' );
     }
 }
 </style>
+<?php
+return $output;
+}
+add_shortcode( 'achievements', 'render_player_achievements' );
