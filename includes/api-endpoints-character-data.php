@@ -1188,18 +1188,25 @@ if ( is_wp_error( $tagsvalidation ) ) {
     wp_send_json_error( array( 'message' => $tagsvalidation->get_error_message() ), 400 );
 }
 
-        $avatar_upload_url = nw_handle_avatar_upload_strict();
-        if ( is_wp_error( $avatar_upload_url ) ) {
-            wp_send_json_error( array( 'message' => $avatar_upload_url->get_error_message() ), 400 );
-        }
+      $avatar_upload_url = nw_handle_avatar_upload_strict();
+if ( is_wp_error( $avatar_upload_url ) ) {
+    wp_send_json_error( array( 'message' => $avatar_upload_url->get_error_message() ), 400 );
+}
 
-        $avatar_url_from_gallery = ! empty( $_POST['avatarurl'] ) ? esc_url_raw( wp_unslash( $_POST['avatarurl'] ) ) : '';
-        $final_avatar_url = '';
-        if ( is_string( $avatar_upload_url ) && '' !== $avatar_upload_url ) {
-            $final_avatar_url = $avatar_upload_url;
-        } elseif ( '' !== $avatar_url_from_gallery ) {
-            $final_avatar_url = $avatar_url_from_gallery;
-        }
+$avatar_url_from_gallery = '';
+
+if ( ! empty( $_POST['avatar_url'] ) ) {
+    $avatar_url_from_gallery = nw_normalize_media_url( wp_unslash( $_POST['avatar_url'] ) );
+} elseif ( ! empty( $_POST['avatarurl'] ) ) {
+    $avatar_url_from_gallery = nw_normalize_media_url( wp_unslash( $_POST['avatarurl'] ) );
+}
+
+$final_avatar_url = '';
+if ( is_string( $avatar_upload_url ) && '' !== $avatar_upload_url ) {
+    $final_avatar_url = $avatar_upload_url;
+} elseif ( '' !== $avatar_url_from_gallery ) {
+    $final_avatar_url = $avatar_url_from_gallery;
+}
 
         $gender = nw_map_pronouns_to_gender( $pronouns );
         if ( null === $gender ) {
