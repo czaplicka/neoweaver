@@ -195,13 +195,6 @@ final class NeoWeaver_Core {
 			true
 		);
 
-		wp_enqueue_style(
-			'nw-character-css',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/tw-character-creator.css',
-			[],
-			NEOWEAVER_VERSION
-		);
-
 		wp_register_script(
 			'chartjs',
 			'https://cdn.jsdelivr.net/npm/chart.js',
