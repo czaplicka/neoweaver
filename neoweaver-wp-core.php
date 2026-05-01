@@ -61,7 +61,6 @@ final class NeoWeaver_Core {
 
 			'includes/classes/class-neoweaver-agents-repository.php',
 			'includes/classes/class-neoweaver-agents-list.php',
-			'includes/classes/class-neoweaver-agents-creator.php',
 			'includes/classes/class-neoweaver-deployments-creator.php',
 			'includes/classes/class-neoweaver-nodes-creator.php',
 			'includes/classes/class-neoweaver-checkout-block.php',
