@@ -50,6 +50,46 @@ if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
     }
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_config', 100 );
+
+if ( ! function_exists( 'neoweaver_character_creator_gallery_config' ) ) {
+    function neoweaver_character_creator_gallery_config(): void {
+        $js_handle = 'neoweaver-character-creator';
+
+        if ( ! wp_script_is( $js_handle, 'registered' ) ) {
+            return;
+        }
+
+        $uploads = wp_get_upload_dir();
+
+        $gallery = array(
+            array(
+                'id'   => 'avatar-1',
+                'name' => 'Avatar',
+                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
+            ),
+            array(
+                'id'   => 'avatar-2',
+                'name' => 'Avatar 2',
+                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
+            ),
+        );
+
+        $config = array(
+            'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
+            'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
+            'avatar_gallery' => $gallery,
+            'avatarGallery'  => $gallery,
+            'avatargallery'  => $gallery,
+        );
+
+        wp_add_inline_script(
+            $js_handle,
+            'window.twCharCreatorGalleryConfig = ' . wp_json_encode( $config ) . ';',
+            'before'
+        );
+    }
+}
+add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_gallery_config', 100 );
 /**
  * Shortcode renderer.
  */
