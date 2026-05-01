@@ -1,10 +1,11 @@
 (function () {
   'use strict';
- var cfg = Object.assign(
+var cfg = Object.assign(
   {},
   window.neoweaverAjax || {},
   window.twCharCreatorAjax || {},
-  window.twCharCreatorConfig || {}
+  window.twCharCreatorConfig || {},
+  window.twCharCreatorGalleryConfig || {}
 );
 	var isInitialized = false;
 var isSubmitting = false;
