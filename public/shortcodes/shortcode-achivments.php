@@ -58,14 +58,55 @@ foreach ( $results as $ach ) {
     $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
     $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
-    $status = $ach->css_status ?? '';
-    $icon   = ( $status === 'status-hidden' ) ? 'question' : ( $ach->icon_slug ?? 'star' );
-    $title  = $ach->display_title ?? ( $status === 'status-hidden' ? 'Hidden achievement' : 'Find the achievement' );
+    $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
+
+    // ICONA
+    $icon = ( $status === 'status-hidden' )
+        ? 'question'          // fa-question dla sekretów
+        : ( $ach->icon_slug ?? 'star' );
+
+    // TYTUŁ
+    if ( $status === 'status-hidden' && ! $is_unlocked ) {
+        // nie spoiluj tytułu, jeśli sekret nieodkryty
+        $title = 'Secret achievement';
+    } else {
+        $title = $ach->display_title ?? 'Untitled achievement';
+    }
+
+    // OPIS
+    if ( $status === 'status-hidden' && ! $is_unlocked ) {
+        $description = 'Hidden objective – keep playing to uncover this.';
+    } else {
+        $description = $ach->display_description ?? '';
+    }
+
+    $badge_label = ( $status === 'status-hidden' )
+        ? 'SECRET'
+        : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
 
     $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
-    $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '"></i></div>';
+
+    // górna linia: badge + progres %
+    $output .= '<div class="ach-top-row">';
+    $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
+    if ( ! $is_unlocked ) {
+        $output .= '<span class="ach-percent">' . esc_html( intval( $percent ) ) . '%</span>';
+    } else {
+        $output .= '<span class="ach-percent ach-percent-done">100%</span>';
+    }
+    $output .= '</div>';
+
+    // ikona
+    $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
+
+    // tytuł + opis
     $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
+    if ( $description !== '' ) {
+        $output .= '<div class="ach-desc">' . esc_html( $description ) . '</div>';
+    }
+
+    // licznik postępu (np. 0/5)
     $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
     if ( ! $is_unlocked && $status !== 'status-hidden' && $goal > 1 ) {
         $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
@@ -74,8 +115,6 @@ foreach ( $results as $ach ) {
 
     $output .= '</div>';
 }
-
-$output .= '</div>';
 ?>
 <style>
 .achievements-grid {
@@ -255,6 +294,71 @@ $output .= '</div>';
         padding-left: 16px;
         padding-right: 16px;
     }
+}
+    .ach-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.65);
+}
+
+.ach-badge {
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(173,255,0,0.4);
+    background: rgba(173,255,0,0.12);
+    color: #adff00;
+}
+
+.ach-card.status-hidden .ach-badge {
+    border-color: rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.3);
+    color: rgba(255,255,255,0.7);
+}
+
+.ach-percent {
+    opacity: 0.8;
+}
+
+.ach-percent-done {
+    color: #adff00;
+    font-weight: 600;
+}
+
+.ach-desc {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.78);
+    margin-top: 4px;
+    max-width: 30em;
+}
+
+.ach-card.status-hidden {
+    opacity: 0.78;
+    border-color: rgba(255,255,255,0.1);
+    backdrop-filter: blur(3px);
+}
+
+.ach-card.status-hidden::before {
+    background:
+        linear-gradient(130deg, rgba(255,255,255,0.18), transparent 30%),
+        linear-gradient(320deg, rgba(255,255,255,0.08), transparent 32%);
+}
+
+.ach-card.status-hidden .ach-icon {
+    background: rgba(0,0,0,0.4);
+    border-color: rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.78);
+}
+
+.ach-card.status-hidden .ach-title,
+.ach-card.status-hidden .ach-desc {
+    color: rgba(255,255,255,0.82);
 }
 </style>
 <?php
