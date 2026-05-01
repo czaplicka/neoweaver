@@ -144,7 +144,7 @@ final class NeoWeaver_Core {
 		$deployments_creator = new Neoweaver_Deployments_Creator();
 		$nodes_creator       = new Neoweaver_Nodes_Creator();
 
-		new Neoweaver_Public( $list, $creator, $deployments_creator, $nodes_creator );
+		new Neoweaver_Public( $list, $deployments_creator, $nodes_creator );
 	}
 
 	public static function enqueue_public_assets() {
