@@ -714,14 +714,27 @@ function renderPackages(rows) {
     wrap.style.display = 'none';
   }
 
-  function bindStaticEvents() {
-    	document.addEventListener('click', unlockAudio, { once: true });
-    var nameInput = q('#tw-char-name', root);
-    if (nameInput) {
-      nameInput.addEventListener('input', function (e) {
-        state.character_name = e.target.value;
-      });
-    }
+function bindStaticEvents() {
+  document.addEventListener('click', unlockAudio, { once: true });
+
+  var form = root.closest('form') || q('form', root);
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      submitCharacter(e);
+    });
+  }
+
+  var submitBtn = q('#tw-char-submit', root);
+  if (submitBtn) {
+    submitBtn.setAttribute('type', 'button');
+    submitBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      submitCharacter(e);
+    });
+  }
 
     qa('input[name="tw-char-pronouns"]', root).forEach(function (input) {
       input.addEventListener('change', function () {
