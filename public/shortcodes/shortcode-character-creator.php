@@ -13,22 +13,6 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
     function neoweaver_register_character_creator_assets(): void {
         $css_handle = 'neoweaver-character-creator';
         $js_handle  = 'neoweaver-character-creator';
-
-        wp_register_style(
-            $css_handle,
-            $css_url,
-            array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
-        );
-
-        wp_register_script(
-            $js_handle,
-            $js_url,
-            array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
-            true
-        );
-
         $uploads = wp_get_upload_dir();
 
         wp_localize_script(
