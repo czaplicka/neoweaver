@@ -1,6 +1,8 @@
 (function () {
   'use strict';
   var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
+	var isInitialized = false;
+var isSubmitting = false;
   var ATTR_MIN = 1;
   var ATTR_MAX = 5;
   var ATTR_POOL = 12;
@@ -8,7 +10,7 @@
   var TOTAL_STEPS = 11;
   var IMG_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
 var uploads = (cfg && cfg.uploadsbase ? String(cfg.uploadsbase).replace(/\/$/, '') : IMG_BASE.replace(/\/$/, ''));
-var sndTuning = new Audio(uploads + '/tuning.mp3');
+var sndTuning = new Audio(uploads + '/kreatory.mp3');
 var sndDeploy = new Audio(uploads + '/create-world.mp3');
 var audioUnlocked = false;
 sndTuning.preload = 'auto';
@@ -1190,8 +1192,7 @@ return fetchPost('neoweaver_get_packages', { classtag: classId, classId: classId
     renderLoreOptions('#tw-operation-grid', PREVIOUS_OPERATION_OPTIONS, 'previous_operation');
     renderLoreOptions('#tw-crisis-grid', SYNC_CRISIS_OPTIONS, 'sync_crisis');
   }
-	var isInitialized = false;
-var isSubmitting = false;
+var isInitialized = window.twCharCreatorInitialized || false;
 function init() {
 	  if (isInitialized) return;
   isInitialized = true;
