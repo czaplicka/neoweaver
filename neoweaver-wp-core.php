@@ -141,7 +141,6 @@ final class NeoWeaver_Core {
 	public static function bootstrap_game_classes() {
 		$repo                = new Neoweaver_Agents_Repository();
 		$list                = new Neoweaver_Agents_List( $repo );
-		$creator             = new Neoweaver_Agents_Creator();
 		$deployments_creator = new Neoweaver_Deployments_Creator();
 		$nodes_creator       = new Neoweaver_Nodes_Creator();
 
