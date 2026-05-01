@@ -86,9 +86,9 @@ class Neoweaver_Public {
 
 		// ── Character creator ──────────────────────────────────────────────
 		wp_enqueue_style(
-			'neoweaver-char-creator',
+			'neoweaver-character-creator',
 			$url . 'assets/css/tw-character-creator.css',
-			[ 'neoweaver-public', 'neoweaver-pronouns' ],
+			[ 'neoweaver-public', 'neoweaver-chararacter' ],
 			$ver
 		);
 		wp_enqueue_script(
