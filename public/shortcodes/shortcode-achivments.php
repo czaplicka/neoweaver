@@ -78,11 +78,34 @@ foreach ( $results as $ach ) {
 $output .= '</div>';
 ?>
 <style>
-    .achievements-grid {
+.achievements-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 18px;
     margin: 24px 0;
+        max-width: 1200px;
+    margin: 24px auto;
+}
+    @media (max-width: 980px) {
+    .achievements-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .achievements-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .ach-card,
+    .ach-shape-hex,
+    .ach-shape-shield {
+        clip-path: none;
+        border-radius: 16px;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
 }
 
 .ach-card {
