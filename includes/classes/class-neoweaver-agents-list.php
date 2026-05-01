@@ -159,7 +159,7 @@ class Neoweaver_Agents_List {
 
 		<div class="tw-grid">
 			<?php foreach ( $characters as $char ) :
-				$avatar     = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://cyber.nieodparady.pl/wp-content/uploads/default-avatar.png';
+				$avatar     = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
 				$camp_data  = isset( $char['cyber_campaign_characters'][0]['cyber_campaign'] ) ? $char['cyber_campaign_characters'][0]['cyber_campaign'] : null;
 				$camp_name  = isset( $camp_data['name'] ) ? $camp_data['name'] : 'Unassigned';
 				$world_name = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
@@ -258,53 +258,58 @@ class Neoweaver_Agents_List {
 			document.getElementById('twCharModal').style.display = 'block';
 		}
 
-		function twConfirmDeleteCharacter(charId, btnEl) {
-			if (!confirm('Are you sure you want to delete this operative? This cannot be undone.')) return;
+function twConfirmDeleteCharacter(charId, btnEl) {
+	if (!confirm('Are you sure you want to delete this operative? This cannot be undone.')) return;
 
-			if (!window.twSupabase) {
-				alert('SUPABASE CLIENT OFFLINE. CANNOT TERMINATE OPERATIVE.');
+	if (!window.twSupabase) {
+		alert('SUPABASE CLIENT OFFLINE. CANNOT TERMINATE OPERATIVE.');
+		return;
+	}
+
+	btnEl.disabled = true;
+	btnEl.textContent = 'Deleting...';
+
+	const client = window.twSupabase;
+
+	(async () => {
+		try {
+			const currentUserId = window.twAdventureData?.wp_user_id;
+			if (!currentUserId) {
+				alert('IDENTITY NOT VERIFIED. CANNOT TERMINATE OPERATIVE.');
+				btnEl.disabled = false;
+				btnEl.textContent = 'Delete Operative';
 				return;
 			}
 
-			btnEl.disabled = true;
-			btnEl.textContent = 'Deleting...';
+			const { error } = await client.rpc('fn_delete_character', {
+				p_character_id: charId,
+				p_wp_user_id: currentUserId
+			});
 
-			const client = window.twSupabase;
+			if (error) {
+				console.error('SUPABASE DELETE CHARACTER ERROR', error);
+				alert('Delete failed: ' + (error.message || 'Grid denied execution.'));
+				btnEl.disabled = false;
+				btnEl.textContent = 'Delete Operative';
+				return;
+			}
 
-			(async () => {
-				try {
-					const currentUserId = window.twAdventureData?.wp_user_id;
-					if ( ! currentUserId ) {
-						alert( 'IDENTITY NOT VERIFIED. CANNOT TERMINATE OPERATIVE.' );
-						btnEl.disabled = false;
-						btnEl.textContent = 'Delete Operative';
-						return;
-					}
-					const { error } = await client
-						.from('cyber_characters')
-						.delete()
-						.eq('id', charId)
-						.eq('wp_user_id', currentUserId);
+			btnEl.closest('.tw-card')?.remove();
 
-					if (error) {
-						console.error('SUPABASE DELETE CHARACTER ERROR', error);
-						alert('Delete failed: ' + (error.message || 'Grid denied execution.'));
-						btnEl.disabled = false;
-						btnEl.textContent = 'Delete Operative';
-						return;
-					}
+			const modal = document.getElementById('twCharModal');
+			if (modal) modal.style.display = 'none';
 
-					btnEl.closest('.tw-card')?.remove();
-					const modal = document.getElementById('twCharModal');
-					if (modal) modal.style.display = 'none';
-				} catch (e) {
-					console.error('DELETE CHARACTER EXCEPTION', e);
-					alert('Delete failed: client exception.');
-					btnEl.disabled = false;
-					btnEl.textContent = 'Delete Operative';
-				}
-			})();
+			if (!document.querySelector('.tw-card')) {
+				window.location.reload();
+			}
+		} catch (e) {
+			console.error('DELETE CHARACTER EXCEPTION', e);
+			alert('Delete failed: client exception.');
+			btnEl.disabled = false;
+			btnEl.textContent = 'Delete Operative';
 		}
+	})();
+}
 
 		document.addEventListener('change', function(e) {
 			const cb = e.target.closest('.tw-toggle-public');
