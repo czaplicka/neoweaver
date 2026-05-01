@@ -1,6 +1,11 @@
 (function () {
   'use strict';
-  var cfg = window.twCharCreatorConfig || window.twCharCreatorAjax || window.neoweaverAjax || {};
+ var cfg = Object.assign(
+  {},
+  window.neoweaverAjax || {},
+  window.twCharCreatorAjax || {},
+  window.twCharCreatorConfig || {}
+);
 	var isInitialized = false;
 var isSubmitting = false;
   var ATTR_MIN = 1;
