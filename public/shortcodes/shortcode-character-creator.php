@@ -6,9 +6,8 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
-if ( ! function_exists( 'neoweaver_localize_character_creator_config' ) ) {
-    function neoweaver_localize_character_creator_config(): void {
+if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
+    function neoweaver_character_creator_config(): void {
         $js_handle = 'neoweaver-character-creator';
 
         if ( ! wp_script_is( $js_handle, 'registered' ) ) {
@@ -16,48 +15,7 @@ if ( ! function_exists( 'neoweaver_localize_character_creator_config' ) ) {
         }
 
         $uploads = wp_get_upload_dir();
-$gallery = array(
-    array(
-        'id'   => 'avatar-1',
-        'name' => 'Avatar',
-        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
-    ),
-    array(
-        'id'   => 'avatar-2',
-        'name' => 'Avatar 2',
-        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
-    ),
-);
 
-wp_localize_script(
-    $js_handle,
-    'twCharCreatorConfig',
-    array(
-        'ajaxurl'        => admin_url( 'admin-ajax.php' ),
-        'ajax_url'       => admin_url( 'admin-ajax.php' ),
-        'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
-        'sitebase'       => home_url(),
-        'site_base'      => home_url(),
-        'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
-        'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
-        'avatar_gallery' => $gallery,
-        'avatarGallery'  => $gallery,
-        'avatargallery'  => $gallery,
-    )
-);
-    }
-}
-add_action( 'wp_enqueue_scripts', 'neoweaver_localize_character_creator_config', 20 );
-
-if ( ! function_exists( 'neoweaver_extend_character_creator_config' ) ) {
-    function neoweaver_extend_character_creator_config(): void {
-        $js_handle = 'neoweaver-character-creator';
-
-        if ( ! wp_script_is( $js_handle, 'registered' ) ) {
-            return;
-        }
-
-        $uploads = wp_get_upload_dir();
         $gallery = array(
             array(
                 'id'   => 'avatar-1',
@@ -74,6 +32,7 @@ if ( ! function_exists( 'neoweaver_extend_character_creator_config' ) ) {
         $config = array(
             'ajaxurl'        => admin_url( 'admin-ajax.php' ),
             'ajax_url'       => admin_url( 'admin-ajax.php' ),
+            'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
             'sitebase'       => home_url(),
             'site_base'      => home_url(),
             'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
@@ -90,7 +49,7 @@ if ( ! function_exists( 'neoweaver_extend_character_creator_config' ) ) {
         );
     }
 }
-add_action( 'wp_enqueue_scripts', 'neoweaver_extend_character_creator_config', 100 );
+add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_config', 100 );
 /**
  * Shortcode renderer.
  */
