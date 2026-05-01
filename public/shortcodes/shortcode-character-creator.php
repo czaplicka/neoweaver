@@ -15,18 +15,6 @@ if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
         }
 
         $uploads = wp_get_upload_dir();
-
-        $gallery = array(
-            array(
-                'id'   => 'avatar-1',
-                'name' => 'Avatar',
-                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
-            ),
-            array(
-                'id'   => 'avatar-2',
-                'name' => 'Avatar 2',
-                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
-            ),
         );
 
         $config = array(
@@ -35,11 +23,6 @@ if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
             'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
             'sitebase'       => home_url(),
             'site_base'      => home_url(),
-            'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
-            'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
-            'avatar_gallery' => $gallery,
-            'avatarGallery'  => $gallery,
-            'avatargallery'  => $gallery,
         );
 
         wp_add_inline_script(
@@ -50,7 +33,7 @@ if ( ! function_exists( 'neoweaver_character_creator_config' ) ) {
     }
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_config', 100 );
-
+consol.log("gallery");
 if ( ! function_exists( 'neoweaver_character_creator_gallery_config' ) ) {
     function neoweaver_character_creator_gallery_config(): void {
         $js_handle = 'neoweaver-character-creator';
