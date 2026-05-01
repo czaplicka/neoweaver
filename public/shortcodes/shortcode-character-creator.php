@@ -9,13 +9,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! function_exists( 'neoweaver_localize_character_creator_config' ) ) {
     function neoweaver_localize_character_creator_config(): void {
-        $js_handle = 'neoweaver-character-creator'; // musi być IDENTYCZNY jak w class-neoweaver-public.php
+        $js_handle = 'neoweaver-character-creator';
 
-        if ( ! wp_script_is( $js_handle, 'registered' ) && ! wp_script_is( $js_handle, 'enqueued' ) ) {
+        if ( ! wp_script_is( $js_handle, 'registered' ) ) {
             return;
         }
 
         $uploads = wp_get_upload_dir();
+        $gallery = array(
+            array(
+                'id'   => 'avatar-1',
+                'name' => 'Avatar',
+                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
+            ),
+            array(
+                'id'   => 'avatar-2',
+                'name' => 'Avatar 2',
+                'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
+            ),
+        );
 
         wp_localize_script(
             $js_handle,
@@ -28,24 +40,13 @@ if ( ! function_exists( 'neoweaver_localize_character_creator_config' ) ) {
                 'site_base'      => home_url(),
                 'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
                 'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
-                'avatar_gallery' => array(
-                    array(
-                        'id'   => 'avatar-1',
-                        'name' => 'Avatar',
-                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
-                    ),
-                    array(
-                        'id'   => 'avatar-2',
-                        'name' => 'Avatar 2',
-                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
-                    ),
-                ),
+                'avatar_gallery' => $gallery,
+                'avatarGallery'  => $gallery,
             )
         );
     }
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_localize_character_creator_config', 20 );
-
 /**
  * Shortcode renderer.
  */
