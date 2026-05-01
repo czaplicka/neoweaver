@@ -6,8 +6,14 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
-    function neoweaver_register_character_creator_assets(): void {
+
+if ( ! function_exists( 'neoweaver_localize_character_creator_config' ) ) {
+    function neoweaver_localize_character_creator_config(): void {
+        $js_handle = 'neoweaver-character-creator'; // musi być IDENTYCZNY jak w class-neoweaver-public.php
+
+        if ( ! wp_script_is( $js_handle, 'registered' ) && ! wp_script_is( $js_handle, 'enqueued' ) ) {
+            return;
+        }
 
         $uploads = wp_get_upload_dir();
 
@@ -38,7 +44,7 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
         );
     }
 }
-add_action( 'wp_enqueue_scripts', 'neoweaver_register_character_creator_assets' );
+add_action( 'wp_enqueue_scripts', 'neoweaver_localize_character_creator_config', 20 );
 
 /**
  * Shortcode renderer.
