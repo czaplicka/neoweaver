@@ -1231,11 +1231,23 @@ if ( is_wp_error( $tagsvalidation ) ) {
             wp_send_json_error( array( 'message' => $result->get_error_message() ), 500 );
         }
 
-        $skills_store = nw_store_character_skills( $character_id, $skills );
-        if ( is_wp_error( $skills_store ) ) {
-            nw_delete_character_by_id( $character_id );
-            wp_send_json_error( array( 'message' => 'Character could not be saved with skills.' ), 500 );
-        }
+		error_log( 'NW STORE SKILLS character_id = ' . $character_id );
+error_log( 'NW STORE SKILLS skills = ' . wp_json_encode( $skills ) );
+error_log( 'NW STORE SKILLS payload = ' . wp_json_encode( $payload ) );
+$skills_store = nw_store_character_skills( $character_id, $skills );
+if ( is_wp_error( $skills_store ) ) {
+    error_log( 'NW SKILLS STORE ERROR: ' . $skills_store->get_error_message() );
+    error_log( 'NW SKILLS STORE DATA: ' . wp_json_encode( $skills_store->get_error_data() ) );
+    nw_delete_character_by_id( $character_id );
+
+    wp_send_json_error(
+        array(
+            'message' => $skills_store->get_error_message(),
+            'debug'   => $skills_store->get_error_data(),
+        ),
+        500
+    );
+}
 
 $tags_store = nw_store_character_backstory_tags( $character_id, $resolved_backstory_tag_ids );
 if ( is_wp_error( $tags_store ) ) {
