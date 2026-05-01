@@ -1255,7 +1255,7 @@ if ( is_wp_error( $tags_store ) ) {
     wp_send_json_error( array( 'message' => 'Character could not be saved with backstory tags.' ), 500 );
 }
 
-        $redirect = home_url( '/character/' . rawurlencode( $character_id ) . '/' );
+        $redirect = home_url( '/agents/' );
         wp_send_json_success(
             array(
                 'message'      => 'Character created successfully.',
