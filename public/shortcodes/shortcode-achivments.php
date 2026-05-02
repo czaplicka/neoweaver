@@ -1,23 +1,26 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
 
         $filters = [
-            'user_id' => 'eq.' . intval( $user_id ),
+            // UŻYTKOWNIK: UUID jako string, NIE intval()
+            'user_id' => 'eq.' . $user_id,
             'select'  => 'achievement_id,user_id,character_id,display_title,display_description,icon_slug,bg_color,scope,goal,current_progress,is_unlocked,unlocked_at,progress_percent,css_status',
         ];
 
+        // CHARACTER: jeśli u Ciebie też jest UUID, to bez intval()
         if ( ! empty( $char_id ) ) {
-            $filters['character_id'] = 'eq.' . intval( $char_id );
+            $filters['character_id'] = 'eq.' . $char_id;
         }
 
         if ( $type === 'earned' ) {
             $filters['is_unlocked'] = 'eq.true';
         }
 
-        // to korzysta z Twojego istniejącego helpera Supabase
         $rows = tw_supabase_get( 'player_achievements_view', $filters );
 
         $results = [];
@@ -28,6 +31,7 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
         return $results;
     }
 }
+
 function render_player_achievements( $atts ) {
     $a = shortcode_atts(
         [
@@ -44,88 +48,93 @@ function render_player_achievements( $atts ) {
         return '<p>Brak osiągnięć do wyświetlenia.</p>';
     }
 
-    $output = '<div class="achievements-grid">';
+    // HTML wynikowy
+    $output  = '<div class="achievements-grid">';
 
-foreach ( $results as $ach ) {
-    $is_unlocked = ! empty( $ach->is_unlocked );
-    $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0 );
+    foreach ( $results as $ach ) {
+        $is_unlocked = ! empty( $ach->is_unlocked );
+        $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
 
-    $legacy_class = '';
+        $legacy_class = '';
 
-    $scope       = $ach->scope ?? 'account';
-    $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
+        $scope       = $ach->scope ?? 'account';
+        $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
 
-    $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
-    $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
+        $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
+        $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
-    $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
+        $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-    // ICONA
-    $icon = ( $status === 'status-hidden' )
-        ? 'question'          // fa-question dla sekretów
-        : ( $ach->icon_slug ?? 'star' );
+        // ICONA
+        $icon = ( $status === 'status-hidden' )
+            ? 'question'
+            : ( $ach->icon_slug ?? 'star' );
 
-    // TYTUŁ
-    if ( $status === 'status-hidden' && ! $is_unlocked ) {
-        // nie spoiluj tytułu, jeśli sekret nieodkryty
-        $title = 'Secret achievement';
-    } else {
-        $title = $ach->display_title ?? 'Find achievement';
+        // TYTUŁ
+        if ( $status === 'status-hidden' && ! $is_unlocked ) {
+            $title = 'Secret achievement';
+        } else {
+            $title = $ach->display_title ?? 'Find achievement';
+        }
+
+        // OPIS
+        if ( $status === 'status-hidden' && ! $is_unlocked ) {
+            $description = 'Hidden objective - keep playing to uncover this.';
+        } else {
+            $description = $ach->display_description ?? '';
+        }
+
+        $badge_label = ( $status === 'status-hidden' )
+            ? 'SECRET'
+            : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
+
+        $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+
+        // górna linia: badge + progres %
+        $output .= '<div class="ach-top-row">';
+        $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
+
+        if ( ! $is_unlocked ) {
+            $output .= '<span class="ach-percent">' . esc_html( (int) round( $percent ) ) . '%</span>';
+        } else {
+            $output .= '<span class="ach-percent ach-percent-done">100%</span>';
+        }
+        $output .= '</div>';
+
+        // ikona
+        $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
+
+        // tytuł + opis
+        $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
+
+        if ( $description !== '' ) {
+            $output .= '<div class="ach-desc">' . esc_html( $description ) . '</div>';
+        }
+
+        // licznik postępu (np. 0/5)
+        $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
+        if ( ! $is_unlocked && $status !== 'status-hidden' && $goal > 1 ) {
+            $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
+            $output .= '<div class="ach-progress">' . esc_html( $current . '/' . $goal ) . '</div>';
+        }
+
+        $output .= '</div>'; // .ach-card
     }
 
-    // OPIS
-    if ( $status === 'status-hidden' && ! $is_unlocked ) {
-        $description = 'Hidden objective – keep playing to uncover this.';
-    } else {
-        $description = $ach->display_description ?? '';
-    }
+    $output .= '</div>'; // .achievements-grid
 
-    $badge_label = ( $status === 'status-hidden' )
-        ? 'SECRET'
-        : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
-
-    $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
-
-    // górna linia: badge + progres %
-    $output .= '<div class="ach-top-row">';
-    $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
-    if ( ! $is_unlocked ) {
-        $output .= '<span class="ach-percent">' . esc_html( intval( $percent ) ) . '%</span>';
-    } else {
-        $output .= '<span class="ach-percent ach-percent-done">100%</span>';
-    }
-    $output .= '</div>';
-
-    // ikona
-    $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
-
-    // tytuł + opis
-    $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
-
-    if ( $description !== '' ) {
-        $output .= '<div class="ach-desc">' . esc_html( $description ) . '</div>';
-    }
-
-    // licznik postępu (np. 0/5)
-    $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
-    if ( ! $is_unlocked && $status !== 'status-hidden' && $goal > 1 ) {
-        $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
-        $output .= '<div class="ach-progress">' . esc_html( $current . '/' . $goal ) . '</div>';
-    }
-
-    $output .= '</div>';
-}
-?>
-<style>
+    // Możesz ten CSS przenieść do pliku .css pluginu / motywu,
+    // ale jeśli chcesz inline:
+    $output .= '<style>
 .achievements-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 18px;
-    margin: 24px 0;
-        max-width: 1200px;
+    max-width: 1200px;
     margin: 24px auto;
 }
-    @media (max-width: 980px) {
+
+@media (max-width: 980px) {
     .achievements-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -226,6 +235,14 @@ foreach ( $results as $ach ) {
     letter-spacing: 0.02em;
 }
 
+.ach-desc {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.78);
+    margin-top: 4px;
+    max-width: 30em;
+}
+
 .ach-progress {
     margin-top: auto;
     font-family: "Chakra Petch", sans-serif;
@@ -234,19 +251,26 @@ foreach ( $results as $ach ) {
 }
 
 .ach-card.status-hidden {
-    opacity: 0.72;
-    border-color: rgba(255,255,255,0.08);
+    opacity: 0.78;
+    border-color: rgba(255,255,255,0.1);
+    backdrop-filter: blur(3px);
+}
+
+.ach-card.status-hidden::before {
+    background:
+        linear-gradient(130deg, rgba(255,255,255,0.18), transparent 30%),
+        linear-gradient(320deg, rgba(255,255,255,0.08), transparent 32%);
 }
 
 .ach-card.status-hidden .ach-icon {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.55);
+    background: rgba(0,0,0,0.4);
+    border-color: rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.78);
 }
 
 .ach-card.status-hidden .ach-title,
-.ach-card.status-hidden .ach-progress {
-    color: rgba(255,255,255,0.58);
+.ach-card.status-hidden .ach-desc {
+    color: rgba(255,255,255,0.82);
 }
 
 .ach-card.status-locked {
@@ -280,22 +304,7 @@ foreach ( $results as $ach ) {
     padding-right: 22px;
 }
 
-@media (max-width: 640px) {
-    .achievements-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
-
-    .ach-card,
-    .ach-shape-hex,
-    .ach-shape-shield {
-        clip-path: none;
-        border-radius: 16px;
-        padding-left: 16px;
-        padding-right: 16px;
-    }
-}
-    .ach-top-row {
+.ach-top-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -329,39 +338,8 @@ foreach ( $results as $ach ) {
     color: #adff00;
     font-weight: 600;
 }
+</style>';
 
-.ach-desc {
-    font-size: 0.85rem;
-    line-height: 1.4;
-    color: rgba(255,255,255,0.78);
-    margin-top: 4px;
-    max-width: 30em;
-}
-
-.ach-card.status-hidden {
-    opacity: 0.78;
-    border-color: rgba(255,255,255,0.1);
-    backdrop-filter: blur(3px);
-}
-
-.ach-card.status-hidden::before {
-    background:
-        linear-gradient(130deg, rgba(255,255,255,0.18), transparent 30%),
-        linear-gradient(320deg, rgba(255,255,255,0.08), transparent 32%);
-}
-
-.ach-card.status-hidden .ach-icon {
-    background: rgba(0,0,0,0.4);
-    border-color: rgba(255,255,255,0.18);
-    color: rgba(255,255,255,0.78);
-}
-
-.ach-card.status-hidden .ach-title,
-.ach-card.status-hidden .ach-desc {
-    color: rgba(255,255,255,0.82);
-}
-</style>
-<?php
-return $output;
+    return $output;
 }
 add_shortcode( 'achievements', 'render_player_achievements' );
