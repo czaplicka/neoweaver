@@ -70,7 +70,7 @@ foreach ( $results as $ach ) {
         // nie spoiluj tytułu, jeśli sekret nieodkryty
         $title = 'Secret achievement';
     } else {
-        $title = $ach->display_title ?? 'Untitled achievement';
+        $title = $ach->display_title ?? 'Find achievement';
     }
 
     // OPIS
