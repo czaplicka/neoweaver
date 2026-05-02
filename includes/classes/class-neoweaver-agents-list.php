@@ -5,20 +5,6 @@
  * Provides data-preparation and rendering logic for any UI surface that
  * lets an Operator browse, filter, and select a Field Agent to play.
  *
- * Typical consumers:
- *  - Character-selection screen shown before a session starts.
- *  - "My Agents" dashboard widget (full roster, including dead agents).
- *  - Admin/debug views listing all agents in a Node.
- *
- * ARCHITECTURAL RULES (do not violate):
- *  - This class is read-only; it never writes to Supabase.
- *  - Dead agents (STATUS_DEAD) may be shown but must be clearly
- *    distinguished in the UI.
- *  - Never expose another Operator's private Data Ghost logs; only the
- *    owning wp_user_id may see their own ghost logs.
- *  - The 1 Agent = 1 Node binding must be reflected in all listing /
- *    filter methods.
- *
  * @package Neoweaver
  */
 
@@ -45,13 +31,11 @@ class Neoweaver_Agents_List {
 
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
-		// Shared styles — output in both empty and populated states.
 		ob_start();
 		?>
 		<style>
 			:root { --neon: #adff00; --dark: #0a0a0a; --gray: #151515; }
 
-			/* ── Empty state ── */
 			.tw-agents-empty {
 				text-align: center;
 				padding: 100px 0;
@@ -100,9 +84,21 @@ class Neoweaver_Agents_List {
 				color: #000 !important;
 			}
 
-			/* ── Roster grid ── */
-			.tw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; font-family: 'Chakra Petch', sans-serif; }
-			.tw-card { background: var(--dark); border: 1px solid rgba(173,255,0,0.2); padding: 15px; color: white; position: relative; display: flex; flex-direction: column; }
+			.tw-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+				gap: 20px;
+				font-family: 'Chakra Petch', sans-serif;
+			}
+			.tw-card {
+				background: var(--dark);
+				border: 1px solid rgba(173,255,0,0.2);
+				padding: 15px;
+				color: white;
+				position: relative;
+				display: flex;
+				flex-direction: column;
+			}
 			.tw-card-header { display: flex; gap: 12px; margin-bottom: 12px; }
 			.tw-avatar { width: 64px; height: 64px; border: 1px solid var(--neon); object-fit: cover; }
 			.tw-lvl-badge { background: var(--neon); color: black; padding: 2px 6px; font-weight: bold; font-size: 11px; margin-right: 5px; }
@@ -128,9 +124,6 @@ class Neoweaver_Agents_List {
 		<?php
 		$shared_styles = ob_get_clean();
 
-		// ------------------------------------------------------------------
-		// Empty state
-		// ------------------------------------------------------------------
 		if ( empty( $characters ) ) {
 			return $shared_styles . '
 			<div class="tw-agents-empty">
@@ -143,37 +136,34 @@ class Neoweaver_Agents_List {
 			</div>';
 		}
 
-		// ------------------------------------------------------------------
-		// Render grid + modal + scripts
-		// ------------------------------------------------------------------
 		ob_start();
 		echo $shared_styles; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		?>
 
 		<script>
 		window.twCharData = {
-			ajaxUrl: "<?php echo esc_url( admin_url('admin-ajax.php') ); ?>",
-			nonce: "<?php echo esc_js( wp_create_nonce('tw_char_nonce') ); ?>"
+			ajaxUrl: "<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>",
+			nonce: "<?php echo esc_js( wp_create_nonce( 'tw_char_nonce' ) ); ?>"
 		};
 		</script>
 
 		<div class="tw-grid">
 			<?php foreach ( $characters as $char ) :
-				$avatar     = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
-				$camp_data  = isset( $char['cyber_campaign_characters'][0]['cyber_campaign'] ) ? $char['cyber_campaign_characters'][0]['cyber_campaign'] : null;
-				$camp_name  = isset( $camp_data['name'] ) ? $camp_data['name'] : 'Unassigned';
-				$world_name = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
-				$is_public  = ! empty( $char['is_public'] );
-				$views      = isset( $char['view_count'] ) ? (int) $char['view_count'] : 0;
-				// char['id'] is a UUID string — never cast to int.
+				$avatar       = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
+				$camp_data    = isset( $char['cyber_campaign_characters'][0]['cyber_campaign'] ) ? $char['cyber_campaign_characters'][0]['cyber_campaign'] : null;
+				$camp_name    = isset( $camp_data['name'] ) ? $camp_data['name'] : 'Unassigned';
+				$world_name   = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
+				$is_public    = ! empty( $char['is_public'] );
+				$views        = isset( $char['view_count'] ) ? (int) $char['view_count'] : 0;
 				$char_id_safe = esc_attr( (string) $char['id'] );
-				$legend_url = add_query_arg( 'char_id', $char_id_safe, home_url( '/legend/' ) );
+				$legend_url   = add_query_arg( 'char_id', $char_id_safe, home_url( '/legend/' ) );
+				$char_json    = wp_json_encode( $char );
 			?>
 				<div class="tw-card">
 					<div class="tw-top-meta">
-						<span>Views: <?php echo $views; ?></span>
+						<span>Views: <?php echo esc_html( $views ); ?></span>
 						<?php if ( $is_public ) : ?>
-							<a href="<?php echo esc_url( $legend_url ); ?>" target="_blank">Agent public profile</a>
+							<a href="<?php echo esc_url( $legend_url ); ?>" target="_blank" rel="noopener noreferrer">Agent public profile</a>
 						<?php else : ?>
 							<span style="opacity:0.5;">Not public</span>
 						<?php endif; ?>
@@ -199,10 +189,10 @@ class Neoweaver_Agents_List {
 						</div>
 					</div>
 					<div class="tw-card-actions">
-						<button class="tw-btn" data-char="<?php echo esc_attr( wp_json_encode( $char ) ); ?>" onclick="twOpenModal(this)">
+						<button class="tw-btn" data-char="<?php echo esc_attr( $char_json ); ?>" onclick="twOpenModal(this)">
 							Agent Dossier
 						</button>
-						<button class="tw-btn tw-btn-danger" onclick="twConfirmDeleteCharacter(<?php echo wp_json_encode( (string) $char['id'] ); ?>, this)">
+						<button class="tw-btn tw-btn-danger" onclick='twConfirmDeleteCharacter(<?php echo wp_json_encode( (string) $char['id'] ); ?>, this)'>
 							Delete Operative
 						</button>
 					</div>
@@ -210,66 +200,93 @@ class Neoweaver_Agents_List {
 			<?php endforeach; ?>
 		</div>
 
-		<div id="twCharModal" class="tw-modal" onclick="if(event.target==this)this.style.display='none'">
+		<div id="twCharModal" class="tw-modal" onclick="if(event.target===this)this.style.display='none'">
 			<div class="tw-modal-content">
 				<span class="tw-close" onclick="document.getElementById('twCharModal').style.display='none'">&times;</span>
 				<div id="twModalBody"></div>
 			</div>
 		</div>
 
-				<script>
+		<script>
 		function twOpenModal(btn) {
 			let data;
 			try {
 				data = JSON.parse(btn.dataset.char);
-			} catch(e) {
+			} catch (e) {
+				alert('Could not open Agent Dossier.');
 				return;
 			}
 
 			const body = document.getElementById('twModalBody');
-			const camp = data.cyber_campaign_characters?.[0]?.cyber_campaign;
+			const modal = document.getElementById('twCharModal');
+			const camp = data.cyber_campaign_characters && data.cyber_campaign_characters[0]
+				? data.cyber_campaign_characters[0].cyber_campaign
+				: null;
+			const raceName = data.cyber_races && data.cyber_races.name ? data.cyber_races.name : 'Human';
+			const className = data.cyber_classes && data.cyber_classes.name ? data.cyber_classes.name : 'Operative';
+			const avatar = data.avatar ? data.avatar : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
 
-			const tagsHtml = (data.tags || []).map(t =>
-				`<span class="tw-tag-pill" style="color:${t.color};border-color:${t.color}">${t.label}</span>`
-			).join('');
+			const tags = Array.isArray(data.tags) ? data.tags : [];
+			const inventory = Array.isArray(data.inventory) ? data.inventory : [];
 
-			const invHtml = (data.inventory || []).map(i =>
-				`<div style="display:flex;justify-content:space-between;border-bottom:1px solid #222;padding:8px 0;font-size:13px;">
-					<span>${i.is_equipped ? '⭐ ' : ''}${i.item_name}</span>
-					<span style="color:#adff00">x${i.quantity}</span>
-				</div>`
-			).join('') || 'Inventory empty.';
+			let tagsHtml = '';
+			if (tags.length) {
+				tags.forEach(function(t) {
+					const color = t && t.color ? t.color : '#adff00';
+					const label = t && t.label ? t.label : 'Tag';
+					tagsHtml += '<span class="tw-tag-pill" style="color:' + color + ';border-color:' + color + '">' + label + '</span>';
+				});
+			} else {
+				tagsHtml = '<span style="opacity:0.7;">No tags.</span>';
+			}
 
-			body.innerHTML = `
-				<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;">
-					<div>
-						<img src="${data.avatar || ''}" style="width:100%;border:1px solid #adff00;margin-bottom:10px;">
-						<h2 style="margin:0;color:#adff00;">${data.name}</h2>
-						<p style="opacity:0.6;">Level ${data.lvl} | ${data.cyber_classes?.name || ''}</p>
-						<div style="font-size:11px;color:#adff00;border:1px solid #adff0033;padding:10px;margin-top:10px;">
-							<strong>ACTIVE CAMPAIGN:</strong><br>
-							${camp?.name || 'None'} / ${camp?.cyber_campaign_worlds?.[0]?.cyber_worlds?.name || 'N/A'}
-						</div>
-					</div>
-					<div>
-						<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;background:#111;padding:15px;margin-bottom:15px;">
-							<div>HP: <b>${data.hp}</b></div><div>MP: <b>${data.mp || 0}</b></div>
-							<div>BOD: <b>${data.body}</b></div><div>REF: <b>${data.reflex}</b></div>
-							<div>MND: <b>${data.mind}</b></div><div>SPI: <b>${data.spirit}</b></div>
-						</div>
-						<h4>TAGS & SKILLS</h4><div style="margin-bottom:20px;">${tagsHtml}</div>
-						<h4>INVENTORY</h4><div>${invHtml}</div>
-						<h4 style="margin-top:20px;">BIO</h4>
-						<p style="font-size:12px;opacity:0.8;font-style:italic;">${data.bio || 'No data.'}</p>
-					</div>
-				</div>`;
-			document.getElementById('twCharModal').style.display = 'block';
+			let invHtml = '';
+			if (inventory.length) {
+				inventory.forEach(function(i) {
+					const isEquipped = i && i.is_equipped ? '⭐ ' : '';
+					const itemName = i && i.item_name ? i.item_name : 'Unknown item';
+					const quantity = i && i.quantity ? i.quantity : 0;
+					invHtml += '<div style="display:flex;justify-content:space-between;border-bottom:1px solid #222;padding:8px 0;font-size:13px;">';
+					invHtml += '<span>' + isEquipped + itemName + '</span>';
+					invHtml += '<span style="color:#adff00">x' + quantity + '</span>';
+					invHtml += '</div>';
+				});
+			} else {
+				invHtml = 'Inventory empty.';
+			}
+
+			body.innerHTML = '' +
+				'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;">' +
+					'<div>' +
+						'<img src="' + avatar + '" style="width:100%;border:1px solid #adff00;margin-bottom:10px;">' +
+						'<h2 style="margin:0;color:#adff00;">' + (data.name || 'Unnamed Agent') + '</h2>' +
+						'<p style="opacity:0.6;">Level ' + (data.lvl || 1) + ' | ' + className + '</p>' +
+						'<p style="opacity:0.75;font-size:12px;">' + raceName + '</p>' +
+						'<div style="font-size:11px;color:#adff00;border:1px solid #adff0033;padding:10px;margin-top:10px;">' +
+							'<strong>ACTIVE CAMPAIGN:</strong><br>' +
+							((camp && camp.name) ? camp.name : 'None') + ' / ' + ((camp && camp.cyber_campaign_worlds && camp.cyber_campaign_worlds[0] && camp.cyber_campaign_worlds[0].cyber_worlds && camp.cyber_campaign_worlds[0].cyber_worlds.name) ? camp.cyber_campaign_worlds[0].cyber_worlds.name : 'N/A') +
+						'</div>' +
+					'</div>' +
+					'<div>' +
+						'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;background:#111;padding:15px;margin-bottom:15px;">' +
+							'<div>HP: <b>' + (data.hp || 0) + '</b></div><div>MP: <b>' + (data.mp || 0) + '</b></div>' +
+							'<div>BOD: <b>' + (data.body || 0) + '</b></div><div>REF: <b>' + (data.reflex || 0) + '</b></div>' +
+							'<div>MND: <b>' + (data.mind || 0) + '</b></div><div>SPI: <b>' + (data.spirit || 0) + '</b></div>' +
+						'</div>' +
+						'<h4>TAGS & SKILLS</h4><div style="margin-bottom:20px;">' + tagsHtml + '</div>' +
+						'<h4>INVENTORY</h4><div>' + invHtml + '</div>' +
+						'<h4 style="margin-top:20px;">BIO</h4>' +
+						'<p style="font-size:12px;opacity:0.8;font-style:italic;">' + (data.bio || 'No data.') + '</p>' +
+					'</div>' +
+				'</div>';
+
+			modal.style.display = 'block';
 		}
 
 		function twConfirmDeleteCharacter(charId, btnEl) {
-			alert('klik delete działa');
-
-			if (!confirm('Are you sure you want to delete this operative? This cannot be undone.')) return;
+			if (!confirm('Are you sure you want to delete this operative? This cannot be undone.')) {
+				return;
+			}
 
 			if (!window.twSupabase) {
 				alert('SUPABASE CLIENT OFFLINE. CANNOT TERMINATE OPERATIVE.');
@@ -279,72 +296,66 @@ class Neoweaver_Agents_List {
 			btnEl.disabled = true;
 			btnEl.textContent = 'Deleting...';
 
-			const client = window.twSupabase;
+			const currentUserId = window.twAdventureData && window.twAdventureData.wp_user_id
+				? window.twAdventureData.wp_user_id
+				: null;
 
-			(async () => {
-				try {
-					const currentUserId = window.twAdventureData?.wp_user_id;
-					alert('wp_user_id: ' + currentUserId);
+			if (!currentUserId) {
+				alert('IDENTITY NOT VERIFIED. CANNOT TERMINATE OPERATIVE.');
+				btnEl.disabled = false;
+				btnEl.textContent = 'Delete Operative';
+				return;
+			}
 
-					if (!currentUserId) {
-						alert('IDENTITY NOT VERIFIED. CANNOT TERMINATE OPERATIVE.');
+			window.twSupabase
+				.rpc('fn_delete_character', {
+					p_character_id: charId,
+					p_wp_user_id: currentUserId
+				})
+				.then(function(result) {
+					if (result.error) {
+						console.error('SUPABASE DELETE CHARACTER ERROR', result.error);
+						alert('Delete failed: ' + (result.error.message || 'Grid denied execution.'));
 						btnEl.disabled = false;
 						btnEl.textContent = 'Delete Operative';
 						return;
 					}
 
-					alert('zaraz odpalam rpc');
-
-					const { error } = await client.rpc('fn_delete_character', {
-						p_character_id: charId,
-						p_wp_user_id: currentUserId
-					});
-
-					alert('rpc wróciło');
-
-					if (error) {
-						console.error('SUPABASE DELETE CHARACTER ERROR', error);
-						alert('Delete failed: ' + (error.message || 'Grid denied execution.'));
-						btnEl.disabled = false;
-						btnEl.textContent = 'Delete Operative';
-						return;
-					}
-
-					alert('sukces, odświeżam stronę');
 					window.location.reload();
-
-				} catch (e) {
+				})
+				.catch(function(e) {
 					console.error('DELETE CHARACTER EXCEPTION', e);
 					alert('Delete failed: client exception.');
 					btnEl.disabled = false;
 					btnEl.textContent = 'Delete Operative';
-				}
-			})();
+				});
 		}
 
 		document.addEventListener('change', function(e) {
 			const cb = e.target.closest('.tw-toggle-public');
-			if (!cb || !window.twCharData?.ajaxUrl) return;
+			if (!cb || !window.twCharData || !window.twCharData.ajaxUrl) return;
 
 			const fd = new FormData();
 			fd.append('action', 'tw_toggle_char_public');
-			fd.append('nonce', twCharData.nonce);
+			fd.append('nonce', window.twCharData.nonce);
 			fd.append('char_id', cb.dataset.charId);
 			fd.append('is_public', cb.checked ? '1' : '0');
 
-			fetch(twCharData.ajaxUrl, {
+			fetch(window.twCharData.ajaxUrl, {
 				method: 'POST',
 				body: fd,
 				credentials: 'same-origin'
 			})
-			.then(r => r.json())
-			.then(json => {
+			.then(function(r) {
+				return r.json();
+			})
+			.then(function(json) {
 				if (!json.success) {
-					alert(json.data?.message || 'Toggle failed.');
+					alert((json.data && json.data.message) ? json.data.message : 'Toggle failed.');
 					cb.checked = !cb.checked;
 				}
 			})
-			.catch(() => {
+			.catch(function() {
 				alert('Network error.');
 				cb.checked = !cb.checked;
 			});
@@ -355,24 +366,15 @@ class Neoweaver_Agents_List {
 		return ob_get_clean();
 	}
 
-	// -------------------------------------------------------------------------
-	// Data-preparation helpers
-	// -------------------------------------------------------------------------
-
 	public function get_roster( int $wp_user_id ): array { return []; }
 	public function get_selectable_agents( int $wp_user_id ): array { return []; }
 
 	/**
-	 * BUG-FIX: was typed as int — cyber_worlds.id is a UUID string.
-	 * intval() on a UUID collapses it to 0 and would match nothing in Supabase.
-	 *
 	 * @param string|int $node_id
 	 */
 	public function get_agents_in_node( $node_id ): array { return []; }
 
 	/**
-	 * BUG-FIX: was typed as int — same UUID issue as get_agents_in_node().
-	 *
 	 * @param string|int $node_id
 	 */
 	public function get_data_ghosts_for_node( $node_id, int $wp_user_id ): array { return []; }
