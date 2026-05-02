@@ -5,23 +5,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
-
-        $filters = [
-            // UŻYTKOWNIK: UUID jako string, NIE intval()
-            'user_id' => 'eq.' . $user_id,
-            'select'  => 'achievement_id,user_id,character_id,display_title,display_description,icon_slug,bg_color,scope,goal,current_progress,is_unlocked,unlocked_at,progress_percent,css_status',
+        $params = [
+            'p_user_id' => (int) $user_id,
+            'p_type'    => in_array( $type, [ 'all', 'earned' ], true ) ? $type : 'all',
+            'p_character_id' => ! empty( $char_id ) ? (string) $char_id : null,
         ];
 
-        // CHARACTER: jeśli u Ciebie też jest UUID, to bez intval()
-        if ( ! empty( $char_id ) ) {
-            $filters['character_id'] = 'eq.' . $char_id;
-        }
-
-        if ( $type === 'earned' ) {
-            $filters['is_unlocked'] = 'eq.true';
-        }
-
-        $rows = tw_supabase_get( 'player_achievements_view', $filters );
+        $rows = tw_supabase_rpc( 'get_player_achievements', $params );
 
         $results = [];
         foreach ( $rows as $row ) {
