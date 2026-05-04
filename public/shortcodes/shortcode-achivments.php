@@ -35,7 +35,7 @@ function render_player_achievements( $atts ) {
     $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
 
     if ( empty( $results ) ) {
-        return '<p>Brak osiągnięć do wyświetlenia.</p>';
+        return '<p>No achievments. Please log in.</p>';
     }
 
     // HTML wynikowy
