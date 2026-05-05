@@ -5,12 +5,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
         $params = [
-            'p_user_id' => (int) $user_id,
-            'p_type'    => in_array( $type, [ 'all', 'earned' ], true ) ? $type : 'all',
+            'p_user_id'      => (int) $user_id,
+            'p_type'         => in_array( $type, [ 'all', 'earned' ], true ) ? $type : 'all',
             'p_character_id' => ! empty( $char_id ) ? (string) $char_id : null,
         ];
 
+        error_log( 'TW achievements params: ' . print_r( $params, true ) );
+
+        if ( ! function_exists( 'tw_supabase_rpc' ) ) {
+            error_log( 'TW achievements error: tw_supabase_rpc() does not exist' );
+            return [];
+        }
+
         $rows = tw_supabase_rpc( 'get_player_achievements', $params );
+
+        error_log( 'TW achievements rows: ' . print_r( $rows, true ) );
 
         $results = [];
         foreach ( $rows as $row ) {
@@ -34,7 +43,7 @@ function render_player_achievements( $atts ) {
     $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
 
     if ( empty( $results ) ) {
-        return '<p>No achievments. Please log in.</p>';
+        return '<p>No achievments. Are you loged in?</p>';
     }
 
     // HTML wynikowy
