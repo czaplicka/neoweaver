@@ -162,11 +162,25 @@
     border-color: rgba(173,255,0,0.36);
 }
 
-.ach-shape-hex {
-    clip-path: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
-    border-radius: 0;
-    padding-left: 22px;
-    padding-right: 22px;
+.ach-shape-hex,
+.ach-shape-shield {
+    clip-path: none;
+    border-radius: 18px;
+    padding-left: 18px;
+    padding-right: 18px;
+}
+.ach-card.scope-character {
+    border-color: rgba(120, 210, 255, 0.35);
+    box-shadow:
+        0 0 0 1px rgba(120,210,255,0.08) inset,
+        0 12px 32px rgba(0,0,0,0.36),
+        0 0 22px rgba(120,210,255,0.14);
+}
+
+.ach-card.scope-character .ach-badge {
+    border-color: rgba(120,210,255,0.45);
+    background: rgba(120,210,255,0.12);
+    color: #9be7ff;
 }
 
 .ach-shape-shield {
