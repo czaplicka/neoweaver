@@ -2,6 +2,33 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+
+/**
+ * Pobiera postacie aktualnego użytkownika z cyber_characters.
+ */
+if ( ! function_exists( 'tw_get_user_characters' ) ) {
+    function tw_get_user_characters( $user_id ) {
+        $rows = tw_supabase_get(
+            'cyber_characters',
+            [
+                'wp_user_id' => 'eq.' . (int) $user_id,
+                'select'     => 'id,name,lvl,avatar',
+                'order'      => 'name.asc',
+            ]
+        );
+
+        $results = [];
+        foreach ( $rows as $row ) {
+            $results[] = (object) $row;
+        }
+
+        return $results;
+    }
+}
+
+/**
+ * Pobiera achievementy gracza przez RPC get_player_achievements().
+ */
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
         $params = [
@@ -10,16 +37,10 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
             'p_character_id' => ! empty( $char_id ) ? (string) $char_id : null,
         ];
 
-        error_log( 'TW achievements params: ' . print_r( $params, true ) );
-
-        if ( ! function_exists( 'tw_supabase_rpc' ) ) {
-            error_log( 'TW achievements error: tw_supabase_rpc() does not exist' );
-            return [];
+        $rows = [];
+        if ( function_exists( 'tw_supabase_rpc' ) ) {
+            $rows = tw_supabase_rpc( 'get_player_achievements', $params );
         }
-
-        $rows = tw_supabase_rpc( 'get_player_achievements', $params );
-
-        error_log( 'TW achievements rows: ' . print_r( $rows, true ) );
 
         $results = [];
         foreach ( $rows as $row ) {
@@ -40,14 +61,76 @@ function render_player_achievements( $atts ) {
         $atts
     );
 
-    $results = tw_get_player_achievements( $a['user_id'], $a['char_id'], $a['type'] );
+    $current_user_id  = (int) $a['user_id'];
 
-    if ( empty( $results ) ) {
-        return '<p>No achievments. Are you loged in?</p>';
+    // Wybrana postać: z GET lub z atrybutu shortcode
+    $selected_char_id = null;
+    if ( ! empty( $_GET['char_id'] ) ) {
+        $selected_char_id = sanitize_text_field( wp_unslash( $_GET['char_id'] ) );
+    } elseif ( ! empty( $a['char_id'] ) ) {
+        $selected_char_id = (string) $a['char_id'];
     }
 
-    // HTML wynikowy
-    $output  = '<div class="achievements-grid">';
+    // Lista postaci
+    $characters = tw_get_user_characters( $current_user_id );
+
+    // Bezpieczeństwo: nie pozwól na char_id nie należący do usera
+    if ( ! empty( $selected_char_id ) && ! empty( $characters ) ) {
+        $allowed_char_ids = array_map(
+            static function( $char ) {
+                return (string) $char->id;
+            },
+            $characters
+        );
+
+        if ( ! in_array( $selected_char_id, $allowed_char_ids, true ) ) {
+            $selected_char_id = null;
+        }
+    }
+
+    // Achievementy dla konta lub konta + wybranej postaci
+    $results = tw_get_player_achievements( $current_user_id, $selected_char_id, $a['type'] );
+
+    if ( empty( $results ) ) {
+        return '<p>No achievements to display.</p>';
+    }
+
+    $output = '';
+
+    // Formularz z wyborem postaci
+    if ( ! empty( $characters ) ) {
+        $output .= '<form method="get" class="ach-filter-form">';
+
+        foreach ( $_GET as $key => $value ) {
+            if ( $key === 'char_id' ) {
+                continue;
+            }
+            if ( is_scalar( $value ) ) {
+                $output .= '<input type="hidden" name="' . esc_attr( $key ) . '" value="' . esc_attr( wp_unslash( $value ) ) . '">';
+            }
+        }
+
+        $output .= '<label for="ach-char-select" class="ach-filter-label">Character view</label>';
+        $output .= '<select id="ach-char-select" name="char_id" onchange="this.form.submit()">';
+
+        $output .= '<option value="">' . esc_html__( 'Account only', 'neoweaver' ) . '</option>';
+
+        foreach ( $characters as $char ) {
+            $selected = selected( $selected_char_id, $char->id, false );
+            $label    = $char->name;
+            if ( isset( $char->lvl ) ) {
+                $label .= ' (Lv. ' . (int) $char->lvl . ')';
+            }
+
+            $output .= '<option value="' . esc_attr( $char->id ) . '" ' . $selected . '>' . esc_html( $label ) . '</option>';
+        }
+
+        $output .= '</select>';
+        $output .= '</form>';
+    }
+
+    // Grid z kartami achievementów
+    $output .= '<div class="achievements-grid">';
 
     foreach ( $results as $ach ) {
         $is_unlocked = ! empty( $ach->is_unlocked );
@@ -63,19 +146,16 @@ function render_player_achievements( $atts ) {
 
         $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-        // ICONA
         $icon = ( $status === 'status-hidden' )
             ? 'question'
             : ( $ach->icon_slug ?? 'star' );
 
-        // TYTUŁ
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $title = 'Secret achievement';
         } else {
             $title = $ach->display_title ?? 'Find achievement';
         }
 
-        // OPIS
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $description = 'Hidden objective - keep playing to uncover this.';
         } else {
@@ -88,7 +168,6 @@ function render_player_achievements( $atts ) {
 
         $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
 
-        // górna linia: badge + progres %
         $output .= '<div class="ach-top-row">';
         $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
 
@@ -99,17 +178,14 @@ function render_player_achievements( $atts ) {
         }
         $output .= '</div>';
 
-        // ikona
         $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
 
-        // tytuł + opis
         $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
         if ( $description !== '' ) {
             $output .= '<div class="ach-desc">' . esc_html( $description ) . '</div>';
         }
 
-        // licznik postępu (np. 0/5)
         $goal = isset( $ach->goal ) ? (int) $ach->goal : 0;
         if ( ! $is_unlocked && $status !== 'status-hidden' && $goal > 1 ) {
             $current = isset( $ach->current_progress ) ? (int) $ach->current_progress : 0;
@@ -121,8 +197,6 @@ function render_player_achievements( $atts ) {
 
     $output .= '</div>'; // .achievements-grid
 
-    // Możesz ten CSS przenieść do pliku .css pluginu / motywu,
-    // ale jeśli chcesz inline:
     $output .= '<style>
 .achievements-grid {
     display: grid;
@@ -166,7 +240,7 @@ function render_player_achievements( $atts ) {
     border: 1px solid var(--card-border);
     border-radius: 18px;
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)) ,
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)),
         linear-gradient(135deg, color-mix(in srgb, var(--bg-color, #222) 32%, #0b0f14 68%), #0b0f14);
     box-shadow:
         0 0 0 1px rgba(255,255,255,0.02) inset,
@@ -335,6 +409,33 @@ function render_player_achievements( $atts ) {
 .ach-percent-done {
     color: #adff00;
     font-weight: 600;
+}
+
+.ach-filter-form {
+    max-width: 1200px;
+    margin: 0 auto 18px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ach-filter-label {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.75);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ach-filter-form select {
+    min-width: 220px;
+    background: #10161d;
+    color: #f5f7fb;
+    border: 1px solid rgba(173,255,0,0.28);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-family: "Chakra Petch", sans-serif;
 }
 </style>';
 
