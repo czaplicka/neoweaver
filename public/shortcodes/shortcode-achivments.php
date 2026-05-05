@@ -155,21 +155,31 @@ wp_enqueue_script(
         $is_unlocked = ! empty( $ach->is_unlocked );
         $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
 
-        $legacy_class = '';
+                $legacy_class = '';
 
-        $scope       = $ach->scope ?? 'account';
-        $shape_class = ( $scope === 'character' ) ? 'ach-shape-shield' : 'ach-shape-hex';
+        $scope    = $ach->scope ?? 'account';
+        $category = $ach->category ?? '';
 
-        $bg_color = ! empty( $ach->bg_color ) ? $ach->bg_color : '#222222';
+        $theme    = tw_get_achievement_theme(
+            $category,
+            $scope,
+            $ach->bg_color ?? ''
+        );
+
+        $bg_color = $theme['color'];
         $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
         $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-       $icon = tw_resolve_achievement_icon(
+$base_icon = tw_resolve_achievement_icon(
     $ach->achievement_id ?? '',
     $scope,
     $status
 );
+
+$icon = ( $status === 'status-hidden' )
+    ? 'scan-search'
+    : ( $theme['icon'] ?? $base_icon );
 
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $title = 'Secret achievement';
@@ -187,7 +197,7 @@ wp_enqueue_script(
             ? 'SECRET'
             : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
 
-        $output .= '<div class="ach-card ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+                $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
 
         $output .= '<div class="ach-top-row">';
         $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
@@ -244,6 +254,30 @@ if ( ! function_exists( 'tw_resolve_achievement_icon' ) ) {
         }
 
         return ( $scope === 'character' ) ? 'shield' : 'badge-check';
+    }
+}
+if ( ! function_exists( 'tw_get_achievement_theme' ) ) {
+    function tw_get_achievement_theme( $category = '', $scope = 'account', $bg_color = '' ) {
+        $themes = [
+            'system'      => [ 'icon' => 'cpu',         'color' => '#8b5cf6' ],
+            'exploration' => [ 'icon' => 'compass',     'color' => '#14b8a6' ],
+            'social'      => [ 'icon' => 'radio',       'color' => '#3b82f6' ],
+            'progression' => [ 'icon' => 'trending-up', 'color' => '#f59e0b' ],
+            'mission'     => [ 'icon' => 'shield',      'color' => '#ef4444' ],
+            'loot'        => [ 'icon' => 'sparkles',    'color' => '#a855f7' ],
+            'secret'      => [ 'icon' => 'scan-search', 'color' => '#64748b' ],
+        ];
+
+        $theme = $themes[ $category ] ?? [
+            'icon'  => ( $scope === 'character' ? 'shield' : 'badge-check' ),
+            'color' => ( $scope === 'character' ? '#0ea5e9' : '#84cc16' ),
+        ];
+
+        if ( ! empty( $bg_color ) ) {
+            $theme['color'] = $bg_color;
+        }
+
+        return $theme;
     }
 }
 add_shortcode( 'achievements', 'render_player_achievements' );
