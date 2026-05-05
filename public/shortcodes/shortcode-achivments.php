@@ -2,7 +2,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
         $params = [
