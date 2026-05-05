@@ -165,9 +165,11 @@ wp_enqueue_script(
 
         $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-        $icon = ( $status === 'status-hidden' )
-            ? 'question'
-            : ( $ach->icon_slug ?? 'star' );
+       $icon = tw_resolve_achievement_icon(
+    $ach->achievement_id ?? '',
+    $scope,
+    $status
+);
 
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $title = 'Secret achievement';
@@ -197,7 +199,7 @@ wp_enqueue_script(
         }
         $output .= '</div>';
 
-        $output .= '<div class="ach-icon"><i class="fa-solid fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
+        $output .= '<div class="ach-icon"><i data-lucide="' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
 
         $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
@@ -217,5 +219,31 @@ wp_enqueue_script(
     $output .= '</div>'; // .achievements-grid
 
     return $output;
+}
+if ( ! function_exists( 'tw_resolve_achievement_icon' ) ) {
+    function tw_resolve_achievement_icon( $achievement_id = '', $scope = 'account', $status = '' ) {
+        if ( $status === 'status-hidden' ) {
+            return 'scan-search';
+        }
+
+        $map = [
+            'beta_tester'      => 'flask-conical',
+            'explorer'         => 'compass',
+            'first_deployment' => 'rocket',
+            'deck_master'      => 'layers-3',
+            'craft_10'         => 'cpu',
+            'social_link'      => 'radio-tower',
+            'secret_path'      => 'fingerprint',
+            'lore_hunter'      => 'eye',
+            'node_walker'      => 'orbit',
+            'signal_sync'      => 'zap',
+        ];
+
+        if ( ! empty( $achievement_id ) && isset( $map[ $achievement_id ] ) ) {
+            return $map[ $achievement_id ];
+        }
+
+        return ( $scope === 'character' ) ? 'shield' : 'badge-check';
+    }
 }
 add_shortcode( 'achievements', 'render_player_achievements' );
