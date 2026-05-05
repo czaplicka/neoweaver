@@ -22,27 +22,25 @@ function neoweaver_enqueue_worlds_assets() {
 		}
 	}
 
-	// BUG-FIX: was plugin_dir_url( dirname( __FILE__, 1 ) ) → resolved to /public/
-	// instead of the plugin root. Use NEOWEAVER_PLUGIN_URL which is defined in the
-	// main plugin file and always points to the correct root.
-	$plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' ) ? NEOWEAVER_PLUGIN_URL : plugin_dir_url( dirname( __FILE__, 2 ) );
+function tw_list_worlds_enqueue_assets() {
+    $plugin_url = plugin_dir_url( __FILE__ );
 
-	wp_enqueue_style(
-		'tw-list-worlds',
-		$plugin_url . 'assets/css/tw-list-worlds.css',
-		[],
-		'1.0.0'
-	);
+    wp_enqueue_style(
+        'tw-list-worlds',
+        $plugin_url . 'assets/css/tw-list-worlds.css',
+        [],
+        '1.0.0'
+    );
 
-	wp_enqueue_script(
-		'tw-list-worlds',
-		$plugin_url . 'assets/js/tw-list-worlds.js',
-		[ 'jquery' ],
-		'1.0.0',
-		true
-	);
+    wp_enqueue_script(
+        'tw-list-worlds',
+        $plugin_url . 'assets/js/tw-list-worlds.js',
+        [ 'jquery' ],
+        '1.0.0',
+        true
+    );
 }
-add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_worlds_assets' );
+add_action( 'wp_enqueue_scripts', 'tw_list_worlds_enqueue_assets' );
 
 /**
  * SHORTCODE LOGIKA
