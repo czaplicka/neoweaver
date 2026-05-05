@@ -218,5 +218,4 @@ wp_enqueue_script(
 
     return $output;
 }
-error_log( 'TW achievements params: ' . wp_json_encode( $params ) );
 add_shortcode( 'achievements', 'render_player_achievements' );
