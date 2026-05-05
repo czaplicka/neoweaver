@@ -24,7 +24,7 @@ if ( ! function_exists( 'tw_get_user_characters' ) ) {
         return $results;
     }
 }
-
+error_log( 'TW achievements params: ' . wp_json_encode( $params ) );
 /**
  * Pobiera achievementy gracza przez RPC get_player_achievements().
  */
