@@ -197,7 +197,7 @@ wp_enqueue_script(
         }
         $output .= '</div>';
 
-        $output .= '<div class="ach-icon"><i class="fas fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
+        $output .= '<div class="ach-icon"><i class="fa-solid fa-' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
 
         $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
