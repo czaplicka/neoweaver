@@ -237,3 +237,12 @@
     padding: 10px 12px;
     font-family: "Chakra Petch", sans-serif;
 }
+.ach-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.9;
+}
+
+.ach-card.status-hidden .ach-icon svg {
+    opacity: 0.9;
+}
