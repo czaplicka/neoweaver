@@ -24,7 +24,7 @@ if ( ! function_exists( 'tw_get_user_characters' ) ) {
         return $results;
     }
 }
-error_log( 'TW achievements params: ' . wp_json_encode( $params ) );
+
 /**
  * Pobiera achievementy gracza przez RPC get_player_achievements().
  */
@@ -63,20 +63,20 @@ function render_player_achievements( $atts ) {
         $atts
     );
 
-    wp_enqueue_style(
-        'neoweaver-achievements',
-        plugin_dir_url( __FILE__ ) . '../css/achievements.css',
-        [],
-        '1.0.0'
-    );
+wp_enqueue_style(
+    'neoweaver-achievements',
+    plugin_dir_url( __FILE__ ) . '../assets/css/achievements.css',
+    [],
+    '1.0.0'
+);
 
-    wp_enqueue_script(
-        'neoweaver-achievements',
-        plugin_dir_url( __FILE__ ) . '../js/achievements.js',
-        [],
-        '1.0.0',
-        true
-    );
+wp_enqueue_script(
+    'neoweaver-achievements',
+    plugin_dir_url( __FILE__ ) . '../assets/js/achievements.js',
+    [],
+    '1.0.0',
+    true
+);
 
     $current_user_id  = (int) $a['user_id'];
 
@@ -218,4 +218,5 @@ function render_player_achievements( $atts ) {
 
     return $output;
 }
+error_log( 'TW achievements params: ' . wp_json_encode( $params ) );
 add_shortcode( 'achievements', 'render_player_achievements' );
