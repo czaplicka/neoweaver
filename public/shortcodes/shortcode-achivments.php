@@ -152,34 +152,34 @@ wp_enqueue_script(
     $output .= '<div class="achievements-grid">';
 
     foreach ( $results as $ach ) {
-        $is_unlocked = ! empty( $ach->is_unlocked );
-        $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
+    $is_unlocked = ! empty( $ach->is_unlocked );
+    $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
 
-                $legacy_class = '';
+    $legacy_class = '';
 
-        $scope    = $ach->scope ?? 'account';
-        $category = $ach->category ?? '';
+    $scope    = $ach->scope ?? 'account';
+    $category = $ach->category ?? '';
 
-        $theme    = tw_get_achievement_theme(
-            $category,
-            $scope,
-            $ach->bg_color ?? ''
-        );
+    $theme    = tw_get_achievement_theme(
+        $category,
+        $scope,
+        $ach->bg_color ?? ''
+    );
 
-        $bg_color = $theme['color'];
-        $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
+    $bg_color = $theme['color'];
+    $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
 
-        $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
+    $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-$base_icon = tw_resolve_achievement_icon(
-    $ach->achievement_id ?? '',
-    $scope,
-    $status
-);
+    $base_icon = tw_resolve_achievement_icon(
+        $ach->achievement_id ?? '',
+        $scope,
+        $status
+    );
 
-$icon = ( $status === 'status-hidden' )
-    ? 'scan-search'
-    : ( $theme['icon'] ?? $base_icon );
+    $icon = ( $status === 'status-hidden' )
+        ? 'scan-search'
+        : ( $theme['icon'] ?? $base_icon );
 
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $title = 'Secret achievement';
@@ -192,12 +192,12 @@ $icon = ( $status === 'status-hidden' )
         } else {
             $description = $ach->display_description ?? '';
         }
+$shape_class = ( $scope === 'account' ) ? 'ach-shape-hex' : '';
+            $badge_label = ( $status === 'status-hidden' )
+        ? 'SECRET'
+        : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
 
-        $badge_label = ( $status === 'status-hidden' )
-            ? 'SECRET'
-            : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
-
-                $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+    $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
 
         $output .= '<div class="ach-top-row">';
         $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
