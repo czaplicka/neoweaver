@@ -31,10 +31,13 @@ if ( ! function_exists( 'tw_get_user_characters' ) ) {
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
     function tw_get_player_achievements( $user_id, $char_id = null, $type = 'all' ) {
         $params = [
-            'p_user_id'      => (int) $user_id,
-            'p_type'         => in_array( $type, [ 'all', 'earned' ], true ) ? $type : 'all',
-            'p_character_id' => ! empty( $char_id ) ? (string) $char_id : null,
+            'p_user_id' => (int) $user_id,
+            'p_type'    => in_array( $type, [ 'all', 'earned' ], true ) ? $type : 'all',
         ];
+
+        if ( ! empty( $char_id ) ) {
+            $params['p_character_id'] = (string) $char_id;
+        }
 
         $rows = [];
         if ( function_exists( 'tw_supabase_rpc' ) ) {
