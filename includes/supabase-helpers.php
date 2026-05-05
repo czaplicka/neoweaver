@@ -203,17 +203,18 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
     function tw_supabase_rpc( $function_name, $params = [], $extra_args = [] ) {
         $base = tw_supabase_rest_base();
         if ( empty( $base ) ) {
+            error_log( 'TW RPC error: empty rest base' );
             return [];
         }
 
         $function_name = preg_replace( '/[^a-zA-Z0-9_]/', '', (string) $function_name );
         if ( $function_name === '' ) {
-            error_log( 'TW tw_supabase_rpc error: empty function name' );
+            error_log( 'TW RPC error: empty function name' );
             return [];
         }
 
         if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-            error_log( 'TW: tw_supabase_anon_key() is not defined.' );
+            error_log( 'TW RPC error: anon key helper missing' );
             return [];
         }
 
@@ -225,6 +226,7 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
                 'apikey'        => tw_supabase_anon_key(),
                 'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
                 'Content-Type'  => 'application/json',
+                'Accept'        => 'application/json',
             ],
             'body'      => wp_json_encode( (object) $params ),
             'timeout'   => 15,
@@ -233,23 +235,21 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 
         $args = array_merge( $default_args, (array) $extra_args );
 
-        if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
-            $args['timeout'] = 15;
-        }
-
         $response = wp_remote_request( $url, $args );
 
         if ( is_wp_error( $response ) ) {
-            error_log( 'TW tw_supabase_rpc error (' . $function_name . '): ' . print_r( $response, true ) );
+            error_log( 'TW RPC wp_error (' . $function_name . '): ' . print_r( $response, true ) );
             return [];
         }
 
         $code = wp_remote_retrieve_response_code( $response );
         $body = wp_remote_retrieve_body( $response );
+
+        error_log( 'TW RPC ' . $function_name . ' HTTP ' . $code . ': ' . $body );
+
         $data = json_decode( $body, true );
 
         if ( $code < 200 || $code >= 300 ) {
-            error_log( 'TW tw_supabase_rpc HTTP ' . $code . ' (' . $function_name . '): ' . $body );
             return [];
         }
 
