@@ -18,7 +18,6 @@
 				o.start(); o.stop( ac.currentTime + duration );
 			} catch ( e ) {}
 		}
-
 		return {
 			nav:    () => beep( 660, 'square',   0.06, 0.15 ),
 			select: () => beep( 880, 'sine',     0.10, 0.20 ),
@@ -27,7 +26,6 @@
 			error:  () => beep( 180, 'sawtooth', 0.18, 0.20 ),
 		};
 	} )();
-
 	// ── Shared spinner factory ────────────────────────────────────────────────
 	// Returns { show, hide }. Appends a single overlay to <body> on first call,
 	// matching the structure and CSS of #tw-node-spinner from world creator.
