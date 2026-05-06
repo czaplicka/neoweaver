@@ -3,6 +3,8 @@
  */
 ( function () {
 	'use strict';
+
+	// ── Shared audio engine (Web Audio API — no external files needed) ────────
 	const NW_SFX = ( () => {
 		let ctx = null;
 		const get = () => ctx || ( ctx = new ( window.AudioContext || window.webkitAudioContext )() );
@@ -18,6 +20,7 @@
 				o.start(); o.stop( ac.currentTime + duration );
 			} catch ( e ) {}
 		}
+
 		return {
 			nav:    () => beep( 660, 'square',   0.06, 0.15 ),
 			select: () => beep( 880, 'sine',     0.10, 0.20 ),
@@ -26,9 +29,8 @@
 			error:  () => beep( 180, 'sawtooth', 0.18, 0.20 ),
 		};
 	} )();
+
 	// ── Shared spinner factory ────────────────────────────────────────────────
-	// Returns { show, hide }. Appends a single overlay to <body> on first call,
-	// matching the structure and CSS of #tw-node-spinner from world creator.
 	function makeSpinner( id, title, subtitle ) {
 		const el = document.createElement( 'div' );
 		el.id = id;
@@ -268,10 +270,8 @@
 		}
 
 		// ── loadAgents ────────────────────────────────────────────────────────
-		// FIX: agents are NOT filtered by world_id (cybercharacters has no such
-		// direct column — the world link is only through cybercampaigncharacters).
-		// Instead we fetch all agents belonging to the current user and exclude
-		// those already assigned to any campaign via cybercampaigncharacters.
+		// Fetches all non-dead agents of the current user, then excludes those
+		// already assigned to any campaign via cyber_campaign_characters.
 		function loadAgents( worldId ) {
 			const grid = document.getElementById( 'tw-camp-agent-grid' );
 			const hint = document.getElementById( 'tw-agent-hint' );
@@ -279,27 +279,27 @@
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 			if ( hint ) hint.style.display = worldId ? 'none' : '';
 
-			// Step 1: get character IDs already assigned to a campaign
-			sbGet( 'cybercampaigncharacters', { select: 'characterid' } )
+			// Step 1: IDs of agents already in a campaign
+			sbGet( 'cyber_campaign_characters', { select: 'character_id' } )
 				.then( function ( assigned ) {
 					const takenIds = ( Array.isArray( assigned ) ? assigned : [] )
-						.map( r => r.characterid )
+						.map( function ( r ) { return r.character_id; } )
 						.filter( Boolean );
 
-					// Step 2: fetch all non-dead agents of the current user
+					// Step 2: all non-dead agents of this user
 					const params = {
 						select : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
 						status : 'neq.STATUS_DEAD',
 						order  : 'name.asc',
 					};
 					if ( userId ) params.wp_user_id = 'eq.' + userId;
-					// NOTE: world_id filter intentionally removed — agents have no direct world_id field.
+					// NOTE: world_id filter removed — cyber_characters has no direct world_id column.
 
 					return sbGet( 'cyber_characters', params ).then( function ( rows ) {
-						// Step 3: exclude agents already tied to a campaign
-						return ( Array.isArray( rows ) ? rows : [] ).filter(
-							r => ! takenIds.includes( r.id )
-						);
+						// Step 3: exclude already-assigned agents
+						return ( Array.isArray( rows ) ? rows : [] ).filter( function ( r ) {
+							return ! takenIds.includes( r.id );
+						} );
 					} );
 				} )
 				.then( function ( rows ) {
@@ -372,7 +372,6 @@
 			}
 		} );
 
-		// Radio card selection sound
 		wrapper.addEventListener( 'change', function ( e ) {
 			if ( e.target && e.target.type === 'radio' ) NW_SFX.select();
 		} );
