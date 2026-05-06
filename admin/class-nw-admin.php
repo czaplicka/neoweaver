@@ -2,9 +2,10 @@
 /**
  * NeoWeaver Admin — Main Menu & Dashboard
  *
- * Registers the top-level "NeoWeaver" menu entry and renders the
- * dashboard page: live Supabase counters + quick-navigation cards
- * to every sub-panel.
+ * IMPORTANT: admin_menu fires at priority 1 so the top-level
+ * "neoweaver" slug exists before sub-panel files register their
+ * own add_submenu_page() calls (glob loads abilities/achievements
+ * alphabetically BEFORE this file).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,9 +20,13 @@ class NeoWeaver_Admin {
 		$this->supabase_url = defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '';
 		$this->supabase_key = defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '';
 
-		add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_dashboard_stats', [ $this, 'ajax_stats' ] );
+		// Priority 1 — must run BEFORE other admin/class-nw-*.php files
+		// register their submenus (they hook at default priority 10).
+		add_action( 'admin_menu', [ $this, 'register_menu' ], 1 );
+		add_action( 'admin_menu', [ $this, 'rename_first_submenu' ], 999 );
+
+		add_action( 'admin_enqueue_scripts',      [ $this, 'enqueue_assets' ] );
+		add_action( 'wp_ajax_nw_dashboard_stats', [ $this, 'ajax_stats'     ] );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -38,16 +43,20 @@ class NeoWeaver_Admin {
 			'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg() ),
 			30
 		);
+		// NOTE: do NOT call add_submenu_page() with the same slug here.
+		// WordPress auto-creates the first submenu item mirroring the parent.
+		// We rename it in rename_first_submenu() below.
+	}
 
-		// First submenu item mirrors the parent (Dashboard).
-		add_submenu_page(
-			$this->slug,
-			'NeoWeaver — Dashboard',
-			'📊 Dashboard',
-			'manage_options',
-			$this->slug,
-			[ $this, 'render_page' ]
-		);
+	/**
+	 * Rename the auto-generated first submenu entry from "⚡ NeoWeaver"
+	 * to "📊 Dashboard". Must run after all submenus are registered.
+	 */
+	public function rename_first_submenu(): void {
+		global $submenu;
+		if ( isset( $submenu[ $this->slug ][0][0] ) ) {
+			$submenu[ $this->slug ][0][0] = '📊 Dashboard'; // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -55,14 +64,20 @@ class NeoWeaver_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public function enqueue_assets( string $hook ): void {
-		// Load on all NeoWeaver admin pages for shared base styles.
-		if ( ! str_contains( $hook, $this->slug ) && ! str_contains( $hook, 'neoweaver' ) ) return;
+		// $hook for top-level page is "toplevel_page_{slug}"
+		$is_dashboard = ( $hook === 'toplevel_page_' . $this->slug );
+		$is_any_nw    = $is_dashboard || str_contains( $hook, 'neoweaver' );
 
-		wp_enqueue_style( 'chakra-petch',
-			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
+		if ( ! $is_any_nw ) return;
 
-		// Dashboard-specific inline styles & script — only on the main page.
-		if ( str_contains( $hook, 'toplevel_page_neoweaver' ) || $hook === 'toplevel_page_' . $this->slug ) {
+		wp_enqueue_style(
+			'chakra-petch',
+			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+			[],
+			null
+		);
+
+		if ( $is_dashboard ) {
 			wp_add_inline_style( 'chakra-petch', $this->get_css() );
 			wp_add_inline_script( 'jquery', $this->get_js() );
 		}
@@ -123,7 +138,7 @@ class NeoWeaver_Admin {
 		$sub_panels = [
 			[
 				'slug'  => 'neoweaver-abilities',
-				'icon'  => '⚡',
+				'icon'  => '✨',
 				'label' => 'Abilities',
 				'desc'  => 'Manage cyberabilities — tags, costs, AI modifiers.',
 				'color' => '#adff00',
@@ -160,7 +175,6 @@ class NeoWeaver_Admin {
 		?>
 		<div class="wrap nw-dash" id="nw-dashboard">
 
-			<!-- ===== HEADER ===== -->
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
 					<?php echo $this->logo_svg( 48, '#adff00' ); ?>
@@ -172,23 +186,22 @@ class NeoWeaver_Admin {
 				<button class="nw-btn nw-btn-ghost" id="nw-refresh-stats">↻ Refresh Stats</button>
 			</div>
 
-			<!-- ===== STATS ===== -->
-			<div class="nw-stat-grid" id="nw-stat-grid">
-				<div class="nw-stat-card" data-key="worlds">
+			<div class="nw-stat-grid">
+				<div class="nw-stat-card">
 					<div class="nw-stat-icon">🌐</div>
 					<div class="nw-stat-body">
 						<div class="nw-stat-value" id="nw-stat-worlds"><div class="nw-spinner"></div></div>
 						<div class="nw-stat-label">Worlds / Nodes</div>
 					</div>
 				</div>
-				<div class="nw-stat-card" data-key="agents">
+				<div class="nw-stat-card">
 					<div class="nw-stat-icon">🧬</div>
 					<div class="nw-stat-body">
 						<div class="nw-stat-value" id="nw-stat-agents"><div class="nw-spinner"></div></div>
 						<div class="nw-stat-label">Field Agents</div>
 					</div>
 				</div>
-				<div class="nw-stat-card" data-key="campaigns">
+				<div class="nw-stat-card">
 					<div class="nw-stat-icon">⚔️</div>
 					<div class="nw-stat-body">
 						<div class="nw-stat-value" id="nw-stat-campaigns"><div class="nw-spinner"></div></div>
@@ -197,7 +210,6 @@ class NeoWeaver_Admin {
 				</div>
 			</div>
 
-			<!-- ===== QUICK NAV ===== -->
 			<h2 class="nw-section-title">Game Data Panels</h2>
 			<div class="nw-panels-grid">
 				<?php foreach ( $sub_panels as $p ) :
@@ -214,7 +226,6 @@ class NeoWeaver_Admin {
 				<?php endforeach; ?>
 			</div>
 
-			<!-- ===== SYSTEM INFO ===== -->
 			<div class="nw-sysinfo">
 				<div class="nw-sysinfo-row">
 					<span class="nw-sysinfo-label">Plugin version</span>
@@ -255,7 +266,6 @@ class NeoWeaver_Admin {
 	/* ------------------------------------------------------------------ */
 
 	private function logo_svg( int $size = 20, string $color = '#ffffff' ): string {
-		// Stylised "NW" hexagon mark
 		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 40 40" fill="none" aria-label="NeoWeaver">'
 			. '<polygon points="20,2 36,11 36,29 20,38 4,29 4,11" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" fill="none"/>'
 			. '<polyline points="11,27 11,13 20,24 29,13 29,27" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
@@ -268,16 +278,13 @@ class NeoWeaver_Admin {
 
 	private function get_css(): string { return <<<'CSS'
 .nw-dash{font-family:'Chakra Petch',monospace;color:#e0e0e0;max-width:1100px}.nw-dash *{box-sizing:border-box}
-/* header */
-.nw-dash-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 20px;border-bottom:1px solid #2a2a2a;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.nw-dash-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid #2a2a2a;margin-bottom:24px;flex-wrap:wrap;gap:12px}
 .nw-dash-logo{display:flex;align-items:center;gap:14px}
 .nw-logo-name{display:block;font-size:26px;font-weight:700;color:#fff;line-height:1;font-family:'Chakra Petch',monospace}
 .nw-accent{color:#adff00}
 .nw-logo-version{display:block;font-size:11px;color:#555;margin-top:4px;letter-spacing:.5px}
-/* buttons */
 .nw-btn{font-family:'Chakra Petch',monospace;font-size:12px;font-weight:600;padding:7px 16px;border-radius:5px;border:1px solid transparent;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
 .nw-btn-ghost{background:transparent;color:#adff00;border-color:#2e2e2e}.nw-btn-ghost:hover{border-color:#adff00}
-/* stat cards */
 .nw-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
 @media(max-width:700px){.nw-stat-grid{grid-template-columns:1fr}}
 .nw-stat-card{background:#111;border:1px solid #222;border-radius:10px;padding:20px 22px;display:flex;align-items:center;gap:18px;transition:border-color .2s}
@@ -285,14 +292,11 @@ class NeoWeaver_Admin {
 .nw-stat-icon{font-size:28px;line-height:1}
 .nw-stat-value{font-size:36px;font-weight:700;color:#adff00;font-variant-numeric:tabular-nums;min-height:44px;display:flex;align-items:center}
 .nw-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#555;margin-top:2px}
-/* spinner */
 .nw-spinner{display:inline-block;width:22px;height:22px;border:2px solid #333;border-top-color:#adff00;border-radius:50%;animation:nw-spin .6s linear infinite}
 @keyframes nw-spin{to{transform:rotate(360deg)}}
-/* section title */
 .nw-section-title{font-family:'Chakra Petch',monospace;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#adff00;font-weight:700;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid #1e2e00}
-/* panels grid */
 .nw-panels-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:32px}
-.nw-panel-card{display:flex;align-items:center;gap:14px;background:#111;border:1px solid #222;border-radius:10px;padding:16px 20px;text-decoration:none;color:#e0e0e0;transition:border-color .18s,transform .18s,box-shadow .18s;cursor:pointer}
+.nw-panel-card{display:flex;align-items:center;gap:14px;background:#111;border:1px solid #222;border-radius:10px;padding:16px 20px;text-decoration:none;color:#e0e0e0;transition:border-color .18s,transform .18s,box-shadow .18s}
 .nw-panel-card:hover{border-color:var(--card-color,#adff00);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.4);color:#fff}
 .nw-panel-card-icon{font-size:24px;line-height:1;flex-shrink:0}
 .nw-panel-card-body{flex:1;min-width:0}
@@ -300,7 +304,6 @@ class NeoWeaver_Admin {
 .nw-panel-card-desc{font-size:11px;color:#555;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nw-panel-card-arrow{color:var(--card-color,#adff00);font-size:18px;opacity:0;transition:opacity .18s,transform .18s;transform:translateX(-4px)}
 .nw-panel-card:hover .nw-panel-card-arrow{opacity:1;transform:translateX(0)}
-/* sysinfo */
 .nw-sysinfo{background:#111;border:1px solid #222;border-radius:10px;overflow:hidden;font-size:12px}
 .nw-sysinfo-row{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid #1a1a1a}
 .nw-sysinfo-row:last-child{border-bottom:none}
