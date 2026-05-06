@@ -272,20 +272,41 @@
 				} );
 		}
 
+		// ── loadAgents ────────────────────────────────────────────────────────
+		// FIX: agents are NOT filtered by world_id (cybercharacters has no such
+		// direct column — the world link is only through cybercampaigncharacters).
+		// Instead we fetch all agents belonging to the current user and exclude
+		// those already assigned to any campaign via cybercampaigncharacters.
 		function loadAgents( worldId ) {
 			const grid = document.getElementById( 'tw-camp-agent-grid' );
 			const hint = document.getElementById( 'tw-agent-hint' );
 			if ( ! grid ) return;
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 			if ( hint ) hint.style.display = worldId ? 'none' : '';
-			const params = {
-				select : 'id,name,class_id,race_id,status,world_id,cyber_classes(name),cyber_races(name)',
-				status : 'neq.STATUS_DEAD',
-				order  : 'name.asc',
-			};
-			if ( userId  ) params.wp_user_id = 'eq.' + userId;
-			if ( worldId ) params.world_id   = 'eq.' + worldId;
-			sbGet( 'cyber_characters', params )
+
+			// Step 1: get character IDs already assigned to a campaign
+			sbGet( 'cybercampaigncharacters', { select: 'characterid' } )
+				.then( function ( assigned ) {
+					const takenIds = ( Array.isArray( assigned ) ? assigned : [] )
+						.map( r => r.characterid )
+						.filter( Boolean );
+
+					// Step 2: fetch all non-dead agents of the current user
+					const params = {
+						select : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
+						status : 'neq.STATUS_DEAD',
+						order  : 'name.asc',
+					};
+					if ( userId ) params.wp_user_id = 'eq.' + userId;
+					// NOTE: world_id filter intentionally removed — agents have no direct world_id field.
+
+					return sbGet( 'cyber_characters', params ).then( function ( rows ) {
+						// Step 3: exclude agents already tied to a campaign
+						return ( Array.isArray( rows ) ? rows : [] ).filter(
+							r => ! takenIds.includes( r.id )
+						);
+					} );
+				} )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! rows || ! rows.length ) {
