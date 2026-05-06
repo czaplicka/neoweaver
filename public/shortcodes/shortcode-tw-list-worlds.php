@@ -1,46 +1,49 @@
 <?php
 /**
  * SHORTCODE: [tw_list_worlds]
- *
- * BUG-FIX: neoweaver_enqueue_worlds_assets() used plugin_dir_url( dirname( __FILE__, 1 ) )
- * which resolves to the *parent* of this file's directory — i.e. /public/ — not the
- * plugin root. All enqueued asset paths therefore became /public/assets/css/… and
- * /public/assets/js/… which don't exist, causing 404s for both CSS and JS.
- * Fixed: use NEOWEAVER_PLUGIN_URL (always the plugin root) with a dirname( __FILE__, 2 )
- * fallback for contexts where the constant isn't defined.
  */
 
-function neoweaver_enqueue_worlds_assets() {
-	if ( is_admin() ) {
-		return;
-	}
+// ─── ASSETS ──────────────────────────────────────────────────────────────────
 
-	if ( is_singular() ) {
-		global $post;
-		if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
-			return;
-		}
-	}
+add_action( 'wp_enqueue_scripts', 'tw_list_worlds_enqueue_assets' );
 
 function tw_list_worlds_enqueue_assets() {
-    $plugin_url = plugin_dir_url( __FILE__ );
+    if ( is_admin() ) {
+        return;
+    }
+
+    // Ładuj tylko gdy shortcode jest na stronie
+    if ( is_singular() ) {
+        global $post;
+        if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
+            return;
+        }
+    }
+
+    // __FILE__ jest w /public/shortcodes/ więc dwa poziomy w górę = root pluginu
+    $plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' )
+        ? NEOWEAVER_PLUGIN_URL
+        : plugin_dir_url( dirname( __FILE__, 2 ) );
 
     wp_enqueue_style(
         'tw-list-worlds',
-        $plugin_url . 'assets/css/tw-list-worlds.css',
+        $plugin_url . 'public/assets/css/tw-list-worlds.css',
         [],
-        '1.0.0'
+        '1.0.1'
     );
 
     wp_enqueue_script(
         'tw-list-worlds',
-        $plugin_url . 'assets/js/tw-list-worlds.js',
+        $plugin_url . 'public/assets/js/tw-list-worlds.js',
         [ 'jquery' ],
-        '1.0.0',
+        '1.0.1',
         true
     );
 }
-add_action( 'wp_enqueue_scripts', 'tw_list_worlds_enqueue_assets' );
+
+// ─── SHORTCODE LOGIKA ─────────────────────────────────────────────────────────
+
+add_shortcode( 'tw_list_worlds', 'tw_list_worlds_v14' );
 
 /**
  * SHORTCODE LOGIKA
