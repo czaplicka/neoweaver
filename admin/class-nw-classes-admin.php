@@ -53,3 +53,4 @@ class NeoWeaver_Admin {
         <?php
     }
 }
+new NeoWeaver_Admin( 'neoweaver', NEOWEAVER_VERSION );
