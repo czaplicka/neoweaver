@@ -3,8 +3,6 @@
  */
 ( function () {
 	'use strict';
-	// ── Shared audio engine (Web Audio API — no external files needed) ────────
-	// Identical to the NW_SFX module used in tw-character-creator.js.
 	const NW_SFX = ( () => {
 		let ctx = null;
 		const get = () => ctx || ( ctx = new ( window.AudioContext || window.webkitAudioContext )() );
