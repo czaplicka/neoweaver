@@ -103,8 +103,30 @@ class Neoweaver_Agents_List {
 			.tw-avatar { width: 64px; height: 64px; border: 1px solid var(--neon); object-fit: cover; }
 			.tw-lvl-badge { background: var(--neon); color: black; padding: 2px 6px; font-weight: bold; font-size: 11px; margin-right: 5px; }
 			.tw-campaign-info { font-size: 10px; text-transform: uppercase; color: var(--neon); opacity: 0.8; margin-top: 5px; border-top: 1px solid #222; padding-top: 5px; }
-			.tw-modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); }
-			.tw-modal-content { background: #050505; border: 1px solid var(--neon); width: 95%; max-width: 800px; margin: 20px auto; padding: 25px; color: white; position: relative; max-height: 90vh; overflow-y: auto; }
+			.tw-modal {
+	display: none;
+	position: fixed;
+	z-index: 10000;
+	inset: 0;
+	background: rgba(0,0,0,0.9);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	box-sizing: border-box;
+}
+
+.tw-modal-content {
+	background: #050505;
+	border: 1px solid var(--neon);
+	width: 100%;
+	max-width: 800px;
+	max-height: 90vh;
+	padding: 25px;
+	color: white;
+	position: relative;
+	overflow-y: auto;
+}
 			.tw-close { position: sticky; top: 0; float: right; color: var(--neon); cursor: pointer; font-size: 24px; z-index: 10; background: #050505; padding: 0 5px; }
 			.tw-btn { background: var(--gray); border: 1px solid var(--neon); color: var(--neon); padding: 8px; cursor: pointer; font-family: inherit; font-size: 11px; text-transform: uppercase; transition: 0.2s; }
 			.tw-btn:hover { background: var(--neon); color: black; }
