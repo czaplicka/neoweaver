@@ -2,31 +2,21 @@
 /**
  * NeoWeaver Admin — Main Menu & Dashboard
  *
- * IMPORTANT: admin_menu fires at priority 1 so the top-level
- * "neoweaver" slug exists before sub-panel files register their
- * own add_submenu_page() calls (glob loads abilities/achievements
- * alphabetically BEFORE this file).
+ * Loaded FIRST (explicitly, before glob) so the top-level "neoweaver"
+ * menu slug exists when all submenu files run add_submenu_page().
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class NeoWeaver_Admin {
 
-	private string $supabase_url;
-	private string $supabase_key;
 	private string $slug = 'neoweaver';
 
 	public function __construct() {
-		$this->supabase_url = defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '';
-		$this->supabase_key = defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '';
-
-		// Priority 1 — must run BEFORE other admin/class-nw-*.php files
-		// register their submenus (they hook at default priority 10).
-		add_action( 'admin_menu', [ $this, 'register_menu' ], 1 );
-		add_action( 'admin_menu', [ $this, 'rename_first_submenu' ], 999 );
-
-		add_action( 'admin_enqueue_scripts',      [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_dashboard_stats', [ $this, 'ajax_stats'     ] );
+		add_action( 'admin_menu',            [ $this, 'register_menu'        ] );
+		add_action( 'admin_menu',            [ $this, 'rename_first_submenu' ], 999 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'       ] );
+		add_action( 'wp_ajax_nw_dashboard_stats', [ $this, 'ajax_stats' ] );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -43,15 +33,11 @@ class NeoWeaver_Admin {
 			'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg() ),
 			30
 		);
-		// NOTE: do NOT call add_submenu_page() with the same slug here.
-		// WordPress auto-creates the first submenu item mirroring the parent.
-		// We rename it in rename_first_submenu() below.
+		// WordPress auto-creates a first submenu mirroring the parent.
+		// We rename it in rename_first_submenu() — do NOT call
+		// add_submenu_page() with the same slug here (causes duplicates).
 	}
 
-	/**
-	 * Rename the auto-generated first submenu entry from "⚡ NeoWeaver"
-	 * to "📊 Dashboard". Must run after all submenus are registered.
-	 */
 	public function rename_first_submenu(): void {
 		global $submenu;
 		if ( isset( $submenu[ $this->slug ][0][0] ) ) {
@@ -64,18 +50,13 @@ class NeoWeaver_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public function enqueue_assets( string $hook ): void {
-		// $hook for top-level page is "toplevel_page_{slug}"
 		$is_dashboard = ( $hook === 'toplevel_page_' . $this->slug );
 		$is_any_nw    = $is_dashboard || str_contains( $hook, 'neoweaver' );
-
 		if ( ! $is_any_nw ) return;
 
-		wp_enqueue_style(
-			'chakra-petch',
+		wp_enqueue_style( 'chakra-petch',
 			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-			[],
-			null
-		);
+			[], null );
 
 		if ( $is_dashboard ) {
 			wp_add_inline_style( 'chakra-petch', $this->get_css() );
@@ -91,6 +72,14 @@ class NeoWeaver_Admin {
 		check_ajax_referer( 'neoweaver_dashboard', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
+		$url = function_exists( 'tw_supabase_url' )         ? tw_supabase_url()         : '';
+		$key = function_exists( 'tw_supabase_service_key' ) ? tw_supabase_service_key() :
+		     ( function_exists( 'tw_supabase_anon_key' )    ? tw_supabase_anon_key()    : '' );
+
+		if ( ! $url || ! $key ) {
+			wp_send_json_error( 'Supabase not configured.' );
+		}
+
 		$tables = [
 			'worlds'    => 'cyberworlds',
 			'agents'    => 'cybercharacters',
@@ -98,19 +87,19 @@ class NeoWeaver_Admin {
 		];
 
 		$counts = [];
-		foreach ( $tables as $key => $table ) {
-			$cached = get_transient( 'nw_count_' . $key );
+		foreach ( $tables as $key_name => $table ) {
+			$cached = get_transient( 'nw_count_' . $key_name );
 			if ( $cached !== false ) {
-				$counts[ $key ] = (int) $cached;
+				$counts[ $key_name ] = (int) $cached;
 				continue;
 			}
 			$res = wp_remote_get(
-				$this->supabase_url . '/rest/v1/' . $table . '?select=id',
+				rtrim( $url, '/' ) . '/rest/v1/' . $table . '?select=id',
 				[
 					'timeout' => 8,
 					'headers' => [
-						'apikey'        => $this->supabase_key,
-						'Authorization' => 'Bearer ' . $this->supabase_key,
+						'apikey'        => $key,
+						'Authorization' => 'Bearer ' . $key,
 						'Range'         => '0-0',
 						'Prefer'        => 'count=exact',
 					],
@@ -123,8 +112,8 @@ class NeoWeaver_Admin {
 					$count = (int) $m[1];
 				}
 			}
-			set_transient( 'nw_count_' . $key, $count, 5 * MINUTE_IN_SECONDS );
-			$counts[ $key ] = $count;
+			set_transient( 'nw_count_' . $key_name, $count, 5 * MINUTE_IN_SECONDS );
+			$counts[ $key_name ] = $count;
 		}
 
 		wp_send_json_success( $counts );
@@ -135,49 +124,23 @@ class NeoWeaver_Admin {
 	/* ------------------------------------------------------------------ */
 
 	public function render_page(): void {
+		$supa_url = function_exists( 'tw_supabase_url' )         ? tw_supabase_url()         : '';
+		$key_ok   = function_exists( 'tw_supabase_service_key' ) ? (bool) tw_supabase_service_key() :
+		          ( function_exists( 'tw_supabase_anon_key' )    ? (bool) tw_supabase_anon_key()    : false );
+
 		$sub_panels = [
-			[
-				'slug'  => 'neoweaver-abilities',
-				'icon'  => '✨',
-				'label' => 'Abilities',
-				'desc'  => 'Manage cyberabilities — tags, costs, AI modifiers.',
-				'color' => '#adff00',
-			],
-			[
-				'slug'  => 'neoweaver-achievements',
-				'icon'  => '🏆',
-				'label' => 'Achievements',
-				'desc'  => 'Define in-game achievements and rewards.',
-				'color' => '#e8af34',
-			],
-			[
-				'slug'  => 'neoweaver-classes',
-				'icon'  => '⚔️',
-				'label' => 'Classes',
-				'desc'  => 'Field Agent classes — bonuses, vulnerabilities, packages.',
-				'color' => '#00d4ff',
-			],
-			[
-				'slug'  => 'neoweaver-items',
-				'icon'  => '🎒',
-				'label' => 'Items',
-				'desc'  => 'Equipment, weapons, consumables and cyber-implants.',
-				'color' => '#ff6b35',
-			],
-			[
-				'slug'  => 'neoweaver-races',
-				'icon'  => '🧬',
-				'label' => 'Races',
-				'desc'  => 'Playable races — attributes, tags, starting traits.',
-				'color' => '#b96eff',
-			],
+			[ 'slug' => 'neoweaver-abilities',   'icon' => '✨', 'label' => 'Abilities',    'desc' => 'Cyberabilities — tags, costs, AI modifiers.',        'color' => '#adff00' ],
+			[ 'slug' => 'neoweaver-achievements', 'icon' => '🏆', 'label' => 'Achievements', 'desc' => 'In-game achievements and rewards.',                  'color' => '#e8af34' ],
+			[ 'slug' => 'neoweaver-classes',      'icon' => '⚔️', 'label' => 'Classes',      'desc' => 'Field Agent classes — bonuses, packages.',           'color' => '#00d4ff' ],
+			[ 'slug' => 'neoweaver-items',        'icon' => '🎒', 'label' => 'Items',        'desc' => 'Equipment, weapons, consumables, cyber-implants.',   'color' => '#ff6b35' ],
+			[ 'slug' => 'neoweaver-races',        'icon' => '🧬', 'label' => 'Races',        'desc' => 'Playable races — attributes, tags, starting traits.', 'color' => '#b96eff' ],
 		];
 		?>
 		<div class="wrap nw-dash" id="nw-dashboard">
 
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
-					<?php echo $this->logo_svg( 48, '#adff00' ); ?>
+					<?php echo $this->logo_svg( 44, '#adff00' ); ?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
 						<span class="nw-logo-version">v<?php echo esc_html( NEOWEAVER_VERSION ); ?> &mdash; Admin Console</span>
@@ -212,10 +175,10 @@ class NeoWeaver_Admin {
 
 			<h2 class="nw-section-title">Game Data Panels</h2>
 			<div class="nw-panels-grid">
-				<?php foreach ( $sub_panels as $p ) :
-					$url = admin_url( 'admin.php?page=' . $p['slug'] );
-				?>
-				<a href="<?php echo esc_url( $url ); ?>" class="nw-panel-card" style="--card-color:<?php echo esc_attr( $p['color'] ); ?>">
+				<?php foreach ( $sub_panels as $p ) : ?>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $p['slug'] ) ); ?>"
+				   class="nw-panel-card"
+				   style="--card-color:<?php echo esc_attr( $p['color'] ); ?>">
 					<div class="nw-panel-card-icon"><?php echo $p['icon']; ?></div>
 					<div class="nw-panel-card-body">
 						<div class="nw-panel-card-title"><?php echo esc_html( $p['label'] ); ?></div>
@@ -233,18 +196,11 @@ class NeoWeaver_Admin {
 				</div>
 				<div class="nw-sysinfo-row">
 					<span class="nw-sysinfo-label">Supabase URL</span>
-					<span class="nw-sysinfo-val"><?php
-						$u = $this->supabase_url;
-						echo $u ? esc_html( $u ) : '<span style="color:#ff4444">Not configured</span>';
-					?></span>
+					<span class="nw-sysinfo-val"><?php echo $supa_url ? esc_html( $supa_url ) : '<span style="color:#ff4444">Not configured</span>'; ?></span>
 				</div>
 				<div class="nw-sysinfo-row">
 					<span class="nw-sysinfo-label">Supabase Key</span>
-					<span class="nw-sysinfo-val"><?php
-						echo $this->supabase_key
-							? '<span style="color:#adff00">✓ Configured</span>'
-							: '<span style="color:#ff4444">✗ Missing</span>';
-					?></span>
+					<span class="nw-sysinfo-val"><?php echo $key_ok ? '<span style="color:#adff00">✓ Configured</span>' : '<span style="color:#ff4444">✗ Missing</span>'; ?></span>
 				</div>
 				<div class="nw-sysinfo-row">
 					<span class="nw-sysinfo-label">PHP</span>
@@ -321,11 +277,13 @@ jQuery(function($){
     function loadStats(){
         $('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').html('<div class="nw-spinner"></div>');
         $.post(ajaxurl,{action:'nw_dashboard_stats',nonce:$('#nw-dash-nonce').val()},function(res){
-            if(!res.success)return;
+            if(!res.success){$('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').text('—');return;}
             var d=res.data;
             $('#nw-stat-worlds').text(d.worlds||0);
             $('#nw-stat-agents').text(d.agents||0);
             $('#nw-stat-campaigns').text(d.campaigns||0);
+        }).fail(function(){
+            $('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').text('err');
         });
     }
     $('#nw-refresh-stats').on('click',loadStats);
