@@ -69,3 +69,14 @@ class NeoWeaver_Admin {
 		<?php
 	}
 }
+add_action( 'admin_menu', function() {
+    add_menu_page(
+        'NeoWeaver',           // page title
+        'NeoWeaver',           // menu title
+        'manage_options',      // capability
+        'neoweaver',           // menu slug — musi być dokładnie tym co parent_slug w podmenu
+        '__return_null',       // callback — null bo przekieruje do pierwszego podmenu
+        'dashicons-superhero', // ikona
+        30                     // pozycja
+    );
+}, 9 ); // priorytet 9 — PRZED podmenu które mają priorytet 10 (domyślny)
