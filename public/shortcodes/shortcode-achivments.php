@@ -54,6 +54,23 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
 }
 
 function render_player_achievements( $atts ) {
+    // Enqueue via wp_footer hook so assets land in <head>/<footer>, not mid-HTML
+    add_action( 'wp_footer', static function () {
+        wp_enqueue_style(
+            'neoweaver-achievements',
+            plugin_dir_url( __FILE__ ) . '../assets/css/achievements.css',
+            [],
+            '1.0.0'
+        );
+        wp_enqueue_script(
+            'neoweaver-achievements',
+            plugin_dir_url( __FILE__ ) . '../assets/js/achievements.js',
+            [],
+            '1.0.0',
+            true
+        );
+    }, 5 );
+
     $a = shortcode_atts(
         [
             'type'    => 'all',
@@ -63,24 +80,7 @@ function render_player_achievements( $atts ) {
         $atts
     );
 
-wp_enqueue_style(
-    'neoweaver-achievements',
-    plugin_dir_url( __FILE__ ) . '../assets/css/achievements.css',
-    [],
-    '1.0.0'
-);
-
-wp_enqueue_script(
-    'neoweaver-achievements',
-    plugin_dir_url( __FILE__ ) . '../assets/js/achievements.js',
-    [],
-    '1.0.0',
-    true
-);
-
-    $current_user_id  = (int) $a['user_id'];
-
-    $current_user_id  = (int) $a['user_id'];
+    $current_user_id = (int) $a['user_id'];
 
     // Wybrana postać: z GET lub z atrybutu shortcode
     $selected_char_id = null;
@@ -152,34 +152,34 @@ wp_enqueue_script(
     $output .= '<div class="achievements-grid">';
 
     foreach ( $results as $ach ) {
-    $is_unlocked = ! empty( $ach->is_unlocked );
-    $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
+        $is_unlocked = ! empty( $ach->is_unlocked );
+        $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
 
-    $legacy_class = '';
+        $legacy_class = '';
 
-    $scope    = $ach->scope ?? 'account';
-    $category = $ach->category ?? '';
+        $scope    = $ach->scope ?? 'account';
+        $category = $ach->category ?? '';
 
-    $theme    = tw_get_achievement_theme(
-        $category,
-        $scope,
-        $ach->bg_color ?? ''
-    );
+        $theme = tw_get_achievement_theme(
+            $category,
+            $scope,
+            $ach->bg_color ?? ''
+        );
 
-    $bg_color = $theme['color'];
-    $style    = "--bg-color: {$bg_color}; --prog-percent: {$percent}%;";
+        $bg_color = $theme['color'];
+        $style    = '--bg-color: ' . $bg_color . '; --prog-percent: ' . $percent . '%;';
 
-    $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
+        $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-    $base_icon = tw_resolve_achievement_icon(
-        $ach->achievement_id ?? '',
-        $scope,
-        $status
-    );
+        $base_icon = tw_resolve_achievement_icon(
+            $ach->achievement_id ?? '',
+            $scope,
+            $status
+        );
 
-    $icon = ( $status === 'status-hidden' )
-        ? 'scan-search'
-        : ( $theme['icon'] ?? $base_icon );
+        $icon = ( $status === 'status-hidden' )
+            ? 'scan-search'
+            : ( $theme['icon'] ?? $base_icon );
 
         if ( $status === 'status-hidden' && ! $is_unlocked ) {
             $title = 'Secret achievement';
@@ -192,12 +192,13 @@ wp_enqueue_script(
         } else {
             $description = $ach->display_description ?? '';
         }
-$shape_class = ( $scope === 'account' ) ? 'ach-shape-hex' : '';
-            $badge_label = ( $status === 'status-hidden' )
-        ? 'SECRET'
-        : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
 
-    $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+        $shape_class = ( $scope === 'account' ) ? 'ach-shape-hex' : '';
+        $badge_label = ( $status === 'status-hidden' )
+            ? 'SECRET'
+            : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
+
+        $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
 
         $output .= '<div class="ach-top-row">';
         $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
@@ -230,6 +231,7 @@ $shape_class = ( $scope === 'account' ) ? 'ach-shape-hex' : '';
 
     return $output;
 }
+
 if ( ! function_exists( 'tw_resolve_achievement_icon' ) ) {
     function tw_resolve_achievement_icon( $achievement_id = '', $scope = 'account', $status = '' ) {
         if ( $status === 'status-hidden' ) {
@@ -256,6 +258,7 @@ if ( ! function_exists( 'tw_resolve_achievement_icon' ) ) {
         return ( $scope === 'character' ) ? 'shield' : 'badge-check';
     }
 }
+
 if ( ! function_exists( 'tw_get_achievement_theme' ) ) {
     function tw_get_achievement_theme( $category = '', $scope = 'account', $bg_color = '' ) {
         $themes = [
@@ -280,4 +283,5 @@ if ( ! function_exists( 'tw_get_achievement_theme' ) ) {
         return $theme;
     }
 }
+
 add_shortcode( 'achievements', 'render_player_achievements' );
