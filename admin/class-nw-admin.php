@@ -224,11 +224,11 @@ class NeoWeaver_Admin {
 		}
 
 		return array(
-			'series'     => $out,
-			'rows_found' => count( $rows ),
-			'query_ok'   => $res['ok'],
-			'http_status'=> $res['status'],
-			'api_error'  => $res['raw'] ?? null,
+			'series'      => $out,
+			'rows_found'  => count( $rows ),
+			'query_ok'    => $res['ok'],
+			'http_status' => $res['status'],
+			'api_error'   => $res['raw'] ?? null,
 		);
 	}
 
@@ -285,18 +285,21 @@ class NeoWeaver_Admin {
 			'characters' => $this->supa_count( 'cyber_characters' ),
 			'worlds'     => $this->supa_count( 'cyber_worlds' ),
 			'campaigns'  => $this->supa_count( 'cyber_campaign' ),
+			'deck_cards' => $this->supa_count( 'cyber_deck' ),
 		);
 
 		$recent = array(
 			'characters_7d' => $this->supa_recent_count( 'cyber_characters', 7 ),
 			'worlds_7d'     => $this->supa_recent_count( 'cyber_worlds', 7 ),
 			'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
+			'deck_cards_7d' => $this->supa_recent_count( 'cyber_deck', 7 ),
 		);
 
 		$growth_raw = array(
 			'characters' => $this->supa_growth_series( 'cyber_characters', 30 ),
 			'worlds'     => $this->supa_growth_series( 'cyber_worlds', 30 ),
 			'campaigns'  => $this->supa_growth_series( 'cyber_campaign', 30 ),
+			'deck_cards' => $this->supa_growth_series( 'cyber_deck', 30 ),
 		);
 
 		// Flatten series for JS (keep debug info separately)
@@ -304,6 +307,7 @@ class NeoWeaver_Admin {
 			'characters' => $growth_raw['characters']['series'],
 			'worlds'     => $growth_raw['worlds']['series'],
 			'campaigns'  => $growth_raw['campaigns']['series'],
+			'deck_cards' => $growth_raw['deck_cards']['series'],
 		);
 
 		$health = array(
@@ -345,8 +349,8 @@ class NeoWeaver_Admin {
 			'alerts'    => $alerts,
 			'logs'      => $this->supa_recent_logs( 10 ),
 			'_debug'    => array(
-				'key_type'   => $this->get_supa_key_type(),
-				'growth_meta'=> array(
+				'key_type'    => $this->get_supa_key_type(),
+				'growth_meta' => array(
 					'characters' => array(
 						'rows_found'  => $growth_raw['characters']['rows_found'],
 						'query_ok'    => $growth_raw['characters']['query_ok'],
@@ -364,6 +368,12 @@ class NeoWeaver_Admin {
 						'query_ok'    => $growth_raw['campaigns']['query_ok'],
 						'http_status' => $growth_raw['campaigns']['http_status'],
 						'api_error'   => $growth_raw['campaigns']['api_error'],
+					),
+					'deck_cards' => array(
+						'rows_found'  => $growth_raw['deck_cards']['rows_found'],
+						'query_ok'    => $growth_raw['deck_cards']['query_ok'],
+						'http_status' => $growth_raw['deck_cards']['http_status'],
+						'api_error'   => $growth_raw['deck_cards']['api_error'],
 					),
 				),
 			),
@@ -414,6 +424,11 @@ class NeoWeaver_Admin {
 							<div class="nw-stat-value" id="nw-stat-campaigns"><div class="nw-spinner"></div></div>
 							<div class="nw-stat-sub" id="nw-recent-campaigns">Last 7d: &mdash;</div>
 						</div>
+						<div class="nw-stat-card">
+							<div class="nw-stat-label-top">Deck Cards</div>
+							<div class="nw-stat-value" id="nw-stat-deck-cards"><div class="nw-spinner"></div></div>
+							<div class="nw-stat-sub" id="nw-recent-deck-cards">Last 7d: &mdash;</div>
+						</div>
 					</div>
 				</section>
 
@@ -434,6 +449,10 @@ class NeoWeaver_Admin {
 						<div class="nw-chart-card">
 							<div class="nw-chart-title">Campaigns</div>
 							<div class="nw-chart" id="nw-chart-campaigns"></div>
+						</div>
+						<div class="nw-chart-card">
+							<div class="nw-chart-title">Deck Cards</div>
+							<div class="nw-chart" id="nw-chart-deck-cards"></div>
 						</div>
 					</div>
 				</section>
@@ -543,15 +562,17 @@ class NeoWeaver_Admin {
 .nw-block-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .nw-section-title{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#adff00;font-weight:700;margin:0}
 .nw-section-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#555}
-.nw-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:800px){.nw-stat-grid{grid-template-columns:1fr}}
+.nw-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1100px){.nw-stat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.nw-stat-grid{grid-template-columns:1fr}}
 .nw-stat-card{background:#141414;border:1px solid #242424;border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
 .nw-stat-card:hover{border-color:#adff00;transform:translateY(-1px)}
 .nw-stat-label-top{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666}
 .nw-stat-value{font-size:36px;font-weight:700;color:#adff00;font-variant-numeric:tabular-nums;min-height:44px;display:flex;align-items:center;margin-top:8px}
 .nw-stat-sub{font-size:11px;color:#8a8a8a}
-.nw-chart-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media(max-width:980px){.nw-chart-grid{grid-template-columns:1fr}}
+.nw-chart-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1100px){.nw-chart-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.nw-chart-grid{grid-template-columns:1fr}}
 .nw-chart-card{background:#141414;border:1px solid #232323;border-radius:12px;padding:14px}
 .nw-chart-title{font-size:12px;color:#fff;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
 .nw-chart{height:120px}
@@ -661,16 +682,16 @@ function renderLogs(logs){
 }
 
 function loadDashboard(){
-	$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns").html(\'<div class="nw-spinner"></div>\');
-	$("#nw-recent-characters,#nw-recent-worlds,#nw-recent-campaigns").text("Last 7d: \u2014");
+	$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns,#nw-stat-deck-cards").html(\'<div class="nw-spinner"></div>\');
+	$("#nw-recent-characters,#nw-recent-worlds,#nw-recent-campaigns,#nw-recent-deck-cards").text("Last 7d: \u2014");
 	$("#nw-health-worlds-without-campaigns,#nw-health-campaigns-without-character").text("\u2014");
 	$("#nw-alerts").html(\'<div class="nw-alert-card nw-alert-card-loading"><div class="nw-spinner"></div><span>Refreshing\u2026</span></div>\');
 	$("#nw-logs").html(\'<div class="nw-empty-state">Loading recent events\u2026</div>\');
-	$("#nw-chart-characters,#nw-chart-worlds,#nw-chart-campaigns").html(\'<div class="nw-chart-empty">Loading\u2026</div>\');
+	$("#nw-chart-characters,#nw-chart-worlds,#nw-chart-campaigns,#nw-chart-deck-cards").html(\'<div class="nw-chart-empty">Loading\u2026</div>\');
 
 	$.post(ajaxurl,{action:"nw_dashboard_data",nonce:$("#nw-dash-nonce").val()},function(res){
 		if(!res.success){
-			$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns").text("\u2014");
+			$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns,#nw-stat-deck-cards").text("\u2014");
 			renderAlerts([{level:"warn",label:"Dashboard",text:(res.data||"Could not load dashboard data.")}]);
 			$("#nw-logs").html(\'<div class="nw-empty-state">Could not load logs.</div>\');
 			return;
@@ -683,10 +704,12 @@ function loadDashboard(){
 		$("#nw-stat-characters").text(c.characters||0);
 		$("#nw-stat-worlds").text(c.worlds||0);
 		$("#nw-stat-campaigns").text(c.campaigns||0);
+		$("#nw-stat-deck-cards").text(c.deck_cards||0);
 
 		$("#nw-recent-characters").text("Last 7d: +"+(r.characters_7d||0));
 		$("#nw-recent-worlds").text("Last 7d: +"+(r.worlds_7d||0));
 		$("#nw-recent-campaigns").text("Last 7d: +"+(r.campaigns_7d||0));
+		$("#nw-recent-deck-cards").text("Last 7d: +"+(r.deck_cards_7d||0));
 
 		$("#nw-health-worlds-without-campaigns").text(h.worlds_without_campaigns||0);
 		$("#nw-health-campaigns-without-character").text(h.campaigns_without_character||0);
@@ -694,6 +717,7 @@ function loadDashboard(){
 		drawSparkline("#nw-chart-characters",g.characters,"#adff00");
 		drawSparkline("#nw-chart-worlds",g.worlds,"#00d4ff");
 		drawSparkline("#nw-chart-campaigns",g.campaigns,"#ffb703");
+		drawSparkline("#nw-chart-deck-cards",g.deck_cards,"#ff5c5c");
 
 		renderAlerts(d.alerts||[]);
 		renderLogs(d.logs||[]);
