@@ -180,8 +180,8 @@ class NeoWeaver_Achievements_Admin {
                         <option value="1">Hidden until earned</option>
                         <option value="0">Always visible</option>
                     </select>
-                    <input type="text" id="nw-search" class="nw-search-input" placeholder="Search id or title…">
-                    <button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">↻ Refresh</button>
+                    <input type="text" id="nw-search" class="nw-search-input" placeholder="Search id or title&hellip;">
+                    <button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">&#8635; Refresh</button>
                     <button class="nw-btn nw-btn-primary" id="nw-add-btn">+ New Achievement</button>
                 </div>
             </div>
@@ -189,12 +189,12 @@ class NeoWeaver_Achievements_Admin {
             <div id="nw-notice" class="nw-notice" style="display:none;"></div>
 
             <div class="nw-stats-bar">
-                <span class="nw-stat-pill">Total: <strong id="nw-total">—</strong></span>
-                <span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">—</strong></span>
-                <span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">—</strong></span>
-                <span class="nw-stat-pill nw-pill-account">Account: <strong id="nw-count-account">—</strong></span>
-                <span class="nw-stat-pill nw-pill-character">Character: <strong id="nw-count-character">—</strong></span>
-                <span class="nw-stat-pill nw-pill-hidden">Hidden: <strong id="nw-count-hidden">—</strong></span>
+                <span class="nw-stat-pill">Total: <strong id="nw-total">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-account">Account: <strong id="nw-count-account">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-character">Character: <strong id="nw-count-character">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-hidden">Hidden: <strong id="nw-count-hidden">&mdash;</strong></span>
             </div>
 
             <div class="nw-table-wrap">
@@ -210,7 +210,7 @@ class NeoWeaver_Achievements_Admin {
                         <th>Actions</th>
                     </tr></thead>
                     <tbody id="nw-achievements-tbody">
-                        <tr><td colspan="8" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading…</td></tr>
+                        <tr><td colspan="8" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading&hellip;</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -220,7 +220,7 @@ class NeoWeaver_Achievements_Admin {
                 <div class="nw-modal">
                     <div class="nw-modal-header">
                         <h2 id="nw-modal-title">Edit Achievement</h2>
-                        <button class="nw-modal-close" id="nw-modal-close">✕</button>
+                        <button class="nw-modal-close" id="nw-modal-close">&#x2715;</button>
                     </div>
                     <div class="nw-modal-body">
                         <form id="nw-achievement-form">
@@ -238,17 +238,17 @@ class NeoWeaver_Achievements_Admin {
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>Description</label>
-                                    <textarea id="nw-field-description" name="description" rows="3" placeholder="Shown to player when earned…"></textarea>
+                                    <textarea id="nw-field-description" name="description" rows="3" placeholder="Shown to player when earned&hellip;"></textarea>
                                 </div>
                             </div>
 
                             <div class="nw-section-label">Appearance</div>
                             <div class="nw-form-grid">
                                 <div class="nw-field">
-                                    <label>Icon Slug <span class="nw-hint">(emoji 🏆 or Lucide slug e.g. trophy, compass, zap)</span></label>
+                                    <label>Icon Slug <span class="nw-hint">(emoji or Lucide slug e.g. trophy, compass, zap)</span></label>
                                     <div class="nw-icon-input-row">
                                         <span id="nw-icon-preview" class="nw-icon-preview"><i data-lucide="trophy"></i></span>
-                                        <input type="text" id="nw-field-icon_slug" name="icon_slug" placeholder="e.g. 🏆 or trophy">
+                                        <input type="text" id="nw-field-icon_slug" name="icon_slug" placeholder="e.g. trophy">
                                     </div>
                                 </div>
                                 <div class="nw-field">
@@ -273,7 +273,7 @@ class NeoWeaver_Achievements_Admin {
                                 <div class="nw-field">
                                     <label>Category</label>
                                     <select id="nw-field-category" name="category" class="nw-select">
-                                        <option value="">— None —</option>
+                                        <option value="">&mdash; None &mdash;</option>
                                         <?php foreach ( $this->categories as $c ) : ?>
                                             <option value="<?php echo esc_attr($c); ?>"><?php echo esc_html(ucfirst($c)); ?></option>
                                         <?php endforeach; ?>
@@ -312,13 +312,13 @@ class NeoWeaver_Achievements_Admin {
                                 <div class="nw-badge-icon" id="nw-badge-icon"><i data-lucide="trophy"></i></div>
                                 <div>
                                     <div class="nw-badge-title" id="nw-preview-title">Achievement Title</div>
-                                    <div class="nw-badge-desc"  id="nw-preview-desc">Description…</div>
+                                    <div class="nw-badge-desc"  id="nw-preview-desc">Description&hellip;</div>
                                 </div>
                             </div>
                         </form>
                     </div>
                     <div class="nw-modal-footer">
-                        <button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">🗑 Delete</button>
+                        <button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">&#128465; Delete</button>
                         <button class="nw-btn nw-btn-ghost" id="nw-cancel-btn">Cancel</button>
                         <button class="nw-btn nw-btn-primary" id="nw-save-btn"><span id="nw-save-label">Save Achievement</span></button>
                     </div>
@@ -440,15 +440,13 @@ jQuery(function($){
     function notice(msg,type){var el=$('#nw-notice');el.attr('class','nw-notice nw-notice-'+type).text(msg).show();setTimeout(function(){el.fadeOut(300);},3500);}
 
     /**
-     * renderIcon(slug) → HTML string
-     * If slug is a single emoji character, render as text span.
-     * Otherwise treat as a Lucide icon name and render <i data-lucide="slug">.
-     * After inserting into the DOM, call lucide.createIcons() on the container.
+     * isEmoji: true if first codepoint is outside ASCII or is a known emoji range.
+     * Uses codepoint ranges instead of \p{Emoji} regex for broad browser compat.
      */
     function isEmoji(s){
         if(!s) return false;
         var cp=s.codePointAt(0);
-        return cp>255 || /\p{Emoji}/u.test(s.charAt(0));
+        return cp>127;
     }
 
     function renderIcon(slug){
@@ -492,13 +490,13 @@ jQuery(function($){
         mission:'nw-cat-badge-mission',loot:'nw-cat-badge-loot',secret:'nw-cat-badge-secret',system:'nw-cat-badge-system'};
 
     function catBadge(cat){
-        if(!cat) return '<span style="color:#555">—</span>';
+        if(!cat) return '<span style="color:#555">\u2014</span>';
         var cls=catClass[cat]||'';
         return '<span class="nw-cat-badge '+cls+'">'+esc(cat)+'</span>';
     }
     function scopeBadge(scope){
         var cls=scope==='character'?'nw-scope-badge-character':'';
-        return '<span class="nw-scope-badge '+cls+'">'+esc(scope||'—')+'</span>';
+        return '<span class="nw-scope-badge '+cls+'">'+esc(scope||'\u2014')+'</span>';
     }
 
     /* ---- render table ---- */
@@ -510,14 +508,14 @@ jQuery(function($){
             var bg=esc(a.bg_color||'#2c3e50');
             var badgeHtml='<div class="nw-ach-badge" style="background:'+bg+'">'+renderIcon(a.icon_slug)+'</div>';
             var hiddenHtml=a.hidden_until_earned
-                ?'<span class="nw-hidden-yes" title="Hidden until earned">👁️​ hidden</span>'
+                ?'<span class="nw-hidden-yes" title="Hidden until earned">&#128065; hidden</span>'
                 :'<span class="nw-hidden-no">visible</span>';
             return '<tr data-id="'+esc(a.id)+'" class="'+((!active)?'nw-row-inactive':'')+'">'\
                 +'<td>'+badgeHtml+'</td>'\
                 +'<td><div class="nw-ach-title">'+esc(a.title)+'</div><div class="nw-ach-id">'+esc(a.id)+'</div></td>'\
                 +'<td>'+catBadge(a.category)+'</td>'\
                 +'<td>'+scopeBadge(a.scope)+'</td>'\
-                +'<td><span class="nw-goal-val">×'+esc(String(a.goal||1))+'</span></td>'\
+                +'<td><span class="nw-goal-val">\u00d7'+esc(String(a.goal||1))+'</span></td>'\
                 +'<td>'+hiddenHtml+'</td>'\
                 +'<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="'+esc(a.id)+'" '+(active?'checked':'')+'><span class="nw-toggle-slider"></span></label></td>'\
                 +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+esc(a.id)+'">Edit</button></div></td>'\
@@ -550,7 +548,7 @@ jQuery(function($){
 
     /* ---- load ---- */
     function loadAll(){
-        $('#nw-achievements-tbody').html('<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading…</td></tr>');
+        $('#nw-achievements-tbody').html('<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading\u2026</td></tr>');
         $.post(ajaxurl,{action:'nw_achievements_get_all',nonce:nonce},function(res){
             if(!res.success){notice('Error: '+res.data,'error');return;}
             all=res.data||[];
@@ -578,7 +576,7 @@ jQuery(function($){
     /* ---- preview ---- */
     function updatePreview(){
         var title=$('#nw-field-title').val()||'Achievement Title';
-        var desc=$('#nw-field-description').val()||'Description…';
+        var desc=$('#nw-field-description').val()||'Description\u2026';
         var slug=$('#nw-field-icon_slug').val()||'trophy';
         var bg=$('#nw-field-bg_color').val()||'#2c3e50';
         $('#nw-preview-title').text(title);
@@ -652,7 +650,7 @@ jQuery(function($){
         if(!$('#nw-field-id').val().trim()){notice('ID (slug) is required.','error');return;}
         if(!$('#nw-field-title').val().trim()){notice('Title is required.','error');return;}
         var btn=$(this); btn.prop('disabled',true);
-        $('#nw-save-label').text('Saving…');
+        $('#nw-save-label').text('Saving\u2026');
         var fd={action:'nw_achievements_save',nonce:nonce,achievement:{}};
         $('#nw-achievement-form').serializeArray().forEach(function(f){
             if(f.name!=='is_active'&&f.name!=='hidden_until_earned') fd.achievement[f.name]=f.value;
