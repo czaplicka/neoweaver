@@ -33,9 +33,6 @@ class NeoWeaver_Admin {
 			'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg() ),
 			30
 		);
-		// WordPress auto-creates a first submenu mirroring the parent.
-		// We rename it in rename_first_submenu() — do NOT call
-		// add_submenu_page() with the same slug here (causes duplicates).
 	}
 
 	public function rename_first_submenu(): void {
@@ -80,11 +77,11 @@ class NeoWeaver_Admin {
 			wp_send_json_error( 'Supabase not configured.' );
 		}
 
-		// table name => stat key
+		// stat key => Supabase table name (must match schema exactly)
 		$tables = [
 			'worlds'    => 'cyber_worlds',
 			'agents'    => 'cyber_characters',
-			'campaigns' => 'cyber_campaigns',
+			'campaigns' => 'cyber_campaign',   // no trailing 's' — matches schema
 		];
 
 		$counts = [];
