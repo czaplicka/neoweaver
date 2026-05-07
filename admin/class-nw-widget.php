@@ -13,15 +13,21 @@ class NeoWeaver_Stats_Widget {
     private string $supabase_key;
 
     public function __construct() {
-        // Credentials stored in wp-config.php as:
-        // define('SUPABASE_URL', 'https://xxxx.supabase.co');
-        // define('SUPABASE_KEY', 'your-anon-or-service-role-key');
-        $this->supabase_url = defined('SUPABASE_URL') ? rtrim(SUPABASE_URL, '/') : '';
-        $this->supabase_key = defined('SUPABASE_KEY') ? SUPABASE_KEY : '';
+        // Use the same credential helpers as the rest of the plugin.
+        // Falls back to SUPABASE_URL / SUPABASE_KEY constants if helpers absent.
+        $this->supabase_url = function_exists( 'tw_supabase_url' )
+            ? rtrim( tw_supabase_url(), '/' )
+            : ( defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '' );
 
-        add_action( 'wp_dashboard_setup', [ $this, 'register_widget' ] );
+        $this->supabase_key = function_exists( 'tw_supabase_service_key' )
+            ? tw_supabase_service_key()
+            : ( function_exists( 'tw_supabase_anon_key' )
+                ? tw_supabase_anon_key()
+                : ( defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '' ) );
+
+        add_action( 'wp_dashboard_setup',          [ $this, 'register_widget'     ] );
         add_action( 'wp_ajax_neoweaver_refresh_stats', [ $this, 'ajax_refresh_stats' ] );
-        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+        add_action( 'admin_enqueue_scripts',        [ $this, 'enqueue_assets'      ] );
     }
 
     public function register_widget(): void {
@@ -78,13 +84,13 @@ class NeoWeaver_Stats_Widget {
             return $cached;
         }
 
+        // Table names must match Supabase schema exactly (prefix cyber_ + underscore)
         $stats = [
-            'worlds'   => $this->get_count( 'cyberworlds' ),
-            'agents'   => $this->get_count( 'cybercharacters' ),
-            'campaigns'=> $this->get_count( 'cybercampaign' ),
+            'worlds'    => $this->get_count( 'cyber_worlds' ),
+            'agents'    => $this->get_count( 'cyber_characters' ),
+            'campaigns' => $this->get_count( 'cyber_campaign' ),  // no trailing 's'
         ];
 
-        // Cache for 5 minutes
         set_transient( $cache_key, $stats, 5 * MINUTE_IN_SECONDS );
 
         return $stats;
@@ -94,25 +100,25 @@ class NeoWeaver_Stats_Widget {
         $stats = $this->get_all_stats();
         $items = [
             [
-                'label' => 'Worlds',
+                'label'    => 'Worlds',
                 'sublabel' => 'Nodes',
-                'count' => $stats['worlds'],
-                'icon'  => '🌐',
-                'color' => '#adff00',
+                'count'    => $stats['worlds'],
+                'icon'     => '🌐',
+                'color'    => '#adff00',
             ],
             [
-                'label' => 'Field Agents',
+                'label'    => 'Field Agents',
                 'sublabel' => 'Characters',
-                'count' => $stats['agents'],
-                'icon'  => '🧬',
-                'color' => '#00d4ff',
+                'count'    => $stats['agents'],
+                'icon'     => '🧬',
+                'color'    => '#00d4ff',
             ],
             [
-                'label' => 'Deployments',
+                'label'    => 'Deployments',
                 'sublabel' => 'Campaigns',
-                'count' => $stats['campaigns'],
-                'icon'  => '⚔️',
-                'color' => '#ff6b35',
+                'count'    => $stats['campaigns'],
+                'icon'     => '⚔️',
+                'color'    => '#ff6b35',
             ],
         ];
         ?>
@@ -150,7 +156,6 @@ class NeoWeaver_Stats_Widget {
             wp_send_json_error( 'Forbidden', 403 );
         }
 
-        // Bust cache and re-fetch
         delete_transient( 'neoweaver_stats_counts' );
         $stats = $this->get_all_stats();
 
