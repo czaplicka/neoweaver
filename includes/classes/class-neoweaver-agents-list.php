@@ -11,6 +11,29 @@ class Neoweaver_Agents_List {
         $this->repo = $repo;
     }
 
+    /**
+     * Enqueue CSS + JS for the agents list.
+     * Call this from your shortcode/page handler before render_roster().
+     */
+    public static function enqueue_assets(): void {
+        $base = plugin_dir_url( dirname( __DIR__ ) );
+
+        wp_enqueue_style(
+            'tw-agents-list',
+            $base . 'assets/css/agents-list.css',
+            [],
+            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/css/agents-list.css' )
+        );
+
+        wp_enqueue_script(
+            'tw-agents-list',
+            $base . 'assets/js/agents-list.js',
+            [],
+            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/agents-list.js' ),
+            true  // load in footer
+        );
+    }
+
     public function render_roster( int $wp_user_id ): string {
 
         $supabase_url = function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '';
