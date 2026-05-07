@@ -196,7 +196,18 @@
 				formState[ key ] = { value: checked.value, label: labels[ checked.value ] || checked.value };
 				return true;
 			}
-
+if ( phase === 'NODE & AGENT BINDING' ) {
+    if ( ! formState.world_id ) {
+        showFieldError( step, 'Select a Node (world) to continue.' );
+        return false;
+    }
+    if ( ! formState.character_id ) {
+        showFieldError( step, 'Select an Agent to continue.' );
+        NW_SFX.error();
+        return false;
+    }
+    return true;
+}
 			return true;
 		}
 
