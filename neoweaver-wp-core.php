@@ -15,7 +15,31 @@ define( 'NEOWEAVER_VERSION', '0.7.1' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+public static function enqueue_agents_list_assets(): void {
+    wp_enqueue_style(
+        'neoweaver-agents-list',
+        NEOWEAVER_PLUGIN_URL . 'assets/css/agents-list.css',
+        [],
+        NEOWEAVER_VERSION
+    );
 
+    wp_enqueue_script(
+        'neoweaver-agents-list',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/agents-list.js',
+        [],
+        NEOWEAVER_VERSION,
+        true // footer
+    );
+
+    wp_localize_script(
+        'neoweaver-agents-list',
+        'twCharData',
+        [
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
+        ]
+    );
+}
 final class NeoWeaver_Core {
 
 	public static function init() {
@@ -27,6 +51,7 @@ final class NeoWeaver_Core {
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_checkout_assets' ] );
 		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_agents_list_assets' ] );
 	}
 
 	private static function load_files() {
