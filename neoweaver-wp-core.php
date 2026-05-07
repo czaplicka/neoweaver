@@ -217,14 +217,21 @@ final class NeoWeaver_Core {
 		] );
 	}
 
-	// -------------------------------------------------------------------------
-	// FIX: przeniesione do środka klasy (było poza klasą jako funkcja globalna)
-	// FIX: usunięto inline <script>window.twCharData</script> z render_roster()
-	// -------------------------------------------------------------------------
 	public static function enqueue_agents_list_assets(): void {
-		// Ładuj tylko na stronach, które zawierają shortcode z listą agentów.
-		// Zmień 'my-agents' na właściwy slug/ID strony jeśli inny.
-		if ( ! is_page( 'agents' ) ) return;
+		// Shortcode [neoweaver_weaver_list] ustawia globalny flag gdy jest na stronie.
+		// Używamy has_shortcode() na post content — ładujemy assets tylko tam gdzie faktycznie jest shortcode.
+		global $post;
+		if ( ! is_a( $post, 'WP_Post' ) ) return;
+
+		$shortcodes = [ 'neoweaver_weaver_list', 'tw_agents_list', 'neoweaver_agents_list' ];
+		$has = false;
+		foreach ( $shortcodes as $sc ) {
+			if ( has_shortcode( $post->post_content, $sc ) ) {
+				$has = true;
+				break;
+			}
+		}
+		if ( ! $has ) return;
 
 		wp_enqueue_style(
 			'neoweaver-agents-list',
