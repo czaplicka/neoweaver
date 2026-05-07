@@ -16,8 +16,8 @@ class NeoWeaver_Abilities_Admin {
     private string $parent_slug = 'neoweaver';
 
     public function __construct() {
-        $this->supabase_url = rtrim( nw_supabase_url(), '/' );
-        $this->supabase_key = nw_supabase_key();
+        $this->supabase_url = rtrim( tw_supabase_url(), '/' );
+        $this->supabase_key = tw_supabase_anon_key();
 
         add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -433,7 +433,6 @@ jQuery(function($){
     $("#nw-filter-type").on("change",loadAll);
     $("#nw-search").on("input",applySearch);
 
-    /* modal */
     function openModal(id){
         $("#nw-ability-form")[0].reset();
         $("#nw-field-id").val("");
