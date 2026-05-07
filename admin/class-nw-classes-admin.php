@@ -16,8 +16,8 @@ class NeoWeaver_Classes_Admin {
     private string $parent_slug = 'neoweaver';
 
     public function __construct() {
-        $this->supabase_url = defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '';
-        $this->supabase_key = defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '';
+        $this->supabase_url = rtrim( tw_supabase_url(), '/' );
+        $this->supabase_key = tw_supabase_anon_key();
 
         add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -142,7 +142,7 @@ class NeoWeaver_Classes_Admin {
 
                             </div>
 
-                            <div class="nw-section-label">Mechanics & Lore</div>
+                            <div class="nw-section-label">Mechanics &amp; Lore</div>
                             <div class="nw-form-grid">
 
                                 <div class="nw-field nw-field-full">
@@ -227,7 +227,7 @@ class NeoWeaver_Classes_Admin {
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
         $res = $this->supa( 'GET',
-            'cyberclasses?select=id,name,tags,starting_gold,starting_package_id,gm_instructions,mechanics,icon_slug,ai_personality_modifier,attribute_bonuses,vulnerability,img_url,created_at&order=name.asc'
+            'cyber_classes?select=id,name,tags,starting_gold,starting_package_id,gm_instructions,mechanics,icon_slug,ai_personality_modifier,attribute_bonuses,vulnerability,img_url,created_at&order=name.asc'
         );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
     }
@@ -245,22 +245,22 @@ class NeoWeaver_Classes_Admin {
         $tags = array_values( array_filter( array_map( 'trim', explode( ',', sanitize_text_field( $raw['tags'] ?? '' ) ) ) ) );
 
         $payload = [
-            'name'                   => sanitize_text_field(     $raw['name']                   ?? '' ),
-            'icon_slug'              => sanitize_text_field(     $raw['icon_slug']              ?? '' ) ?: null,
-            'vulnerability'          => sanitize_text_field(     $raw['vulnerability']          ?? '' ) ?: null,
-            'attribute_bonuses'      => sanitize_text_field(     $raw['attribute_bonuses']      ?? '' ) ?: null,
-            'mechanics'              => sanitize_textarea_field( $raw['mechanics']              ?? '' ) ?: null,
-            'gm_instructions'        => sanitize_textarea_field( $raw['gm_instructions']        ?? '' ) ?: null,
-            'ai_personality_modifier'=> sanitize_textarea_field( $raw['ai_personality_modifier']?? '' ) ?: null,
-            'img_url'                => esc_url_raw(             $raw['img_url']               ?? '' ) ?: null,
-            'starting_gold'          => strlen( $raw['starting_gold'] ?? '' ) ? (int) $raw['starting_gold'] : null,
-            'starting_package_id'    => sanitize_text_field(     $raw['starting_package_id']    ?? '' ) ?: null,
-            'tags'                   => $tags,
+            'name'                    => sanitize_text_field(     $raw['name']                    ?? '' ),
+            'icon_slug'               => sanitize_text_field(     $raw['icon_slug']               ?? '' ) ?: null,
+            'vulnerability'           => sanitize_text_field(     $raw['vulnerability']           ?? '' ) ?: null,
+            'attribute_bonuses'       => sanitize_text_field(     $raw['attribute_bonuses']       ?? '' ) ?: null,
+            'mechanics'               => sanitize_textarea_field( $raw['mechanics']               ?? '' ) ?: null,
+            'gm_instructions'         => sanitize_textarea_field( $raw['gm_instructions']         ?? '' ) ?: null,
+            'ai_personality_modifier' => sanitize_textarea_field( $raw['ai_personality_modifier'] ?? '' ) ?: null,
+            'img_url'                 => esc_url_raw(             $raw['img_url']                 ?? '' ) ?: null,
+            'starting_gold'           => strlen( $raw['starting_gold'] ?? '' ) ? (int) $raw['starting_gold'] : null,
+            'starting_package_id'     => sanitize_text_field(     $raw['starting_package_id']     ?? '' ) ?: null,
+            'tags'                    => $tags,
         ];
 
         $res = $id
-            ? $this->supa( 'PATCH', 'cyberclasses?id=eq.' . urlencode( $id ), $payload )
-            : $this->supa( 'POST',  'cyberclasses', $payload );
+            ? $this->supa( 'PATCH', 'cyber_classes?id=eq.' . urlencode( $id ), $payload )
+            : $this->supa( 'POST',  'cyber_classes', $payload );
 
         if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
         $code = $res['code'] ?? 0;
@@ -278,7 +278,7 @@ class NeoWeaver_Classes_Admin {
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $id = sanitize_text_field( $_POST['class_id'] ?? '' );
         if ( ! $id ) wp_send_json_error( 'Missing ID' );
-        $res = $this->supa( 'DELETE', 'cyberclasses?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
+        $res = $this->supa( 'DELETE', 'cyber_classes?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 
@@ -393,7 +393,6 @@ jQuery(function($){
 
     $("#nw-search").on("input",applySearch);
 
-    /* modal */
     function openModal(id){
         $("#nw-class-form")[0].reset();
         $("#nw-field-id").val("");
