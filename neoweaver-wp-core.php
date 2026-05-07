@@ -218,12 +218,15 @@ final class NeoWeaver_Core {
 	}
 
 	public static function enqueue_agents_list_assets(): void {
-		// Shortcode [neoweaver_weaver_list] ustawia globalny flag gdy jest na stronie.
-		// Używamy has_shortcode() na post content — ładujemy assets tylko tam gdzie faktycznie jest shortcode.
 		global $post;
 		if ( ! is_a( $post, 'WP_Post' ) ) return;
 
-		$shortcodes = [ 'neoweaver_weaver_list', 'tw_agents_list', 'neoweaver_agents_list' ];
+		$shortcodes = [
+			'tw_list_characters',    // registered in Neoweaver_Public
+			'neoweaver_weaver_list',
+			'tw_agents_list',
+			'neoweaver_agents_list',
+		];
 		$has = false;
 		foreach ( $shortcodes as $sc ) {
 			if ( has_shortcode( $post->post_content, $sc ) ) {
