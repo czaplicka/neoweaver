@@ -111,7 +111,9 @@ final class NeoWeaver_Core {
 				require_once $admin_main;
 			}
 			foreach ( glob( NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-*.php' ) ?: [] as $file ) {
-				if ( realpath( $file ) !== realpath( $admin_main ) ) {
+				// Skip class-nw-admin.php by basename to avoid loading it twice
+				// (realpath() comparison can fail with symlinks or path differences).
+				if ( basename( $file ) !== 'class-nw-admin.php' ) {
 					require_once $file;
 				}
 			}
