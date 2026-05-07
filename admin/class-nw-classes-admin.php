@@ -1,9 +1,9 @@
 <?php
 /**
  * NeoWeaver Admin Panel — Classes (cyberclasses)
- * Columns: id (uuid), name, tags (jsonb), starting_gold, starting_package_id,
- *          gm_instructions, mechanics, icon_slug, ai_personality_modifier,
- *          attribute_bonuses, vulnerability, img_url, created_at
+ * Schema: id, name, description, tags (jsonb), starting_gold, gm_instructions,
+ *         ai_personality_modifier, mechanics, attribute_bonuses (jsonb),
+ *         vulnerability, icon_slug, img_url, is_active, skill_limit, created_at
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -77,6 +77,7 @@ class NeoWeaver_Classes_Admin {
 
             <div class="nw-stats-bar">
                 <span class="nw-stat-pill">Total: <strong id="nw-total">—</strong></span>
+                <span class="nw-stat-pill">Active: <strong id="nw-active">—</strong></span>
             </div>
 
             <div class="nw-table-wrap">
@@ -84,14 +85,15 @@ class NeoWeaver_Classes_Admin {
                     <thead><tr>
                         <th class="nw-col-img"></th>
                         <th>Name</th>
-                        <th>Icon Slug</th>
                         <th>Tags</th>
-                        <th>Starting Gold</th>
+                        <th>Gold</th>
+                        <th>Skill Limit</th>
                         <th>Vulnerability</th>
+                        <th>Active</th>
                         <th>Actions</th>
                     </tr></thead>
                     <tbody id="nw-classes-tbody">
-                        <tr class="nw-loading-row"><td colspan="7"><div class="nw-spinner"></div> Loading classes…</td></tr>
+                        <tr class="nw-loading-row"><td colspan="8"><div class="nw-spinner"></div> Loading classes…</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -115,6 +117,11 @@ class NeoWeaver_Classes_Admin {
                                     <input type="text" id="nw-field-name" name="name" required placeholder="e.g. Shadowblade">
                                 </div>
 
+                                <div class="nw-field nw-field-full">
+                                    <label>Description</label>
+                                    <textarea id="nw-field-description" name="description" rows="2" placeholder="Short class description visible to players…"></textarea>
+                                </div>
+
                                 <div class="nw-field">
                                     <label>Icon Slug</label>
                                     <input type="text" id="nw-field-icon_slug" name="icon_slug" placeholder="e.g. shadowblade">
@@ -122,12 +129,12 @@ class NeoWeaver_Classes_Admin {
 
                                 <div class="nw-field">
                                     <label>Starting Gold</label>
-                                    <input type="number" id="nw-field-starting_gold" name="starting_gold" min="0" placeholder="0">
+                                    <input type="number" id="nw-field-starting_gold" name="starting_gold" min="0" placeholder="100">
                                 </div>
 
                                 <div class="nw-field">
-                                    <label>Starting Package ID <span class="nw-hint">(uuid)</span></label>
-                                    <input type="text" id="nw-field-starting_package_id" name="starting_package_id" placeholder="uuid…">
+                                    <label>Skill Limit</label>
+                                    <input type="number" id="nw-field-skill_limit" name="skill_limit" min="0" placeholder="3">
                                 </div>
 
                                 <div class="nw-field">
@@ -138,6 +145,14 @@ class NeoWeaver_Classes_Admin {
                                 <div class="nw-field nw-field-full">
                                     <label>Tags <span class="nw-hint">(comma-separated → JSON array)</span></label>
                                     <input type="text" id="nw-field-tags" name="tags" placeholder="e.g. Stealth, Melee, Shadow">
+                                </div>
+
+                                <div class="nw-field">
+                                    <label>Active</label>
+                                    <select id="nw-field-is_active" name="is_active">
+                                        <option value="1">Yes</option>
+                                        <option value="0">No</option>
+                                    </select>
                                 </div>
 
                             </div>
@@ -161,8 +176,8 @@ class NeoWeaver_Classes_Admin {
                                 </div>
 
                                 <div class="nw-field nw-field-full">
-                                    <label>Attribute Bonuses</label>
-                                    <input type="text" id="nw-field-attribute_bonuses" name="attribute_bonuses" placeholder="e.g. +2 Reflex, +1 Mind">
+                                    <label>Attribute Bonuses <span class="nw-hint">(JSON object, e.g. {"Reflex":2,"Mind":1})</span></label>
+                                    <input type="text" id="nw-field-attribute_bonuses" name="attribute_bonuses" placeholder='{"Reflex":2,"Mind":1}'>
                                 </div>
 
                             </div>
@@ -227,7 +242,7 @@ class NeoWeaver_Classes_Admin {
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
         $res = $this->supa( 'GET',
-            'cyber_classes?select=id,name,tags,starting_gold,starting_package_id,gm_instructions,mechanics,icon_slug,ai_personality_modifier,attribute_bonuses,vulnerability,img_url,created_at&order=name.asc'
+            'cyber_classes?select=id,name,description,tags,starting_gold,gm_instructions,mechanics,icon_slug,ai_personality_modifier,attribute_bonuses,vulnerability,img_url,is_active,skill_limit,created_at&order=name.asc'
         );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
     }
@@ -242,19 +257,33 @@ class NeoWeaver_Classes_Admin {
 
         $raw  = $_POST['nw_class'] ?? [];
         $id   = sanitize_text_field( $raw['id'] ?? '' );
-        $tags = array_values( array_filter( array_map( 'trim', explode( ',', sanitize_text_field( $raw['tags'] ?? '' ) ) ) ) );
+
+        // tags: comma-separated → JSON array
+        $tags = array_values( array_filter( array_map( 'trim',
+            explode( ',', sanitize_text_field( $raw['tags'] ?? '' ) )
+        ) ) );
+
+        // attribute_bonuses: JSON string → decoded object (jsonb column)
+        $ab_raw = trim( sanitize_text_field( $raw['attribute_bonuses'] ?? '' ) );
+        $attribute_bonuses = null;
+        if ( $ab_raw ) {
+            $decoded = json_decode( $ab_raw, true );
+            $attribute_bonuses = ( json_last_error() === JSON_ERROR_NONE ) ? $decoded : null;
+        }
 
         $payload = [
             'name'                    => sanitize_text_field(     $raw['name']                    ?? '' ),
+            'description'             => sanitize_textarea_field( $raw['description']             ?? '' ) ?: null,
             'icon_slug'               => sanitize_text_field(     $raw['icon_slug']               ?? '' ) ?: null,
             'vulnerability'           => sanitize_text_field(     $raw['vulnerability']           ?? '' ) ?: null,
-            'attribute_bonuses'       => sanitize_text_field(     $raw['attribute_bonuses']       ?? '' ) ?: null,
+            'attribute_bonuses'       => $attribute_bonuses,
             'mechanics'               => sanitize_textarea_field( $raw['mechanics']               ?? '' ) ?: null,
             'gm_instructions'         => sanitize_textarea_field( $raw['gm_instructions']         ?? '' ) ?: null,
             'ai_personality_modifier' => sanitize_textarea_field( $raw['ai_personality_modifier'] ?? '' ) ?: null,
             'img_url'                 => esc_url_raw(             $raw['img_url']                 ?? '' ) ?: null,
-            'starting_gold'           => strlen( $raw['starting_gold'] ?? '' ) ? (int) $raw['starting_gold'] : null,
-            'starting_package_id'     => sanitize_text_field(     $raw['starting_package_id']     ?? '' ) ?: null,
+            'starting_gold'           => isset( $raw['starting_gold'] ) && $raw['starting_gold'] !== '' ? (int) $raw['starting_gold'] : 100,
+            'skill_limit'             => isset( $raw['skill_limit']   ) && $raw['skill_limit']   !== '' ? (int) $raw['skill_limit']   : 3,
+            'is_active'               => ( ( $raw['is_active'] ?? '1' ) === '1' ),
             'tags'                    => $tags,
         ];
 
@@ -313,11 +342,12 @@ class NeoWeaver_Classes_Admin {
 .nw-class-img{width:40px;height:40px;border-radius:6px;object-fit:cover;border:1px solid #2e2e2e;background:#1a1a1a}
 .nw-class-img-placeholder{width:40px;height:40px;border-radius:6px;background:#1a1a1a;border:1px solid #2e2e2e;display:flex;align-items:center;justify-content:center;color:#444;font-size:20px}
 .nw-class-name{font-weight:600;color:#fff}.nw-class-sub{font-size:11px;color:#555;margin-top:2px}
-.nw-icon-slug{font-size:11px;color:#666;font-family:monospace;background:#1a1a1a;padding:2px 6px;border-radius:3px;border:1px solid #2a2a2a}
 .nw-gold{color:#e8af34;font-weight:700;font-size:13px}
 .nw-vuln{font-size:11px;color:#ff6b35}
 .nw-tags{display:flex;flex-wrap:wrap;gap:4px}
 .nw-tag{font-size:10px;padding:2px 7px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:3px;color:#888}
+.nw-badge-active{font-size:10px;padding:2px 8px;border-radius:20px;background:#0a2800;border:1px solid #2a5000;color:#adff00}
+.nw-badge-inactive{font-size:10px;padding:2px 8px;border-radius:20px;background:#1a1a1a;border:1px solid #2e2e2e;color:#555}
 .nw-row-actions{display:flex;gap:6px}
 .nw-action-btn{font-family:'Chakra Petch',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #2e2e2e;background:transparent;color:#aaa;cursor:pointer;transition:all .15s;text-transform:uppercase}
 .nw-action-btn:hover{border-color:#adff00;color:#adff00}
@@ -338,8 +368,8 @@ class NeoWeaver_Classes_Admin {
 .nw-field{display:flex;flex-direction:column;gap:5px}.nw-field-full{grid-column:1/-1}
 .nw-field label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#666;font-weight:600}
 .nw-req{color:#ff4444}.nw-hint{font-size:10px;color:#444;text-transform:none;letter-spacing:0;font-weight:400}
-.nw-field input[type="text"],.nw-field input[type="url"],.nw-field input[type="number"],.nw-field textarea{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#e0e0e0;padding:8px 10px;font-family:'Chakra Petch',monospace;font-size:13px;transition:border-color .15s;width:100%}
-.nw-field input:focus,.nw-field textarea:focus{outline:none;border-color:#adff00;box-shadow:0 0 0 2px rgba(173,255,0,.08)}
+.nw-field input[type="text"],.nw-field input[type="url"],.nw-field input[type="number"],.nw-field textarea,.nw-field select{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#e0e0e0;padding:8px 10px;font-family:'Chakra Petch',monospace;font-size:13px;transition:border-color .15s;width:100%}
+.nw-field input:focus,.nw-field textarea:focus,.nw-field select:focus{outline:none;border-color:#adff00;box-shadow:0 0 0 2px rgba(173,255,0,.08)}
 .nw-field textarea{resize:vertical}
 CSS;
     }
@@ -358,18 +388,20 @@ jQuery(function($){
 
     function renderTable(data){
         var tbody=$("#nw-classes-tbody");
-        if(!data.length){tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#555;">No classes found.</td></tr>');return;}
+        if(!data.length){tbody.html('<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;">No classes found.</td></tr>');return;}
         tbody.html(data.map(function(c){
             var tags=Array.isArray(c.tags)?c.tags:(c.tags?[c.tags]:[]);
             var tagsH=tags.slice(0,4).map(function(t){return'<span class="nw-tag">'+esc(t)+'</span>';}).join('')+(tags.length>4?'<span class="nw-tag">+'+(tags.length-4)+'</span>':'');
             var imgH=c.img_url?'<img src="'+esc(c.img_url)+'" class="nw-class-img" loading="lazy" onerror="this.style.display=\'none\'">':'<div class="nw-class-img-placeholder">⚔️</div>';
+            var activeH=c.is_active?'<span class="nw-badge-active">Active</span>':'<span class="nw-badge-inactive">Inactive</span>';
             return'<tr data-id="'+c.id+'">'
                 +'<td>'+imgH+'</td>'
-                +'<td><div class="nw-class-name">'+esc(c.name)+'</div></td>'
-                +'<td>'+(c.icon_slug?'<span class="nw-icon-slug">'+esc(c.icon_slug)+'</span>':'<span style="color:#444">—</span>')+'</td>'
+                +'<td><div class="nw-class-name">'+esc(c.name)+'</div>'+(c.description?'<div class="nw-class-sub">'+esc(c.description.substring(0,60))+(c.description.length>60?'…':'')+'</div>':'')+'</td>'
                 +'<td><div class="nw-tags">'+tagsH+'</div></td>'
                 +'<td>'+(c.starting_gold!=null?'<span class="nw-gold">'+c.starting_gold+' g</span>':'<span style="color:#444">—</span>')+'</td>'
+                +'<td><span style="color:#aaa">'+( c.skill_limit!=null?c.skill_limit:'—')+'</span></td>'
                 +'<td>'+(c.vulnerability?'<span class="nw-vuln">'+esc(c.vulnerability)+'</span>':'<span style="color:#444">—</span>')+'</td>'
+                +'<td>'+activeH+'</td>'
                 +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+c.id+'">Edit</button></div></td>'
                 +'</tr>';
         }).join(''));
@@ -382,35 +414,45 @@ jQuery(function($){
     }
 
     function loadAll(){
-        $("#nw-classes-tbody").html('<tr class="nw-loading-row"><td colspan="7"><div class="nw-spinner"></div> Loading…</td></tr>');
+        $("#nw-classes-tbody").html('<tr class="nw-loading-row"><td colspan="8"><div class="nw-spinner"></div> Loading…</td></tr>');
         $.post(ajaxurl,{action:"nw_classes_get_all",nonce:nonce},function(res){
             if(!res.success){notice("Error: "+res.data,"error");return;}
             all=res.data||[];
             $("#nw-total").text(all.length);
+            $("#nw-active").text(all.filter(function(c){return c.is_active;}).length);
             applySearch();
         }).fail(function(){notice("Request failed.","error");});
     }
 
     $("#nw-search").on("input",applySearch);
 
+    function abToStr(ab){
+        if(!ab)return'';
+        if(typeof ab==='string')return ab;
+        try{return JSON.stringify(ab);}catch(e){return'';}
+    }
+
     function openModal(id){
         $("#nw-class-form")[0].reset();
         $("#nw-field-id").val("");
         $("#nw-img-preview-wrap").hide();
+        $("#nw-field-is_active").val("1");
         if(id){
             var c=all.find(function(x){return x.id===id;});
             if(c){
                 $("#nw-field-id").val(c.id);
                 $("#nw-field-name").val(c.name||"");
+                $("#nw-field-description").val(c.description||"");
                 $("#nw-field-icon_slug").val(c.icon_slug||"");
                 $("#nw-field-starting_gold").val(c.starting_gold!=null?c.starting_gold:"");
-                $("#nw-field-starting_package_id").val(c.starting_package_id||"");
+                $("#nw-field-skill_limit").val(c.skill_limit!=null?c.skill_limit:"");
                 $("#nw-field-vulnerability").val(c.vulnerability||"");
                 $("#nw-field-tags").val(tagsStr(c.tags));
+                $("#nw-field-is_active").val(c.is_active?"1":"0");
                 $("#nw-field-mechanics").val(c.mechanics||"");
                 $("#nw-field-gm_instructions").val(c.gm_instructions||"");
                 $("#nw-field-ai_personality_modifier").val(c.ai_personality_modifier||"");
-                $("#nw-field-attribute_bonuses").val(c.attribute_bonuses||"");
+                $("#nw-field-attribute_bonuses").val(abToStr(c.attribute_bonuses));
                 if(c.img_url){$("#nw-field-img_url").val(c.img_url);$("#nw-img-preview").attr("src",c.img_url);$("#nw-img-preview-wrap").show();}
             }
             $("#nw-modal-title").text("Edit Class");
