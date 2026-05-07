@@ -266,6 +266,56 @@ class NeoWeaver_Admin {
 		return $count;
 	}
 
+	/**
+	 * Fetch deck breakdown by deck_category and rarity.
+	 * Returns arrays keyed by category / rarity with counts.
+	 */
+	private function supa_deck_breakdown() {
+		$path = 'cyber_deck?select=deck_category,rarity,is_active&limit=5000';
+		$res  = $this->supa_get( $path );
+		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
+
+		$categories = array(
+			'action'    => 0,
+			'magic'     => 0,
+			'equipment' => 0,
+		);
+		$rarities = array(
+			'common'    => 0,
+			'uncommon'  => 0,
+			'rare'      => 0,
+			'epic'      => 0,
+			'legendary' => 0,
+		);
+		$active_count   = 0;
+		$inactive_count = 0;
+
+		foreach ( $rows as $row ) {
+			$cat = isset( $row['deck_category'] ) ? $row['deck_category'] : '';
+			$rar = isset( $row['rarity'] )        ? $row['rarity']        : '';
+
+			if ( isset( $categories[ $cat ] ) ) {
+				$categories[ $cat ]++;
+			}
+			if ( isset( $rarities[ $rar ] ) ) {
+				$rarities[ $rar ]++;
+			}
+			if ( ! empty( $row['is_active'] ) ) {
+				$active_count++;
+			} else {
+				$inactive_count++;
+			}
+		}
+
+		return array(
+			'categories'     => $categories,
+			'rarities'       => $rarities,
+			'active_count'   => $active_count,
+			'inactive_count' => $inactive_count,
+			'total'          => count( $rows ),
+		);
+	}
+
 	/* ------------------------------------------------------------------ */
 	/*  AJAX: DASHBOARD                                                    */
 	/* ------------------------------------------------------------------ */
@@ -315,6 +365,8 @@ class NeoWeaver_Admin {
 			'campaigns_without_character' => $this->supa_campaigns_without_character(),
 		);
 
+		$deck_breakdown = $this->supa_deck_breakdown();
+
 		$alerts = array();
 
 		if ( $recent['characters_7d'] === 0 ) {
@@ -342,13 +394,14 @@ class NeoWeaver_Admin {
 		}
 
 		wp_send_json_success( array(
-			'counts'    => $counts,
-			'recent'    => $recent,
-			'growth'    => $growth,
-			'health'    => $health,
-			'alerts'    => $alerts,
-			'logs'      => $this->supa_recent_logs( 10 ),
-			'_debug'    => array(
+			'counts'         => $counts,
+			'recent'         => $recent,
+			'growth'         => $growth,
+			'health'         => $health,
+			'deck_breakdown' => $deck_breakdown,
+			'alerts'         => $alerts,
+			'logs'           => $this->supa_recent_logs( 10 ),
+			'_debug'         => array(
 				'key_type'    => $this->get_supa_key_type(),
 				'growth_meta' => array(
 					'characters' => array(
@@ -456,6 +509,53 @@ class NeoWeaver_Admin {
 						</div>
 					</div>
 				</section>
+
+				<!-- ======================================================= -->
+				<!-- DECK LIBRARY                                             -->
+				<!-- ======================================================= -->
+				<section class="nw-block">
+					<div class="nw-block-head">
+						<h2 class="nw-section-title">Deck Library</h2>
+						<span class="nw-section-kicker">cyber_deck breakdown</span>
+					</div>
+					<div class="nw-deck-grid">
+
+						<!-- Categories -->
+						<div class="nw-deck-col">
+							<div class="nw-deck-col-title">By Category</div>
+							<div class="nw-deck-bars" id="nw-deck-categories">
+								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
+							</div>
+						</div>
+
+						<!-- Rarities -->
+						<div class="nw-deck-col">
+							<div class="nw-deck-col-title">By Rarity</div>
+							<div class="nw-deck-bars" id="nw-deck-rarities">
+								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
+							</div>
+						</div>
+
+						<!-- Active / Inactive -->
+						<div class="nw-deck-col nw-deck-col-sm">
+							<div class="nw-deck-col-title">Status</div>
+							<div id="nw-deck-status">
+								<div class="nw-deck-status-row">
+									<span class="nw-deck-status-dot nw-deck-dot-active"></span>
+									<span class="nw-deck-status-label">Active</span>
+									<span class="nw-deck-status-val" id="nw-deck-active">&mdash;</span>
+								</div>
+								<div class="nw-deck-status-row">
+									<span class="nw-deck-status-dot nw-deck-dot-inactive"></span>
+									<span class="nw-deck-status-label">Inactive</span>
+									<span class="nw-deck-status-val" id="nw-deck-inactive">&mdash;</span>
+								</div>
+							</div>
+						</div>
+
+					</div>
+				</section>
+				<!-- /DECK LIBRARY -->
 
 				<div class="nw-grid-2">
 					<section class="nw-block">
@@ -578,6 +678,36 @@ class NeoWeaver_Admin {
 .nw-chart{height:120px}
 .nw-chart svg{width:100%;height:120px;display:block}
 .nw-chart-empty{height:120px;display:flex;align-items:center;justify-content:center;color:#666;font-size:12px;border:1px dashed #2a2a2a;border-radius:10px}
+/* ---- Deck Library ---- */
+.nw-deck-grid{display:grid;grid-template-columns:1fr 1fr 180px;gap:18px;align-items:start}
+@media(max-width:900px){.nw-deck-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.nw-deck-grid{grid-template-columns:1fr}}
+.nw-deck-col-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:12px}
+.nw-deck-bars{display:flex;flex-direction:column;gap:10px}
+.nw-deck-bar-row{display:flex;flex-direction:column;gap:4px}
+.nw-deck-bar-meta{display:flex;justify-content:space-between;font-size:11px;color:#aaa;text-transform:capitalize}
+.nw-deck-bar-track{height:8px;background:#1e1e1e;border-radius:999px;overflow:hidden}
+.nw-deck-bar-fill{height:100%;border-radius:999px;transition:width .5s ease}
+.nw-deck-bar-count{font-size:12px;color:#e0e0e0;font-weight:600;font-variant-numeric:tabular-nums}
+/* category colors */
+.nw-deck-cat-action{background:#adff00}
+.nw-deck-cat-magic{background:#00d4ff}
+.nw-deck-cat-equipment{background:#ffb703}
+/* rarity colors */
+.nw-deck-rar-common{background:#888}
+.nw-deck-rar-uncommon{background:#3cb371}
+.nw-deck-rar-rare{background:#4a9eff}
+.nw-deck-rar-epic{background:#a64dff}
+.nw-deck-rar-legendary{background:#ff9900}
+/* status */
+.nw-deck-status-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e1e1e}
+.nw-deck-status-row:last-child{border-bottom:none}
+.nw-deck-status-dot{width:10px;height:10px;border-radius:999px;flex-shrink:0}
+.nw-deck-dot-active{background:#adff00}
+.nw-deck-dot-inactive{background:#555}
+.nw-deck-status-label{flex:1;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.5px}
+.nw-deck-status-val{font-size:22px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+/* ---- /Deck Library ---- */
 .nw-alerts-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
 .nw-alert-card{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid #262626;background:#151515}
 .nw-alert-card-loading{align-items:center}
@@ -644,12 +774,31 @@ function drawSparkline(el,series,color){
 	}).join("");
 	var last=pts[pts.length-1];
 	var svg=\'<svg viewBox="0 0 \'+W+" "+H+\'" preserveAspectRatio="none" aria-hidden="true">\'
-		+\'<line x1="0" y1="\'+( H-pad)+\'" x2="\'+W+\'" y2="\'+( H-pad)+\'" stroke="#2c2c2c" stroke-width="1"></line>\'
+		+\'<line x1="0" y1="\'+(H-pad)+\'" x2="\'+W+\'" y2="\'+(H-pad)+\'" stroke="#2c2c2c" stroke-width="1"></line>\'
 		+bars
 		+\'<polyline fill="none" stroke="\'+color+\'" stroke-width="3" points="\'+line+\'"></polyline>\'
 		+\'<circle cx="\'+last[0].toFixed(2)+\'" cy="\'+last[1].toFixed(2)+\'" r="4" fill="\'+color+\'"></circle>\'
 		+\'</svg>\';
 	$el.html(svg);
+}
+
+function renderDeckBars(containerId, data, colorPrefix){
+	var $w=$(containerId);
+	if(!data||!Object.keys(data).length){
+		$w.html(\'<div class="nw-empty-state">No data</div>\');
+		return;
+	}
+	var keys=Object.keys(data);
+	var max=Math.max.apply(null,keys.map(function(k){return data[k];}));
+	if(max<=0){$w.html(\'<div class="nw-empty-state">No cards yet</div>\');return;}
+	var html=keys.map(function(k){
+		var pct=max>0?Math.round((data[k]/max)*100):0;
+		return\'<div class="nw-deck-bar-row">\'
+			+\'<div class="nw-deck-bar-meta"><span>\'+escapeHtml(k)+\'</span><span class="nw-deck-bar-count">\'+data[k]+\'</span></div>\'
+			+\'<div class="nw-deck-bar-track"><div class="nw-deck-bar-fill \'+colorPrefix+k+\'" style="width:\'+pct+\'%"></div></div>\'
+			+\'</div>\';
+	}).join("");
+	$w.html(html);
 }
 
 function renderAlerts(alerts){
@@ -688,6 +837,8 @@ function loadDashboard(){
 	$("#nw-alerts").html(\'<div class="nw-alert-card nw-alert-card-loading"><div class="nw-spinner"></div><span>Refreshing\u2026</span></div>\');
 	$("#nw-logs").html(\'<div class="nw-empty-state">Loading recent events\u2026</div>\');
 	$("#nw-chart-characters,#nw-chart-worlds,#nw-chart-campaigns,#nw-chart-deck-cards").html(\'<div class="nw-chart-empty">Loading\u2026</div>\');
+	$("#nw-deck-categories,#nw-deck-rarities").html(\'<div class="nw-spinner" style="margin:20px auto;display:block;"></div>\');
+	$("#nw-deck-active,#nw-deck-inactive").text("\u2014");
 
 	$.post(ajaxurl,{action:"nw_dashboard_data",nonce:$("#nw-dash-nonce").val()},function(res){
 		if(!res.success){
@@ -696,7 +847,7 @@ function loadDashboard(){
 			$("#nw-logs").html(\'<div class="nw-empty-state">Could not load logs.</div>\');
 			return;
 		}
-		var d=res.data||{},c=d.counts||{},r=d.recent||{},g=d.growth||{},h=d.health||{};
+		var d=res.data||{},c=d.counts||{},r=d.recent||{},g=d.growth||{},h=d.health||{},deck=d.deck_breakdown||{};
 
 		// Debug info in console
 		if(d._debug){console.group("[NeoWeaver] Dashboard debug");console.log("Key type:",d._debug.key_type);console.table(d._debug.growth_meta);console.groupEnd();}
@@ -718,6 +869,14 @@ function loadDashboard(){
 		drawSparkline("#nw-chart-worlds",g.worlds,"#00d4ff");
 		drawSparkline("#nw-chart-campaigns",g.campaigns,"#ffb703");
 		drawSparkline("#nw-chart-deck-cards",g.deck_cards,"#ff5c5c");
+
+		// Deck Library
+		if(deck.categories){renderDeckBars("#nw-deck-categories",deck.categories,"nw-deck-cat-");}
+		if(deck.rarities){renderDeckBars("#nw-deck-rarities",deck.rarities,"nw-deck-rar-");}
+		if(typeof deck.active_count!=="undefined"){
+			$("#nw-deck-active").text(deck.active_count||0);
+			$("#nw-deck-inactive").text(deck.inactive_count||0);
+		}
 
 		renderAlerts(d.alerts||[]);
 		renderLogs(d.logs||[]);
