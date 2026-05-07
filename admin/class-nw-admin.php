@@ -72,34 +72,35 @@ class NeoWeaver_Admin {
 		check_ajax_referer( 'neoweaver_dashboard', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
-		$url = function_exists( 'tw_supabase_url' )         ? tw_supabase_url()         : '';
-		$key = function_exists( 'tw_supabase_service_key' ) ? tw_supabase_service_key() :
-		     ( function_exists( 'tw_supabase_anon_key' )    ? tw_supabase_anon_key()    : '' );
+		$supa_url = function_exists( 'tw_supabase_url' )         ? tw_supabase_url()         : '';
+		$supa_key = function_exists( 'tw_supabase_service_key' ) ? tw_supabase_service_key() :
+		          ( function_exists( 'tw_supabase_anon_key' )    ? tw_supabase_anon_key()    : '' );
 
-		if ( ! $url || ! $key ) {
+		if ( ! $supa_url || ! $supa_key ) {
 			wp_send_json_error( 'Supabase not configured.' );
 		}
 
+		// table name => stat key
 		$tables = [
-			'worlds'    => 'cyberworlds',
-			'agents'    => 'cybercharacters',
-			'campaigns' => 'cybercampaign',
+			'worlds'    => 'cyber_worlds',
+			'agents'    => 'cyber_characters',
+			'campaigns' => 'cyber_campaigns',
 		];
 
 		$counts = [];
-		foreach ( $tables as $key_name => $table ) {
-			$cached = get_transient( 'nw_count_' . $key_name );
+		foreach ( $tables as $stat_key => $table ) {
+			$cached = get_transient( 'nw_count_' . $stat_key );
 			if ( $cached !== false ) {
-				$counts[ $key_name ] = (int) $cached;
+				$counts[ $stat_key ] = (int) $cached;
 				continue;
 			}
 			$res = wp_remote_get(
-				rtrim( $url, '/' ) . '/rest/v1/' . $table . '?select=id',
+				rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id',
 				[
 					'timeout' => 8,
 					'headers' => [
-						'apikey'        => $key,
-						'Authorization' => 'Bearer ' . $key,
+						'apikey'        => $supa_key,
+						'Authorization' => 'Bearer ' . $supa_key,
 						'Range'         => '0-0',
 						'Prefer'        => 'count=exact',
 					],
@@ -112,8 +113,8 @@ class NeoWeaver_Admin {
 					$count = (int) $m[1];
 				}
 			}
-			set_transient( 'nw_count_' . $key_name, $count, 5 * MINUTE_IN_SECONDS );
-			$counts[ $key_name ] = $count;
+			set_transient( 'nw_count_' . $stat_key, $count, 5 * MINUTE_IN_SECONDS );
+			$counts[ $stat_key ] = $count;
 		}
 
 		wp_send_json_success( $counts );
@@ -277,13 +278,18 @@ jQuery(function($){
     function loadStats(){
         $('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').html('<div class="nw-spinner"></div>');
         $.post(ajaxurl,{action:'nw_dashboard_stats',nonce:$('#nw-dash-nonce').val()},function(res){
-            if(!res.success){$('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').text('—');return;}
+            if(!res.success){
+                $('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').text('—');
+                console.error('[NeoWeaver] ajax_stats error:',res.data);
+                return;
+            }
             var d=res.data;
             $('#nw-stat-worlds').text(d.worlds||0);
             $('#nw-stat-agents').text(d.agents||0);
             $('#nw-stat-campaigns').text(d.campaigns||0);
-        }).fail(function(){
+        }).fail(function(xhr){
             $('#nw-stat-worlds,#nw-stat-agents,#nw-stat-campaigns').text('err');
+            console.error('[NeoWeaver] ajax_stats HTTP error:',xhr.status,xhr.responseText);
         });
     }
     $('#nw-refresh-stats').on('click',loadStats);
