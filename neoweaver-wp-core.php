@@ -224,7 +224,7 @@ final class NeoWeaver_Core {
 	public static function enqueue_agents_list_assets(): void {
 		// Ładuj tylko na stronach, które zawierają shortcode z listą agentów.
 		// Zmień 'my-agents' na właściwy slug/ID strony jeśli inny.
-		if ( ! is_page( 'my-agents' ) ) return;
+		if ( ! is_page( 'agents' ) ) return;
 
 		wp_enqueue_style(
 			'neoweaver-agents-list',
