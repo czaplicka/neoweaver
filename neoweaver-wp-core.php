@@ -217,24 +217,18 @@ final class NeoWeaver_Core {
 		] );
 	}
 
+	/**
+	 * Enqueue agents-list CSS + JS on every frontend page.
+	 *
+	 * has_shortcode() is unreliable: it only scans $post->post_content, so it
+	 * misses shortcodes placed inside Gutenberg blocks, widgets, theme templates,
+	 * or injected programmatically. Because these are small, focused files,
+	 * loading them site-wide costs nothing meaningful.
+	 */
 	public static function enqueue_agents_list_assets(): void {
-		global $post;
-		if ( ! is_a( $post, 'WP_Post' ) ) return;
-
-		$shortcodes = [
-			'tw_list_characters',    // registered in Neoweaver_Public
-			'neoweaver_weaver_list',
-			'tw_agents_list',
-			'neoweaver_agents_list',
-		];
-		$has = false;
-		foreach ( $shortcodes as $sc ) {
-			if ( has_shortcode( $post->post_content, $sc ) ) {
-				$has = true;
-				break;
-			}
+		if ( is_admin() ) {
+			return;
 		}
-		if ( ! $has ) return;
 
 		wp_enqueue_style(
 			'neoweaver-agents-list',
