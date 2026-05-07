@@ -30,8 +30,9 @@ class NeoWeaver_Races_Admin {
     }
 
     public function register_menu(): void {
-        add_menu_page( 'NeoWeaver', 'NeoWeaver', 'manage_options',
-            $this->menu_slug, [ $this, 'render_page' ], 'dashicons-superhero-alt', 30 );
+        // NOTE: add_menu_page() is intentionally NOT called here.
+        // The top-level NeoWeaver menu is registered solely in class-nw-admin.php.
+        // Each sub-module only adds its own submenu item.
         add_submenu_page( $this->menu_slug, 'NeoWeaver — Races', '🧬 Races',
             'manage_options', $this->page_slug, [ $this, 'render_page' ] );
     }
