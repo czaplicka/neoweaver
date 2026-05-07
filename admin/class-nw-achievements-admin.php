@@ -440,8 +440,8 @@ jQuery(function($){
     function notice(msg,type){var el=$('#nw-notice');el.attr('class','nw-notice nw-notice-'+type).text(msg).show();setTimeout(function(){el.fadeOut(300);},3500);}
 
     /**
-     * isEmoji: true if first codepoint is outside ASCII or is a known emoji range.
-     * Uses codepoint ranges instead of \p{Emoji} regex for broad browser compat.
+     * isEmoji: true if first codepoint is outside ASCII.
+     * Uses codepoint comparison for broad browser compat (avoids \p{Emoji} regex).
      */
     function isEmoji(s){
         if(!s) return false;
