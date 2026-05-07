@@ -83,6 +83,16 @@ class NeoWeaver_Admin {
 		return '';
 	}
 
+	private function get_supa_key_type() {
+		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
+			return 'service_role';
+		}
+		if ( function_exists( 'tw_supabase_anon_key' ) && tw_supabase_anon_key() ) {
+			return 'anon';
+		}
+		return 'none';
+	}
+
 	private function supa_get( $path ) {
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
@@ -112,10 +122,11 @@ class NeoWeaver_Admin {
 		$code = (int) wp_remote_retrieve_response_code( $res );
 
 		return array(
-			'ok'    => ( $code >= 200 && $code < 300 ),
+			'ok'     => ( $code >= 200 && $code < 300 ),
 			'status' => $code,
-			'body'  => $data,
-			'error' => null,
+			'body'   => $data,
+			'error'  => null,
+			'raw'    => ( $code < 200 || $code >= 300 ) ? substr( $body, 0, 300 ) : null,
 		);
 	}
 
@@ -195,7 +206,7 @@ class NeoWeaver_Admin {
 
 		$series = array();
 		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$d           = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
+			$d            = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
 			$series[ $d ] = 0;
 		}
 
@@ -212,7 +223,13 @@ class NeoWeaver_Admin {
 			$out[] = array( 'date' => $date, 'value' => $count );
 		}
 
-		return $out;
+		return array(
+			'series'     => $out,
+			'rows_found' => count( $rows ),
+			'query_ok'   => $res['ok'],
+			'http_status'=> $res['status'],
+			'api_error'  => $res['raw'] ?? null,
+		);
 	}
 
 	private function supa_recent_logs( $limit = 10 ) {
@@ -276,10 +293,17 @@ class NeoWeaver_Admin {
 			'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
 		);
 
-		$growth = array(
+		$growth_raw = array(
 			'characters' => $this->supa_growth_series( 'cyber_characters', 30 ),
 			'worlds'     => $this->supa_growth_series( 'cyber_worlds', 30 ),
 			'campaigns'  => $this->supa_growth_series( 'cyber_campaign', 30 ),
+		);
+
+		// Flatten series for JS (keep debug info separately)
+		$growth = array(
+			'characters' => $growth_raw['characters']['series'],
+			'worlds'     => $growth_raw['worlds']['series'],
+			'campaigns'  => $growth_raw['campaigns']['series'],
 		);
 
 		$health = array(
@@ -314,12 +338,35 @@ class NeoWeaver_Admin {
 		}
 
 		wp_send_json_success( array(
-			'counts' => $counts,
-			'recent' => $recent,
-			'growth' => $growth,
-			'health' => $health,
-			'alerts' => $alerts,
-			'logs'   => $this->supa_recent_logs( 10 ),
+			'counts'    => $counts,
+			'recent'    => $recent,
+			'growth'    => $growth,
+			'health'    => $health,
+			'alerts'    => $alerts,
+			'logs'      => $this->supa_recent_logs( 10 ),
+			'_debug'    => array(
+				'key_type'   => $this->get_supa_key_type(),
+				'growth_meta'=> array(
+					'characters' => array(
+						'rows_found'  => $growth_raw['characters']['rows_found'],
+						'query_ok'    => $growth_raw['characters']['query_ok'],
+						'http_status' => $growth_raw['characters']['http_status'],
+						'api_error'   => $growth_raw['characters']['api_error'],
+					),
+					'worlds' => array(
+						'rows_found'  => $growth_raw['worlds']['rows_found'],
+						'query_ok'    => $growth_raw['worlds']['query_ok'],
+						'http_status' => $growth_raw['worlds']['http_status'],
+						'api_error'   => $growth_raw['worlds']['api_error'],
+					),
+					'campaigns' => array(
+						'rows_found'  => $growth_raw['campaigns']['rows_found'],
+						'query_ok'    => $growth_raw['campaigns']['query_ok'],
+						'http_status' => $growth_raw['campaigns']['http_status'],
+						'api_error'   => $growth_raw['campaigns']['api_error'],
+					),
+				),
+			),
 		) );
 	}
 
@@ -442,7 +489,7 @@ class NeoWeaver_Admin {
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Supabase Key</span>
-							<span class="nw-sysinfo-val"><?php echo $key_ok ? '<span class="nw-text-good">Configured</span>' : '<span class="nw-text-danger">Missing</span>'; ?></span>
+							<span class="nw-sysinfo-val"><?php echo $key_ok ? '<span class="nw-text-good">Configured (' . esc_html( $this->get_supa_key_type() ) . ')</span>' : '<span class="nw-text-danger">Missing</span>'; ?></span>
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">PHP</span>
@@ -629,6 +676,9 @@ function loadDashboard(){
 			return;
 		}
 		var d=res.data||{},c=d.counts||{},r=d.recent||{},g=d.growth||{},h=d.health||{};
+
+		// Debug info in console
+		if(d._debug){console.group("[NeoWeaver] Dashboard debug");console.log("Key type:",d._debug.key_type);console.table(d._debug.growth_meta);console.groupEnd();}
 
 		$("#nw-stat-characters").text(c.characters||0);
 		$("#nw-stat-worlds").text(c.worlds||0);
