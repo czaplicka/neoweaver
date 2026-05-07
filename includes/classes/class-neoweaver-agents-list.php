@@ -305,7 +305,11 @@ class Neoweaver_Agents_List {
 					'</div>' +
 				'</div>';
 
-			modal.style.display = 'block';
+			// otwieranie
+modal.classList.add('is-open');
+
+// zamykanie
+modal.classList.remove('is-open');
 		}
 
 		function twConfirmDeleteCharacter(charId, btnEl) {
