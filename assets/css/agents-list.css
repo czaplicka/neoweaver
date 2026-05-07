@@ -74,7 +74,6 @@
 				position: fixed;
 				z-index: 10000;
 				inset: 0;
-				background: rgba(0,0,0,0.9);
 				align-items: center;
 				justify-content: center;
 				padding: 20px;
@@ -83,6 +82,7 @@
 			}
 			.tw-modal.is-open {
 				display: flex;
+				background: rgba(0, 0, 0, 0.92);
 			}
 			.tw-modal-content {
 				background: #050505;
