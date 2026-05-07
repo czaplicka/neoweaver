@@ -30,6 +30,10 @@
  *    leave stale data.
  *10. Single onchange handler replaced with explicit onchange on each select –
  *    avoids the handler firing for the text inputs inside the same <form>.
+ *11. Spinner overlay + polling loop – redirect only fires after Supabase
+ *    confirms the record is readable (eventual-consistency guard). Prevents
+ *    the race where /deployments/ loads before the row is visible.
+ *    Prefer header extended with return=representation for faster confirms.
  */
 function tw_connect_character_campaign_direct_v2() {
     if ( ! is_user_logged_in() ) {
@@ -44,6 +48,14 @@ function tw_connect_character_campaign_direct_v2() {
     <div id="tw-deployment-root" class="tw-deployment-main-container">
 
         <audio id="tw-glitch-sound" src="https://cyber.nieodparady.pl/wp-content/uploads/2026/02/soundreality-glitch-177348.mp3" preload="auto"></audio>
+
+        <!-- FIX #11 – fullscreen overlay shown during injection + polling -->
+        <div id="tw-inject-overlay" class="tw-inject-overlay" hidden>
+            <div class="tw-spinner-box">
+                <div class="tw-spinner"></div>
+                <p id="tw-spinner-msg">INJECTING AGENT INTO MATRIX…</p>
+            </div>
+        </div>
 
         <section class="tw-briefing-hero">
             <div class="tw-hero-overlay"></div>
@@ -114,13 +126,15 @@ function tw_connect_character_campaign_direct_v2() {
         };
 
         /* ── DOM refs ── */
-        const selCamp = document.getElementById('select-camp-char');
-        const selChar = document.getElementById('select-char');
-        const btn     = document.getElementById('btn-connect-char');
-        const status  = document.getElementById('tw-char-status-console');
-        const form    = document.getElementById('tw-char-connect-form');
-        const audio   = document.getElementById('tw-glitch-sound');
-        const root    = document.getElementById('tw-deployment-root');
+        const selCamp  = document.getElementById('select-camp-char');
+        const selChar  = document.getElementById('select-char');
+        const btn      = document.getElementById('btn-connect-char');
+        const status   = document.getElementById('tw-char-status-console');
+        const form     = document.getElementById('tw-char-connect-form');
+        const audio    = document.getElementById('tw-glitch-sound');
+        const root     = document.getElementById('tw-deployment-root');
+        const overlay  = document.getElementById('tw-inject-overlay');  // FIX #11
+        const spnMsg   = document.getElementById('tw-spinner-msg');     // FIX #11
 
         /* ── State ── */
         let store        = { campaigns: [], characters: [] };
@@ -146,13 +160,22 @@ function tw_connect_character_campaign_direct_v2() {
 
         // FIX #8 – keep aria-disabled in sync
         function setBtn(enabled) {
-            btn.disabled   = !enabled;
+            btn.disabled = !enabled;
             btn.setAttribute('aria-disabled', String(!enabled));
         }
 
         function setStatus(msg, color = '#00e5ff') {
             status.style.color = color;
             status.textContent = msg;
+        }
+
+        // FIX #11 – overlay helpers
+        function showOverlay(msg) {
+            spnMsg.textContent = msg;
+            overlay.hidden = false;
+        }
+        function hideOverlay() {
+            overlay.hidden = true;
         }
 
         // FIX #3 – debounce for search inputs
@@ -371,50 +394,92 @@ function tw_connect_character_campaign_direct_v2() {
         selChar.addEventListener('change', onSelectionChange);
 
         /* ── Submit ── */
+        // FIX #11 – show spinner overlay, poll Supabase until record is
+        //           readable, then redirect; prevents the race where
+        //           /deployments/ loaded before the row was visible.
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             setBtn(false);
-            setStatus('> System: Injecting Agent data into Matrix...');
+            clearTimeout(redirectTimer); // FIX #5
 
-            // FIX #5 – cancel any previous stale redirect
-            clearTimeout(redirectTimer);
+            const campVal = selCamp.value;
+            const charVal = selChar.value;
+
+            setStatus('> System: Injecting Agent data into Matrix...');
+            showOverlay('INJECTING AGENT INTO MATRIX…');
 
             const payload = {
-                campaign_id:   selCamp.value,   // FIX #2 – stay as string (Supabase handles int coercion)
-                character_id:  selChar.value,
-                wp_user_id: config.uid
+                campaign_id:  campVal,  // FIX #2 – stay as string (Supabase handles int coercion)
+                character_id: charVal,
+                wp_user_id:   config.uid
             };
 
             try {
+                /* Step 1 – insert the link */
                 const res = await fetch(config.url + 'rest/v1/cyber_campaign_characters', {
                     method: 'POST',
                     headers: {
                         'apikey':        config.key,
                         'Authorization': `Bearer ${config.key}`,
                         'Content-Type':  'application/json',
-                        'Prefer':        'resolution=merge-duplicates'
+                        'Prefer':        'resolution=merge-duplicates,return=representation'
                     },
                     body: JSON.stringify(payload)
                 });
 
-                if (res.ok) {
-                    // FIX #4 – guard against autoplay policy rejection
-                    if (audio) {
-                        audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
-                    }
-                    root.classList.add('tw-glitch-shake');
-                    setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
-
-                    // FIX #5 – store timer reference so it can be cancelled
-                    redirectTimer = setTimeout(() => {
-                        window.location.href = '/deployments/';
-                    }, 1500);
-                } else {
+                if (!res.ok) {
                     const txt = await res.text();
                     console.error('Injection error:', res.status, txt);
                     throw new Error('Rejection');
                 }
+
+                /* Step 2 – poll until the record is readable (eventual-consistency guard) */
+                spnMsg.textContent = 'SYNCHRONISING WORLD NODE…';
+                setStatus('> System: Synchronising World Node…');
+
+                const pollHeaders = { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` };
+                let confirmed = false;
+
+                for (let attempt = 0; attempt < 8; attempt++) {
+                    await new Promise(r => setTimeout(r, 400)); // 400 ms between polls → max ~3.2 s
+                    try {
+                        const check = await fetch(
+                            config.url + 'rest/v1/cyber_campaign_characters' +
+                            '?campaign_id=eq.'  + encodeURIComponent(campVal) +
+                            '&character_id=eq.' + encodeURIComponent(charVal) +
+                            '&select=campaign_id&limit=1',
+                            { headers: pollHeaders }
+                        );
+                        if (check.ok) {
+                            const rows = await check.json();
+                            if (rows.length > 0) { confirmed = true; break; }
+                        }
+                    } catch (pollErr) {
+                        console.warn('Poll attempt', attempt, 'failed:', pollErr);
+                    }
+                }
+
+                if (!confirmed) {
+                    // Didn't confirm within ~3.2 s – redirect anyway, just warn
+                    console.warn('World-node sync timeout – redirecting anyway.');
+                }
+
+                /* Step 3 – success: glitch effect, then redirect */
+                if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err)); // FIX #4
+                root.classList.add('tw-glitch-shake');
+                spnMsg.textContent = confirmed
+                    ? 'INJECTION CONFIRMED. BRIDGING TO DEPLOYMENT…'
+                    : 'SYNC TIMEOUT. BRIDGING ANYWAY…';
+                setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
+
+                redirectTimer = setTimeout(() => { // FIX #5
+                    hideOverlay();
+                    window.location.href = '/deployments/';
+                }, 800); // shorter because write is already confirmed
+
             } catch (err) {
+                console.error('Submit error:', err);
+                hideOverlay();
                 setStatus('> Error: Injection failed. Entity rejection.', '#ff0055');
                 setBtn(true);
             }
@@ -460,6 +525,12 @@ function tw_connect_character_campaign_direct_v2() {
         }
         .tw-world-lock-note { margin-top: 16px; padding: 14px 18px; border: 1px solid #333; background: #050505; font-size: 0.8rem; color: #777; }
         .tw-world-lock-note h4 { margin: 0 0 6px; font-size: 0.8rem; color: #adff00; letter-spacing: 1px; }
+        /* FIX #11 – inject overlay + spinner */
+        .tw-inject-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; }
+        .tw-inject-overlay[hidden] { display: none; }
+        .tw-spinner-box { display: flex; flex-direction: column; align-items: center; gap: 20px; color: #adff00; font-family: 'Chakra Petch', sans-serif; font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
+        .tw-spinner { width: 60px; height: 60px; border: 3px solid #1a1a1a; border-top-color: #adff00; border-right-color: #ff0055; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); animation: tw-spin 0.9s linear infinite; }
+        @keyframes tw-spin { to { transform: rotate(360deg); } }
     </style>
     <?php
     return ob_get_clean();
