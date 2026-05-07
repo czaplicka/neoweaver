@@ -9,7 +9,6 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
-
 class NeoWeaver_Races_Admin {
 
     private string $supabase_url;
