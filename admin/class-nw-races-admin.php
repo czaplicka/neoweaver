@@ -18,8 +18,8 @@ class NeoWeaver_Races_Admin {
     private string $menu_slug = 'neoweaver';
 
     public function __construct() {
-        $this->supabase_url = defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '';
-        $this->supabase_key = defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '';
+        $this->supabase_url = rtrim( tw_supabase_url(), '/' );
+$this->supabase_key = tw_supabase_anon_key();
 
         add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
