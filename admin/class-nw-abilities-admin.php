@@ -16,8 +16,8 @@ class NeoWeaver_Abilities_Admin {
     private string $parent_slug = 'neoweaver';
 
     public function __construct() {
-        $this->supabase_url = defined( 'SUPABASE_URL' ) ? rtrim( SUPABASE_URL, '/' ) : '';
-        $this->supabase_key = defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '';
+        $this->supabase_url = rtrim( nw_supabase_url(), '/' );
+        $this->supabase_key = nw_supabase_key();
 
         add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
