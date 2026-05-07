@@ -10,6 +10,41 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+// W głównym pliku pluginu lub w osobnym class-neoweaver-assets.php
+// Hook: wp_enqueue_scripts (frontend)
+
+add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_agents_list_assets' );
+
+function neoweaver_enqueue_agents_list_assets(): void {
+
+	// Załaduj tylko na stronach gdzie shortcode/blok jest używany
+	// Możesz dodać warunek: if ( ! is_page( 'agents' ) ) return;
+
+	wp_enqueue_style(
+		'neoweaver-agents-list',
+		plugin_dir_url( dirname( __DIR__ ) ) . 'assets/css/agents-list.css'
+		[],
+		NEOWEAVER_VERSION // stała z głównego pliku pluginu, np. '1.0.0'
+	);
+
+	wp_enqueue_script(
+		'neoweaver-agents-list',
+		plugin_dir_url( dirname( __DIR__ ) ) . 'assets/js/agents-list.js'
+		[], // brak zależności (vanilla JS)
+		NEOWEAVER_VERSION,
+		true // ← w footer, po DOM
+	);
+
+	// Przekaż dane do JS (ajaxUrl + nonce)
+	wp_localize_script(
+		'neoweaver-agents-list',
+		'twCharData',
+		[
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
+		]
+	);
+}
 class Neoweaver_Agents_List {
 
 	private Neoweaver_Agents_Repository $repo;
