@@ -28,13 +28,6 @@ if ( ! function_exists( 'tw_supabase_service_key' ) ) {
         if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
             return TW_SUPABASE_SERVICE_KEY;
         }
-        // BUG-FIX 4: The original code had a hardcoded service/secret key as a
-        // plaintext fallback. Service keys have full DB access and must NEVER
-        // appear in source code — they belong exclusively in wp-config.php (which
-        // is outside the webroot and excluded from version control).
-        // If TW_SUPABASE_SERVICE_KEY is not defined, we return an empty string so
-        // any call that needs the service key fails loudly rather than silently
-        // using a leaked credential.
         error_log( 'TW supabase-config.php: TW_SUPABASE_SERVICE_KEY is not defined in wp-config.php.' );
         return '';
     }
@@ -42,6 +35,23 @@ if ( ! function_exists( 'tw_supabase_service_key' ) ) {
 
 if ( ! function_exists( 'tw_supabase_key' ) ) {
     function tw_supabase_key() {
+        return tw_supabase_anon_key();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatibility aliases
+// Old admin files (pre-refactor) used nw_supabase_url() / nw_supabase_anon_key().
+// These shims prevent Fatal errors when a stale file is still on the server.
+// ---------------------------------------------------------------------------
+if ( ! function_exists( 'nw_supabase_url' ) ) {
+    function nw_supabase_url() {
+        return tw_supabase_url();
+    }
+}
+
+if ( ! function_exists( 'nw_supabase_anon_key' ) ) {
+    function nw_supabase_anon_key() {
         return tw_supabase_anon_key();
     }
 }
