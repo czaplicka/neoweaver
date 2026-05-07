@@ -1,6 +1,6 @@
 <?php
 /**
- * NeoWeaver Admin Panel — Races (cyberraces)
+ * NeoWeaver Admin Panel — Races (cyber_races)
  * Kolumny: id, name, parent_race, tags, gm_instructions, description,
  *          race_base_hp, img_url, preferred_tech, preferred_magic,
  *          preferred_gods, preferred_wealth, preferred_threat,
@@ -18,7 +18,7 @@ class NeoWeaver_Races_Admin {
 
     public function __construct() {
         $this->supabase_url = rtrim( tw_supabase_url(), '/' );
-$this->supabase_key = tw_supabase_anon_key();
+        $this->supabase_key = tw_supabase_anon_key();
 
         add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -222,7 +222,7 @@ $this->supabase_key = tw_supabase_anon_key();
         check_ajax_referer( 'neoweaver_races', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $res = $this->supa( 'GET',
-            'cyberraces?select=id,name,parent_race,tags,gm_instructions,description,race_base_hp,img_url,preferred_tech,preferred_magic,preferred_gods,preferred_wealth,preferred_threat,preferred_moral,preferred_social,conflict_axis,conflict_side,race_base_mp,bonus,is_active&order=name.asc'
+            'cyber_races?select=id,name,parent_race,tags,gm_instructions,description,race_base_hp,img_url,preferred_tech,preferred_magic,preferred_gods,preferred_wealth,preferred_threat,preferred_moral,preferred_social,conflict_axis,conflict_side,race_base_mp,bonus,is_active&order=name.asc'
         );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
     }
@@ -258,8 +258,8 @@ $this->supabase_key = tw_supabase_anon_key();
         ];
 
         $res = $id
-            ? $this->supa( 'PATCH', 'cyberraces?id=eq.' . urlencode( $id ), $payload )
-            : $this->supa( 'POST',  'cyberraces', $payload );
+            ? $this->supa( 'PATCH', 'cyber_races?id=eq.' . urlencode( $id ), $payload )
+            : $this->supa( 'POST',  'cyber_races', $payload );
 
         if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
         $code = $res['code'] ?? 0;
@@ -274,7 +274,7 @@ $this->supabase_key = tw_supabase_anon_key();
         $id    = sanitize_text_field( $_POST['race_id'] ?? '' );
         $state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
         if ( ! $id ) wp_send_json_error( 'Missing ID' );
-        $res = $this->supa( 'PATCH', 'cyberraces?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_races?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
