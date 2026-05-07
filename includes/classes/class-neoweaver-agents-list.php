@@ -103,17 +103,20 @@ class Neoweaver_Agents_List {
 			.tw-avatar { width: 64px; height: 64px; border: 1px solid var(--neon); object-fit: cover; }
 			.tw-lvl-badge { background: var(--neon); color: black; padding: 2px 6px; font-weight: bold; font-size: 11px; margin-right: 5px; }
 			.tw-campaign-info { font-size: 10px; text-transform: uppercase; color: var(--neon); opacity: 0.8; margin-top: 5px; border-top: 1px solid #222; padding-top: 5px; }
-			.tw-modal {
-	display: none;
-	position: fixed;
-	z-index: 10000;
-	inset: 0;
-	background: rgba(0,0,0,0.9);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 20px;
-	box-sizing: border-box;
+.tw-modal {
+    display: none; /* domyślnie ukryty */
+    position: fixed;
+    z-index: 10000;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.tw-modal.is-open {
+    display: flex; /* widoczny tylko po dodaniu klasy */
 }
 
 .tw-modal-content {
