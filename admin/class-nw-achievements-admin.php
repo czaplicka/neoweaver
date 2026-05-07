@@ -42,11 +42,11 @@ class NeoWeaver_Achievements_Admin {
         if ( ! str_contains( $hook, $this->page_slug ) ) return;
         wp_enqueue_style( 'chakra-petch',
             'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
-        // Font Awesome 6 Free — needed for FA icon slugs (e.g. map-marked-alt)
-        wp_enqueue_style( 'font-awesome-6',
-            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css', [], '6.5.1' );
+        // Lucide icons — UMD build loaded in footer
+        wp_enqueue_script( 'lucide',
+            'https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js', [], null, true );
         wp_add_inline_style( 'chakra-petch', $this->get_css() );
-        wp_register_script( 'nw-achievements-admin', false, [ 'jquery' ], null, true );
+        wp_register_script( 'nw-achievements-admin', false, [ 'jquery', 'lucide' ], null, true );
         wp_enqueue_script( 'nw-achievements-admin' );
         wp_localize_script( 'nw-achievements-admin', 'NWAch', [
             'ajaxurl' => admin_url( 'admin-ajax.php' ),
@@ -109,7 +109,7 @@ class NeoWeaver_Achievements_Admin {
             'id'                  => $new_id,
             'title'               => sanitize_text_field(     $raw['title']       ?? '' ),
             'description'         => sanitize_textarea_field( $raw['description'] ?? '' ) ?: null,
-            'icon_slug'           => sanitize_text_field(     $raw['icon_slug']   ?? 'default_icon' ) ?: 'default_icon',
+            'icon_slug'           => sanitize_text_field(     $raw['icon_slug']   ?? 'trophy' ) ?: 'trophy',
             'bg_color'            => sanitize_hex_color(      $raw['bg_color']    ?? '#2c3e50' ) ?: '#2c3e50',
             'scope'               => in_array( $scope, $this->scopes, true ) ? $scope : 'account',
             'goal'                => max( 1, (int)( $raw['goal'] ?? 1 ) ),
@@ -245,10 +245,10 @@ class NeoWeaver_Achievements_Admin {
                             <div class="nw-section-label">Appearance</div>
                             <div class="nw-form-grid">
                                 <div class="nw-field">
-                                    <label>Icon Slug <span class="nw-hint">(emoji 🏆 lub FA slug np. map-marked-alt)</span></label>
+                                    <label>Icon Slug <span class="nw-hint">(emoji 🏆 or Lucide slug e.g. trophy, compass, zap)</span></label>
                                     <div class="nw-icon-input-row">
-                                        <span id="nw-icon-preview" class="nw-icon-preview"><i class="fas fa-trophy"></i></span>
-                                        <input type="text" id="nw-field-icon_slug" name="icon_slug" placeholder="e.g. 🏆 or map-marked-alt">
+                                        <span id="nw-icon-preview" class="nw-icon-preview"><i data-lucide="trophy"></i></span>
+                                        <input type="text" id="nw-field-icon_slug" name="icon_slug" placeholder="e.g. 🏆 or trophy">
                                     </div>
                                 </div>
                                 <div class="nw-field">
@@ -309,7 +309,7 @@ class NeoWeaver_Achievements_Admin {
 
                             <div class="nw-section-label">Badge Preview</div>
                             <div class="nw-badge-preview">
-                                <div class="nw-badge-icon" id="nw-badge-icon"><i class="fas fa-trophy"></i></div>
+                                <div class="nw-badge-icon" id="nw-badge-icon"><i data-lucide="trophy"></i></div>
                                 <div>
                                     <div class="nw-badge-title" id="nw-preview-title">Achievement Title</div>
                                     <div class="nw-badge-desc"  id="nw-preview-desc">Description…</div>
@@ -363,7 +363,7 @@ class NeoWeaver_Achievements_Admin {
 .nw-table td{padding:10px 14px;vertical-align:middle}
 .nw-col-icon{width:64px;text-align:center!important}
 .nw-ach-badge{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;margin:0 auto;border:1px solid rgba(255,255,255,.1)}
-.nw-ach-badge i{font-size:20px;color:#fff}
+.nw-ach-badge svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nw-ach-id{font-size:10px;color:#555;font-family:monospace;margin-top:2px}
 .nw-ach-title{font-weight:600;color:#fff}
 .nw-cat-badge,.nw-scope-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;border:1px solid}
@@ -416,13 +416,13 @@ class NeoWeaver_Achievements_Admin {
 .nw-color-text{flex:1}
 .nw-icon-input-row{display:flex;align-items:center;gap:8px}
 .nw-icon-preview{font-size:22px;line-height:1;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid #2a2a2a;background:#0d0d0d;flex-shrink:0;color:#fff}
-.nw-icon-preview i{font-size:20px}
+.nw-icon-preview svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nw-icon-input-row input{flex:1}
 .nw-toggle-row{display:flex;gap:20px;align-items:center;padding-top:4px}
 .nw-toggle-label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#aaa}
 .nw-badge-preview{display:flex;align-items:center;gap:14px;padding:14px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px}
 .nw-badge-icon{width:52px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;background:#2c3e50;flex-shrink:0;transition:background .2s}
-.nw-badge-icon i{font-size:22px;color:#fff}
+.nw-badge-icon svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nw-badge-title{font-weight:700;color:#fff;font-size:14px}.nw-badge-desc{font-size:12px;color:#888;margin-top:3px}
 CSS;
     }
@@ -441,76 +441,33 @@ jQuery(function($){
 
     /**
      * renderIcon(slug) → HTML string
-     * If slug is a single emoji character (or starts with an emoji), render as text.
-     * Otherwise treat it as a Font Awesome 5/6 Free slug and render <i class="fas fa-{slug}">.
-     * FA6 renamed some icons — we keep a small compat map for common v5 names.
+     * If slug is a single emoji character, render as text span.
+     * Otherwise treat as a Lucide icon name and render <i data-lucide="slug">.
+     * After inserting into the DOM, call lucide.createIcons() on the container.
      */
-    var faCompat={
-        'map-marked-alt':'map-location-dot',
-        'map-marked':'map-location',
-        'atlas':'book-atlas',
-        'film':'film',
-        'user-astronaut':'user-astronaut',
-        'dice-d20':'dice-d20',
-        'chess-knight':'chess-knight',
-        'hand-sparkles':'hand-sparkles',
-        'user-shield':'user-shield',
-        'skull-crossbones':'skull-crossbones',
-        'dragon':'dragon',
-        'dungeon':'dungeon',
-        'hat-wizard':'hat-wizard',
-        'crown':'crown',
-        'bolt':'bolt',
-        'star':'star',
-        'heart':'heart',
-        'trophy':'trophy',
-        'medal':'medal',
-        'shield-alt':'shield-halved',
-        'shield':'shield',
-        'fire':'fire',
-        'fire-alt':'fire-flame-curved',
-        'magic':'wand-magic-sparkles',
-        'fist-raised':'hand-fist',
-        'scroll':'scroll',
-        'book-open':'book-open',
-        'compass':'compass',
-        'flag':'flag',
-        'gem':'gem',
-        'coins':'coins',
-        'key':'key',
-        'lock':'lock',
-        'unlock':'lock-open',
-        'eye':'eye',
-        'eye-slash':'eye-slash',
-        'skull':'skull',
-        'ghost':'ghost',
-        'robot':'robot',
-        'user':'user',
-        'users':'users',
-        'swords':'sword',
-        'dagger':'dagger'
-    };
-
     function isEmoji(s){
         if(!s) return false;
-        // Detect emoji: codepoint > 0xFF or contains variation selectors
         var cp=s.codePointAt(0);
         return cp>255 || /\p{Emoji}/u.test(s.charAt(0));
     }
 
     function renderIcon(slug){
-        if(!slug||slug==='default_icon') return '<i class="fas fa-trophy"></i>';
+        if(!slug||slug==='default_icon'||slug==='trophy') return '<i data-lucide="trophy"></i>';
         if(isEmoji(slug)) return '<span style="font-size:22px;line-height:1;">'+esc(slug)+'</span>';
-        // FA slug — apply compat map
-        var fa=faCompat[slug]||slug;
-        return '<i class="fas fa-'+esc(fa)+'"></i>';
+        return '<i data-lucide="'+esc(slug)+'"></i>';
     }
 
     function renderIconPreview(slug){
-        if(!slug||slug==='default_icon') return '<i class="fas fa-trophy"></i>';
+        if(!slug||slug==='default_icon'||slug==='trophy') return '<i data-lucide="trophy"></i>';
         if(isEmoji(slug)) return '<span style="font-size:26px;line-height:1;">'+esc(slug)+'</span>';
-        var fa=faCompat[slug]||slug;
-        return '<i class="fas fa-'+esc(fa)+'" style="font-size:22px;"></i>';
+        return '<i data-lucide="'+esc(slug)+'"></i>';
+    }
+
+    /** Call after injecting data-lucide elements into a container */
+    function initLucide(container){
+        if(typeof lucide !== 'undefined'){
+            lucide.createIcons({attrs:{class:'lucide-icon'},nameAttr:'data-lucide',nodes: container ? Array.from(container.querySelectorAll('[data-lucide]')) : undefined});
+        }
     }
 
     /* ---- stats ---- */
@@ -555,17 +512,18 @@ jQuery(function($){
             var hiddenHtml=a.hidden_until_earned
                 ?'<span class="nw-hidden-yes" title="Hidden until earned">👁️​ hidden</span>'
                 :'<span class="nw-hidden-no">visible</span>';
-            return '<tr data-id="'+esc(a.id)+'" class="'+((!active)?'nw-row-inactive':'')+'">'
-                +'<td>'+badgeHtml+'</td>'
-                +'<td><div class="nw-ach-title">'+esc(a.title)+'</div><div class="nw-ach-id">'+esc(a.id)+'</div></td>'
-                +'<td>'+catBadge(a.category)+'</td>'
-                +'<td>'+scopeBadge(a.scope)+'</td>'
-                +'<td><span class="nw-goal-val">×'+esc(String(a.goal||1))+'</span></td>'
-                +'<td>'+hiddenHtml+'</td>'
-                +'<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="'+esc(a.id)+'" '+(active?'checked':'')+'><span class="nw-toggle-slider"></span></label></td>'
-                +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+esc(a.id)+'">Edit</button></div></td>'
+            return '<tr data-id="'+esc(a.id)+'" class="'+((!active)?'nw-row-inactive':'')+'">'\
+                +'<td>'+badgeHtml+'</td>'\
+                +'<td><div class="nw-ach-title">'+esc(a.title)+'</div><div class="nw-ach-id">'+esc(a.id)+'</div></td>'\
+                +'<td>'+catBadge(a.category)+'</td>'\
+                +'<td>'+scopeBadge(a.scope)+'</td>'\
+                +'<td><span class="nw-goal-val">×'+esc(String(a.goal||1))+'</span></td>'\
+                +'<td>'+hiddenHtml+'</td>'\
+                +'<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="'+esc(a.id)+'" '+(active?'checked':'')+'><span class="nw-toggle-slider"></span></label></td>'\
+                +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+esc(a.id)+'">Edit</button></div></td>'\
                 +'</tr>';
         }).join(''));
+        initLucide(document.getElementById('nw-achievements-tbody'));
     }
 
     /* ---- apply filters (client-side) ---- */
@@ -627,6 +585,8 @@ jQuery(function($){
         $('#nw-preview-desc').text(desc);
         $('#nw-badge-icon').html(renderIcon(slug)).css('background',bg);
         $('#nw-icon-preview').html(renderIconPreview(slug));
+        initLucide(document.getElementById('nw-badge-icon'));
+        initLucide(document.getElementById('nw-icon-preview'));
     }
     $(document).on('input','#nw-field-title,#nw-field-description,#nw-field-icon_slug,#nw-field-bg_color',updatePreview);
     $('#nw-field-bg_color_picker').on('input',function(){$('#nw-field-bg_color').val($(this).val());updatePreview();});
@@ -643,8 +603,10 @@ jQuery(function($){
         $('#nw-field-original_id').val('');
         $('#nw-field-bg_color_picker').val('#2c3e50');
         $('#nw-field-bg_color').val('#2c3e50');
-        $('#nw-icon-preview').html('<i class="fas fa-trophy"></i>');
-        $('#nw-badge-icon').html('<i class="fas fa-trophy"></i>').css('background','#2c3e50');
+        $('#nw-icon-preview').html('<i data-lucide="trophy"></i>');
+        $('#nw-badge-icon').html('<i data-lucide="trophy"></i>').css('background','#2c3e50');
+        initLucide(document.getElementById('nw-icon-preview'));
+        initLucide(document.getElementById('nw-badge-icon'));
         updatePreview();
         if(id){
             var a=null;
@@ -657,6 +619,7 @@ jQuery(function($){
                 var slug=a.icon_slug||'trophy';
                 $('#nw-field-icon_slug').val(slug);
                 $('#nw-icon-preview').html(renderIconPreview(slug));
+                initLucide(document.getElementById('nw-icon-preview'));
                 var bg=a.bg_color||'#2c3e50';
                 $('#nw-field-bg_color').val(bg);
                 if(/^#[0-9a-fA-F]{6}$/.test(bg))$('#nw-field-bg_color_picker').val(bg);
