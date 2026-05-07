@@ -4,7 +4,6 @@
  * Columns: id, name, description, total_slots, allowed_sizes,
  *          img_url, rarity, is_active, created_at, parent_id
  */
-
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class NeoWeaver_Containers_Admin {
