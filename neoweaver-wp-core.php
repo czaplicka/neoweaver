@@ -15,31 +15,7 @@ define( 'NEOWEAVER_VERSION', '0.7.1' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-public static function enqueue_agents_list_assets(): void {
-    wp_enqueue_style(
-        'neoweaver-agents-list',
-        NEOWEAVER_PLUGIN_URL . 'assets/css/agents-list.css',
-        [],
-        NEOWEAVER_VERSION
-    );
 
-    wp_enqueue_script(
-        'neoweaver-agents-list',
-        NEOWEAVER_PLUGIN_URL . 'assets/js/agents-list.js',
-        [],
-        NEOWEAVER_VERSION,
-        true // footer
-    );
-
-    wp_localize_script(
-        'neoweaver-agents-list',
-        'twCharData',
-        [
-            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
-        ]
-    );
-}
 final class NeoWeaver_Core {
 
 	public static function init() {
@@ -127,17 +103,11 @@ final class NeoWeaver_Core {
 		}
 
 		if ( is_admin() ) {
-			// class-nw-admin.php MUST be loaded first — it registers the
-			// top-level "neoweaver" menu slug that all submenus depend on.
-			// glob() is alphabetical: abilities/achievements come before
-			// admin.php, so we load admin.php explicitly first.
 			$admin_main = NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-admin.php';
 			if ( file_exists( $admin_main ) ) {
 				require_once $admin_main;
 			}
 			foreach ( glob( NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-*.php' ) ?: [] as $file ) {
-				// Skip class-nw-admin.php by basename to avoid loading it twice
-				// (realpath() comparison can fail with symlinks or path differences).
 				if ( basename( $file ) !== 'class-nw-admin.php' ) {
 					require_once $file;
 				}
@@ -245,6 +215,40 @@ final class NeoWeaver_Core {
 			'hasNeoweaver' => $has_neoweaver ? '1' : '0',
 			'createUrl'    => home_url( '/new-agent/' ),
 		] );
+	}
+
+	// -------------------------------------------------------------------------
+	// FIX: przeniesione do środka klasy (było poza klasą jako funkcja globalna)
+	// FIX: usunięto inline <script>window.twCharData</script> z render_roster()
+	// -------------------------------------------------------------------------
+	public static function enqueue_agents_list_assets(): void {
+		// Ładuj tylko na stronach, które zawierają shortcode z listą agentów.
+		// Zmień 'my-agents' na właściwy slug/ID strony jeśli inny.
+		if ( ! is_page( 'my-agents' ) ) return;
+
+		wp_enqueue_style(
+			'neoweaver-agents-list',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/agents-list.css',
+			[],
+			NEOWEAVER_VERSION
+		);
+
+		wp_enqueue_script(
+			'neoweaver-agents-list',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/agents-list.js',
+			[],
+			NEOWEAVER_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'neoweaver-agents-list',
+			'twCharData',
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
+			]
+		);
 	}
 
 	public static function print_supabase_bootstrap() {
