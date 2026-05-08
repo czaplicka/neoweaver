@@ -2,7 +2,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 /**
  * TALE WEAVER - FIELD AGENT COMMAND CENTER
  * Shortcode: [tw_list_campaigns]
