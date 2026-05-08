@@ -6,6 +6,8 @@
  *
  * CHANGELOG
  * ---------
+ *13. v4: Sound-first fix – audio.play() fires BEFORE redirect timer.
+ *    Redirect now waits 1200 ms so glitch sound is audible before navigation.
  *12. v3: Auto-scroll to #tw-deployment-root when hash is present in URL.
  *    Browser tries to anchor before JS renders the section; we override
  *    with scrollIntoView after a 300 ms delay.
@@ -441,17 +443,20 @@ function tw_connect_character_campaign_direct_v2() {
                     console.warn('World-node sync timeout – redirecting anyway.');
                 }
 
-                if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
+                /* FIX #13: Play sound FIRST, then wait 1200 ms before redirect
+                 * so the glitch audio is audible before the page navigates away. */
                 root.classList.add('tw-glitch-shake');
+                setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
                 spnMsg.textContent = confirmed
                     ? 'INJECTION CONFIRMED. BRIDGING TO DEPLOYMENT…'
                     : 'SYNC TIMEOUT. BRIDGING ANYWAY…';
-                setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
+
+                if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
 
                 redirectTimer = setTimeout(() => {
                     hideOverlay();
                     window.location.href = '/deployments/';
-                }, 800);
+                }, 1200);
 
             } catch (err) {
                 console.error('Submit error:', err);
