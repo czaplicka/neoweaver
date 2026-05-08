@@ -4,36 +4,24 @@
  * NEOWEAVE AGENT INJECTION (World-Lock Protocol)
  * World-Lock: agent locked to world via cyber_campaign_worlds junction table
  *
- * Fixed & optimised – see changelog in comments below.
- *
  * CHANGELOG
  * ---------
+ *12. v3: Auto-scroll to #tw-deployment-root when hash is present in URL.
+ *    Browser tries to anchor before JS renders the section; we override
+ *    with scrollIntoView after a 300 ms delay.
+ *
  * 1. Race-condition guard: `isValidating` flag prevents concurrent world-lock
  *    requests when the user changes both selects quickly.
- * 2. Consistent ID typing: all IDs are kept as strings throughout to avoid
- *    mixed parseInt / loose-equality bugs (was: parseInt in submit but == in
- *    world-lock compare, causing subtle mismatches on large IDs).
- * 3. Debounced search inputs (150 ms) – no more full re-renders on every
- *    keystroke.
- * 4. audio.play() wrapped in Promise.catch() – silences the unhandled-
- *    rejection DOMException thrown when autoplay is blocked by the browser.
- * 5. Redirect stored in a variable and cleared on page-hide so the 1 500 ms
- *    timer can't fire after the user has already navigated away.
- * 6. Empty/placeholder options given value="" and filtered out before
- *    enabling the submit button, closing the gap where value="" passed the
- *    falsy check but still reached the API.
- * 7. Option labels sanitised with a small escapeHtml() helper – prevents
- *    stored-XSS if a character/campaign name ever contains HTML entities.
- * 8. aria-disabled kept in sync with the button's disabled state for
- *    screen-readers (clip-path hides the default disabled look visually).
- * 9. store reset to [] at the top of init() so a manual re-init doesn't
- *    leave stale data.
- *10. Single onchange handler replaced with explicit onchange on each select –
- *    avoids the handler firing for the text inputs inside the same <form>.
- *11. Spinner overlay + polling loop – redirect only fires after Supabase
- *    confirms the record is readable (eventual-consistency guard). Prevents
- *    the race where /deployments/ loads before the row is visible.
- *    Prefer header extended with return=representation for faster confirms.
+ * 2. Consistent ID typing: all IDs are kept as strings throughout.
+ * 3. Debounced search inputs (150 ms).
+ * 4. audio.play() wrapped in Promise.catch().
+ * 5. Redirect stored in a variable and cleared on page-hide.
+ * 6. Empty/placeholder options given value="" and filtered out.
+ * 7. Option labels sanitised with escapeHtml().
+ * 8. aria-disabled kept in sync with button disabled state.
+ * 9. store reset to [] at the top of init().
+ *10. Single onchange replaced with explicit onchange on each select.
+ *11. Spinner overlay + polling loop – redirect only after Supabase confirms.
  */
 function tw_connect_character_campaign_direct_v2() {
     if ( ! is_user_logged_in() ) {
@@ -125,6 +113,20 @@ function tw_connect_character_campaign_direct_v2() {
             uid: <?php echo (int) $user_id; ?>
         };
 
+        /* ── FIX #12: Auto-scroll when arriving via #tw-deployment-root anchor ──
+         * The browser tries to scroll to the anchor before WP/JS renders
+         * the shortcode, so it lands at the top. We override by scrolling
+         * manually after a short delay once the element is in the DOM.
+         */
+        (function autoScroll() {
+            var el = document.getElementById('tw-deployment-root');
+            if (el && window.location.hash === '#tw-deployment-root') {
+                setTimeout(function () {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+        })();
+
         /* ── DOM refs ── */
         const selCamp  = document.getElementById('select-camp-char');
         const selChar  = document.getElementById('select-char');
@@ -133,13 +135,13 @@ function tw_connect_character_campaign_direct_v2() {
         const form     = document.getElementById('tw-char-connect-form');
         const audio    = document.getElementById('tw-glitch-sound');
         const root     = document.getElementById('tw-deployment-root');
-        const overlay  = document.getElementById('tw-inject-overlay');  // FIX #11
-        const spnMsg   = document.getElementById('tw-spinner-msg');     // FIX #11
+        const overlay  = document.getElementById('tw-inject-overlay');
+        const spnMsg   = document.getElementById('tw-spinner-msg');
 
         /* ── State ── */
         let store        = { campaigns: [], characters: [] };
-        let isValidating = false;  // FIX #1 – race-condition guard
-        let redirectTimer = null;  // FIX #5 – clearable redirect
+        let isValidating = false;
+        let redirectTimer = null;
 
         /* ── Latency ticker ── */
         setInterval(() => {
@@ -148,8 +150,6 @@ function tw_connect_character_campaign_direct_v2() {
         }, 3000);
 
         /* ── Helpers ── */
-
-        // FIX #7 – XSS-safe label builder
         function escapeHtml(str) {
             return String(str)
                 .replace(/&/g, '&amp;')
@@ -158,7 +158,6 @@ function tw_connect_character_campaign_direct_v2() {
                 .replace(/"/g, '&quot;');
         }
 
-        // FIX #8 – keep aria-disabled in sync
         function setBtn(enabled) {
             btn.disabled = !enabled;
             btn.setAttribute('aria-disabled', String(!enabled));
@@ -169,7 +168,6 @@ function tw_connect_character_campaign_direct_v2() {
             status.textContent = msg;
         }
 
-        // FIX #11 – overlay helpers
         function showOverlay(msg) {
             spnMsg.textContent = msg;
             overlay.hidden = false;
@@ -178,7 +176,6 @@ function tw_connect_character_campaign_direct_v2() {
             overlay.hidden = true;
         }
 
-        // FIX #3 – debounce for search inputs
         function debounce(fn, delay) {
             let t;
             return function(...args) {
@@ -193,7 +190,6 @@ function tw_connect_character_campaign_direct_v2() {
             const lc = filter.toLowerCase();
             const filtered = list.filter(i => i.name.toLowerCase().includes(lc));
 
-            // Build fragment off-DOM for one reflow
             const frag = document.createDocumentFragment();
 
             if (filtered.length === 0) {
@@ -202,14 +198,12 @@ function tw_connect_character_campaign_direct_v2() {
                 frag.appendChild(opt);
             } else {
                 filtered.forEach(i => {
-                    // FIX #7 – escape names before building label
                     let label = escapeHtml(i.name).toUpperCase();
                     if (type === 'char') {
                         const raceLabel  = escapeHtml(i.race_name  || i.race_id  || '-');
                         const classLabel = escapeHtml(i.class_name || i.class_id || '-');
                         label += ` [${raceLabel} | ${classLabel}]`;
                     }
-                    // FIX #2 – keep IDs as strings; no parseInt here
                     const opt = new Option(label, String(i.id));
                     frag.appendChild(opt);
                 });
@@ -221,7 +215,6 @@ function tw_connect_character_campaign_direct_v2() {
 
         /* ── Initialise ── */
         async function init() {
-            // FIX #9 – reset store before re-init
             store = { campaigns: [], characters: [] };
             setBtn(false);
             setStatus('> System: Calibrating Uplink with The Weave...');
@@ -254,14 +247,14 @@ function tw_connect_character_campaign_direct_v2() {
 
                 const rawCamps = await rC.json();
                 store.campaigns = rawCamps.map(item => ({
-                    id:       String(item.id),  // FIX #2 – keep as string
+                    id:       String(item.id),
                     name:     item.name,
                     world_id: item.world_id != null ? String(item.world_id) : null
                 }));
 
                 const rawChars = await rCh.json();
                 store.characters = rawChars.map(ch => ({
-                    id:         String(ch.id),  // FIX #2
+                    id:         String(ch.id),
                     name:       ch.name,
                     race_id:    ch.race_id,
                     class_id:   ch.class_id,
@@ -279,7 +272,6 @@ function tw_connect_character_campaign_direct_v2() {
         }
 
         /* ── Search inputs (debounced) ── */
-        // FIX #3
         document.getElementById('search-camp-char').addEventListener(
             'input',
             debounce(e => render('camp', store.campaigns, e.target.value), 150)
@@ -290,33 +282,27 @@ function tw_connect_character_campaign_direct_v2() {
         );
 
         /* ── World-Lock validation ── */
-        // FIX #10 – listen on individual selects, not the whole form
         async function onSelectionChange() {
             setBtn(false);
 
             const campVal = selCamp.value;
             const charVal = selChar.value;
 
-            // FIX #6 – guard against empty/placeholder options
             if (!campVal || !charVal) return;
-
-            // FIX #1 – prevent concurrent validation
             if (isValidating) return;
             isValidating = true;
 
             setStatus('> System: Validating World-Lock constraints...');
 
-            const selectedCamp = store.campaigns.find(c => c.id === campVal); // FIX #2 – strict ===
+            const selectedCamp = store.campaigns.find(c => c.id === campVal);
             const headers      = { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` };
 
-            // No world_id on campaign → no lock needed
             if (!selectedCamp || selectedCamp.world_id == null) {
                 allow('> System: No World-Lock constraint. Neural bridge open.');
                 return;
             }
 
             try {
-                // Step 1: has this agent ever been deployed?
                 const resLinks = await fetch(
                     config.url + 'rest/v1/cyber_campaign_characters' +
                     '?character_id=eq.' + encodeURIComponent(charVal) +
@@ -337,9 +323,8 @@ function tw_connect_character_campaign_direct_v2() {
                     return;
                 }
 
-                const firstCampaignId = String(links[0].campaign_id); // FIX #2
+                const firstCampaignId = String(links[0].campaign_id);
 
-                // Step 2: get world_id of the agent's existing campaign
                 const resWorld = await fetch(
                     config.url + 'rest/v1/cyber_campaign_worlds' +
                     '?campaign_id=eq.' + encodeURIComponent(firstCampaignId) +
@@ -360,12 +345,10 @@ function tw_connect_character_campaign_direct_v2() {
                     return;
                 }
 
-                // Step 3: compare world IDs (both normalised to string – FIX #2)
                 const agentWorldId = String(worldRows[0].world_id);
 
                 if (agentWorldId !== selectedCamp.world_id) {
                     setStatus('> Violation: Agent is locked to another World Node.', '#ff0055');
-                    // btn stays disabled
                     isValidating = false;
                     return;
                 }
@@ -394,13 +377,10 @@ function tw_connect_character_campaign_direct_v2() {
         selChar.addEventListener('change', onSelectionChange);
 
         /* ── Submit ── */
-        // FIX #11 – show spinner overlay, poll Supabase until record is
-        //           readable, then redirect; prevents the race where
-        //           /deployments/ loaded before the row was visible.
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             setBtn(false);
-            clearTimeout(redirectTimer); // FIX #5
+            clearTimeout(redirectTimer);
 
             const campVal = selCamp.value;
             const charVal = selChar.value;
@@ -409,13 +389,12 @@ function tw_connect_character_campaign_direct_v2() {
             showOverlay('INJECTING AGENT INTO MATRIX…');
 
             const payload = {
-                campaign_id:  campVal,  // FIX #2 – stay as string (Supabase handles int coercion)
+                campaign_id:  campVal,
                 character_id: charVal,
                 wp_user_id:   config.uid
             };
 
             try {
-                /* Step 1 – insert the link */
                 const res = await fetch(config.url + 'rest/v1/cyber_campaign_characters', {
                     method: 'POST',
                     headers: {
@@ -433,7 +412,6 @@ function tw_connect_character_campaign_direct_v2() {
                     throw new Error('Rejection');
                 }
 
-                /* Step 2 – poll until the record is readable (eventual-consistency guard) */
                 spnMsg.textContent = 'SYNCHRONISING WORLD NODE…';
                 setStatus('> System: Synchronising World Node…');
 
@@ -441,7 +419,7 @@ function tw_connect_character_campaign_direct_v2() {
                 let confirmed = false;
 
                 for (let attempt = 0; attempt < 8; attempt++) {
-                    await new Promise(r => setTimeout(r, 400)); // 400 ms between polls → max ~3.2 s
+                    await new Promise(r => setTimeout(r, 400));
                     try {
                         const check = await fetch(
                             config.url + 'rest/v1/cyber_campaign_characters' +
@@ -460,22 +438,20 @@ function tw_connect_character_campaign_direct_v2() {
                 }
 
                 if (!confirmed) {
-                    // Didn't confirm within ~3.2 s – redirect anyway, just warn
                     console.warn('World-node sync timeout – redirecting anyway.');
                 }
 
-                /* Step 3 – success: glitch effect, then redirect */
-                if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err)); // FIX #4
+                if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
                 root.classList.add('tw-glitch-shake');
                 spnMsg.textContent = confirmed
                     ? 'INJECTION CONFIRMED. BRIDGING TO DEPLOYMENT…'
                     : 'SYNC TIMEOUT. BRIDGING ANYWAY…';
                 setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
 
-                redirectTimer = setTimeout(() => { // FIX #5
+                redirectTimer = setTimeout(() => {
                     hideOverlay();
                     window.location.href = '/deployments/';
-                }, 800); // shorter because write is already confirmed
+                }, 800);
 
             } catch (err) {
                 console.error('Submit error:', err);
@@ -485,7 +461,6 @@ function tw_connect_character_campaign_direct_v2() {
             }
         });
 
-        // FIX #5 – cancel redirect if user navigates away before it fires
         window.addEventListener('pagehide', () => clearTimeout(redirectTimer));
 
         init();
@@ -525,7 +500,6 @@ function tw_connect_character_campaign_direct_v2() {
         }
         .tw-world-lock-note { margin-top: 16px; padding: 14px 18px; border: 1px solid #333; background: #050505; font-size: 0.8rem; color: #777; }
         .tw-world-lock-note h4 { margin: 0 0 6px; font-size: 0.8rem; color: #adff00; letter-spacing: 1px; }
-        /* FIX #11 – inject overlay + spinner */
         .tw-inject-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; }
         .tw-inject-overlay[hidden] { display: none; }
         .tw-spinner-box { display: flex; flex-direction: column; align-items: center; gap: 20px; color: #adff00; font-family: 'Chakra Petch', sans-serif; font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; text-align: center; }
