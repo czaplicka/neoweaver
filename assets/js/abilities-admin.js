@@ -24,7 +24,7 @@ jQuery(function ($) {
     var $fieldSource = $('#nw-field-source');
     var $fieldCost = $('#nw-field-cost');
     var $fieldTags = $('#nw-field-tags');
-    var $fieldImgUrl = $('#nw-field_img_url, #nw-field-img_url');
+    var $fieldImgUrl = $('#nw-field-img_url');
 
     var all = [];
     var filtered = [];
@@ -294,9 +294,9 @@ jQuery(function ($) {
     $filterType.on('change', loadAll);
     $search.on('input', debounce(applySearch, 150));
 
-    $(document).on('error', '#nw-abilities-tbody img[data-fallback]', function () {
-        $(this).hide();
-    });
+    $tbody.find('img[data-fallback]').on('error', function () {
+    $(this).hide();
+});
 
     $saveBtn.on('click', function () {
         if (!$fieldName.val().trim()) {
