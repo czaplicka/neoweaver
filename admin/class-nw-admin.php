@@ -46,25 +46,66 @@ class NeoWeaver_Admin {
 	/*  ASSETS                                                             */
 	/* ------------------------------------------------------------------ */
 
-	public function enqueue_assets( $hook ) {
-		$is_dashboard = ( $hook === 'toplevel_page_' . $this->slug );
-		$is_any_nw    = $is_dashboard || ( strpos( $hook, 'neoweaver' ) !== false );
-		if ( ! $is_any_nw ) return;
+    public function enqueue_assets( string $hook ): void {
+        if ( ! str_contains( $hook, $this->page_slug ) ) return;
 
-		wp_enqueue_style(
-			'chakra-petch',
-			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-			array(),
-			null
-		);
+        // Ładowanie fontu z Google Fonts
+        wp_enqueue_style( 'chakra-petch', 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
 
-		if ( $is_dashboard ) {
-			wp_enqueue_script( 'jquery' );
-			wp_add_inline_style( 'chakra-petch', $this->get_css() );
-			wp_add_inline_script( 'jquery', $this->get_js() );
-		}
-	}
+        // Generowanie bazowego URL wtyczki (cofa się z folderu admin/ do głównego katalogu)
+        $plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 
+        wp_enqueue_style( 
+            'nw-classes-admin-style', 
+            $plugin_url . 'assets/css/classes-admin.css', 
+            [ 'chakra-petch' ], 
+            '1.0.0' 
+        );
+
+		        wp_enqueue_style( 
+            'nw-abilities-admin-style', 
+            $plugin_url . 'assets/css/abilities-admin.css', 
+            [ 'chakra-petch' ], 
+            '1.0.0' 
+        );
+
+				        wp_enqueue_style( 
+            'nw-achievements-admin-style', 
+            $plugin_url . 'assets/css/achievements-admin.css', 
+            [ 'chakra-petch' ], 
+            '1.0.0' 
+        );
+
+        wp_enqueue_script( 
+            'nw-achievements-admin-script', 
+            $plugin_url . 'assets/js/achievements-admin.js', 
+            [ 'jquery' ], 
+            '1.0.0', 
+            true 
+        );
+
+        wp_enqueue_script( 
+            'nw-classes-admin-script', 
+            $plugin_url . 'assets/js/classes-admin.js', 
+            [ 'jquery' ], 
+            '1.0.0', 
+            true 
+        );
+
+		        wp_enqueue_script( 
+            'nw-abilities-admin-script', 
+            $plugin_url . 'assets/js/abilities-admin.js', 
+            [ 'jquery' ], 
+            '1.0.0', 
+            true 
+        );
+
+        // Przekazywanie zmiennych do zewnętrznego pliku JS
+        wp_localize_script( 'nw-classes-admin-script', 'NWClassesData', [
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'neoweaver_classes' ),
+        ] );
+    }
 	/* ------------------------------------------------------------------ */
 	/*  HELPERS                                                            */
 	/* ------------------------------------------------------------------ */
