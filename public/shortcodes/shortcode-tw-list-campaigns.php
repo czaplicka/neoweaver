@@ -9,14 +9,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
- * v10 – FIX: add_query_arg() koduje URL przecinki i nawiasy w parametrze
- *       `select=`, co psuje składnię PostgREST embedded resources.
- *       URL budowany ręcznie przez sprintf() – PostgREST dostaje surowy select.
+ * v11 – FIX: PostgREST zwraca 300 Multiple Choices bo istnieje i bezpośredni FK
+ *       (cyber_campaign_world_id_fkey) i junction table cyber_campaign_worlds,
+ *       obie wskazują na cyber_worlds. PostgREST nie wie którą ścieżką iść.
+ *       Rozwiązanie: hint FK w select: cyber_worlds!cyber_campaign_world_id_fkey
+ *
+ * v10 – FIX: URL budowany ręcznie zamiast add_query_arg (który URL-encoduje
+ *       przecinki i nawiasy psując PostgREST select).
  *
  * v9  – FIX: usunięto nieistniejącą junction table cyber_campaign_worlds.
  *       cyber_worlds joinowane bezpośrednio przez FK world_id.
- *
- * v8  – BUG-FIX: SOLO "ENTER MATRIX" naprawiony na REST route.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -40,19 +42,18 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $anon_key = tw_supabase_anon_key();
 
         /*
-         * FIX v10: add_query_arg() URL-encoduje przecinki i nawiasy w `select`,
-         * co psuje składnię PostgREST (embedded resources). Budujemy URL ręcznie.
-         * Jedyna wartość dynamiczna to $user_id (int) – nie wymaga URL-encodowania.
+         * FIX v11: PostgREST 300 Multiple Choices
          *
-         * select wyjaśnienie:
-         *   *                               – wszystkie pola cyber_campaign
-         *   cyber_worlds(name,difficulty)   – join przez FK world_id (bezpośredni)
-         *   cyber_campaign_characters(...)  – join przez FK campaign_id
-         *     character_id                  – pole junction
-         *     cyber_characters(...)         – join przez FK character_id
-         *       name,cyber_races(name),cyber_classes(name)
+         * Problem: cyber_campaign ma bezpośredni FK do cyber_worlds (cyber_campaign_world_id_fkey)
+         * ORAZ istnieje junction table cyber_campaign_worlds która też wskazuje na cyber_worlds.
+         * PostgREST widzi dwie ścieżki i zwraca 300.
+         *
+         * Fix: użyj składni !fkey_name by wskazać konkretną ścieżkę:
+         *   cyber_worlds!cyber_campaign_world_id_fkey(name,difficulty)
+         *
+         * FIX v10: URL ręcznie (add_query_arg koduje przecinki/nawiasy)
          */
-        $select = '*,cyber_worlds(name,difficulty),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
+        $select = '*,cyber_worlds!cyber_campaign_world_id_fkey(name,difficulty),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
         $url    = $url_base . 'cyber_campaign'
             . '?wp_user_id=eq.' . (int) $user_id
             . '&select=' . $select
@@ -73,7 +74,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $code = wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) {
             $body = wp_remote_retrieve_body( $response );
-            // Loguj błąd żeby było widać w debug.log co PostgREST odrzucił
             if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
                 error_log( '[NeoWeaver] Supabase HTTP ' . $code . ': ' . $body );
             }
@@ -127,7 +127,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
-                    // v9: world_id bezpośrednio z rekordu, cyber_worlds jako obiekt (many-to-one FK)
+                    // v11: odczyt przez hint FK — klucz w odpowiedzi to nadal 'cyber_worlds'
                     $world_rel = ! empty( $c['cyber_worlds'] ) ? $c['cyber_worlds'] : null;
                     $world_id  = ! empty( $c['world_id'] ) ? (string) $c['world_id'] : null;
 
@@ -241,7 +241,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 btn.prop('disabled', false).text(label).css('opacity', '1');
             }
 
-            // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────
+            // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────────────
             $('.tw-delete-campaign-btn').on('click', async function(e) {
                 e.preventDefault();
                 const btn      = $(this);
@@ -259,7 +259,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 } catch (err) { console.error('DELETE EXCEPTION', err); alert('TERMINATION FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'TERMINATE'); }
             });
 
-            // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────
+            // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────────────
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
                 const btn    = $(this);
@@ -330,7 +330,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 }
             });
 
-            // ─── 3. COPY HASH ─────────────────────────────────────────────────
+            // ─── 3. COPY HASH ─────────────────────────────────────────────────────────
             $('.tw-copy-join-btn').on('click', async function(e) {
                 e.preventDefault();
                 const btn  = $(this);
