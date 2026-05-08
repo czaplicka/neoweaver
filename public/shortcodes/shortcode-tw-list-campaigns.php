@@ -9,6 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
+ * v16 – FIX: enqueue tw-core.css directly in shortcode so .tw-action-btn
+ *       and .enter-matrix styles load on non-adventure-template pages.
+ *
  * v15 – FIX: cyber_campaign_characters i cyber_campaign_worlds mogą zwracać
  *       obiekt (jeden rekord) zamiast tablicy — obsługujemy oba przypadki.
  *       Dodano data-character na przycisk ENTER MATRIX.
@@ -24,6 +27,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
         if ( is_admin() ) {
             return '';
+        }
+
+        // Enqueue tw-core.css if not already loaded (e.g. on non-adventure pages)
+        if ( ! wp_style_is( 'neoweaver-tw-core', 'enqueued' ) ) {
+            wp_enqueue_style(
+                'neoweaver-tw-core',
+                NEOWEAVER_PLUGIN_URL . 'assets/css/tw-core.css',
+                [],
+                '1.0.0'
+            );
         }
 
         $user_id = get_current_user_id();
@@ -60,7 +73,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $code = wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) {
             $body = wp_remote_retrieve_body( $response );
-            error_log( '[NeoWeaver v15] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
+            error_log( '[NeoWeaver v16] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
             return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed [HTTP ' . (int) $code . ']. Check your Uplink.</p>';
         }
 
@@ -68,7 +81,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $decoded = json_decode( $raw, true );
 
         if ( ! is_array( $decoded ) ) {
-            error_log( '[NeoWeaver v15] JSON decode failed. Raw: ' . $raw );
+            error_log( '[NeoWeaver v16] JSON decode failed. Raw: ' . $raw );
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
         $active_campaigns = $decoded;
