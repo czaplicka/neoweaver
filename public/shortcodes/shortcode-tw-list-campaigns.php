@@ -9,18 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
- * v13 – FIX: explicit FK hints in PostgREST nested select.
- *       cyber_campaign_characters!cyber_campaign_characters_campaign_id_fkey(
- *           character_id,
- *           cyber_characters!cyber_campaign_characters_character_id_fkey(
- *               name,
- *               cyber_races!cyber_characters_race_id_fkey(name),
- *               cyber_classes!cyber_characters_class_id_fkey(name)
- *           )
- *       )
+ * v14 – FIX: rawurlencode() kodowało ! na %21, psując hinty FK.
+ *       Rozwiązanie: rezygnacja z hintów FK (relacje są jednoznaczne),
+ *       URL budowany bez kodowania $select — tylko wp_user_id jest enkodowane.
+ *       $select przekazywany jako surowy string.
  *
- * v12 – FIX: cyber_campaign.world_id jest zawsze NULL – world przez junction
- * v11 – FIX: PostgREST 300 hint FK
+ * v13 – explicit FK hints (zepsute przez rawurlencode)
+ * v12 – world przez cyber_campaign_worlds junction
+ * v11 – FK hint hint
  * v10 – URL ręcznie
  */
 
@@ -45,23 +41,25 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $anon_key = tw_supabase_anon_key();
 
         /*
-         * v13: pełne hinty FK na każdym poziomie nestingu.
+         * v14: Bez rawurlencode na $select.
+         * PostgREST akceptuje nawiasy/przecinki/kropki surowo w query stringu.
+         * Kodujemy TYLKO wp_user_id (int, bezpieczne).
          *
-         * cyber_campaign_worlds – FK: cyber_campaign_worlds_campaign_id_fkey
-         * cyber_campaign_characters – FK: cyber_campaign_characters_campaign_id_fkey
-         * cyber_characters – FK: cyber_campaign_characters_character_id_fkey
-         * cyber_races wewnątrz cyber_characters – FK: cyber_characters_race_id_fkey
-         * cyber_classes wewnątrz cyber_characters – FK: cyber_characters_class_id_fkey
+         * Relacje są jednoznaczne (jeden FK na parę tabel), więc hinty zbędne.
+         *
+         * Struktura zwrotna:
+         *   $c['cyber_campaign_worlds'][0]['world_id']
+         *   $c['cyber_campaign_worlds'][0]['cyber_worlds']['name']
+         *   $c['cyber_campaign_characters'][0]['character_id']
+         *   $c['cyber_campaign_characters'][0]['cyber_characters']['name']
+         *   $c['cyber_campaign_characters'][0]['cyber_characters']['cyber_races']['name']
+         *   $c['cyber_campaign_characters'][0]['cyber_characters']['cyber_classes']['name']
          */
-        $select = implode( ',', [
-            '*',
-            'cyber_campaign_worlds!cyber_campaign_worlds_campaign_id_fkey(world_id,cyber_worlds!cyber_campaign_worlds_world_id_fkey(name,difficulty))',
-            'cyber_campaign_characters!cyber_campaign_characters_campaign_id_fkey(character_id,cyber_characters!cyber_campaign_characters_character_id_fkey(name,cyber_races!cyber_characters_race_id_fkey(name),cyber_classes!cyber_characters_class_id_fkey(name)))',
-        ] );
+        $select = '*,cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty)),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
 
         $url = $url_base . 'cyber_campaign'
             . '?wp_user_id=eq.' . (int) $user_id
-            . '&select=' . rawurlencode( $select )
+            . '&select=' . $select
             . '&order=created_at.desc';
 
         $response = wp_remote_get( $url, array(
@@ -79,17 +77,25 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $code = wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) {
             $body = wp_remote_retrieve_body( $response );
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                error_log( '[NeoWeaver] Supabase HTTP ' . $code . ': ' . $body );
-            }
+            error_log( '[NeoWeaver v14] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
             return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed [HTTP ' . (int) $code . ']. Check your Uplink.</p>';
         }
 
-        $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+        $raw     = wp_remote_retrieve_body( $response );
+        $decoded = json_decode( $raw, true );
+
         if ( ! is_array( $decoded ) ) {
+            error_log( '[NeoWeaver v14] JSON decode failed. Raw: ' . $raw );
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
         $active_campaigns = $decoded;
+
+        /* DEBUG: loguj pierwszą kampanię by sprawdzić strukturę */
+        if ( ! empty( $active_campaigns ) ) {
+            error_log( '[NeoWeaver v14] first campaign keys: ' . implode( ', ', array_keys( $active_campaigns[0] ) ) );
+            error_log( '[NeoWeaver v14] cyber_campaign_characters raw: ' . wp_json_encode( $active_campaigns[0]['cyber_campaign_characters'] ?? 'KEY_MISSING' ) );
+            error_log( '[NeoWeaver v14] cyber_campaign_worlds raw: ' . wp_json_encode( $active_campaigns[0]['cyber_campaign_worlds'] ?? 'KEY_MISSING' ) );
+        }
 
         $empty_styles = '
         <style>
@@ -132,18 +138,12 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
-                    /*
-                     * v12/v13: Świat przez junction cyber_campaign_worlds.
-                     * PostgREST zwraca tablicę (one-to-many), bierzemy [0].
-                     */
+                    /* Świat przez junction */
                     $world_junction = ! empty( $c['cyber_campaign_worlds'][0] ) ? $c['cyber_campaign_worlds'][0] : null;
                     $world_rel      = $world_junction ? ( $world_junction['cyber_worlds'] ?? null ) : null;
                     $world_id       = $world_junction ? ( $world_junction['world_id'] ?? null ) : null;
 
-                    /*
-                     * v13: Postać przez junction cyber_campaign_characters.
-                     * Wewnątrz [0] jest cyber_characters (obiekt) z race/class.
-                     */
+                    /* Postać przez junction */
                     $char_junction = ! empty( $c['cyber_campaign_characters'][0] ) ? $c['cyber_campaign_characters'][0] : null;
                     $char_rel      = $char_junction ? ( $char_junction['cyber_characters'] ?? null ) : null;
 
@@ -155,10 +155,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                     $operative_name = 'PENDING ASSIGNMENT';
                     if ( $char_rel ) {
-                        $race  = $char_rel['cyber_races']['name']   ?? 'Unknown';
-                        $class = $char_rel['cyber_classes']['name'] ?? 'Agent';
+                        $race  = isset( $char_rel['cyber_races']['name'] )   ? $char_rel['cyber_races']['name']   : 'Unknown';
+                        $class = isset( $char_rel['cyber_classes']['name'] ) ? $char_rel['cyber_classes']['name'] : 'Agent';
                         $operative_name = esc_html( $char_rel['name'] )
-                            . " <small style='color:#666; font-size:0.7rem;'>[{$race} | {$class}]</small>";
+                            . " <small style='color:#666; font-size:0.7rem;'>[" . esc_html( $race ) . ' | ' . esc_html( $class ) . "]</small>";
                     }
 
                     if ( ! $world_rel ) {
@@ -217,7 +217,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                             <?php if ( $is_team ) : ?>
                                 <div class="tw-data-row" style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                                     <span style="font-size:0.7rem; color:#444; font-weight:bold;">DEPLOYMENT HASH:</span>
-                                    <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;" class="tw-join-code-display" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>">
+                                    <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;">
                                         <?php echo $join_code ? esc_html( strtoupper( $join_code ) ) : 'NOT INITIALIZED'; ?>
                                     </span>
                                 </div>
@@ -253,7 +253,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 btn.prop('disabled', false).text(label).css('opacity', '1');
             }
 
-            // ─── 1. HARD DELETE via Supabase RPC ─────────────────────────────────────
             $('.tw-delete-campaign-btn').on('click', async function(e) {
                 e.preventDefault();
                 const btn      = $(this);
@@ -264,14 +263,12 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 if (!window.twSupabase) { alert('SUPABASE CLIENT OFFLINE.'); resetBtn(btn, 'TERMINATE'); return; }
                 try {
                     const { error } = await window.twSupabase.rpc('fn_delete_campaign', { p_campaign_id: campId });
-                    if (error) { console.error('DELETE ERROR', error); alert('TERMINATION FAILED: ' + (error.message || 'Grid Denied.')); resetBtn(btn, 'TERMINATE'); return; }
-                    const card = $('#campaign-card-' + campId);
-                    if (card.length) card.css({ opacity: '0', 'pointer-events': 'none' });
+                    if (error) { alert('TERMINATION FAILED: ' + (error.message || 'Grid Denied.')); resetBtn(btn, 'TERMINATE'); return; }
+                    $('#campaign-card-' + campId).css({ opacity: '0', 'pointer-events': 'none' });
                     setTimeout(() => window.location.reload(), 1200);
-                } catch (err) { console.error('DELETE EXCEPTION', err); alert('TERMINATION FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'TERMINATE'); }
+                } catch (err) { alert('TERMINATION FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'TERMINATE'); }
             });
 
-            // ─── 2. ENTER MATRIX — SOLO vs TEAM ──────────────────────────────────────
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
                 const btn    = $(this);
@@ -281,16 +278,11 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                 if (mode === 'SOLO') {
                     btn.text('INITIALIZING...').css('opacity', '0.7');
-
                     const fd = new FormData();
                     fd.append('campaign_id', campId);
                     fd.append('security',    GLOBAL_NONCE);
-
                     fetch(SESSION_START_URL, {
-                        method:      'POST',
-                        headers:     { 'X-WP-Nonce': REST_NONCE },
-                        body:        fd,
-                        credentials: 'same-origin',
+                        method: 'POST', headers: { 'X-WP-Nonce': REST_NONCE }, body: fd, credentials: 'same-origin',
                     })
                     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(response => {
@@ -306,43 +298,35 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                             }
                         }
                     })
-                    .catch(err => { console.error('SESSION INIT ERROR', err); alert('SESSION INIT FAILED: network error'); resetBtn(btn, 'ENTER MATRIX'); });
-
+                    .catch(err => { alert('SESSION INIT FAILED: network error'); resetBtn(btn, 'ENTER MATRIX'); });
                 } else {
                     btn.text('LINKING...').css('opacity', '0.7');
                     if (!window.twSupabase) { alert('SUPABASE CLIENT OFFLINE.'); resetBtn(btn, 'ENTER MATRIX'); return; }
-
                     const adv = window.twAdventureData || {};
                     const currentWpUserId = adv.wp_user_id || adv.userid || null;
-                    if (!currentWpUserId) { alert('SIGNUP FAILED: Cannot detect current operator ID.'); resetBtn(btn, 'ENTER MATRIX'); return; }
-
-                    const client  = window.twSupabase;
+                    if (!currentWpUserId) { alert('SIGNUP FAILED: Cannot detect operator ID.'); resetBtn(btn, 'ENTER MATRIX'); return; }
                     const worldId = btn.data('world') || null;
-
                     (async () => {
                         try {
                             let characterId = null;
                             if (worldId) {
-                                const { data: charRows, error: charError } = await client.from('cyber_characters').select('id').eq('wp_user_id', currentWpUserId).eq('world_id', worldId).limit(1);
-                                if (charError) { console.error('CHARACTER LOOKUP ERROR', charError); alert('SIGNUP FAILED: Cannot resolve your Field Agent.'); resetBtn(btn, 'ENTER MATRIX'); return; }
+                                const { data: charRows, error: charError } = await window.twSupabase.from('cyber_characters').select('id').eq('wp_user_id', currentWpUserId).eq('world_id', worldId).limit(1);
+                                if (charError) { alert('SIGNUP FAILED: Cannot resolve Field Agent.'); resetBtn(btn, 'ENTER MATRIX'); return; }
                                 characterId = (charRows && charRows.length) ? charRows[0].id : null;
                             }
                             if (!characterId) { window.location.href = '/agents/?campaign_id=' + campId; return; }
-
-                            const { data: existingSignups, error: existingError } = await client.from('cyber_campaign_signups').select('id').eq('campaign_id', campId).eq('wp_user_id', currentWpUserId).limit(1);
-                            if (existingError) { console.error('SIGNUP CHECK ERROR', existingError); alert('SIGNUP FAILED: Cannot verify existing link.'); resetBtn(btn, 'ENTER MATRIX'); return; }
-
-                            if (!existingSignups || !existingSignups.length) {
-                                const { error: signupError } = await client.from('cyber_campaign_signups').insert({ campaign_id: campId, character_id: characterId, wp_user_id: currentWpUserId });
-                                if (signupError) { console.error('SIGNUP ERROR', signupError); alert('SIGNUP FAILED: ' + (signupError.message || 'Unknown interference')); resetBtn(btn, 'ENTER MATRIX'); return; }
+                            const { data: ex, error: exErr } = await window.twSupabase.from('cyber_campaign_signups').select('id').eq('campaign_id', campId).eq('wp_user_id', currentWpUserId).limit(1);
+                            if (exErr) { alert('SIGNUP FAILED: Cannot verify link.'); resetBtn(btn, 'ENTER MATRIX'); return; }
+                            if (!ex || !ex.length) {
+                                const { error: sigErr } = await window.twSupabase.from('cyber_campaign_signups').insert({ campaign_id: campId, character_id: characterId, wp_user_id: currentWpUserId });
+                                if (sigErr) { alert('SIGNUP FAILED: ' + (sigErr.message || 'Unknown')); resetBtn(btn, 'ENTER MATRIX'); return; }
                             }
                             window.location.href = '<?php echo esc_js( home_url( '/lobby/?campaign_id=' ) ); ?>' + campId;
-                        } catch (err) { console.error('TEAM SIGNUP EXCEPTION', err); alert('SIGNUP FAILED: CLIENT EXCEPTION'); resetBtn(btn, 'ENTER MATRIX'); }
+                        } catch (err) { alert('SIGNUP FAILED: EXCEPTION'); resetBtn(btn, 'ENTER MATRIX'); }
                     })();
                 }
             });
 
-            // ─── 3. COPY HASH ─────────────────────────────────────────────────────────
             $('.tw-copy-join-btn').on('click', async function(e) {
                 e.preventDefault();
                 const btn  = $(this);
@@ -352,15 +336,11 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(code);
                     } else {
-                        const temp = $('<input>');
-                        $('body').append(temp);
-                        temp.val(code).select();
-                        document.execCommand('copy');
-                        temp.remove();
+                        const temp = $('<input>'); $('body').append(temp); temp.val(code).select(); document.execCommand('copy'); temp.remove();
                     }
                     btn.text('HASH COPIED');
                     setTimeout(() => btn.text('COPY HASH'), 2000);
-                } catch (err) { console.error('CLIPBOARD ERROR', err); alert('COPY FAILED: BROWSER BLOCKED CLIPBOARD ACCESS.'); }
+                } catch (err) { alert('COPY FAILED.'); }
             });
         });
         </script>
