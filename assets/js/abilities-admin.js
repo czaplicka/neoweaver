@@ -106,6 +106,14 @@ jQuery(function ($) {
         $('#nw-other-count').text(data.length - active - passive);
     }
 
+    function bindImageFallbacks() {
+        $tbody.find('img[data-fallback]')
+            .off('error.nwFallback')
+            .on('error.nwFallback', function () {
+                $(this).hide();
+            });
+    }
+
     function renderTable(data) {
         if (!data.length) {
             $tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#555;">No abilities found.</td></tr>');
@@ -139,6 +147,8 @@ jQuery(function ($) {
                 + '<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="' + safeId + '">Edit</button></div></td>'
                 + '</tr>';
         }).join(''));
+
+        bindImageFallbacks();
     }
 
     function applySearch() {
@@ -293,10 +303,6 @@ jQuery(function ($) {
     $('#nw-refresh-btn').on('click', loadAll);
     $filterType.on('change', loadAll);
     $search.on('input', debounce(applySearch, 150));
-
-    $tbody.find('img[data-fallback]').on('error', function () {
-    $(this).hide();
-});
 
     $saveBtn.on('click', function () {
         if (!$fieldName.val().trim()) {
