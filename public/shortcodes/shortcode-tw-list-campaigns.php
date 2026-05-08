@@ -7,12 +7,19 @@ if ( ! defined( 'ABSPATH' ) ) {
  * TALE WEAVER - FIELD AGENT COMMAND CENTER
  * Shortcode: [tw_list_campaigns]
  *
- * BUG-FIX: SOLO "ENTER MATRIX" posted to a hard-coded theme file path
- * (get_stylesheet_directory_uri().'/endpoint/tw-endpoint-start-game-session.php').
- * That file does not exist on the active theme, bypasses all WordPress auth
- * and nonce infrastructure, and 404s on any theme change.
- * Fixed: post to the registered REST route neoweaver/v1/session/start, which
- * handles authentication via neoweaver_user_can_play() and its own nonce check.
+ * CHANGELOG
+ * ---------
+ * v9 – FIX: zapytanie Supabase odpytywało nieistniejącą junction table
+ *      `cyber_campaign_worlds`. Tabela `cyber_campaign` ma `world_id` jako
+ *      bezpośredni FK do `cyber_worlds`. Zmieniono select na:
+ *        cyber_worlds(name,difficulty)
+ *      zamiast:
+ *        cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty))
+ *      Dzięki temu REALITY_NODE i OPERATIVE_LINK wyświetlają się poprawnie,
+ *      a przycisk "ENTER MATRIX" pojawia się gdy kampania ma i świat i agenta.
+ *
+ * v8 – BUG-FIX: SOLO "ENTER MATRIX" posted to a hard-coded theme file path.
+ *      Fixed: post to registered REST route neoweaver/v1/session/start.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -35,13 +42,15 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
         $anon_key = tw_supabase_anon_key();
 
+        /*
+         * FIX v9: cyber_campaign.world_id jest bezpośrednim FK do cyber_worlds.
+         * Nie ma tabeli junction cyber_campaign_worlds — usunięto ten błędny join.
+         * cyber_worlds joinowane bezpośrednio przez istniejący FK.
+         */
         $params = array(
             'wp_user_id' => 'eq.' . $user_id,
             'select'     => '*,'
-                . 'cyber_campaign_worlds('
-                    . 'world_id,'
-                    . 'cyber_worlds(name,difficulty)'
-                . '),'
+                . 'cyber_worlds(name,difficulty),'
                 . 'cyber_campaign_characters('
                     . 'character_id,'
                     . 'cyber_characters('
@@ -99,9 +108,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             </div>';
         }
 
-        $game_nonce      = wp_create_nonce( 'tw_game_nonce' );
-        // REST nonce for the session/start endpoint (WP REST uses X-WP-Nonce).
-        $rest_nonce      = wp_create_nonce( 'wp_rest' );
+        $game_nonce       = wp_create_nonce( 'tw_game_nonce' );
+        $rest_nonce       = wp_create_nonce( 'wp_rest' );
         $session_rest_url = get_rest_url( null, 'neoweaver/v1/session/start' );
 
         ob_start();
@@ -115,13 +123,13 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
-                    $world_rel = ! empty( $c['cyber_campaign_worlds'] )
-                        ? ( $c['cyber_campaign_worlds'][0]['cyber_worlds'] ?? null )
-                        : null;
-
-                    $world_id  = ! empty( $c['cyber_campaign_worlds'] )
-                        ? ( $c['cyber_campaign_worlds'][0]['world_id'] ?? null )
-                        : null;
+                    /*
+                     * FIX v9: cyber_worlds jest teraz bezpośrednim obiektem (nie tablicą),
+                     * bo relacja jest przez bezpośredni FK (many-to-one).
+                     * world_id bierzemy z pola tabeli cyber_campaign.
+                     */
+                    $world_rel = ! empty( $c['cyber_worlds'] ) ? $c['cyber_worlds'] : null;
+                    $world_id  = ! empty( $c['world_id'] ) ? (string) $c['world_id'] : null;
 
                     $char_rel  = ! empty( $c['cyber_campaign_characters'] )
                         ? ( $c['cyber_campaign_characters'][0]['cyber_characters'] ?? null )
@@ -225,10 +233,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         <script>
         jQuery(document).ready(function($) {
 
-            const GLOBAL_NONCE = '<?php echo esc_js( $game_nonce ); ?>';
-            const REST_NONCE   = '<?php echo esc_js( $rest_nonce ); ?>';
-            // BUG-FIX: SOLO session start now posts to the proper REST endpoint
-            // instead of a non-existent theme PHP file.
+            const GLOBAL_NONCE      = '<?php echo esc_js( $game_nonce ); ?>';
+            const REST_NONCE        = '<?php echo esc_js( $rest_nonce ); ?>';
             const SESSION_START_URL = '<?php echo esc_js( $session_rest_url ); ?>';
 
             function resetBtn(btn, label) {
@@ -268,9 +274,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     fd.append('campaign_id', campId);
                     fd.append('security',    GLOBAL_NONCE);
 
-                    // BUG-FIX: was posting to a hard-coded theme file path that doesn't
-                    // exist and has no auth layer. Now uses the registered REST route
-                    // neoweaver/v1/session/start with a proper X-WP-Nonce header.
                     fetch(SESSION_START_URL, {
                         method:      'POST',
                         headers:     { 'X-WP-Nonce': REST_NONCE },
@@ -332,8 +335,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 e.preventDefault();
                 const btn  = $(this);
                 const code = btn.data('code');
-                if (!code) { alert('NO HASH DETECTED.'); return; }
-                try {
+                if (!code) { alert('NO HASH DETECTED.'); return; }\n                try {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(code);
                     } else {
