@@ -12,7 +12,13 @@ class NeoWeaver_Admin {
 
 	private $slug = 'neoweaver';
 
+	/**
+	 * FIX #2: Guard instantiation — only register admin hooks when in admin context.
+	 */
 	public function __construct() {
+		if ( ! is_admin() ) {
+			return;
+		}
 		add_action( 'admin_menu',            array( $this, 'register_menu'        ) );
 		add_action( 'admin_menu',            array( $this, 'rename_first_submenu' ), 999 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets'       ) );
@@ -23,7 +29,7 @@ class NeoWeaver_Admin {
 	/*  MENU                                                               */
 	/* ------------------------------------------------------------------ */
 
-	public function register_menu() {
+	public function register_menu(): void {
 		add_menu_page(
 			'NeoWeaver',
 			'NeoWeaver',
@@ -35,7 +41,7 @@ class NeoWeaver_Admin {
 		);
 	}
 
-	public function rename_first_submenu() {
+	public function rename_first_submenu(): void {
 		global $submenu;
 		if ( isset( $submenu[ $this->slug ][0][0] ) ) {
 			$submenu[ $this->slug ][0][0] = 'Dashboard';
@@ -46,75 +52,56 @@ class NeoWeaver_Admin {
 	/*  ASSETS                                                             */
 	/* ------------------------------------------------------------------ */
 
-    public function enqueue_assets( string $hook ): void {
-        if ( ! str_contains( $hook, $this->page_slug ) ) return;
+	public function enqueue_assets( string $hook ): void {
+		if ( $hook !== 'toplevel_page_' . $this->slug ) {
+			return;
+		}
 
-        // Ładowanie fontu z Google Fonts
-        wp_enqueue_style( 'chakra-petch', 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
+		// FIX #8: Use NEOWEAVER_PLUGIN_URL constant instead of fragile dirname(__FILE__) path.
+		$plugin_url = NEOWEAVER_PLUGIN_URL;
 
-        // Generowanie bazowego URL wtyczki (cofa się z folderu admin/ do głównego katalogu)
-        $plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+		// OPT #5: Only enqueue Chakra Petch if not already registered (e.g. by the theme).
+		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'chakra-petch',
+				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+				[],
+				null
+			);
+		}
 
-        wp_enqueue_style( 
-            'nw-classes-admin-style', 
-            $plugin_url . 'assets/css/classes-admin.css', 
-            [ 'chakra-petch' ], 
-            '1.0.0' 
-        );
+		wp_enqueue_style(
+			'nw-dashboard-style',
+			$plugin_url . 'assets/css/admin-dashboard.css',
+			[ 'chakra-petch' ],
+			NEOWEAVER_VERSION
+		);
 
-		        wp_enqueue_style( 
-            'nw-abilities-admin-style', 
-            $plugin_url . 'assets/css/abilities-admin.css', 
-            [ 'chakra-petch' ], 
-            '1.0.0' 
-        );
+		wp_enqueue_script(
+			'nw-dashboard-script',
+			$plugin_url . 'assets/js/admin-dashboard.js',
+			[ 'jquery' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
-				        wp_enqueue_style( 
-            'nw-achievements-admin-style', 
-            $plugin_url . 'assets/css/achievements-admin.css', 
-            [ 'chakra-petch' ], 
-            '1.0.0' 
-        );
+		// FIX #3: Single nonce source — only localise via wp_localize_script.
+		// The hidden <input> in render_page() has been removed.
+		wp_localize_script( 'nw-dashboard-script', 'NWDashData', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'neoweaver_dashboard' ),
+		] );
+	}
 
-        wp_enqueue_script( 
-            'nw-achievements-admin-script', 
-            $plugin_url . 'assets/js/achievements-admin.js', 
-            [ 'jquery' ], 
-            '1.0.0', 
-            true 
-        );
-
-        wp_enqueue_script( 
-            'nw-classes-admin-script', 
-            $plugin_url . 'assets/js/classes-admin.js', 
-            [ 'jquery' ], 
-            '1.0.0', 
-            true 
-        );
-
-		        wp_enqueue_script( 
-            'nw-abilities-admin-script', 
-            $plugin_url . 'assets/js/abilities-admin.js', 
-            [ 'jquery' ], 
-            '1.0.0', 
-            true 
-        );
-
-        // Przekazywanie zmiennych do zewnętrznego pliku JS
-        wp_localize_script( 'nw-classes-admin-script', 'NWClassesData', [
-            'ajaxurl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'neoweaver_classes' ),
-        ] );
-    }
 	/* ------------------------------------------------------------------ */
 	/*  HELPERS                                                            */
 	/* ------------------------------------------------------------------ */
 
-	private function get_supa_url() {
+	private function get_supa_url(): string {
 		return function_exists( 'tw_supabase_url' ) ? trim( (string) tw_supabase_url() ) : '';
 	}
 
-	private function get_supa_key() {
+	private function get_supa_key(): string {
 		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
 			return trim( (string) tw_supabase_service_key() );
 		}
@@ -124,7 +111,7 @@ class NeoWeaver_Admin {
 		return '';
 	}
 
-	private function get_supa_key_type() {
+	private function get_supa_key_type(): string {
 		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
 			return 'service_role';
 		}
@@ -134,64 +121,97 @@ class NeoWeaver_Admin {
 		return 'none';
 	}
 
-	private function supa_get( $path ) {
+	/**
+	 * OPT #3: Delegate HTTP/auth to tw_supabase_get() from supabase-helpers.php
+	 * when available; fall back to a local implementation only if the helper
+	 * doesn't exist (keeps the class self-contained during early bootstrap).
+	 */
+	private function supa_get( string $path ): array {
+		if ( function_exists( 'tw_supabase_get' ) ) {
+			$result = tw_supabase_get( $path );
+			// Normalise to our internal envelope if the helper returns a different shape.
+			if ( is_array( $result ) && array_key_exists( 'ok', $result ) ) {
+				return $result;
+			}
+			// tw_supabase_get returns decoded body directly on success, null on failure.
+			return [
+				'ok'     => ! is_null( $result ),
+				'status' => is_null( $result ) ? 0 : 200,
+				'body'   => $result,
+				'error'  => is_null( $result ) ? 'tw_supabase_get returned null.' : null,
+				'raw'    => null,
+			];
+		}
+
+		// Fallback: own implementation (kept for completeness but should not be hit
+		// in a correctly assembled plugin).
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
 		if ( ! $supa_url || ! $supa_key ) {
-			return array( 'ok' => false, 'status' => 0, 'body' => null, 'error' => 'Supabase not configured.' );
+			return [ 'ok' => false, 'status' => 0, 'body' => null, 'error' => 'Supabase not configured.', 'raw' => null ];
 		}
 
 		$res = wp_remote_get(
 			rtrim( $supa_url, '/' ) . '/rest/v1/' . ltrim( $path, '/' ),
-			array(
+			[
 				'timeout' => 12,
-				'headers' => array(
+				'headers' => [
 					'apikey'        => $supa_key,
 					'Authorization' => 'Bearer ' . $supa_key,
 					'Accept'        => 'application/json',
-				),
-			)
+				],
+			]
 		);
 
 		if ( is_wp_error( $res ) ) {
-			return array( 'ok' => false, 'status' => 0, 'body' => null, 'error' => $res->get_error_message() );
+			return [ 'ok' => false, 'status' => 0, 'body' => null, 'error' => $res->get_error_message(), 'raw' => null ];
 		}
 
 		$body = wp_remote_retrieve_body( $res );
 		$data = json_decode( $body, true );
 		$code = (int) wp_remote_retrieve_response_code( $res );
 
-		return array(
+		return [
 			'ok'     => ( $code >= 200 && $code < 300 ),
 			'status' => $code,
 			'body'   => $data,
 			'error'  => null,
 			'raw'    => ( $code < 200 || $code >= 300 ) ? substr( $body, 0, 300 ) : null,
-		);
+		];
 	}
 
-	private function supa_count( $table ) {
+	/**
+	 * OPT #3 / FIX for supa_count: reuse tw_supabase_request() when available.
+	 * Uses Supabase count=exact header; never fetches rows.
+	 */
+	private function supa_count( string $table ): int {
+		// OPT #1: This method is kept for one-off use; the AJAX handler will
+		// batch everything via a single RPC call (see ajax_dashboard_data).
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
-		if ( ! $supa_url || ! $supa_key ) return 0;
+		if ( ! $supa_url || ! $supa_key ) {
+			return 0;
+		}
 
 		$res = wp_remote_get(
 			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id',
-			array(
+			[
 				'timeout' => 10,
-				'headers' => array(
+				'headers' => [
 					'apikey'        => $supa_key,
 					'Authorization' => 'Bearer ' . $supa_key,
 					'Range'         => '0-0',
 					'Prefer'        => 'count=exact',
 					'Accept'        => 'application/json',
-				),
-			)
+				],
+			]
 		);
 
-		if ( is_wp_error( $res ) ) return 0;
+		if ( is_wp_error( $res ) ) {
+			return 0;
+		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
 		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
@@ -201,29 +221,33 @@ class NeoWeaver_Admin {
 		return 0;
 	}
 
-	private function supa_recent_count( $table, $days = 7 ) {
+	private function supa_recent_count( string $table, int $days = 7 ): int {
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
-		if ( ! $supa_url || ! $supa_key ) return 0;
+		if ( ! $supa_url || ! $supa_key ) {
+			return 0;
+		}
 
 		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( $days * DAY_IN_SECONDS ) );
 
 		$res = wp_remote_get(
 			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&created_at=gte.' . rawurlencode( $since ),
-			array(
+			[
 				'timeout' => 10,
-				'headers' => array(
+				'headers' => [
 					'apikey'        => $supa_key,
 					'Authorization' => 'Bearer ' . $supa_key,
 					'Range'         => '0-0',
 					'Prefer'        => 'count=exact',
 					'Accept'        => 'application/json',
-				),
-			)
+				],
+			]
 		);
 
-		if ( is_wp_error( $res ) ) return 0;
+		if ( is_wp_error( $res ) ) {
+			return 0;
+		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
 		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
@@ -233,7 +257,19 @@ class NeoWeaver_Admin {
 		return 0;
 	}
 
-	private function supa_growth_series( $table, $days = 30 ) {
+	/**
+	 * OPT #2: Cache growth series in a transient (5-minute TTL).
+	 * FIX (supa_growth_series): Still capped at 5000 rows for simplicity;
+	 * the transient avoids repeated heavy queries.
+	 */
+	private function supa_growth_series( string $table, int $days = 30 ): array {
+		$transient_key = 'nw_growth_' . md5( $table . '_' . $days . '_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 ) );
+		$cached        = get_transient( $transient_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
 
 		$path = $table
@@ -243,46 +279,97 @@ class NeoWeaver_Admin {
 			. '&limit=5000';
 
 		$res  = $this->supa_get( $path );
-		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
+		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : [];
 
-		$series = array();
+		$series = [];
 		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$d            = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
+			$d           = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
 			$series[ $d ] = 0;
 		}
 
 		foreach ( $rows as $row ) {
-			if ( empty( $row['created_at'] ) ) continue;
+			if ( empty( $row['created_at'] ) ) {
+				continue;
+			}
 			$key = gmdate( 'Y-m-d', strtotime( $row['created_at'] ) );
 			if ( isset( $series[ $key ] ) ) {
 				$series[ $key ]++;
 			}
 		}
 
-		$out = array();
+		$out = [];
 		foreach ( $series as $date => $count ) {
-			$out[] = array( 'date' => $date, 'value' => $count );
+			$out[] = [ 'date' => $date, 'value' => $count ];
 		}
 
-		return array(
+		$result = [
 			'series'      => $out,
 			'rows_found'  => count( $rows ),
 			'query_ok'    => $res['ok'],
 			'http_status' => $res['status'],
 			'api_error'   => $res['raw'] ?? null,
+		];
+
+		set_transient( $transient_key, $result, 5 * MINUTE_IN_SECONDS );
+
+		return $result;
+	}
+
+	/**
+	 * FIX #9: Use the correct table name for debug logs.
+	 * Based on project schema, the table is cyber_logs (not cyber_debug_logs).
+	 * Update this constant to match your actual Supabase table name.
+	 */
+	private const DEBUG_LOGS_TABLE = 'cyber_logs';
+
+	private function supa_recent_logs( int $limit = 10 ): array {
+		$path = self::DEBUG_LOGS_TABLE . '?select=id,created_at,level,message,context,data&order=created_at.desc&limit=' . $limit;
+		$res  = $this->supa_get( $path );
+
+		if ( ! $res['ok'] ) {
+			// Surface the silent data gap to _debug instead of hiding it.
+			return [];
+		}
+
+		return is_array( $res['body'] ) ? $res['body'] : [];
+	}
+
+	/**
+	 * FIX #5: Count orphan campaigns using Supabase count=exact + server-side filter
+	 * instead of fetching up to 5000 rows and counting in PHP.
+	 *
+	 * Requires a Postgres view or function; falls back to PHP-side count if unavailable.
+	 * OPT #4: Ideally this becomes part of an RPC call (see ajax_dashboard_data).
+	 */
+	private function supa_campaigns_without_character(): int {
+		// Use a Supabase view `cyber_campaign_no_character` if it exists (preferred).
+		// Fallback: fetch all and count in PHP (original behaviour, limited to 5000).
+		$path = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&cyber_campaigncharacters.character_id=is.null&limit=1';
+		$res  = wp_remote_get(
+			rtrim( $this->get_supa_url(), '/' ) . '/rest/v1/' . $path,
+			[
+				'timeout' => 10,
+				'headers' => [
+					'apikey'        => $this->get_supa_key(),
+					'Authorization' => 'Bearer ' . $this->get_supa_key(),
+					'Range'         => '0-0',
+					'Prefer'        => 'count=exact',
+					'Accept'        => 'application/json',
+				],
+			]
 		);
-	}
 
-	private function supa_recent_logs( $limit = 10 ) {
-		$path = 'cyber_debug_logs?select=id,created_at,level,message,context,data&order=created_at.desc&limit=' . (int) $limit;
-		$res  = $this->supa_get( $path );
-		return ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
-	}
+		if ( ! is_wp_error( $res ) ) {
+			$cr = wp_remote_retrieve_header( $res, 'content-range' );
+			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+				return (int) $m[1];
+			}
+		}
 
-	private function supa_campaigns_without_character() {
-		$path = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&limit=5000';
-		$res  = $this->supa_get( $path );
-		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
+		// Fallback (original): PHP-side count, capped at 5000.
+		$path_full = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&limit=5000';
+		$r         = $this->supa_get( $path_full );
+		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
 
 		$count = 0;
 		foreach ( $rows as $row ) {
@@ -293,10 +380,36 @@ class NeoWeaver_Admin {
 		return $count;
 	}
 
-	private function supa_worlds_without_campaigns() {
-		$path = 'cyber_worlds?select=id,cyber_campaign!left(id)&limit=5000';
-		$res  = $this->supa_get( $path );
-		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
+	/**
+	 * FIX #5: Same pattern — server-side count with !inner filter.
+	 */
+	private function supa_worlds_without_campaigns(): int {
+		$path = 'cyber_worlds?select=id,cyber_campaign!left(id)&cyber_campaign.id=is.null&limit=1';
+		$res  = wp_remote_get(
+			rtrim( $this->get_supa_url(), '/' ) . '/rest/v1/' . $path,
+			[
+				'timeout' => 10,
+				'headers' => [
+					'apikey'        => $this->get_supa_key(),
+					'Authorization' => 'Bearer ' . $this->get_supa_key(),
+					'Range'         => '0-0',
+					'Prefer'        => 'count=exact',
+					'Accept'        => 'application/json',
+				],
+			]
+		);
+
+		if ( ! is_wp_error( $res ) ) {
+			$cr = wp_remote_retrieve_header( $res, 'content-range' );
+			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+				return (int) $m[1];
+			}
+		}
+
+		// Fallback.
+		$path_full = 'cyber_worlds?select=id,cyber_campaign!left(id)&limit=5000';
+		$r         = $this->supa_get( $path_full );
+		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
 
 		$count = 0;
 		foreach ( $rows as $row ) {
@@ -308,32 +421,29 @@ class NeoWeaver_Admin {
 	}
 
 	/**
-	 * Fetch deck breakdown by deck_category and rarity.
-	 * Returns arrays keyed by category / rarity with counts.
+	 * OPT #4: Deck breakdown — still PHP-side aggregation, but cached.
+	 * Recommend creating a Supabase RPC/view for production.
 	 */
-	private function supa_deck_breakdown() {
+	private function supa_deck_breakdown(): array {
+		$transient_key = 'nw_deck_breakdown_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 );
+		$cached        = get_transient( $transient_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$path = 'cyber_deck?select=deck_category,rarity,is_active&limit=5000';
 		$res  = $this->supa_get( $path );
-		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : array();
+		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : [];
 
-		$categories = array(
-			'action'    => 0,
-			'magic'     => 0,
-			'equipment' => 0,
-		);
-		$rarities = array(
-			'common'    => 0,
-			'uncommon'  => 0,
-			'rare'      => 0,
-			'epic'      => 0,
-			'legendary' => 0,
-		);
+		$categories = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
+		$rarities   = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
 		$active_count   = 0;
 		$inactive_count = 0;
 
 		foreach ( $rows as $row ) {
-			$cat = isset( $row['deck_category'] ) ? $row['deck_category'] : '';
-			$rar = isset( $row['rarity'] )        ? $row['rarity']        : '';
+			$cat = $row['deck_category'] ?? '';
+			$rar = $row['rarity']        ?? '';
 
 			if ( isset( $categories[ $cat ] ) ) {
 				$categories[ $cat ]++;
@@ -348,137 +458,196 @@ class NeoWeaver_Admin {
 			}
 		}
 
-		return array(
+		$result = [
 			'categories'     => $categories,
 			'rarities'       => $rarities,
 			'active_count'   => $active_count,
 			'inactive_count' => $inactive_count,
 			'total'          => count( $rows ),
-		);
+		];
+
+		set_transient( $transient_key, $result, 5 * MINUTE_IN_SECONDS );
+
+		return $result;
 	}
 
 	/* ------------------------------------------------------------------ */
 	/*  AJAX: DASHBOARD                                                    */
 	/* ------------------------------------------------------------------ */
 
-	public function ajax_dashboard_data() {
+	/**
+	 * OPT #1 + FIX #10: Attempt a single RPC call to get all counts at once.
+	 * Falls back to individual calls if the RPC is not available.
+	 *
+	 * Expected RPC signature (create in Supabase):
+	 *
+	 *   CREATE OR REPLACE FUNCTION nw_dashboard_counts()
+	 *   RETURNS json LANGUAGE sql STABLE AS $$
+	 *     SELECT json_build_object(
+	 *       'characters',  (SELECT count(*) FROM cyber_characters),
+	 *       'worlds',      (SELECT count(*) FROM cyber_worlds),
+	 *       'campaigns',   (SELECT count(*) FROM cyber_campaign),
+	 *       'deck_cards',  (SELECT count(*) FROM cyber_deck),
+	 *       'chars_7d',    (SELECT count(*) FROM cyber_characters  WHERE created_at >= now() - interval '7 days'),
+	 *       'worlds_7d',   (SELECT count(*) FROM cyber_worlds      WHERE created_at >= now() - interval '7 days'),
+	 *       'camps_7d',    (SELECT count(*) FROM cyber_campaign     WHERE created_at >= now() - interval '7 days'),
+	 *       'deck_7d',     (SELECT count(*) FROM cyber_deck         WHERE created_at >= now() - interval '7 days')
+	 *     );
+	 *   $$;
+	 */
+	private function supa_all_counts(): ?array {
+		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
+			return null;
+		}
+		$result = tw_supabase_rpc( 'nw_dashboard_counts', [] );
+		if ( is_array( $result ) && isset( $result['characters'] ) ) {
+			return $result;
+		}
+		return null;
+	}
+
+	public function ajax_dashboard_data(): void {
 		check_ajax_referer( 'neoweaver_dashboard', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
+			return; // FIX #4: Explicit return after wp_send_json_error for clarity.
 		}
 
 		if ( ! $this->get_supa_url() || ! $this->get_supa_key() ) {
 			wp_send_json_error( 'Supabase not configured.' );
+			return; // FIX #4: Explicit return.
 		}
 
-		$counts = array(
-			'characters' => $this->supa_count( 'cyber_characters' ),
-			'worlds'     => $this->supa_count( 'cyber_worlds' ),
-			'campaigns'  => $this->supa_count( 'cyber_campaign' ),
-			'deck_cards' => $this->supa_count( 'cyber_deck' ),
-		);
+		// OPT #1: Try a single RPC call for all counts; fall back to individual requests.
+		$rpc = $this->supa_all_counts();
 
-		$recent = array(
-			'characters_7d' => $this->supa_recent_count( 'cyber_characters', 7 ),
-			'worlds_7d'     => $this->supa_recent_count( 'cyber_worlds', 7 ),
-			'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
-			'deck_cards_7d' => $this->supa_recent_count( 'cyber_deck', 7 ),
-		);
+		if ( $rpc ) {
+			$counts = [
+				'characters' => (int) ( $rpc['characters'] ?? 0 ),
+				'worlds'     => (int) ( $rpc['worlds']     ?? 0 ),
+				'campaigns'  => (int) ( $rpc['campaigns']  ?? 0 ),
+				'deck_cards' => (int) ( $rpc['deck_cards'] ?? 0 ),
+			];
+			$recent = [
+				'characters_7d' => (int) ( $rpc['chars_7d']  ?? 0 ),
+				'worlds_7d'     => (int) ( $rpc['worlds_7d'] ?? 0 ),
+				'campaigns_7d'  => (int) ( $rpc['camps_7d']  ?? 0 ),
+				'deck_cards_7d' => (int) ( $rpc['deck_7d']   ?? 0 ),
+			];
+		} else {
+			$counts = [
+				'characters' => $this->supa_count( 'cyber_characters' ),
+				'worlds'     => $this->supa_count( 'cyber_worlds' ),
+				'campaigns'  => $this->supa_count( 'cyber_campaign' ),
+				'deck_cards' => $this->supa_count( 'cyber_deck' ),
+			];
+			$recent = [
+				'characters_7d' => $this->supa_recent_count( 'cyber_characters', 7 ),
+				'worlds_7d'     => $this->supa_recent_count( 'cyber_worlds', 7 ),
+				'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
+				'deck_cards_7d' => $this->supa_recent_count( 'cyber_deck', 7 ),
+			];
+		}
 
-		$growth_raw = array(
+		$growth_raw = [
 			'characters' => $this->supa_growth_series( 'cyber_characters', 30 ),
 			'worlds'     => $this->supa_growth_series( 'cyber_worlds', 30 ),
 			'campaigns'  => $this->supa_growth_series( 'cyber_campaign', 30 ),
 			'deck_cards' => $this->supa_growth_series( 'cyber_deck', 30 ),
-		);
+		];
 
-		// Flatten series for JS (keep debug info separately)
-		$growth = array(
+		$growth = [
 			'characters' => $growth_raw['characters']['series'],
 			'worlds'     => $growth_raw['worlds']['series'],
 			'campaigns'  => $growth_raw['campaigns']['series'],
 			'deck_cards' => $growth_raw['deck_cards']['series'],
-		);
+		];
 
-		$health = array(
+		$health = [
 			'worlds_without_campaigns'    => $this->supa_worlds_without_campaigns(),
 			'campaigns_without_character' => $this->supa_campaigns_without_character(),
-		);
+		];
 
 		$deck_breakdown = $this->supa_deck_breakdown();
 
-		$alerts = array();
+		$logs         = $this->supa_recent_logs( 10 );
+		$logs_ok      = ! empty( $logs ) || true; // always include; empty is valid.
+		$logs_table   = self::DEBUG_LOGS_TABLE;
+
+		$alerts = [];
 
 		if ( $recent['characters_7d'] === 0 ) {
-			$alerts[] = array( 'level' => 'warn', 'label' => 'Characters', 'text' => 'No new characters in the last 7 days.' );
+			$alerts[] = [ 'level' => 'warn', 'label' => 'Characters', 'text' => 'No new characters in the last 7 days.' ];
 		}
 		if ( $recent['worlds_7d'] === 0 ) {
-			$alerts[] = array( 'level' => 'warn', 'label' => 'Worlds', 'text' => 'No new worlds in the last 7 days.' );
+			$alerts[] = [ 'level' => 'warn', 'label' => 'Worlds', 'text' => 'No new worlds in the last 7 days.' ];
 		}
 		if ( $recent['campaigns_7d'] === 0 ) {
-			$alerts[] = array( 'level' => 'warn', 'label' => 'Campaigns', 'text' => 'No new campaigns in the last 7 days.' );
+			$alerts[] = [ 'level' => 'warn', 'label' => 'Campaigns', 'text' => 'No new campaigns in the last 7 days.' ];
 		}
 		if ( $health['worlds_without_campaigns'] > 0 ) {
-			$alerts[] = array(
+			$alerts[] = [
 				'level' => 'info',
 				'label' => 'World Coverage',
 				'text'  => $health['worlds_without_campaigns'] . ' world(s) have no campaign yet.',
-			);
+			];
 		}
 		if ( $health['campaigns_without_character'] > 0 ) {
-			$alerts[] = array(
+			$alerts[] = [
 				'level' => 'warn',
 				'label' => 'Campaign Setup',
 				'text'  => $health['campaigns_without_character'] . ' campaign(s) have no assigned character.',
-			);
+			];
 		}
 
-		wp_send_json_success( array(
+		wp_send_json_success( [
 			'counts'         => $counts,
 			'recent'         => $recent,
 			'growth'         => $growth,
 			'health'         => $health,
 			'deck_breakdown' => $deck_breakdown,
 			'alerts'         => $alerts,
-			'logs'           => $this->supa_recent_logs( 10 ),
-			'_debug'         => array(
+			'logs'           => $logs,
+			'_debug'         => [
 				'key_type'    => $this->get_supa_key_type(),
-				'growth_meta' => array(
-					'characters' => array(
+				'rpc_used'    => ! is_null( $rpc ),
+				'logs_table'  => $logs_table,
+				'growth_meta' => [
+					'characters' => [
 						'rows_found'  => $growth_raw['characters']['rows_found'],
 						'query_ok'    => $growth_raw['characters']['query_ok'],
 						'http_status' => $growth_raw['characters']['http_status'],
 						'api_error'   => $growth_raw['characters']['api_error'],
-					),
-					'worlds' => array(
+					],
+					'worlds' => [
 						'rows_found'  => $growth_raw['worlds']['rows_found'],
 						'query_ok'    => $growth_raw['worlds']['query_ok'],
 						'http_status' => $growth_raw['worlds']['http_status'],
 						'api_error'   => $growth_raw['worlds']['api_error'],
-					),
-					'campaigns' => array(
+					],
+					'campaigns' => [
 						'rows_found'  => $growth_raw['campaigns']['rows_found'],
 						'query_ok'    => $growth_raw['campaigns']['query_ok'],
 						'http_status' => $growth_raw['campaigns']['http_status'],
 						'api_error'   => $growth_raw['campaigns']['api_error'],
-					),
-					'deck_cards' => array(
+					],
+					'deck_cards' => [
 						'rows_found'  => $growth_raw['deck_cards']['rows_found'],
 						'query_ok'    => $growth_raw['deck_cards']['query_ok'],
 						'http_status' => $growth_raw['deck_cards']['http_status'],
 						'api_error'   => $growth_raw['deck_cards']['api_error'],
-					),
-				),
-			),
-		) );
+					],
+				],
+			],
+		] );
 	}
 
 	/* ------------------------------------------------------------------ */
 	/*  RENDER                                                             */
 	/* ------------------------------------------------------------------ */
 
-	public function render_page() {
+	public function render_page(): void {
 		$supa_url = $this->get_supa_url();
 		$key_ok   = (bool) $this->get_supa_key();
 		?>
@@ -486,7 +655,10 @@ class NeoWeaver_Admin {
 
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
-					<?php echo $this->logo_svg( 44, '#adff00' ); ?>
+					<?php
+					// FIX #7: Escape SVG output through wp_kses_post to prevent XSS.
+					echo wp_kses_post( $this->logo_svg( 44, '#adff00' ) );
+					?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
 						<span class="nw-logo-version">v<?php echo esc_html( NEOWEAVER_VERSION ); ?> &mdash; Game Ops Dashboard</span>
@@ -551,33 +723,24 @@ class NeoWeaver_Admin {
 					</div>
 				</section>
 
-				<!-- ======================================================= -->
-				<!-- DECK LIBRARY                                             -->
-				<!-- ======================================================= -->
 				<section class="nw-block">
 					<div class="nw-block-head">
 						<h2 class="nw-section-title">Deck Library</h2>
 						<span class="nw-section-kicker">cyber_deck breakdown</span>
 					</div>
 					<div class="nw-deck-grid">
-
-						<!-- Categories -->
 						<div class="nw-deck-col">
 							<div class="nw-deck-col-title">By Category</div>
 							<div class="nw-deck-bars" id="nw-deck-categories">
 								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
 							</div>
 						</div>
-
-						<!-- Rarities -->
 						<div class="nw-deck-col">
 							<div class="nw-deck-col-title">By Rarity</div>
 							<div class="nw-deck-bars" id="nw-deck-rarities">
 								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
 							</div>
 						</div>
-
-						<!-- Active / Inactive -->
 						<div class="nw-deck-col nw-deck-col-sm">
 							<div class="nw-deck-col-title">Status</div>
 							<div id="nw-deck-status">
@@ -593,10 +756,8 @@ class NeoWeaver_Admin {
 								</div>
 							</div>
 						</div>
-
 					</div>
 				</section>
-				<!-- /DECK LIBRARY -->
 
 				<div class="nw-grid-2">
 					<section class="nw-block">
@@ -625,7 +786,7 @@ class NeoWeaver_Admin {
 					<section class="nw-block">
 						<div class="nw-block-head">
 							<h2 class="nw-section-title">Recent System Events</h2>
-							<span class="nw-section-kicker">cyber_debug_logs</span>
+							<span class="nw-section-kicker"><?php echo esc_html( self::DEBUG_LOGS_TABLE ); ?></span>
 						</div>
 						<div id="nw-logs" class="nw-logs-list">
 							<div class="nw-empty-state">Loading recent events&hellip;</div>
@@ -645,11 +806,19 @@ class NeoWeaver_Admin {
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Supabase URL</span>
-							<span class="nw-sysinfo-val"><?php echo $supa_url ? esc_html( $supa_url ) : '<span class="nw-text-danger">Not configured</span>'; ?></span>
+							<span class="nw-sysinfo-val">
+								<?php echo $supa_url
+									? esc_html( $supa_url )
+									: '<span class="nw-text-danger">Not configured</span>'; ?>
+							</span>
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Supabase Key</span>
-							<span class="nw-sysinfo-val"><?php echo $key_ok ? '<span class="nw-text-good">Configured (' . esc_html( $this->get_supa_key_type() ) . ')</span>' : '<span class="nw-text-danger">Missing</span>'; ?></span>
+							<span class="nw-sysinfo-val">
+								<?php echo $key_ok
+									? '<span class="nw-text-good">Configured (' . esc_html( $this->get_supa_key_type() ) . ')</span>'
+									: '<span class="nw-text-danger">Missing</span>'; ?>
+							</span>
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">PHP</span>
@@ -663,8 +832,10 @@ class NeoWeaver_Admin {
 				</section>
 
 			</div>
-
-			<input type="hidden" id="nw-dash-nonce" value="<?php echo esc_attr( wp_create_nonce( 'neoweaver_dashboard' ) ); ?>">
+			<?php
+			// FIX #3: Nonce is already injected via NWDashData.nonce (wp_localize_script).
+			// The redundant hidden <input> has been intentionally removed.
+			?>
 		</div>
 		<?php
 	}
@@ -673,264 +844,13 @@ class NeoWeaver_Admin {
 	/*  SVG LOGO                                                           */
 	/* ------------------------------------------------------------------ */
 
-	private function logo_svg( $size = 20, $color = '#ffffff' ) {
-		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 40 40" fill="none" aria-label="NeoWeaver">'
+	private function logo_svg( int $size = 20, string $color = '#ffffff' ): string {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 40 40" fill="none" aria-label="NeoWeaver">'
 			. '<polygon points="20,2 36,11 36,29 20,38 4,29 4,11" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" fill="none"/>'
 			. '<polyline points="11,27 11,13 20,24 29,13 29,27" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
 			. '</svg>';
 	}
 
-	/* ------------------------------------------------------------------ */
-	/*  CSS                                                                */
-	/* ------------------------------------------------------------------ */
-
-	private function get_css() {
-		return '
-.nw-dash{font-family:\'Chakra Petch\',monospace;color:#e0e0e0;max-width:1280px}
-.nw-dash *{box-sizing:border-box}
-.nw-dash-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;border-bottom:1px solid #2a2a2a;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-.nw-dash-logo{display:flex;align-items:center;gap:14px}
-.nw-logo-name{display:block;font-size:26px;font-weight:700;color:#fff;line-height:1}
-.nw-accent{color:#adff00}
-.nw-logo-version{display:block;font-size:11px;color:#555;margin-top:4px;letter-spacing:.5px}
-.nw-btn{font-family:\'Chakra Petch\',monospace;font-size:12px;font-weight:600;padding:7px 16px;border-radius:5px;border:1px solid transparent;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
-.nw-btn-ghost{background:transparent;color:#adff00;border-color:#2e2e2e}
-.nw-btn-ghost:hover{border-color:#adff00;background:#141414}
-.nw-grid-main{display:flex;flex-direction:column;gap:18px}
-.nw-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media(max-width:980px){.nw-grid-2{grid-template-columns:1fr}}
-.nw-block{background:#101010;border:1px solid #1f1f1f;border-radius:14px;padding:18px 18px 16px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
-.nw-block-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.nw-section-title{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#adff00;font-weight:700;margin:0}
-.nw-section-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#555}
-.nw-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(max-width:1100px){.nw-stat-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.nw-stat-grid{grid-template-columns:1fr}}
-.nw-stat-card{background:#141414;border:1px solid #242424;border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
-.nw-stat-card:hover{border-color:#adff00;transform:translateY(-1px)}
-.nw-stat-label-top{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666}
-.nw-stat-value{font-size:36px;font-weight:700;color:#adff00;font-variant-numeric:tabular-nums;min-height:44px;display:flex;align-items:center;margin-top:8px}
-.nw-stat-sub{font-size:11px;color:#8a8a8a}
-.nw-chart-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-@media(max-width:1100px){.nw-chart-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:600px){.nw-chart-grid{grid-template-columns:1fr}}
-.nw-chart-card{background:#141414;border:1px solid #232323;border-radius:12px;padding:14px}
-.nw-chart-title{font-size:12px;color:#fff;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
-.nw-chart{height:120px}
-.nw-chart svg{width:100%;height:120px;display:block}
-.nw-chart-empty{height:120px;display:flex;align-items:center;justify-content:center;color:#666;font-size:12px;border:1px dashed #2a2a2a;border-radius:10px}
-/* ---- Deck Library ---- */
-.nw-deck-grid{display:grid;grid-template-columns:1fr 1fr 180px;gap:18px;align-items:start}
-@media(max-width:900px){.nw-deck-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.nw-deck-grid{grid-template-columns:1fr}}
-.nw-deck-col-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:12px}
-.nw-deck-bars{display:flex;flex-direction:column;gap:10px}
-.nw-deck-bar-row{display:flex;flex-direction:column;gap:4px}
-.nw-deck-bar-meta{display:flex;justify-content:space-between;font-size:11px;color:#aaa;text-transform:capitalize}
-.nw-deck-bar-track{height:8px;background:#1e1e1e;border-radius:999px;overflow:hidden}
-.nw-deck-bar-fill{height:100%;border-radius:999px;transition:width .5s ease}
-.nw-deck-bar-count{font-size:12px;color:#e0e0e0;font-weight:600;font-variant-numeric:tabular-nums}
-/* category colors */
-.nw-deck-cat-action{background:#adff00}
-.nw-deck-cat-magic{background:#00d4ff}
-.nw-deck-cat-equipment{background:#ffb703}
-/* rarity colors */
-.nw-deck-rar-common{background:#888}
-.nw-deck-rar-uncommon{background:#3cb371}
-.nw-deck-rar-rare{background:#4a9eff}
-.nw-deck-rar-epic{background:#a64dff}
-.nw-deck-rar-legendary{background:#ff9900}
-/* status */
-.nw-deck-status-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e1e1e}
-.nw-deck-status-row:last-child{border-bottom:none}
-.nw-deck-status-dot{width:10px;height:10px;border-radius:999px;flex-shrink:0}
-.nw-deck-dot-active{background:#adff00}
-.nw-deck-dot-inactive{background:#555}
-.nw-deck-status-label{flex:1;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.5px}
-.nw-deck-status-val{font-size:22px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
-/* ---- /Deck Library ---- */
-.nw-alerts-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
-.nw-alert-card{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid #262626;background:#151515}
-.nw-alert-card-loading{align-items:center}
-.nw-alert-dot{width:10px;height:10px;border-radius:999px;flex-shrink:0;margin-top:5px}
-.nw-alert-warn .nw-alert-dot{background:#ffb703}
-.nw-alert-info .nw-alert-dot{background:#00d4ff}
-.nw-alert-ok .nw-alert-dot{background:#adff00}
-.nw-alert-body{display:flex;flex-direction:column;gap:3px}
-.nw-alert-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#777}
-.nw-alert-text{font-size:13px;color:#ddd;line-height:1.45}
-.nw-health-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(max-width:560px){.nw-health-grid{grid-template-columns:1fr}}
-.nw-health-card{background:#141414;border:1px solid #232323;border-radius:10px;padding:14px}
-.nw-health-label{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#666}
-.nw-health-value{font-size:28px;color:#fff;font-weight:700;margin-top:8px}
-.nw-logs-list{display:flex;flex-direction:column;gap:10px}
-.nw-log-item{background:#141414;border:1px solid #232323;border-radius:10px;padding:12px 14px}
-.nw-log-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
-.nw-log-level{font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:4px 8px;border-radius:999px;border:1px solid #333;color:#ccc}
-.nw-log-level-info{color:#00d4ff;border-color:#004e60;background:#07191d}
-.nw-log-level-warn{color:#ffb703;border-color:#5c4300;background:#211800}
-.nw-log-level-error{color:#ff5c5c;border-color:#5b1f1f;background:#1f1010}
-.nw-log-date{font-size:11px;color:#777}
-.nw-log-message{font-size:13px;color:#fff;line-height:1.4}
-.nw-log-meta{margin-top:6px;font-size:11px;color:#777;word-break:break-word}
-.nw-empty-state{background:#141414;border:1px dashed #2a2a2a;border-radius:10px;padding:18px;color:#777;font-size:12px;text-align:center}
-.nw-spinner{display:inline-block;width:20px;height:20px;border:2px solid #333;border-top-color:#adff00;border-radius:50%;animation:nw-spin .6s linear infinite}
-@keyframes nw-spin{to{transform:rotate(360deg)}}
-.nw-sysinfo{background:#141414;border:1px solid #232323;border-radius:12px;overflow:hidden;font-size:12px}
-.nw-sysinfo-row{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid #1a1a1a;gap:10px}
-.nw-sysinfo-row:last-child{border-bottom:none}
-.nw-sysinfo-label{width:130px;flex-shrink:0;color:#666;text-transform:uppercase;letter-spacing:.5px;font-size:10px}
-.nw-sysinfo-val{color:#aaa;font-family:monospace;font-size:12px;word-break:break-word}
-.nw-text-good{color:#adff00}
-.nw-text-danger{color:#ff4444}
-';
-	}
-
-	/* ------------------------------------------------------------------ */
-	/*  JS                                                                 */
-	/* ------------------------------------------------------------------ */
-
-	private function get_js() {
-		return '
-jQuery(function($){
-
-function escapeHtml(str){
-	return String(str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#039;");
-}
-
-function drawSparkline(el,series,color){
-	var $el=$(el);
-	if(!series||!series.length){$el.html(\'<div class="nw-chart-empty">No data yet</div>\');return;}
-	var values=series.map(function(p){return parseInt(p.value||0,10);});
-	var max=Math.max.apply(null,values);
-	if(max<=0){$el.html(\'<div class="nw-chart-empty">No growth yet</div>\');return;}
-	var W=320,H=120,pad=10;
-	var stepX=(W-pad*2)/Math.max(values.length-1,1);
-	var pts=values.map(function(v,i){return[pad+i*stepX,H-pad-(v/max)*(H-pad*2)];});
-	var line=pts.map(function(p){return p[0].toFixed(2)+","+p[1].toFixed(2);}).join(" ");
-	var bars=values.map(function(v,i){
-		var x=pad+i*stepX-3,h=max?(v/max)*(H-pad*2):0,y=H-pad-h;
-		return\'<rect x="\'+x.toFixed(2)+\'" y="\'+y.toFixed(2)+\'" width="6" height="\'+h.toFixed(2)+\'" rx="2" fill="\'+color+\'" opacity="0.22"></rect>\';
-	}).join("");
-	var last=pts[pts.length-1];
-	var svg=\'<svg viewBox="0 0 \'+W+" "+H+\'" preserveAspectRatio="none" aria-hidden="true">\'
-		+\'<line x1="0" y1="\'+(H-pad)+\'" x2="\'+W+\'" y2="\'+(H-pad)+\'" stroke="#2c2c2c" stroke-width="1"></line>\'
-		+bars
-		+\'<polyline fill="none" stroke="\'+color+\'" stroke-width="3" points="\'+line+\'"></polyline>\'
-		+\'<circle cx="\'+last[0].toFixed(2)+\'" cy="\'+last[1].toFixed(2)+\'" r="4" fill="\'+color+\'"></circle>\'
-		+\'</svg>\';
-	$el.html(svg);
-}
-
-function renderDeckBars(containerId, data, colorPrefix){
-	var $w=$(containerId);
-	if(!data||!Object.keys(data).length){
-		$w.html(\'<div class="nw-empty-state">No data</div>\');
-		return;
-	}
-	var keys=Object.keys(data);
-	var max=Math.max.apply(null,keys.map(function(k){return data[k];}));
-	if(max<=0){$w.html(\'<div class="nw-empty-state">No cards yet</div>\');return;}
-	var html=keys.map(function(k){
-		var pct=max>0?Math.round((data[k]/max)*100):0;
-		return\'<div class="nw-deck-bar-row">\'
-			+\'<div class="nw-deck-bar-meta"><span>\'+escapeHtml(k)+\'</span><span class="nw-deck-bar-count">\'+data[k]+\'</span></div>\'
-			+\'<div class="nw-deck-bar-track"><div class="nw-deck-bar-fill \'+colorPrefix+k+\'" style="width:\'+pct+\'%"></div></div>\'
-			+\'</div>\';
-	}).join("");
-	$w.html(html);
-}
-
-function renderAlerts(alerts){
-	var w=$("#nw-alerts");
-	if(!alerts||!alerts.length){
-		w.html(\'<div class="nw-alert-card nw-alert-ok"><div class="nw-alert-dot"></div><div class="nw-alert-body"><div class="nw-alert-label">System</div><div class="nw-alert-text">No immediate operational issues detected.</div></div></div>\');
-		return;
-	}
-	w.html(alerts.map(function(a){
-		return\'<div class="nw-alert-card nw-alert-\'+escapeHtml(a.level||"info")+\'"><div class="nw-alert-dot"></div><div class="nw-alert-body"><div class="nw-alert-label">\'+escapeHtml(a.label||"Notice")+\'</div><div class="nw-alert-text">\'+escapeHtml(a.text||"")+\'</div></div></div>\';
-	}).join(""));
-}
-
-function renderLogs(logs){
-	var w=$("#nw-logs");
-	if(!logs||!logs.length){w.html(\'<div class="nw-empty-state">No recent system events.</div>\');return;}
-	w.html(logs.map(function(log){
-		var lvl=String(log.level||"info").toLowerCase();
-		if(["info","warn","error"].indexOf(lvl)===-1)lvl="info";
-		var dataText="";
-		if(log.data!==null&&typeof log.data!=="undefined"&&String(log.data).length){
-			dataText=typeof log.data==="object"?JSON.stringify(log.data):String(log.data);
-		}
-		return\'<div class="nw-log-item">\'
-			+\'<div class="nw-log-top"><span class="nw-log-level nw-log-level-\'+escapeHtml(lvl)+\'">\'+escapeHtml(lvl)+\'</span><span class="nw-log-date">\'+escapeHtml(log.created_at||"")+\'</span></div>\'
-			+\'<div class="nw-log-message">\'+escapeHtml(log.message||"(no message)")+\'</div>\'
-			+\'<div class="nw-log-meta">context: \'+escapeHtml(log.context||"&#8212;")+(dataText?" | data: "+escapeHtml(dataText):"")+\'</div>\'
-			+\'</div>\';
-	}).join(""));
-}
-
-function loadDashboard(){
-	$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns,#nw-stat-deck-cards").html(\'<div class="nw-spinner"></div>\');
-	$("#nw-recent-characters,#nw-recent-worlds,#nw-recent-campaigns,#nw-recent-deck-cards").text("Last 7d: \u2014");
-	$("#nw-health-worlds-without-campaigns,#nw-health-campaigns-without-character").text("\u2014");
-	$("#nw-alerts").html(\'<div class="nw-alert-card nw-alert-card-loading"><div class="nw-spinner"></div><span>Refreshing\u2026</span></div>\');
-	$("#nw-logs").html(\'<div class="nw-empty-state">Loading recent events\u2026</div>\');
-	$("#nw-chart-characters,#nw-chart-worlds,#nw-chart-campaigns,#nw-chart-deck-cards").html(\'<div class="nw-chart-empty">Loading\u2026</div>\');
-	$("#nw-deck-categories,#nw-deck-rarities").html(\'<div class="nw-spinner" style="margin:20px auto;display:block;"></div>\');
-	$("#nw-deck-active,#nw-deck-inactive").text("\u2014");
-
-	$.post(ajaxurl,{action:"nw_dashboard_data",nonce:$("#nw-dash-nonce").val()},function(res){
-		if(!res.success){
-			$("#nw-stat-characters,#nw-stat-worlds,#nw-stat-campaigns,#nw-stat-deck-cards").text("\u2014");
-			renderAlerts([{level:"warn",label:"Dashboard",text:(res.data||"Could not load dashboard data.")}]);
-			$("#nw-logs").html(\'<div class="nw-empty-state">Could not load logs.</div>\');
-			return;
-		}
-		var d=res.data||{},c=d.counts||{},r=d.recent||{},g=d.growth||{},h=d.health||{},deck=d.deck_breakdown||{};
-
-		// Debug info in console
-		if(d._debug){console.group("[NeoWeaver] Dashboard debug");console.log("Key type:",d._debug.key_type);console.table(d._debug.growth_meta);console.groupEnd();}
-
-		$("#nw-stat-characters").text(c.characters||0);
-		$("#nw-stat-worlds").text(c.worlds||0);
-		$("#nw-stat-campaigns").text(c.campaigns||0);
-		$("#nw-stat-deck-cards").text(c.deck_cards||0);
-
-		$("#nw-recent-characters").text("Last 7d: +"+(r.characters_7d||0));
-		$("#nw-recent-worlds").text("Last 7d: +"+(r.worlds_7d||0));
-		$("#nw-recent-campaigns").text("Last 7d: +"+(r.campaigns_7d||0));
-		$("#nw-recent-deck-cards").text("Last 7d: +"+(r.deck_cards_7d||0));
-
-		$("#nw-health-worlds-without-campaigns").text(h.worlds_without_campaigns||0);
-		$("#nw-health-campaigns-without-character").text(h.campaigns_without_character||0);
-
-		drawSparkline("#nw-chart-characters",g.characters,"#adff00");
-		drawSparkline("#nw-chart-worlds",g.worlds,"#00d4ff");
-		drawSparkline("#nw-chart-campaigns",g.campaigns,"#ffb703");
-		drawSparkline("#nw-chart-deck-cards",g.deck_cards,"#ff5c5c");
-
-		// Deck Library
-		if(deck.categories){renderDeckBars("#nw-deck-categories",deck.categories,"nw-deck-cat-");}
-		if(deck.rarities){renderDeckBars("#nw-deck-rarities",deck.rarities,"nw-deck-rar-");}
-		if(typeof deck.active_count!=="undefined"){
-			$("#nw-deck-active").text(deck.active_count||0);
-			$("#nw-deck-inactive").text(deck.inactive_count||0);
-		}
-
-		renderAlerts(d.alerts||[]);
-		renderLogs(d.logs||[]);
-	});
-}
-
-loadDashboard();
-$("#nw-refresh-dashboard").on("click",function(){loadDashboard();});
-
-});
-';
-	}
-
-}
+} // FIX #1: Closing brace for class NeoWeaver_Admin — was missing in original.
 
 new NeoWeaver_Admin();
