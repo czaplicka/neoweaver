@@ -133,15 +133,21 @@ jQuery(function($){
     // [FIX 6] Debounce 150ms na search
     $('#nw-search').on('input', debounce(applyFilters, 150));
 
-    function loadAll(){
-        $('#nw-achievements-tbody').html('<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading\u2026</td></tr>');
-        $.post(ajaxurl,{action:'nw_achievements_get_all',nonce:nonce},function(res){
-            if(!res.success){notice('Error: '+res.data,'error');return;}
-            all=res.data||[];
-            updateStats(all);
-            applyFilters();
-        }).fail(function(){notice('Request failed.','error');});
-    }
+function loadAll(){
+    $('#nw-achievements-tbody').html('<tr><td colspan="8"> Loading…</td></tr>');
+    $.post(ajaxurl, {action:'nw_achievements_get_all', nonce:nonce})
+    .done(function(res){
+        console.log('AJAX response:', res); // ← dodaj to tymczasowo
+        if(!res.success){ notice('Error: '+JSON.stringify(res.data),'error'); return; }
+        all = res.data || [];
+        updateStats(all);
+        applyFilters();
+    })
+    .fail(function(xhr){ 
+        notice('Request failed: '+xhr.status+' '+xhr.responseText,'error');
+        console.error(xhr.responseText);
+    });
+}
 
     // [FIX 4] Toggle z .fail() — cofa checkbox przy błędzie sieciowym
     $(document).on('change','.nw-active-toggle',function(){
