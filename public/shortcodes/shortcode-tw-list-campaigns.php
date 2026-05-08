@@ -8,6 +8,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
+ * v17 – FIX: ANCHOR WORLD NODE and LINK NODE buttons now link to
+ *       /nodes/?campaign_id=...#tw-deployment-root so the browser scrolls
+ *       directly to the [tw_connect_campaign_world] shortcode section.
+ *
  * v16 – FIX: enqueue tw-core.css directly in shortcode so .tw-action-btn
  *       and .enter-matrix styles load on non-adventure-template pages.
  *
@@ -72,7 +76,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $code = wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) {
             $body = wp_remote_retrieve_body( $response );
-            error_log( '[NeoWeaver v16] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
+            error_log( '[NeoWeaver v17] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
             return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed [HTTP ' . (int) $code . ']. Check your Uplink.</p>';
         }
 
@@ -80,7 +84,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $decoded = json_decode( $raw, true );
 
         if ( ! is_array( $decoded ) ) {
-            error_log( '[NeoWeaver v16] JSON decode failed. Raw: ' . $raw );
+            error_log( '[NeoWeaver v17] JSON decode failed. Raw: ' . $raw );
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
         $active_campaigns = $decoded;
@@ -163,8 +167,11 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                             . " <small style='color:#666; font-size:0.7rem;'>[" . esc_html( $race ) . ' | ' . esc_html( $class ) . "]</small>";
                     }
 
+                    // v17: links to /nodes/ now include #tw-deployment-root anchor
+                    $nodes_url = '/nodes/?campaign_id=' . esc_attr( $c_id_safe ) . '#tw-deployment-root';
+
                     if ( ! $world_rel ) {
-                        $main_btn = '<a href="/nodes/?campaign_id=' . esc_attr( $c_id_safe ) . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
+                        $main_btn = '<a href="' . $nodes_url . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
                     } elseif ( ! $char_rel ) {
                         $main_btn = '<a href="/agents/?campaign_id=' . esc_attr( $c_id_safe ) . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
                     } else {
@@ -202,7 +209,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:<?php echo $world_rel ? '#fff' : '#ff0055'; ?>; font-weight:bold; text-align:right;">
                                     <?php echo $world_rel ? esc_html( $world_rel['name'] ) : 'MISSING ANCHOR'; ?>
                                     <?php if ( ! $world_rel ) : ?>
-                                        <a href="/nodes/?campaign_id=<?php echo esc_attr( $c_id_safe ); ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">LINK NODE</a>
+                                        <a href="<?php echo $nodes_url; ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">LINK NODE</a>
                                     <?php endif; ?>
                                 </span>
                             </div>
