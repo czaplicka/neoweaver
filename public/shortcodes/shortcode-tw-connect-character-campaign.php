@@ -6,6 +6,7 @@
  *
  * CHANGELOG
  * ---------
+ *14. v5: autoScroll triggers on ?campaign_id= query param too (not only #hash).
  *13. v4: Sound-first fix – audio.play() fires BEFORE redirect timer.
  *    Redirect now waits 1200 ms so glitch sound is audible before navigation.
  *12. v3: Auto-scroll to #tw-deployment-root when hash is present in URL.
@@ -115,14 +116,16 @@ function tw_connect_character_campaign_direct_v2() {
             uid: <?php echo (int) $user_id; ?>
         };
 
-        /* ── FIX #12: Auto-scroll when arriving via #tw-deployment-root anchor ──
-         * The browser tries to scroll to the anchor before WP/JS renders
-         * the shortcode, so it lands at the top. We override by scrolling
-         * manually after a short delay once the element is in the DOM.
+        /* ── FIX #14: Auto-scroll when arriving via ?campaign_id= OR #hash ──
+         * The link /agents/?campaign_id=xxx has no hash, so the old check on
+         * window.location.hash never fired. Now we scroll whenever the element
+         * exists AND either a hash OR a campaign_id query param is present.
          */
         (function autoScroll() {
             var el = document.getElementById('tw-deployment-root');
-            if (el && window.location.hash === '#tw-deployment-root') {
+            var hasCampaignParam = new URLSearchParams(window.location.search).has('campaign_id');
+            var hasHash = window.location.hash === '#tw-deployment-root';
+            if (el && (hasCampaignParam || hasHash)) {
                 setTimeout(function () {
                     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 300);
