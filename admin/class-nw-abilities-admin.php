@@ -45,31 +45,44 @@ class NeoWeaver_Abilities_Admin {
     /*  ASSETS                                                            */
     /* ---------------------------------------------------------------- */
 
-    public function enqueue_assets( string $hook ): void {
-        if ( ! str_contains( $hook, $this->page_slug ) ) return;
-
-        wp_enqueue_style(
-            'chakra-petch',
-            'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-            [],
-            null
-        );
-
-        // [BUG-7] Inline CSS — no external file that could 404
-        wp_add_inline_style( 'chakra-petch', $this->get_css() );
-
-        // [BUG-8] Register own handle first, attach inline JS to it (not to 'jquery')
-        wp_register_script(
-            'nw-abilities-script',
-            false,
-            [ 'jquery' ],
-            NEOWEAVER_VERSION,
-            true
-        );
-        wp_enqueue_script( 'nw-abilities-script' );
-        wp_add_inline_script( 'nw-abilities-script', $this->get_js() );
+ public function enqueue_assets( string $hook ): void {
+    if ( ! str_contains( $hook, $this->page_slug ) ) {
+        return;
     }
 
+    $base_url = plugin_dir_url( dirname( __FILE__ ) );
+
+    wp_enqueue_style(
+        'chakra-petch',
+        'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+        [],
+        null
+    );
+
+    wp_enqueue_style(
+        'nw-abilities-admin',
+        $base_url . 'assets/css/abilities-admin.css',
+        [ 'chakra-petch' ],
+        NEOWEAVER_VERSION
+    );
+
+    wp_enqueue_script(
+        'nw-abilities-script',
+        $base_url . 'assets/js/abilities-admin.js',
+        [ 'jquery' ],
+        NEOWEAVER_VERSION,
+        true
+    );
+
+    wp_localize_script(
+        'nw-abilities-script',
+        'NWAbilities',
+        [
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+        ]
+    );
+}
     /* ---------------------------------------------------------------- */
     /*  RENDER                                                            */
     /* ---------------------------------------------------------------- */
@@ -333,16 +346,15 @@ class NeoWeaver_Abilities_Admin {
     /*  AJAX: DELETE                                                      */
     /* ---------------------------------------------------------------- */
 
-    public function ajax_delete(): void {
+        public function ajax_delete(): void {
         check_ajax_referer( 'neoweaver_abilities', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 ); return;
         }
 
-        // [BUG-3] UUID sanitisation — same pattern as ajax_save()
         $id = function_exists( 'tw_sanitize_supabase_id' )
             ? tw_sanitize_supabase_id( $_POST['ability_id'] ?? '' )
-            : preg_replace( '/[^a-f0-9\-]/i', '', sanitize_text_field( $_POST['ability_id'] ?? '' ) );
+            : preg_replace( '/[^a-f0-9\\-]/i', '', sanitize_text_field( $_POST['ability_id'] ?? '' ) );
 
         if ( ! $id ) {
             wp_send_json_error( 'Missing or invalid ID' ); return;
@@ -354,8 +366,8 @@ class NeoWeaver_Abilities_Admin {
             : wp_send_json_success( 'deleted' );
     }
 
-// [BUG-10] Instantiate only after plugins_loaded (priority 20) — supabase-helpers.php
-// is guaranteed to be loaded by NeoWeaver_Core at priority 10.
+} // koniec klasy
+
 add_action( 'plugins_loaded', function() {
     if ( is_admin() ) {
         new NeoWeaver_Abilities_Admin();
