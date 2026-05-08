@@ -221,8 +221,6 @@ class NeoWeaver_Abilities_Admin {
                     </div>
                 </div>
             </div>
-
-            <input type="hidden" id="nw-nonce" value="<?php echo esc_attr( wp_create_nonce( 'neoweaver_abilities' ) ); ?>">
         </div>
     <?php }
 
