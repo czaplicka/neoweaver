@@ -9,16 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
- * v11 – FIX: PostgREST zwraca 300 Multiple Choices bo istnieje i bezpośredni FK
- *       (cyber_campaign_world_id_fkey) i junction table cyber_campaign_worlds,
- *       obie wskazują na cyber_worlds. PostgREST nie wie którą ścieżką iść.
- *       Rozwiązanie: hint FK w select: cyber_worlds!cyber_campaign_world_id_fkey
+ * v12 – FIX: cyber_campaign.world_id jest zawsze NULL.
+ *       Świat przechowywany jest wyłącznie w junction table cyber_campaign_worlds.
+ *       Zmiana select: cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty))
+ *       Zmiana odczytu PHP: $world_rel i $world_id z junction, nie z rekordu głównego.
  *
- * v10 – FIX: URL budowany ręcznie zamiast add_query_arg (który URL-encoduje
- *       przecinki i nawiasy psując PostgREST select).
- *
- * v9  – FIX: usunięto nieistniejącą junction table cyber_campaign_worlds.
- *       cyber_worlds joinowane bezpośrednio przez FK world_id.
+ * v11 – FIX: PostgREST 300 – hint FK cyber_worlds!cyber_campaign_world_id_fkey
+ * v10 – FIX: URL ręcznie zamiast add_query_arg
+ * v9  – FIX: usunięto nieistniejącą junction table (wrócono do niej w v12)
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -42,18 +40,18 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $anon_key = tw_supabase_anon_key();
 
         /*
-         * FIX v11: PostgREST 300 Multiple Choices
+         * FIX v12: Świat NIE jest w cyber_campaign.world_id (zawsze NULL).
+         * Jest w junction table cyber_campaign_worlds.
          *
-         * Problem: cyber_campaign ma bezpośredni FK do cyber_worlds (cyber_campaign_world_id_fkey)
-         * ORAZ istnieje junction table cyber_campaign_worlds która też wskazuje na cyber_worlds.
-         * PostgREST widzi dwie ścieżki i zwraca 300.
+         * select:
+         *   cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty))
+         *     → przez FK cyber_campaign_worlds_campaign_id_fkey
+         *   cyber_campaign_characters(character_id,cyber_characters(...))
+         *     → przez FK cyber_campaign_characters_campaign_id_fkey
          *
-         * Fix: użyj składni !fkey_name by wskazać konkretną ścieżkę:
-         *   cyber_worlds!cyber_campaign_world_id_fkey(name,difficulty)
-         *
-         * FIX v10: URL ręcznie (add_query_arg koduje przecinki/nawiasy)
+         * URL budowany ręcznie (v10) – add_query_arg koduje przecinki/nawiasy.
          */
-        $select = '*,cyber_worlds!cyber_campaign_world_id_fkey(name,difficulty),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
+        $select = '*,cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty)),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
         $url    = $url_base . 'cyber_campaign'
             . '?wp_user_id=eq.' . (int) $user_id
             . '&select=' . $select
@@ -127,10 +125,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
-                    // v11: odczyt przez hint FK — klucz w odpowiedzi to nadal 'cyber_worlds'
-                    $world_rel = ! empty( $c['cyber_worlds'] ) ? $c['cyber_worlds'] : null;
-                    $world_id  = ! empty( $c['world_id'] ) ? (string) $c['world_id'] : null;
+                    /*
+                     * v12: Świat przez junction cyber_campaign_worlds
+                     * PostgREST zwraca tablicę (one-to-many), bierzemy pierwszy rekord.
+                     * Wewnątrz jest cyber_worlds (obiekt) i world_id.
+                     */
+                    $world_junction = ! empty( $c['cyber_campaign_worlds'][0] ) ? $c['cyber_campaign_worlds'][0] : null;
+                    $world_rel      = $world_junction ? ( $world_junction['cyber_worlds'] ?? null ) : null;
+                    $world_id       = $world_junction ? ( $world_junction['world_id'] ?? null ) : null;
 
+                    // Postać przez junction cyber_campaign_characters
                     $char_rel  = ! empty( $c['cyber_campaign_characters'] )
                         ? ( $c['cyber_campaign_characters'][0]['cyber_characters'] ?? null )
                         : null;
