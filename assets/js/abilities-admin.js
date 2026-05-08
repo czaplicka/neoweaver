@@ -189,26 +189,30 @@ jQuery(function ($) {
         $tbody.html('<tr class="nw-loading-row"><td colspan="7"><div class="nw-spinner"></div> Loading…</td></tr>');
 
         activeXhr = $.post(ajaxEndpoint, {
-            action: 'nw_abilities_get_all',
-            nonce: nonce,
-            filter_type: ft
-        }, function (res) {
-            if (!res.success) {
-                notice('Error: ' + (res.data || 'Unknown error'), 'error');
-                return;
-            }
+    action: 'nw_abilities_get_all',
+    nonce: nonce,
+    filter_type: ft
+}, function (res) {
+    if (!res || !res.success) {
+        notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
+        return;
+    }
 
-            all = cloneAbilities(res.data || []);
-            filtered = cloneAbilities(all);
-            updateStats(all);
-            applySearch();
-        }).fail(function (xhr, status) {
-            if (status !== 'abort') {
-                notice('Request failed.', 'error');
-            }
-        }).always(function () {
-            activeXhr = null;
-        });
+    var rows = Array.isArray(res.data)
+        ? res.data
+        : (res.data && typeof res.data === 'object' ? Object.values(res.data) : []);
+
+    all = cloneAbilities(rows);
+    filtered = cloneAbilities(rows);
+    updateStats(all);
+    applySearch();
+}).fail(function (xhr, status) {
+    if (status !== 'abort') {
+        notice('Request failed.', 'error');
+    }
+}).always(function () {
+    activeXhr = null;
+});
     }
 
     function confirmModal(message, onConfirm) {
