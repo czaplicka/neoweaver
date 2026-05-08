@@ -1,10 +1,8 @@
 jQuery(function ($) {
     'use strict';
-
     var cfg = window.NWAbilities || {};
     var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     var nonce = cfg.nonce || '';
-
     var $notice = $('#nw-notice');
     var $tbody = $('#nw-abilities-tbody');
     var $filterType = $('#nw-filter-type');
@@ -25,7 +23,6 @@ jQuery(function ($) {
     var $fieldCost = $('#nw-field-cost');
     var $fieldTags = $('#nw-field-tags');
     var $fieldImgUrl = $('#nw-field-img_url');
-
     var all = [];
     var filtered = [];
     var activeXhr = null;
