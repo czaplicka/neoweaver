@@ -4,7 +4,6 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
-
 class NeoWeaver_Abilities_Admin {
 
     private string $page_slug   = 'neoweaver-abilities';
