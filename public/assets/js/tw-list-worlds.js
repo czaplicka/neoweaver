@@ -42,7 +42,15 @@ function openWorldModal(data) {
 
 		const client  = window.twSupabase;
 		const btnCard = document.getElementById('tw-world-card-' + worldId);
-		if (btnCard) btnCard.style.opacity = '0.5';
+
+		// Dodaj spinner overlay na karcie
+		if (btnCard) {
+			btnCard.style.pointerEvents = 'none';
+			const overlay = document.createElement('div');
+			overlay.className = 'tw-delete-overlay';
+			overlay.innerHTML = '<div class="tw-delete-spinner"></div><div class="tw-delete-label">ERASING…</div>';
+			btnCard.appendChild(overlay);
+		}
 
 		(async () => {
 			try {
@@ -51,19 +59,33 @@ function openWorldModal(data) {
 				if (error) {
 					console.error('SUPABASE RPC WORLD DELETE ERROR', error);
 					alert('Deletion failed: ' + (error.message || 'Grid denied execution.'));
-					if (btnCard) btnCard.style.opacity = '1';
+					// Przywróć kartę
+					if (btnCard) {
+						btnCard.style.pointerEvents = '';
+						const ov = btnCard.querySelector('.tw-delete-overlay');
+						if (ov) ov.remove();
+					}
 					return;
 				}
 
+				// Sukces — animacja znikania i reload
 				if (btnCard) {
-					btnCard.style.opacity      = '0.3';
-					btnCard.style.pointerEvents = 'none';
+					const ov = btnCard.querySelector('.tw-delete-overlay');
+					if (ov) ov.querySelector('.tw-delete-label').innerText = 'NODE ERASED';
+					btnCard.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+					btnCard.style.opacity   = '0';
+					btnCard.style.transform = 'scale(0.92)';
 				}
-				setTimeout(() => window.location.reload(), 500);
+				setTimeout(() => window.location.reload(), 700);
+
 			} catch (e) {
 				console.error('WORLD DELETE EXCEPTION', e);
 				alert('Deletion failed: client exception.');
-				if (btnCard) btnCard.style.opacity = '1';
+				if (btnCard) {
+					btnCard.style.pointerEvents = '';
+					const ov = btnCard.querySelector('.tw-delete-overlay');
+					if (ov) ov.remove();
+				}
 			}
 		})();
 	}
