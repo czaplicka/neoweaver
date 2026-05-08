@@ -73,24 +73,34 @@ jQuery(function ($) {
     }
 
    function cloneAbilities(data) {
-    var list = [];
+    var list = data;
 
-    if (Array.isArray(data)) {
-        list = data;
-    } else if (data && typeof data === 'object') {
-        list = Object.values(data);
+    if (typeof list === 'string') {
+        try {
+            list = JSON.parse(list);
+        } catch (e) {
+            list = [];
+        }
+    }
+
+    if (Array.isArray(list)) {
+        // ok
+    } else if (list && typeof list === 'object') {
+        list = Object.values(list);
+    } else {
+        list = [];
     }
 
     return list.map(function (item) {
         return {
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            gm_notes: item.gm_notes,
-            ability_type: item.ability_type,
-            source: item.source,
-            cost: item.cost,
-            img_url: item.img_url,
+            id: item.id || '',
+            name: item.name || '',
+            description: item.description || '',
+            gm_notes: item.gm_notes || '',
+            ability_type: item.ability_type || '',
+            source: item.source || '',
+            cost: item.cost || '',
+            img_url: item.img_url || '',
             tags: Array.isArray(item.tags) ? item.tags.slice() : []
         };
     });
@@ -194,7 +204,8 @@ jQuery(function ($) {
         notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
         return;
     }
-
+console.log('Abilities AJAX response:', res);
+console.log('Abilities data type:', typeof res.data, Array.isArray(res.data), res.data);
     var rows = Array.isArray(res.data)
         ? res.data
         : (res.data && typeof res.data === 'object' ? Object.values(res.data) : []);
