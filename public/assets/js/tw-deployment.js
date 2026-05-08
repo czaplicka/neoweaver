@@ -1,6 +1,6 @@
 /* NeoWeaver — Deployment connector (campaign ↔ world)
  * Config injected via wp_localize_script as window.twDeploymentCfg
- * v18: no agent/character logic
+ * v19: auto-scroll to #tw-deployment-root when hash present in URL
  */
 (function () {
     'use strict';
@@ -16,6 +16,17 @@
         const form  = document.getElementById('tw-anchor-form');
         const audio = document.getElementById('tw-glitch-sound');
         const root  = document.getElementById('tw-deployment-root');
+
+        /* ── Auto-scroll if URL contains #tw-deployment-root ──
+         * Browser tries to scroll before JS renders the section.
+         * We override that by scrolling manually after DOM is ready.
+         */
+        if (root && window.location.hash === '#tw-deployment-root') {
+            /* Small delay ensures theme/WP scripts finish rendering */
+            setTimeout(function () {
+                root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+        }
 
         /* Bail silently if shortcode not on this page */
         if (!selC || !selW || !btn || !log || !form) return;
@@ -173,10 +184,10 @@
             setLog('> System: Weaving Splot threads...');
 
             const payload = {
-    campaign_id:   selC.value,               
-    world_id:      selW.value,               
-    creator_wp_id: parseInt(cfg.uid, 10)     
-};
+                campaign_id:   selC.value,
+                world_id:      selW.value,
+                creator_wp_id: parseInt(cfg.uid, 10)
+            };
 
             const apiHeaders = {
                 'apikey':        cfg.key,
