@@ -9,15 +9,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
- * v14 – FIX: rawurlencode() kodowało ! na %21, psując hinty FK.
- *       Rozwiązanie: rezygnacja z hintów FK (relacje są jednoznaczne),
- *       URL budowany bez kodowania $select — tylko wp_user_id jest enkodowane.
- *       $select przekazywany jako surowy string.
+ * v15 – FIX: cyber_campaign_characters i cyber_campaign_worlds mogą zwracać
+ *       obiekt (jeden rekord) zamiast tablicy — obsługujemy oba przypadki.
+ *       Dodano data-character na przycisk ENTER MATRIX.
  *
+ * v14 – FIX: rawurlencode() kodowało ! na %21, psując hinty FK.
  * v13 – explicit FK hints (zepsute przez rawurlencode)
  * v12 – world przez cyber_campaign_worlds junction
- * v11 – FK hint hint
- * v10 – URL ręcznie
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -40,21 +38,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
         $anon_key = tw_supabase_anon_key();
 
-        /*
-         * v14: Bez rawurlencode na $select.
-         * PostgREST akceptuje nawiasy/przecinki/kropki surowo w query stringu.
-         * Kodujemy TYLKO wp_user_id (int, bezpieczne).
-         *
-         * Relacje są jednoznaczne (jeden FK na parę tabel), więc hinty zbędne.
-         *
-         * Struktura zwrotna:
-         *   $c['cyber_campaign_worlds'][0]['world_id']
-         *   $c['cyber_campaign_worlds'][0]['cyber_worlds']['name']
-         *   $c['cyber_campaign_characters'][0]['character_id']
-         *   $c['cyber_campaign_characters'][0]['cyber_characters']['name']
-         *   $c['cyber_campaign_characters'][0]['cyber_characters']['cyber_races']['name']
-         *   $c['cyber_campaign_characters'][0]['cyber_characters']['cyber_classes']['name']
-         */
         $select = '*,cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty)),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
 
         $url = $url_base . 'cyber_campaign'
@@ -77,7 +60,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $code = wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) {
             $body = wp_remote_retrieve_body( $response );
-            error_log( '[NeoWeaver v14] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
+            error_log( '[NeoWeaver v15] Supabase HTTP ' . $code . ' URL: ' . $url . ' BODY: ' . $body );
             return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed [HTTP ' . (int) $code . ']. Check your Uplink.</p>';
         }
 
@@ -85,17 +68,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $decoded = json_decode( $raw, true );
 
         if ( ! is_array( $decoded ) ) {
-            error_log( '[NeoWeaver v14] JSON decode failed. Raw: ' . $raw );
+            error_log( '[NeoWeaver v15] JSON decode failed. Raw: ' . $raw );
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
         $active_campaigns = $decoded;
-
-        /* DEBUG: loguj pierwszą kampanię by sprawdzić strukturę */
-        if ( ! empty( $active_campaigns ) ) {
-            error_log( '[NeoWeaver v14] first campaign keys: ' . implode( ', ', array_keys( $active_campaigns[0] ) ) );
-            error_log( '[NeoWeaver v14] cyber_campaign_characters raw: ' . wp_json_encode( $active_campaigns[0]['cyber_campaign_characters'] ?? 'KEY_MISSING' ) );
-            error_log( '[NeoWeaver v14] cyber_campaign_worlds raw: ' . wp_json_encode( $active_campaigns[0]['cyber_campaign_worlds'] ?? 'KEY_MISSING' ) );
-        }
 
         $empty_styles = '
         <style>
@@ -138,14 +114,28 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
+                    /*
+                     * v15 FIX: PostgREST może zwrócić obiekt (jeden rekord) lub tablicę.
+                     * Obsługujemy oba przypadki dla junction tables.
+                     */
+
                     /* Świat przez junction */
-                    $world_junction = ! empty( $c['cyber_campaign_worlds'][0] ) ? $c['cyber_campaign_worlds'][0] : null;
-                    $world_rel      = $world_junction ? ( $world_junction['cyber_worlds'] ?? null ) : null;
-                    $world_id       = $world_junction ? ( $world_junction['world_id'] ?? null ) : null;
+                    $cw_raw         = $c['cyber_campaign_worlds'] ?? null;
+                    $world_junction = null;
+                    if ( ! empty( $cw_raw ) ) {
+                        $world_junction = isset( $cw_raw[0] ) ? $cw_raw[0] : $cw_raw;
+                    }
+                    $world_rel = $world_junction ? ( $world_junction['cyber_worlds'] ?? null ) : null;
+                    $world_id  = $world_junction ? ( $world_junction['world_id'] ?? null ) : null;
 
                     /* Postać przez junction */
-                    $char_junction = ! empty( $c['cyber_campaign_characters'][0] ) ? $c['cyber_campaign_characters'][0] : null;
-                    $char_rel      = $char_junction ? ( $char_junction['cyber_characters'] ?? null ) : null;
+                    $cc_raw        = $c['cyber_campaign_characters'] ?? null;
+                    $char_junction = null;
+                    if ( ! empty( $cc_raw ) ) {
+                        $char_junction = isset( $cc_raw[0] ) ? $cc_raw[0] : $cc_raw;
+                    }
+                    $char_rel = $char_junction ? ( $char_junction['cyber_characters'] ?? null ) : null;
+                    $char_id  = $char_junction ? ( $char_junction['character_id'] ?? null ) : null;
 
                     $is_active = ! empty( $c['is_active'] );
                     $game_mode = isset( $c['game_mode'] ) ? (int) $c['game_mode'] : 1;
@@ -167,10 +157,11 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                         $main_btn = '<a href="/agents/?campaign_id=' . esc_attr( $c_id_safe ) . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
                     } else {
                         $main_btn = '<button class="tw-action-btn enter-matrix"'
-                            . ' data-id="'    . esc_attr( $c_id_safe ) . '"'
-                            . ' data-mode="'  . esc_attr( $mode_str ) . '"'
-                            . ' data-join="'  . esc_attr( strtoupper( $join_code ) ) . '"'
-                            . ' data-world="' . esc_attr( (string) $world_id ) . '">'
+                            . ' data-id="'        . esc_attr( $c_id_safe ) . '"'
+                            . ' data-character="' . esc_attr( (string) $char_id ) . '"'
+                            . ' data-mode="'      . esc_attr( $mode_str ) . '"'
+                            . ' data-join="'      . esc_attr( strtoupper( $join_code ) ) . '"'
+                            . ' data-world="'     . esc_attr( (string) $world_id ) . '">'
                             . 'ENTER MATRIX'
                             . '</button>';
                     }
@@ -271,16 +262,18 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
             $('.enter-matrix').on('click', function(e) {
                 e.preventDefault();
-                const btn    = $(this);
-                const campId = btn.data('id');
-                const mode   = String(btn.data('mode') || 'SOLO').toUpperCase();
+                const btn         = $(this);
+                const campId      = btn.data('id');
+                const characterId = btn.data('character') || null;
+                const mode        = String(btn.data('mode') || 'SOLO').toUpperCase();
                 if (!campId) { alert('DEPLOYMENT ERROR: Missing campaign ID.'); return; }
 
                 if (mode === 'SOLO') {
                     btn.text('INITIALIZING...').css('opacity', '0.7');
                     const fd = new FormData();
-                    fd.append('campaign_id', campId);
-                    fd.append('security',    GLOBAL_NONCE);
+                    fd.append('campaign_id',  campId);
+                    fd.append('character_id', characterId || '');
+                    fd.append('security',     GLOBAL_NONCE);
                     fetch(SESSION_START_URL, {
                         method: 'POST', headers: { 'X-WP-Nonce': REST_NONCE }, body: fd, credentials: 'same-origin',
                     })
@@ -305,15 +298,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     const adv = window.twAdventureData || {};
                     const currentWpUserId = adv.wp_user_id || adv.userid || null;
                     if (!currentWpUserId) { alert('SIGNUP FAILED: Cannot detect operator ID.'); resetBtn(btn, 'ENTER MATRIX'); return; }
-                    const worldId = btn.data('world') || null;
                     (async () => {
                         try {
-                            let characterId = null;
-                            if (worldId) {
-                                const { data: charRows, error: charError } = await window.twSupabase.from('cyber_characters').select('id').eq('wp_user_id', currentWpUserId).eq('world_id', worldId).limit(1);
-                                if (charError) { alert('SIGNUP FAILED: Cannot resolve Field Agent.'); resetBtn(btn, 'ENTER MATRIX'); return; }
-                                characterId = (charRows && charRows.length) ? charRows[0].id : null;
-                            }
                             if (!characterId) { window.location.href = '/agents/?campaign_id=' + campId; return; }
                             const { data: ex, error: exErr } = await window.twSupabase.from('cyber_campaign_signups').select('id').eq('campaign_id', campId).eq('wp_user_id', currentWpUserId).limit(1);
                             if (exErr) { alert('SIGNUP FAILED: Cannot verify link.'); resetBtn(btn, 'ENTER MATRIX'); return; }
