@@ -75,22 +75,29 @@ jQuery(function ($) {
         };
     }
 
-    function cloneAbilities(data) {
-        return (data || []).map(function (item) {
-            return {
-                id: item.id,
-                name: item.name,
-                description: item.description,
-                gm_notes: item.gm_notes,
-                ability_type: item.ability_type,
-                source: item.source,
-                cost: item.cost,
-                img_url: item.img_url,
-                tags: Array.isArray(item.tags) ? item.tags.slice() : []
-            };
-        });
+   function cloneAbilities(data) {
+    var list = [];
+
+    if (Array.isArray(data)) {
+        list = data;
+    } else if (data && typeof data === 'object') {
+        list = Object.values(data);
     }
 
+    return list.map(function (item) {
+        return {
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            gm_notes: item.gm_notes,
+            ability_type: item.ability_type,
+            source: item.source,
+            cost: item.cost,
+            img_url: item.img_url,
+            tags: Array.isArray(item.tags) ? item.tags.slice() : []
+        };
+    });
+}
     function updateStats(data) {
         var active = 0;
         var passive = 0;
