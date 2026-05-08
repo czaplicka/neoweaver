@@ -311,5 +311,5 @@ class NeoWeaver_Classes_Admin {
         $res = $this->supa( 'DELETE', 'cyber_classes?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
-
+}
 new NeoWeaver_Classes_Admin();
