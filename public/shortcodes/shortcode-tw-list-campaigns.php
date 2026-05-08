@@ -9,17 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * CHANGELOG
  * ---------
- * v9 – FIX: zapytanie Supabase odpytywało nieistniejącą junction table
- *      `cyber_campaign_worlds`. Tabela `cyber_campaign` ma `world_id` jako
- *      bezpośredni FK do `cyber_worlds`. Zmieniono select na:
- *        cyber_worlds(name,difficulty)
- *      zamiast:
- *        cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty))
- *      Dzięki temu REALITY_NODE i OPERATIVE_LINK wyświetlają się poprawnie,
- *      a przycisk "ENTER MATRIX" pojawia się gdy kampania ma i świat i agenta.
+ * v10 – FIX: add_query_arg() koduje URL przecinki i nawiasy w parametrze
+ *       `select=`, co psuje składnię PostgREST embedded resources.
+ *       URL budowany ręcznie przez sprintf() – PostgREST dostaje surowy select.
  *
- * v8 – BUG-FIX: SOLO "ENTER MATRIX" posted to a hard-coded theme file path.
- *      Fixed: post to registered REST route neoweaver/v1/session/start.
+ * v9  – FIX: usunięto nieistniejącą junction table cyber_campaign_worlds.
+ *       cyber_worlds joinowane bezpośrednio przez FK world_id.
+ *
+ * v8  – BUG-FIX: SOLO "ENTER MATRIX" naprawiony na REST route.
  */
 
 if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
@@ -43,26 +40,23 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $anon_key = tw_supabase_anon_key();
 
         /*
-         * FIX v9: cyber_campaign.world_id jest bezpośrednim FK do cyber_worlds.
-         * Nie ma tabeli junction cyber_campaign_worlds — usunięto ten błędny join.
-         * cyber_worlds joinowane bezpośrednio przez istniejący FK.
+         * FIX v10: add_query_arg() URL-encoduje przecinki i nawiasy w `select`,
+         * co psuje składnię PostgREST (embedded resources). Budujemy URL ręcznie.
+         * Jedyna wartość dynamiczna to $user_id (int) – nie wymaga URL-encodowania.
+         *
+         * select wyjaśnienie:
+         *   *                               – wszystkie pola cyber_campaign
+         *   cyber_worlds(name,difficulty)   – join przez FK world_id (bezpośredni)
+         *   cyber_campaign_characters(...)  – join przez FK campaign_id
+         *     character_id                  – pole junction
+         *     cyber_characters(...)         – join przez FK character_id
+         *       name,cyber_races(name),cyber_classes(name)
          */
-        $params = array(
-            'wp_user_id' => 'eq.' . $user_id,
-            'select'     => '*,'
-                . 'cyber_worlds(name,difficulty),'
-                . 'cyber_campaign_characters('
-                    . 'character_id,'
-                    . 'cyber_characters('
-                        . 'name,'
-                        . 'cyber_races(name),'
-                        . 'cyber_classes(name)'
-                    . ')'
-                . ')',
-            'order'      => 'created_at.desc',
-        );
-
-        $url = add_query_arg( $params, $url_base . 'cyber_campaign' );
+        $select = '*,cyber_worlds(name,difficulty),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
+        $url    = $url_base . 'cyber_campaign'
+            . '?wp_user_id=eq.' . (int) $user_id
+            . '&select=' . $select
+            . '&order=created_at.desc';
 
         $response = wp_remote_get( $url, array(
             'headers' => array(
@@ -72,8 +66,18 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             'timeout' => 15,
         ) );
 
-        if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-            return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed. Check your Uplink.</p>';
+        if ( is_wp_error( $response ) ) {
+            return '<p class="tw-error">CRITICAL ERROR: ' . esc_html( $response->get_error_message() ) . '</p>';
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        if ( $code !== 200 ) {
+            $body = wp_remote_retrieve_body( $response );
+            // Loguj błąd żeby było widać w debug.log co PostgREST odrzucił
+            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+                error_log( '[NeoWeaver] Supabase HTTP ' . $code . ': ' . $body );
+            }
+            return '<p class="tw-error">CRITICAL ERROR: Matrix Synchronization Failed [HTTP ' . (int) $code . ']. Check your Uplink.</p>';
         }
 
         $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -123,11 +127,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
                     $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
 
-                    /*
-                     * FIX v9: cyber_worlds jest teraz bezpośrednim obiektem (nie tablicą),
-                     * bo relacja jest przez bezpośredni FK (many-to-one).
-                     * world_id bierzemy z pola tabeli cyber_campaign.
-                     */
+                    // v9: world_id bezpośrednio z rekordu, cyber_worlds jako obiekt (many-to-one FK)
                     $world_rel = ! empty( $c['cyber_worlds'] ) ? $c['cyber_worlds'] : null;
                     $world_id  = ! empty( $c['world_id'] ) ? (string) $c['world_id'] : null;
 
@@ -335,7 +335,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 e.preventDefault();
                 const btn  = $(this);
                 const code = btn.data('code');
-                if (!code) { alert('NO HASH DETECTED.'); return; }\n                try {
+                if (!code) { alert('NO HASH DETECTED.'); return; }
+                try {
                     if (navigator.clipboard && window.isSecureContext) {
                         await navigator.clipboard.writeText(code);
                     } else {
