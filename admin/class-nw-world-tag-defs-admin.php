@@ -7,7 +7,6 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
-
 class NeoWeaver_World_Tag_Defs_Admin {
 
     private string $supabase_url;
