@@ -1,0 +1,72 @@
+/* NeoWeaver Admin — Deck Cards */
+.nw-panel{font-family:'Chakra Petch',monospace;color:#e0e0e0}.nw-panel *{box-sizing:border-box}
+.nw-panel-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;border-bottom:1px solid #2a2a2a;margin-bottom:16px}
+.nw-panel-title{font-size:22px;font-weight:700;color:#fff;margin:0;font-family:'Chakra Petch',monospace}
+.nw-accent{color:#adff00}.nw-panel-subtitle{color:#555;font-weight:400;font-size:18px;margin-left:4px}
+.nw-header-actions{display:flex;align-items:center;gap:8px}
+.nw-filter-bar{display:flex;gap:6px}
+.nw-select-filter{font-family:'Chakra Petch',monospace;font-size:12px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#ccc;padding:6px 10px;cursor:pointer}
+.nw-select-filter:focus{outline:none;border-color:#adff00}
+.nw-btn{font-family:'Chakra Petch',monospace;font-size:12px;font-weight:600;padding:7px 16px;border-radius:5px;border:1px solid transparent;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
+.nw-btn-primary{background:#adff00;color:#0a0a0a;border-color:#adff00}.nw-btn-primary:hover{background:#c8ff40}
+.nw-btn-ghost{background:transparent;color:#adff00;border-color:#2e2e2e}.nw-btn-ghost:hover{border-color:#adff00}
+.nw-btn-danger{background:transparent;color:#ff4444;border-color:#3a1111}.nw-btn-danger:hover{background:#2a0000;border-color:#ff4444}
+.nw-stats-bar{display:flex;gap:10px;margin-bottom:16px}
+.nw-stat-pill{font-size:12px;padding:4px 12px;border-radius:20px;background:#1a1a1a;border:1px solid #2e2e2e;color:#aaa}
+.nw-stat-pill strong{color:#fff}.nw-pill-active{border-color:#adff00}.nw-pill-active strong{color:#adff00}.nw-pill-inactive strong{color:#ff6b35}
+.nw-notice{padding:10px 16px;border-radius:6px;margin-bottom:14px;font-size:13px;border-left:3px solid}
+.nw-notice-success{background:#0a2800;border-color:#adff00;color:#adff00}.nw-notice-error{background:#2a0000;border-color:#ff4444;color:#ff4444}
+.nw-table-wrap{background:#111;border:1px solid #222;border-radius:8px;overflow:hidden}
+.nw-table{width:100%;border-collapse:collapse;font-size:13px}
+.nw-table thead tr{background:#1a1a1a;border-bottom:1px solid #2a2a2a}
+.nw-table th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:600}
+.nw-table tbody tr{border-bottom:1px solid #1e1e1e;transition:background .12s}
+.nw-table tbody tr:last-child{border-bottom:none}.nw-table tbody tr:hover{background:#161616}
+.nw-table td{padding:10px 14px;vertical-align:middle}.nw-col-img{width:50px}
+.nw-card-img{width:40px;height:40px;border-radius:6px;object-fit:cover;border:1px solid #2e2e2e;background:#1a1a1a}
+.nw-card-img-placeholder{width:40px;height:40px;border-radius:6px;background:#1a1a1a;border:1px solid #2e2e2e;display:flex;align-items:center;justify-content:center;color:#444;font-size:20px}
+.nw-item-name{font-weight:600;color:#fff}.nw-item-sub{font-size:11px;color:#555;margin-top:2px}
+.nw-type-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:#1e1e1e;border:1px solid #2e2e2e;color:#aaa;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.nw-cat-action{border-color:#3a5200;color:#adff00}.nw-cat-magic{border-color:#004e60;color:#00d4ff}.nw-cat-equipment{border-color:#5c4300;color:#ffb703}
+.nw-tags{display:flex;flex-wrap:wrap;gap:4px}
+.nw-tag{font-size:10px;padding:2px 7px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:3px;color:#888}
+.nw-rarity-common{color:#aaa}.nw-rarity-uncommon{color:#4fc874}.nw-rarity-rare{color:#4da6ff}
+.nw-rarity-epic{color:#b084f5}.nw-rarity-legendary{color:#ffd700}
+.nw-level-badge{font-size:11px;font-weight:700;color:#adff00;background:#0d1a00;padding:2px 7px;border-radius:3px;border:1px solid #3a5200}
+.nw-cost-info{font-size:12px;color:#aaa}.nw-cost-label{color:#adff00;font-size:11px}
+.nw-toggle-wrap{display:flex;align-items:center;justify-content:center}
+.nw-toggle{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+.nw-toggle input{opacity:0;width:0;height:0;position:absolute}
+.nw-toggle-slider{position:absolute;inset:0;background:#2a2a2a;border-radius:20px;transition:.2s;border:1px solid #333}
+.nw-toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:#555;border-radius:50%;transition:.2s}
+.nw-toggle input:checked+.nw-toggle-slider{background:#1a3300;border-color:#adff00}
+.nw-toggle input:checked+.nw-toggle-slider::before{transform:translateX(16px);background:#adff00}
+.nw-toggle input:checked+.nw-toggle-blue{background:#00263a;border-color:#00d4ff}
+.nw-toggle input:checked+.nw-toggle-blue::before{background:#00d4ff}
+.nw-toggle input:checked+.nw-toggle-orange{background:#2a1500;border-color:#ff6b35}
+.nw-toggle input:checked+.nw-toggle-orange::before{background:#ff6b35}
+.nw-action-btn{font-family:'Chakra Petch',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #2e2e2e;background:transparent;color:#aaa;cursor:pointer;transition:all .12s;text-transform:uppercase}
+.nw-action-btn:hover{border-color:#adff00;color:#adff00}
+.nw-loading-row td{text-align:center;padding:30px;color:#555}
+.nw-spinner{display:inline-block;width:16px;height:16px;border:2px solid #333;border-top-color:#adff00;border-radius:50%;animation:nw-spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes nw-spin{to{transform:rotate(360deg)}}
+.nw-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px}
+.nw-modal{background:#0f0f0f;border:1px solid #2a2a2a;border-radius:10px;width:100%;max-width:780px;max-height:90vh;display:flex;flex-direction:column;font-family:'Chakra Petch',monospace}
+.nw-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #222}
+.nw-modal-header h2{margin:0;font-size:16px;color:#fff;font-weight:700}
+.nw-modal-close{background:none;border:none;color:#555;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
+.nw-modal-close:hover{color:#fff}
+.nw-modal-body{flex:1;overflow-y:auto;padding:20px}
+.nw-modal-footer{display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid #222;justify-content:flex-end}
+.nw-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#adff00;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid #1e1e1e}
+.nw-section-label:first-child{margin-top:0}
+.nw-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.nw-field{display:flex;flex-direction:column;gap:5px}
+.nw-field-full{grid-column:1/-1}
+.nw-field-center{align-items:center}
+.nw-field label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.nw-field input,.nw-field textarea,.nw-select{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#e0e0e0;padding:7px 10px;font-family:'Chakra Petch',monospace;font-size:13px;transition:border-color .15s;width:100%}
+.nw-field input:focus,.nw-field textarea:focus,.nw-select:focus{outline:none;border-color:#adff00}
+.nw-field textarea{resize:vertical;min-height:60px}
+.nw-req{color:#ff4444}
+.nw-hint{font-size:10px;color:#444;text-transform:none;letter-spacing:0}
