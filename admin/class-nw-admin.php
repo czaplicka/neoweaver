@@ -29,17 +29,31 @@ class NeoWeaver_Admin {
 	/*  MENU                                                               */
 	/* ------------------------------------------------------------------ */
 
-	public function register_menu(): void {
-		add_menu_page(
-			'NeoWeaver',
-			'NeoWeaver',
-			'manage_options',
-			$this->slug,
-			array( $this, 'render_page' ),
-			'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg() ),
-			30
-		);
-	}
+public function register_menu(): void {
+    add_menu_page(
+        'NeoWeaver',
+        'NeoWeaver',
+        'manage_options',
+        $this->slug,
+        array( $this, 'render_page' ),
+        'none',   // ← tymczasowo none
+        30
+    );
+
+    // Ikona przez CSS — niezawodna metoda
+    add_action( 'admin_head', function() {
+        $svg = base64_encode( $this->logo_svg( 20, '#a0a0a0' ) );
+        echo '<style>
+            #adminmenu .menu-icon-neoweaver div.wp-menu-image:before {
+                content: "" !important;
+                background-image: url("data:image/svg+xml;base64,' . $svg . '") !important;
+                background-repeat: no-repeat;
+                background-position: center;
+                background-size: 20px 20px;
+            }
+        </style>';
+    });
+}
 
 	public function rename_first_submenu(): void {
 		global $submenu;
