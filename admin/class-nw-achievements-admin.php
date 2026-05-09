@@ -96,59 +96,80 @@ class NeoWeaver_Achievements_Admin {
 
 	/* ---------------------------------------------------------------- */
 	/*  SUPABASE                                                         */
+	/*                                                                   */
+	/*  Zawsze zwraca: [ 'ok' => bool, 'code' => int, 'data' => mixed,  */
+	/*                   'error' => string|null ]                        */
 	/* ---------------------------------------------------------------- */
 
-	private function supa( string $method, string $endpoint, array $body = [], array $extra = [] ): array {
+	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
-		if ( function_exists( 'tw_supabase_get' ) && 'GET' === $method ) {
-			return tw_supabase_get( $endpoint );
+		/* --- GET: tw_supabase_get zwraca bezpośrednio tablicę danych --- */
+		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+			// Rozbij endpoint na tabelę i query string
+			$parts    = explode( '?', $endpoint, 2 );
+			$table    = $parts[0];
+			$qs       = $parts[1] ?? '';
+			$query    = [];
+
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+
+			$data = tw_supabase_get( $table, $query );
+
+			if ( ! is_array( $data ) ) {
+				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
+			}
+
+			// Supabase zwraca błąd jako ['code' => ..., 'message' => ...] zamiast tablicy wierszy
+			if ( isset( $data['code'], $data['message'] ) ) {
+				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+			}
+
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
 
+		/* --- POST/PATCH/DELETE: tw_supabase_request zwraca ['ok','code','data'] --- */
 		if ( function_exists( 'tw_supabase_request' ) ) {
-			return tw_supabase_request( $method, $endpoint, $body, $extra );
+			// Rozbij endpoint na tabelę i query string
+			$parts  = explode( '?', $endpoint, 2 );
+			$table  = $parts[0];
+			$qs     = $parts[1] ?? '';
+			$query  = [];
+
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+
+			// Dodaj Prefer header dla write operations
+			$extra_args = [];
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
+			}
+			if ( 'DELETE' === $method ) {
+				$extra_args['headers']['Prefer'] = '';
+			}
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+
+			$res = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+
+			// Normalizuj — helper już zwraca ['ok', 'code', 'data']
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+
+			if ( ! $ok ) {
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+			}
+
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
 
-		$supabase_url = function_exists( 'tw_supabase_url' ) ? rtrim( tw_supabase_url(), '/' ) : '';
-		$supabase_key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
-
-		if ( '' === $supabase_url || '' === $supabase_key ) {
-			return [ 'error' => 'Supabase credentials are unavailable.' ];
-		}
-
-		$headers = array_merge(
-			[
-				'apikey'        => $supabase_key,
-				'Authorization' => 'Bearer ' . $supabase_key,
-				'Content-Type'  => 'application/json',
-			],
-			$extra
-		);
-
-		if ( in_array( $method, [ 'POST', 'PATCH' ], true ) && ! isset( $headers['Prefer'] ) ) {
-			$headers['Prefer'] = 'return=representation';
-		}
-
-		$args = [
-			'method'  => $method,
-			'timeout' => 10,
-			'headers' => $headers,
-		];
-
-		if ( ! empty( $body ) ) {
-			$args['body'] = wp_json_encode( $body );
-		}
-
-		$res = wp_remote_request( $supabase_url . '/rest/v1/' . $endpoint, $args );
-
-		if ( is_wp_error( $res ) ) {
-			return [ 'error' => $res->get_error_message() ];
-		}
-
-		return [
-			'code' => wp_remote_retrieve_response_code( $res ),
-			'data' => json_decode( wp_remote_retrieve_body( $res ), true ),
-		];
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
 	}
 
 	/* ---------------------------------------------------------------- */
@@ -181,12 +202,12 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa( 'GET', $qs );
 
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'] );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Unknown error' );
 			return;
 		}
 
-		wp_send_json_success( $res['data'] );
+		wp_send_json_success( $res['data'] ?? [] );
 	}
 
 	public function ajax_save(): void {
@@ -228,23 +249,19 @@ class NeoWeaver_Achievements_Admin {
 			return;
 		}
 
-		$res = $orig_id
-			? $this->supa( 'PATCH', 'cyber_achievements?id=eq.' . rawurlencode( $orig_id ), $payload )
-			: $this->supa( 'POST', 'cyber_achievements', $payload );
+		$endpoint = $orig_id
+			? 'cyber_achievements?id=eq.' . rawurlencode( $orig_id )
+			: 'cyber_achievements';
 
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'] );
+		$res = $this->supa( $orig_id ? 'PATCH' : 'POST', $endpoint, $payload );
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Supabase error ' . ( $res['code'] ?? 0 ) );
 			return;
 		}
 
-		$code = $res['code'] ?? 0;
-
-		if ( $code >= 200 && $code < 300 ) {
-			wp_send_json_success( $res['data'][0] ?? $res['data'] );
-			return;
-		}
-
-		wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+		$saved = $res['data'];
+		wp_send_json_success( is_array( $saved ) ? ( $saved[0] ?? $saved ) : $saved );
 	}
 
 	public function ajax_toggle(): void {
@@ -269,8 +286,8 @@ class NeoWeaver_Achievements_Admin {
 			[ 'is_active' => $state ]
 		);
 
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'] );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Toggle failed' );
 			return;
 		}
 
@@ -294,13 +311,11 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa(
 			'DELETE',
-			'cyber_achievements?id=eq.' . rawurlencode( $id ),
-			[],
-			[ 'Prefer' => '' ]
+			'cyber_achievements?id=eq.' . rawurlencode( $id )
 		);
 
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'] );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Delete failed' );
 			return;
 		}
 
