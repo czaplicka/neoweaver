@@ -2,6 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+
 /**
  * Pobiera postacie aktualnego użytkownika z cyber_characters.
  */
@@ -54,7 +55,6 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
 }
 
 function render_player_achievements( $atts ) {
-    // Enqueue via wp_footer hook so assets land in <head>/<footer>, not mid-HTML
     add_action( 'wp_footer', static function () {
         wp_enqueue_style(
             'neoweaver-achievements',
@@ -63,9 +63,16 @@ function render_player_achievements( $atts ) {
             '1.0.0'
         );
         wp_enqueue_script(
+            'lucide',
+            'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
+            [],
+            null,
+            true
+        );
+        wp_enqueue_script(
             'neoweaver-achievements',
             plugin_dir_url( __FILE__ ) . '../assets/js/achievements.js',
-            [],
+            [ 'lucide' ],
             '1.0.0',
             true
         );
@@ -131,7 +138,6 @@ function render_player_achievements( $atts ) {
 
         $output .= '<label for="ach-char-select" class="ach-filter-label">Character view</label>';
         $output .= '<select id="ach-char-select" name="char_id">';
-
         $output .= '<option value="">' . esc_html__( 'Account only', 'neoweaver' ) . '</option>';
 
         foreach ( $characters as $char ) {
@@ -140,7 +146,6 @@ function render_player_achievements( $atts ) {
             if ( isset( $char->lvl ) ) {
                 $label .= ' (Lv. ' . (int) $char->lvl . ')';
             }
-
             $output .= '<option value="' . esc_attr( $char->id ) . '" ' . $selected . '>' . esc_html( $label ) . '</option>';
         }
 
@@ -155,54 +160,29 @@ function render_player_achievements( $atts ) {
         $is_unlocked = ! empty( $ach->is_unlocked );
         $percent     = $is_unlocked ? 100 : ( isset( $ach->progress_percent ) ? (float) $ach->progress_percent : 0.0 );
 
-        $legacy_class = '';
-
-        $scope    = $ach->scope ?? 'account';
-        $category = $ach->category ?? '';
-
-        $theme = tw_get_achievement_theme(
-            $category,
-            $scope,
-            $ach->bg_color ?? ''
-        );
-
-        $bg_color = $theme['color'];
-        $style    = '--bg-color: ' . $bg_color . '; --prog-percent: ' . $percent . '%;';
-
+        $scope  = $ach->scope ?? 'account';
         $status = $ach->css_status ?? ( $is_unlocked ? 'status-unlocked' : 'status-locked' );
 
-        $base_icon = tw_resolve_achievement_icon(
-            $ach->achievement_id ?? '',
-            $scope,
-            $status
-        );
+        // Ikona – prosto z bazy (RPC zwraca icon_slug z logiką hidden)
+        $icon = ! empty( $ach->icon_slug ) ? $ach->icon_slug : 'badge-check';
 
-        $icon = ( $status === 'status-hidden' )
-            ? 'scan-search'
-            : ( $theme['icon'] ?? $base_icon );
+        // Kolor tła – z bazy, fallback przez kategorie
+        $bg_color = tw_get_achievement_color( $ach->category ?? '', $scope, $ach->bg_color ?? '' );
+        $style    = '--bg-color: ' . $bg_color . '; --prog-percent: ' . $percent . '%;';
 
-        if ( $status === 'status-hidden' && ! $is_unlocked ) {
-            $title = 'Secret achievement';
-        } else {
-            $title = $ach->display_title ?? 'Find achievement';
-        }
-
-        if ( $status === 'status-hidden' && ! $is_unlocked ) {
-            $description = 'Hidden objective - keep playing to uncover this.';
-        } else {
-            $description = $ach->display_description ?? '';
-        }
+        // Tytuł i opis – już przetworzone przez RPC (hidden → zaślepka)
+        $title       = $ach->display_title       ?? 'Unknown achievement';
+        $description = $ach->display_description ?? '';
 
         $shape_class = ( $scope === 'account' ) ? 'ach-shape-hex' : '';
         $badge_label = ( $status === 'status-hidden' )
             ? 'SECRET'
             : ( $scope === 'character' ? 'CHARACTER' : 'ACCOUNT' );
 
-        $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $shape_class . ' ' . $legacy_class ) ) . '" style="' . esc_attr( $style ) . '">';
+        $output .= '<div class="ach-card scope-' . esc_attr( $scope ) . ' ' . esc_attr( trim( $status . ' ' . $shape_class ) ) . '" style="' . esc_attr( $style ) . '">';
 
         $output .= '<div class="ach-top-row">';
         $output .= '<span class="ach-badge">' . esc_html( $badge_label ) . '</span>';
-
         if ( ! $is_unlocked ) {
             $output .= '<span class="ach-percent">' . esc_html( (int) round( $percent ) ) . '%</span>';
         } else {
@@ -211,7 +191,6 @@ function render_player_achievements( $atts ) {
         $output .= '</div>';
 
         $output .= '<div class="ach-icon"><i data-lucide="' . esc_attr( $icon ) . '" aria-hidden="true"></i></div>';
-
         $output .= '<div class="ach-title">' . esc_html( $title ) . '</div>';
 
         if ( $description !== '' ) {
@@ -232,55 +211,31 @@ function render_player_achievements( $atts ) {
     return $output;
 }
 
-if ( ! function_exists( 'tw_resolve_achievement_icon' ) ) {
-    function tw_resolve_achievement_icon( $achievement_id = '', $scope = 'account', $status = '' ) {
-        if ( $status === 'status-hidden' ) {
-            return 'scan-search';
-        }
-
-        $map = [
-            'beta_tester'      => 'flask-conical',
-            'explorer'         => 'compass',
-            'first_deployment' => 'rocket',
-            'deck_master'      => 'layers-3',
-            'craft_10'         => 'cpu',
-            'social_link'      => 'radio-tower',
-            'secret_path'      => 'fingerprint',
-            'lore_hunter'      => 'eye',
-            'node_walker'      => 'orbit',
-            'signal_sync'      => 'zap',
-        ];
-
-        if ( ! empty( $achievement_id ) && isset( $map[ $achievement_id ] ) ) {
-            return $map[ $achievement_id ];
-        }
-
-        return ( $scope === 'character' ) ? 'shield' : 'badge-check';
-    }
-}
-
-if ( ! function_exists( 'tw_get_achievement_theme' ) ) {
-    function tw_get_achievement_theme( $category = '', $scope = 'account', $bg_color = '' ) {
-        $themes = [
-            'system'      => [ 'icon' => 'cpu',         'color' => '#8b5cf6' ],
-            'exploration' => [ 'icon' => 'compass',     'color' => '#14b8a6' ],
-            'social'      => [ 'icon' => 'radio',       'color' => '#3b82f6' ],
-            'progression' => [ 'icon' => 'trending-up', 'color' => '#f59e0b' ],
-            'mission'     => [ 'icon' => 'shield',      'color' => '#ef4444' ],
-            'loot'        => [ 'icon' => 'sparkles',    'color' => '#a855f7' ],
-            'secret'      => [ 'icon' => 'scan-search', 'color' => '#64748b' ],
-        ];
-
-        $theme = $themes[ $category ] ?? [
-            'icon'  => ( $scope === 'character' ? 'shield' : 'badge-check' ),
-            'color' => ( $scope === 'character' ? '#0ea5e9' : '#84cc16' ),
-        ];
-
+/**
+ * Zwraca kolor tła dla karty achievementu.
+ * Priorytet: bg_color z bazy > kolor kategorii > fallback.
+ */
+if ( ! function_exists( 'tw_get_achievement_color' ) ) {
+    function tw_get_achievement_color( $category = '', $scope = 'account', $bg_color = '' ) {
         if ( ! empty( $bg_color ) ) {
-            $theme['color'] = $bg_color;
+            return $bg_color;
         }
 
-        return $theme;
+        $colors = [
+            'system'      => '#8b5cf6',
+            'exploration' => '#14b8a6',
+            'social'      => '#3b82f6',
+            'progression' => '#f59e0b',
+            'mission'     => '#ef4444',
+            'loot'        => '#a855f7',
+            'secret'      => '#64748b',
+        ];
+
+        if ( isset( $colors[ $category ] ) ) {
+            return $colors[ $category ];
+        }
+
+        return ( $scope === 'character' ) ? '#0ea5e9' : '#84cc16';
     }
 }
 
