@@ -21,6 +21,7 @@ class NeoWeaver_Admin {
 		}
 		add_action( 'admin_menu',            array( $this, 'register_menu'        ) );
 		add_action( 'admin_menu',            array( $this, 'rename_first_submenu' ), 999 );
+		add_action( 'admin_menu',            array( $this, 'sort_submenu'         ), 9999 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets'       ) );
 		add_action( 'wp_ajax_nw_dashboard_data', array( $this, 'ajax_dashboard_data' ) );
 	}
@@ -60,6 +61,29 @@ public function register_menu(): void {
 		if ( isset( $submenu[ $this->slug ][0][0] ) ) {
 			$submenu[ $this->slug ][0][0] = 'Dashboard';
 		}
+	}
+
+	/**
+	 * Sort submenu: Dashboard (index 0) stays first,
+	 * remaining items sorted alphabetically by label.
+	 */
+	public function sort_submenu(): void {
+		global $submenu;
+
+		if ( empty( $submenu[ $this->slug ] ) || count( $submenu[ $this->slug ] ) < 2 ) {
+			return;
+		}
+
+		// Separate Dashboard (first item) from the rest.
+		$dashboard = array_shift( $submenu[ $this->slug ] );
+
+		// Sort remaining items alphabetically by menu label (index 0).
+		usort( $submenu[ $this->slug ], function( $a, $b ) {
+			return strcasecmp( $a[0], $b[0] );
+		} );
+
+		// Re-insert Dashboard at the top.
+		array_unshift( $submenu[ $this->slug ], $dashboard );
 	}
 
 	/* ------------------------------------------------------------------ */
