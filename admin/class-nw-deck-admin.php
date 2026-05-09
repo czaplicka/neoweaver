@@ -33,7 +33,7 @@ class NeoWeaver_Deck_Admin {
         add_submenu_page(
             $this->parent_slug,
             'NeoWeaver \u2014 Deck Cards',
-            '\u{1F0CF} Deck Cards',
+            '🃏 Deck Cards',
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
