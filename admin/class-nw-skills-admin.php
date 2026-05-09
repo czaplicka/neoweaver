@@ -51,10 +51,28 @@ class NeoWeaver_Skills_Admin {
 
     public function enqueue_assets( string $hook ): void {
         if ( ! str_contains( $hook, $this->page_slug ) ) return;
-        wp_enqueue_style( 'chakra-petch',
-            'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
-        wp_add_inline_style( 'chakra-petch', $this->get_css() );
-        wp_add_inline_script( 'jquery', $this->get_js() );
+
+        $base = plugin_dir_url( dirname( __FILE__ ) ) . 'admin/';
+        $ver  = '1.0.0';
+
+        wp_enqueue_style(
+            'chakra-petch',
+            'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+            [], null
+        );
+        wp_enqueue_style(
+            'nw-skills-admin',
+            $base . 'css/skills-admin.css',
+            [ 'chakra-petch' ],
+            $ver
+        );
+        wp_enqueue_script(
+            'nw-skills-admin',
+            $base . 'js/skills-admin.js',
+            [ 'jquery' ],
+            $ver,
+            true
+        );
     }
 
     /* ---------------------------------------------------------------- */
@@ -309,215 +327,6 @@ class NeoWeaver_Skills_Admin {
         if ( ! $id ) wp_send_json_error( 'Missing ID' );
         $res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
-    }
-
-    /* ---------------------------------------------------------------- */
-    /*  CSS                                                               */
-    /* ---------------------------------------------------------------- */
-
-    private function get_css(): string { return <<<'CSS'
-.nw-panel{font-family:'Chakra Petch',monospace;color:#e0e0e0}.nw-panel *{box-sizing:border-box}
-.nw-panel-header{display:flex;align-items:center;justify-content:space-between;padding:20px 0 16px;border-bottom:1px solid #2a2a2a;margin-bottom:16px}
-.nw-panel-title{font-size:22px;font-weight:700;color:#fff;margin:0;font-family:'Chakra Petch',monospace}
-.nw-accent{color:#adff00}.nw-panel-subtitle{color:#555;font-weight:400;font-size:18px;margin-left:4px}
-.nw-header-actions{display:flex;align-items:center;gap:8px}
-.nw-filter-bar{display:flex;gap:6px}
-.nw-select-filter{font-family:'Chakra Petch',monospace;font-size:12px;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#ccc;padding:6px 10px;cursor:pointer}
-.nw-select-filter:focus{outline:none;border-color:#adff00}
-.nw-btn{font-family:'Chakra Petch',monospace;font-size:12px;font-weight:600;padding:7px 16px;border-radius:5px;border:1px solid transparent;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
-.nw-btn-primary{background:#adff00;color:#0a0a0a;border-color:#adff00}.nw-btn-primary:hover{background:#c8ff40}
-.nw-btn-ghost{background:transparent;color:#adff00;border-color:#2e2e2e}.nw-btn-ghost:hover{border-color:#adff00}
-.nw-btn-danger{background:transparent;color:#ff4444;border-color:#3a1111}.nw-btn-danger:hover{background:#2a0000;border-color:#ff4444}
-.nw-stats-bar{display:flex;gap:10px;margin-bottom:16px}
-.nw-stat-pill{font-size:12px;padding:4px 12px;border-radius:20px;background:#1a1a1a;border:1px solid #2e2e2e;color:#aaa}
-.nw-stat-pill strong{color:#fff}.nw-pill-active{border-color:#adff00}.nw-pill-active strong{color:#adff00}.nw-pill-inactive strong{color:#ff6b35}
-.nw-notice{padding:10px 16px;border-radius:6px;margin-bottom:14px;font-size:13px;border-left:3px solid}
-.nw-notice-success{background:#0a2800;border-color:#adff00;color:#adff00}.nw-notice-error{background:#2a0000;border-color:#ff4444;color:#ff4444}
-.nw-table-wrap{background:#111;border:1px solid #222;border-radius:8px;overflow:hidden}
-.nw-table{width:100%;border-collapse:collapse;font-size:13px}
-.nw-table thead tr{background:#1a1a1a;border-bottom:1px solid #2a2a2a}
-.nw-table th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#666;font-weight:600}
-.nw-table tbody tr{border-bottom:1px solid #1e1e1e;transition:background .12s}
-.nw-table tbody tr:last-child{border-bottom:none}.nw-table tbody tr:hover{background:#161616}
-.nw-table td{padding:10px 14px;vertical-align:middle}.nw-col-img{width:50px}
-.nw-skill-img{width:40px;height:40px;border-radius:6px;object-fit:cover;border:1px solid #2e2e2e;background:#1a1a1a}
-.nw-skill-img-placeholder{width:40px;height:40px;border-radius:6px;background:#1a1a1a;border:1px solid #2e2e2e;display:flex;align-items:center;justify-content:center;color:#444;font-size:20px}
-.nw-skill-name{font-weight:600;color:#fff}.nw-skill-sub{font-size:11px;color:#555;margin-top:2px}
-.nw-category-badge{font-size:10px;padding:2px 8px;border-radius:3px;background:#1e1e1e;border:1px solid #2e2e2e;color:#aaa;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
-.nw-cat-Physical{border-color:#ff6b35;color:#ff6b35}.nw-cat-Social{border-color:#4da6ff;color:#4da6ff}
-.nw-cat-Mental{border-color:#b04dff;color:#b04dff}.nw-cat-Exploration{border-color:#4fc874;color:#4fc874}
-.nw-tags{display:flex;flex-wrap:wrap;gap:4px}
-.nw-tag{font-size:10px;padding:2px 7px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:3px;color:#888}
-.nw-card-effect{font-size:11px;color:#adff00;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nw-toggle{position:relative;display:inline-block;width:40px;height:22px}
-.nw-toggle input{opacity:0;width:0;height:0}
-.nw-toggle-slider{position:absolute;inset:0;background:#2a2a2a;border-radius:22px;cursor:pointer;transition:background .2s;border:1px solid #3a3a3a}
-.nw-toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;background:#555;border-radius:50%;transition:all .2s}
-.nw-toggle input:checked+.nw-toggle-slider{background:#1a3300;border-color:#adff00}
-.nw-toggle input:checked+.nw-toggle-slider::before{background:#adff00;transform:translateX(18px)}
-.nw-row-inactive td:not(:last-child):not(:first-child){opacity:.4}
-.nw-row-actions{display:flex;gap:6px}
-.nw-action-btn{font-family:'Chakra Petch',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #2e2e2e;background:transparent;color:#aaa;cursor:pointer;transition:all .15s;text-transform:uppercase}
-.nw-action-btn:hover{border-color:#adff00;color:#adff00}
-.nw-loading-row td{text-align:center;padding:32px;color:#555}
-.nw-spinner{display:inline-block;width:16px;height:16px;border:2px solid #333;border-top-color:#adff00;border-radius:50%;animation:nw-spin .6s linear infinite;vertical-align:middle;margin-right:8px}
-@keyframes nw-spin{to{transform:rotate(360deg)}}
-.nw-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px}
-.nw-modal{background:#111;border:1px solid #2e2e2e;border-radius:10px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;display:flex;flex-direction:column;font-family:'Chakra Petch',monospace}
-.nw-modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px 14px;border-bottom:1px solid #1e1e1e;position:sticky;top:0;background:#111;z-index:1}
-.nw-modal-header h2{margin:0;font-size:16px;color:#fff;font-family:'Chakra Petch',monospace}
-.nw-modal-close{background:none;border:none;color:#666;font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
-.nw-modal-close:hover{color:#fff;background:#222}
-.nw-modal-body{padding:20px 24px;flex:1}
-.nw-modal-footer{padding:14px 24px;border-top:1px solid #1e1e1e;display:flex;justify-content:flex-end;align-items:center;gap:10px;position:sticky;bottom:0;background:#111}
-.nw-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#adff00;font-weight:700;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #1e2e00}
-.nw-section-label:first-child{margin-top:0}
-.nw-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.nw-field{display:flex;flex-direction:column;gap:5px}.nw-field-full{grid-column:1/-1}.nw-field-center{align-items:flex-start}
-.nw-field label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#666;font-weight:600}
-.nw-req{color:#ff4444}.nw-hint{font-size:10px;color:#444;text-transform:none;letter-spacing:0;font-weight:400}
-.nw-field input[type="text"],.nw-field input[type="url"],.nw-field textarea,.nw-select{background:#0d0d0d;border:1px solid #2a2a2a;border-radius:5px;color:#e0e0e0;padding:8px 10px;font-family:'Chakra Petch',monospace;font-size:13px;transition:border-color .15s;width:100%}
-.nw-field input:focus,.nw-field textarea:focus,.nw-select:focus{outline:none;border-color:#adff00;box-shadow:0 0 0 2px rgba(173,255,0,.08)}
-.nw-field textarea{resize:vertical}
-.nw-select option{background:#111}
-CSS;
-    }
-
-    /* ---------------------------------------------------------------- */
-    /*  JS                                                                */
-    /* ---------------------------------------------------------------- */
-
-    private function get_js(): string { return <<<'JS'
-jQuery(function($){
-    var nonce   = $('#nw-nonce').val();
-    var editId  = null;
-
-    /* ---------- load ---------- */
-    function loadSkills(){
-        var cat = $('#nw-filter-category').val();
-        $('#nw-skills-tbody').html('<tr class="nw-loading-row"><td colspan="8"><div class="nw-spinner"></div> Loading skills…</td></tr>');
-        $.post(ajaxurl,{action:'nw_skills_get_all',nonce:nonce,filter_category:cat},function(r){
-            if(!r.success){showNotice('error',r.data);return;}
-            renderTable(r.data);
-        });
-    }
-
-    function renderTable(rows){
-        var total=rows.length,active=0,inactive=0,html='';
-        if(!rows.length){html='<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;">No skills found.</td></tr>';}
-        $.each(rows,function(_,s){
-            if(s.is_active) active++; else inactive++;
-            var tags='';
-            if(s.tags&&s.tags.length){$.each(s.tags,function(_,t){tags+='<span class="nw-tag">'+escH(t)+'</span>';});}
-            var img=s.img_url
-                ?'<img class="nw-skill-img" src="'+escH(s.img_url)+'" alt="" loading="lazy">'
-                :'<div class="nw-skill-img-placeholder">⚡</div>';
-            var catCls='nw-cat-'+(s.category||'');
-            var cardEff=s.card_effect?'<span class="nw-card-effect" title="'+escH(s.card_effect)+'">'+escH(s.card_effect)+'</span>':'<span style="color:#333">—</span>';
-            html+='<tr class="'+(s.is_active?'':'nw-row-inactive')+'" data-id="'+escH(s.id)+'">'
-                +'<td>'+img+'</td>'
-                +'<td><div class="nw-skill-name">'+escH(s.name)+'</div>'+(s.description?'<div class="nw-skill-sub">'+escH(s.description.substring(0,60))+(s.description.length>60?'…':'')+'</div>':'')+'</td>'
-                +'<td>'+(s.category?'<span class="nw-category-badge '+catCls+'">'+escH(s.category)+'</span>':'<span style="color:#333">—</span>')+'</td>'
-                +'<td>'+(s.application?escH(s.application):'<span style="color:#333">—</span>')+'</td>'
-                +'<td><div class="nw-tags">'+tags+'</div></td>'
-                +'<td>'+cardEff+'</td>'
-                +'<td><label class="nw-toggle"><input type="checkbox" class="nw-toggle-active" data-id="'+escH(s.id)+'"'+(s.is_active?' checked':'')+'><span class="nw-toggle-slider"></span></label></td>'
-                +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+escH(s.id)+'">Edit</button></div></td>'
-                +'</tr>';
-        });
-        $('#nw-skills-tbody').html(html);
-        $('#nw-total').text(total);$('#nw-active').text(active);$('#nw-inactive').text(inactive);
-    }
-
-    /* ---------- modal ---------- */
-    function openModal(skill){
-        editId = skill ? skill.id : null;
-        $('#nw-modal-title').text(skill?'Edit Skill':'New Skill');
-        $('#nw-save-label').text(skill?'Save Skill':'Create Skill');
-        $('#nw-delete-btn').toggle(!!skill);
-        $('#nw-field-id').val(skill?skill.id:'');
-        $('#nw-field-name').val(skill?skill.name:'');
-        $('#nw-field-category').val(skill&&skill.category?skill.category:'');
-        $('#nw-field-application').val(skill?skill.application||'':'');
-        $('#nw-field-description').val(skill?skill.description||'':'');
-        $('#nw-field-card_effect').val(skill?skill.card_effect||'':'');
-        $('#nw-field-img_url').val(skill?skill.img_url||'':'');
-        $('#nw-field-tags').val(skill&&skill.tags?skill.tags.join(', '):'');
-        $('#nw-field-linked_attributes').val(skill&&skill.linked_attributes?skill.linked_attributes.join(', '):'');
-        $('#nw-field-is_active').prop('checked',skill?skill.is_active:true);
-        updateImgPreview($('#nw-field-img_url').val());
-        $('#nw-modal-overlay').show();
-    }
-    function closeModal(){ $('#nw-modal-overlay').hide(); editId=null; }
-
-    function updateImgPreview(url){
-        if(url){$('#nw-img-preview').attr('src',url);$('#nw-img-preview-wrap').show();}
-        else{$('#nw-img-preview-wrap').hide();}
-    }
-
-    /* ---------- save ---------- */
-    function saveSkill(){
-        var data={action:'nw_skills_save',nonce:nonce,skill:{}};
-        $('#nw-skill-form').serializeArray().forEach(function(f){data.skill[f.name]=f.value;});
-        data.skill.is_active=$('#nw-field-is_active').is(':checked')?'1':'0';
-        $('#nw-save-btn').prop('disabled',true).text('Saving…');
-        $.post(ajaxurl,data,function(r){
-            $('#nw-save-btn').prop('disabled',false);
-            $('#nw-save-label').text(editId?'Save Skill':'Create Skill');
-            if(!r.success){showNotice('error',r.data);return;}
-            showNotice('success',editId?'Skill updated.':'Skill created.');
-            closeModal(); loadSkills();
-        });
-    }
-
-    /* ---------- toggle ---------- */
-    $(document).on('change','.nw-toggle-active',function(){
-        var id=$(this).data('id'), state=$(this).is(':checked');
-        $.post(ajaxurl,{action:'nw_skills_toggle',nonce:nonce,skill_id:id,is_active:state?1:0},function(r){
-            if(!r.success){showNotice('error',r.data);loadSkills();}
-            else{$(document).find('tr[data-id="'+id+'"]').toggleClass('nw-row-inactive',!state);}
-        });
-    });
-
-    /* ---------- delete ---------- */
-    $('#nw-delete-btn').on('click',function(){
-        if(!editId||!confirm('Delete this skill? This cannot be undone.')) return;
-        $.post(ajaxurl,{action:'nw_skills_delete',nonce:nonce,skill_id:editId},function(r){
-            if(!r.success){showNotice('error',r.data);return;}
-            showNotice('success','Skill deleted.');
-            closeModal(); loadSkills();
-        });
-    });
-
-    /* ---------- events ---------- */
-    $('#nw-add-btn').on('click',function(){openModal(null);});
-    $('#nw-refresh-btn').on('click',loadSkills);
-    $('#nw-filter-category').on('change',loadSkills);
-    $('#nw-modal-close,#nw-cancel-btn').on('click',closeModal);
-    $('#nw-modal-overlay').on('click',function(e){if($(e.target).is('#nw-modal-overlay'))closeModal();});
-    $('#nw-save-btn').on('click',saveSkill);
-    $('#nw-field-img_url').on('input',function(){updateImgPreview($(this).val());});
-    $(document).on('click','.nw-edit-btn',function(){
-        var id=$(this).data('id');
-        var row=$('tr[data-id="'+id+'"]');
-        /* fetch full row from server to get all fields */
-        $.post(ajaxurl,{action:'nw_skills_get_all',nonce:nonce,filter_category:''},function(r){
-            if(!r.success) return;
-            var skill=null; $.each(r.data,function(_,s){if(s.id===id){skill=s;return false;}});
-            if(skill) openModal(skill);
-        });
-    });
-
-    function showNotice(type,msg){
-        var $n=$('#nw-notice');
-        $n.removeClass('nw-notice-success nw-notice-error').addClass('nw-notice-'+type).text(msg).show();
-        setTimeout(function(){$n.fadeOut();},4000);
-    }
-    function escH(s){return $('<div>').text(String(s||'')).html();}
-
-    loadSkills();
-});
-JS;
     }
 }
 
