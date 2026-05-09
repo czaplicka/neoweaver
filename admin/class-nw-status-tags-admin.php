@@ -22,7 +22,7 @@ class NeoWeaver_Status_Tags_Admin {
 		add_action( 'wp_ajax_nw_status_tags_delete',  [ $this, 'ajax_delete'  ] );
 	}
 
-	/* ── menu ──────────────────────────────────────────────────────── */
+	/* ── menu ─────────────────────────────────────────────── */
 
 	public function register_menu(): void {
 		add_submenu_page(
@@ -35,7 +35,7 @@ class NeoWeaver_Status_Tags_Admin {
 		);
 	}
 
-	/* ── assets ────────────────────────────────────────────────────── */
+	/* ── assets ────────────────────────────────────────────── */
 
 	public function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, 'nw-status-tags' ) ) return;
@@ -56,7 +56,7 @@ class NeoWeaver_Status_Tags_Admin {
 		] );
 	}
 
-	/* ── page HTML ─────────────────────────────────────────────────── */
+	/* ── page HTML ───────────────────────────────────────────── */
 
 	public function render_page(): void {
 		?>
@@ -144,13 +144,13 @@ class NeoWeaver_Status_Tags_Admin {
 		<?php
 	}
 
-	/* ── helpers ────────────────────────────────────────────────────── */
+	/* ── helpers ────────────────────────────────────────────── */
 
 	private function supa( string $method, string $path, array $body = [], array $extra_headers = [] ): array {
 		return nw_supabase_request( $method, $path, $body, $extra_headers );
 	}
 
-	/* ── AJAX: get all ─────────────────────────────────────────────── */
+	/* ── AJAX: get all ───────────────────────────────────────────── */
 
 	public function ajax_get_all(): void {
 		check_ajax_referer( 'nw_status_tags_nonce', 'nonce' );
@@ -174,7 +174,7 @@ class NeoWeaver_Status_Tags_Admin {
 		wp_send_json_success( $rows['data'] ?? [] );
 	}
 
-	/* ── AJAX: save ─────────────────────────────────────────────────── */
+	/* ── AJAX: save ─────────────────────────────────────────────── */
 
 	public function ajax_save(): void {
 		check_ajax_referer( 'nw_status_tags_nonce', 'nonce' );
@@ -229,7 +229,7 @@ class NeoWeaver_Status_Tags_Admin {
 			: wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
 	}
 
-	/* ── AJAX: toggle active ────────────────────────────────────────── */
+	/* ── AJAX: toggle active ────────────────────────────────────────────── */
 
 	public function ajax_toggle(): void {
 		check_ajax_referer( 'nw_status_tags_nonce', 'nonce' );
@@ -244,7 +244,7 @@ class NeoWeaver_Status_Tags_Admin {
 		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
 	}
 
-	/* ── AJAX: delete ───────────────────────────────────────────────── */
+	/* ── AJAX: delete ─────────────────────────────────────────────── */
 
 	public function ajax_delete(): void {
 		check_ajax_referer( 'nw_status_tags_nonce', 'nonce' );
