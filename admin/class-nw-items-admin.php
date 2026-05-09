@@ -37,11 +37,22 @@ class NeoWeaver_Items_Admin {
 
 	public function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, 'nw-items' ) ) return;
+
+		// shared admin table styles
 		wp_enqueue_style(
-			'nw-items-css',
+			'nw-admin-tables',
 			plugin_dir_url( __FILE__ ) . '../assets/css/nw-admin-tables.css',
 			[], '1.0'
 		);
+
+		// items-specific styles
+		wp_enqueue_style(
+			'nw-items-css',
+			plugin_dir_url( __FILE__ ) . '../assets/css/items-admin.css',
+			[ 'nw-admin-tables' ], '1.0'
+		);
+
+		// items JS
 		wp_enqueue_script(
 			'nw-items-js',
 			plugin_dir_url( __FILE__ ) . '../assets/js/items-admin.js',
