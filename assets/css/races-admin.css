@@ -1,0 +1,295 @@
+/* ============================================================
+   NeoWeaver Admin — Races panel
+   Scoped styles for the cyber_races admin screen.
+   Font: Chakra Petch | Accent: #adff00
+   ============================================================ */
+
+.nw-panel{font-family:'Chakra Petch',monospace;color:#e0e0e0}
+.nw-panel *{box-sizing:border-box}
+
+/* ── Panel header ──────────────────────────────────────────── */
+.nw-panel-header{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	padding:20px 0 16px;
+	border-bottom:1px solid #2a2a2a;
+	margin-bottom:16px;
+}
+.nw-panel-title{
+	font-size:22px;
+	font-weight:700;
+	color:#fff;
+	margin:0;
+	font-family:'Chakra Petch',monospace;
+}
+.nw-accent{color:#adff00}
+.nw-panel-subtitle{color:#555;font-weight:400;font-size:18px;margin-left:4px}
+.nw-header-actions{display:flex;gap:8px}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.nw-btn{
+	font-family:'Chakra Petch',monospace;
+	font-size:12px;
+	font-weight:600;
+	padding:7px 16px;
+	border-radius:5px;
+	border:1px solid transparent;
+	cursor:pointer;
+	transition:all .15s;
+	text-transform:uppercase;
+	letter-spacing:.5px;
+}
+.nw-btn-primary{background:#adff00;color:#0a0a0a;border-color:#adff00}
+.nw-btn-primary:hover{background:#c8ff40}
+.nw-btn-ghost{background:transparent;color:#adff00;border-color:#2e2e2e}
+.nw-btn-ghost:hover{border-color:#adff00}
+
+/* ── Stats bar ─────────────────────────────────────────────── */
+.nw-stats-bar{display:flex;gap:10px;margin-bottom:16px}
+.nw-stat-pill{
+	font-size:12px;
+	padding:4px 12px;
+	border-radius:20px;
+	background:#1a1a1a;
+	border:1px solid #2e2e2e;
+	color:#aaa;
+}
+.nw-stat-pill strong{color:#fff}
+.nw-pill-active{border-color:#adff00}
+.nw-pill-active strong{color:#adff00}
+.nw-pill-inactive strong{color:#ff6b35}
+
+/* ── Notice ────────────────────────────────────────────────── */
+.nw-notice{
+	padding:10px 16px;
+	border-radius:6px;
+	margin-bottom:14px;
+	font-size:13px;
+	border-left:3px solid;
+}
+.nw-notice-success{background:#0a2800;border-color:#adff00;color:#adff00}
+.nw-notice-error  {background:#2a0000;border-color:#ff4444;color:#ff4444}
+
+/* ── Table ─────────────────────────────────────────────────── */
+.nw-table-wrap{
+	background:#111;
+	border:1px solid #222;
+	border-radius:8px;
+	overflow:hidden;
+}
+.nw-table{width:100%;border-collapse:collapse;font-size:13px}
+.nw-table thead tr{background:#1a1a1a;border-bottom:1px solid #2a2a2a}
+.nw-table th{
+	padding:10px 14px;
+	text-align:left;
+	font-size:11px;
+	text-transform:uppercase;
+	letter-spacing:.8px;
+	color:#666;
+	font-weight:600;
+}
+.nw-table tbody tr{
+	border-bottom:1px solid #1e1e1e;
+	transition:background .12s;
+}
+.nw-table tbody tr:last-child{border-bottom:none}
+.nw-table tbody tr:hover{background:#161616}
+.nw-table td{padding:10px 14px;vertical-align:middle}
+.nw-col-img{width:44px}
+
+/* ── Race image ────────────────────────────────────────────── */
+.nw-race-img{
+	width:36px;height:36px;
+	border-radius:50%;
+	object-fit:cover;
+	border:1px solid #2e2e2e;
+	background:#1a1a1a;
+	padding:3px;
+	filter:invert(1) sepia(1) saturate(5) hue-rotate(50deg);
+}
+.nw-race-img-placeholder{
+	width:36px;height:36px;
+	border-radius:50%;
+	background:#1a1a1a;
+	border:1px solid #2e2e2e;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	color:#444;
+	font-size:16px;
+}
+.nw-race-name{font-weight:600;color:#fff}
+.nw-race-sub{font-size:11px;color:#555;margin-top:2px}
+
+/* ── Tags ──────────────────────────────────────────────────── */
+.nw-tags{display:flex;flex-wrap:wrap;gap:4px}
+.nw-tag{
+	font-size:10px;
+	padding:2px 7px;
+	background:#1e1e1e;
+	border:1px solid #2e2e2e;
+	border-radius:3px;
+	color:#888;
+}
+
+/* ── HP / MP ───────────────────────────────────────────────── */
+.nw-hp-mp{font-size:12px;color:#aaa;white-space:nowrap}
+.nw-hp{color:#ff6b35;font-weight:600}
+.nw-mp{color:#00d4ff;font-weight:600}
+
+/* ── Toggle switch ─────────────────────────────────────────── */
+.nw-toggle{position:relative;display:inline-block;width:40px;height:22px}
+.nw-toggle input{opacity:0;width:0;height:0}
+.nw-toggle-slider{
+	position:absolute;inset:0;
+	background:#2a2a2a;
+	border-radius:22px;
+	cursor:pointer;
+	transition:background .2s;
+	border:1px solid #3a3a3a;
+}
+.nw-toggle-slider::before{
+	content:'';
+	position:absolute;
+	width:16px;height:16px;
+	left:2px;top:2px;
+	background:#555;
+	border-radius:50%;
+	transition:all .2s;
+}
+.nw-toggle input:checked + .nw-toggle-slider{background:#1a3300;border-color:#adff00}
+.nw-toggle input:checked + .nw-toggle-slider::before{background:#adff00;transform:translateX(18px)}
+.nw-row-inactive td:not(:last-child):not(:first-child){opacity:.4}
+
+/* ── Action buttons ────────────────────────────────────────── */
+.nw-row-actions{display:flex;gap:6px}
+.nw-action-btn{
+	font-family:'Chakra Petch',monospace;
+	font-size:11px;
+	padding:4px 10px;
+	border-radius:4px;
+	border:1px solid #2e2e2e;
+	background:transparent;
+	color:#aaa;
+	cursor:pointer;
+	transition:all .15s;
+	text-transform:uppercase;
+}
+.nw-action-btn:hover{border-color:#adff00;color:#adff00}
+
+/* ── Loading spinner ───────────────────────────────────────── */
+.nw-loading-row td{text-align:center;padding:32px;color:#555}
+.nw-spinner{
+	display:inline-block;
+	width:16px;height:16px;
+	border:2px solid #333;
+	border-top-color:#adff00;
+	border-radius:50%;
+	animation:nw-spin .6s linear infinite;
+	vertical-align:middle;
+	margin-right:8px;
+}
+@keyframes nw-spin{to{transform:rotate(360deg)}}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+.nw-modal-overlay{
+	position:fixed;inset:0;
+	background:rgba(0,0,0,.78);
+	z-index:99998;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	padding:20px;
+}
+.nw-modal{
+	background:#111;
+	border:1px solid #2e2e2e;
+	border-radius:10px;
+	width:100%;
+	max-width:740px;
+	max-height:92vh;
+	overflow-y:auto;
+	display:flex;
+	flex-direction:column;
+	font-family:'Chakra Petch',monospace;
+}
+.nw-modal-header{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	padding:18px 24px 14px;
+	border-bottom:1px solid #1e1e1e;
+	position:sticky;top:0;
+	background:#111;
+	z-index:1;
+}
+.nw-modal-header h2{margin:0;font-size:16px;color:#fff;font-family:'Chakra Petch',monospace}
+.nw-modal-close{
+	background:none;border:none;
+	color:#666;font-size:18px;
+	cursor:pointer;padding:2px 6px;
+	border-radius:4px;
+}
+.nw-modal-close:hover{color:#fff;background:#222}
+.nw-modal-body{padding:20px 24px;flex:1}
+.nw-modal-footer{
+	padding:14px 24px;
+	border-top:1px solid #1e1e1e;
+	display:flex;
+	justify-content:flex-end;
+	gap:10px;
+	position:sticky;bottom:0;
+	background:#111;
+}
+
+/* ── Form grid ─────────────────────────────────────────────── */
+.nw-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.nw-field{display:flex;flex-direction:column;gap:5px}
+.nw-field-full{grid-column:1/-1}
+.nw-field-center{align-items:flex-start}
+.nw-field label{
+	font-size:11px;
+	text-transform:uppercase;
+	letter-spacing:.6px;
+	color:#666;
+	font-weight:600;
+}
+.nw-req{color:#ff4444}
+.nw-hint{font-size:10px;color:#444;text-transform:none;letter-spacing:0;font-weight:400}
+.nw-field input[type="text"],
+.nw-field textarea{
+	background:#0d0d0d;
+	border:1px solid #2a2a2a;
+	border-radius:5px;
+	color:#e0e0e0;
+	padding:8px 10px;
+	font-family:'Chakra Petch',monospace;
+	font-size:13px;
+	transition:border-color .15s;
+	width:100%;
+}
+.nw-field input:focus,
+.nw-field textarea:focus{
+	outline:none;
+	border-color:#adff00;
+	box-shadow:0 0 0 2px rgba(173,255,0,.08);
+}
+.nw-field textarea{resize:vertical}
+
+/* ── Stat sliders ──────────────────────────────────────────── */
+.nw-stats-section{margin-top:20px;padding-top:16px;border-top:1px solid #1e1e1e}
+.nw-stats-title{
+	font-size:11px;
+	text-transform:uppercase;
+	letter-spacing:.6px;
+	color:#666;
+	margin:0 0 12px;
+	font-family:'Chakra Petch',monospace;
+}
+.nw-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.nw-stat-slider{display:flex;flex-direction:column;gap:4px}
+.nw-stat-slider label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.nw-stat-slider-row{display:flex;align-items:center;gap:8px}
+.nw-range{width:100%;accent-color:#adff00;cursor:pointer}
+.nw-range-val{font-size:13px;color:#adff00;font-weight:700;min-width:22px;text-align:right}
