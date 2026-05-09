@@ -45,6 +45,10 @@ class NeoWeaver_Abilities_Admin {
     public function enqueue_assets( string $hook ): void {
         if ( ! str_contains( $hook, $this->page_slug ) ) return;
 
+        // plugin_dir_url( dirname( __FILE__ ) ) zawsze wskazuje na główny folder pluginu
+        // niezależnie od tego, jak stała NEOWEAVER_PLUGIN_URL jest zdefiniowana
+        $plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+
         wp_enqueue_style(
             'chakra-petch',
             'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
@@ -54,21 +58,21 @@ class NeoWeaver_Abilities_Admin {
 
         wp_enqueue_style(
             'nw-admin-core',
-            NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+            $plugin_url . 'assets/css/nw-admin-core.css',
             [ 'chakra-petch' ],
             NEOWEAVER_VERSION
         );
 
         wp_enqueue_style(
             'nw-abilities-style',
-            NEOWEAVER_PLUGIN_URL . 'assets/css/abilities-admin.css',
+            $plugin_url . 'assets/css/abilities-admin.css',
             [ 'chakra-petch', 'nw-admin-core' ],
             NEOWEAVER_VERSION
         );
 
         wp_enqueue_script(
             'nw-abilities-script',
-            NEOWEAVER_PLUGIN_URL . 'assets/js/abilities-admin.js',
+            $plugin_url . 'assets/js/abilities-admin.js',
             [ 'jquery' ],
             NEOWEAVER_VERSION,
             true
