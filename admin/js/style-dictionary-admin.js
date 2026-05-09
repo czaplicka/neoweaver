@@ -1,240 +1,256 @@
 /**
- * NeoWeaver Admin — Style Dictionary
- * Handles: load, filter, modal open/close, save, toggle, delete
- *
- * Enqueued with wp_localize_script as 'NW_SD':
- *   NW_SD.ajax_url — admin-ajax.php
- *   NW_SD.nonce    — nonce for all requests
+ * NeoWeaver — Style Dictionary Admin JS
+ * Depends on: jQuery, NW_SD (ajax_url, nonce)
  */
+/* global jQuery, NW_SD */
+(function ($) {
+    'use strict';
 
-jQuery( function ( $ ) {
-	'use strict';
+    /* ---------------------------------------------------------------- */
+    /*  State                                                             */
+    /* ---------------------------------------------------------------- */
+    let allTags   = [];
+    let editingId = null;
 
-	/* ---------------------------------------------------------------- */
-	/*  State                                                            */
-	/* ---------------------------------------------------------------- */
+    /* ---------------------------------------------------------------- */
+    /*  DOM refs                                                          */
+    /* ---------------------------------------------------------------- */
+    const $tbody      = $('#nw-sd-tbody');
+    const $notice     = $('#nw-notice');
+    const $overlay    = $('#nw-modal-overlay');
+    const $modalTitle = $('#nw-modal-title');
+    const $form       = $('#nw-sd-form');
+    const $deleteBtn  = $('#nw-delete-btn');
+    const $saveLabel  = $('#nw-save-label');
 
-	var editId  = null;
-	var allTags = [];
+    /* filter refs */
+    const $fCat    = $('#nw-filter-category');
+    const $fActive = $('#nw-filter-active');
+    const $fSearch = $('#nw-filter-search');
 
-	var nonce    = typeof NW_SD !== 'undefined' ? NW_SD.nonce    : $( '#nw-nonce' ).val();
-	var ajaxurl  = typeof NW_SD !== 'undefined' ? NW_SD.ajax_url : window.ajaxurl;
+    /* stat refs */
+    const $total    = $('#nw-total');
+    const $active   = $('#nw-active');
+    const $inactive = $('#nw-inactive');
 
-	/* ---------------------------------------------------------------- */
-	/*  Helpers                                                          */
-	/* ---------------------------------------------------------------- */
+    /* ---------------------------------------------------------------- */
+    /*  Notice helper                                                     */
+    /* ---------------------------------------------------------------- */
+    function showNotice(msg, isError) {
+        $notice
+            .removeClass('is-error')
+            .toggleClass('is-error', !!isError)
+            .html(msg)
+            .show();
+        clearTimeout($notice.data('timer'));
+        $notice.data('timer', setTimeout(function () { $notice.fadeOut(); }, 4000));
+    }
 
-	function escH( s ) {
-		return $( '<div>' ).text( String( s || '' ) ).html();
-	}
+    /* ---------------------------------------------------------------- */
+    /*  Stats                                                             */
+    /* ---------------------------------------------------------------- */
+    function updateStats(tags) {
+        var activeCount   = tags.filter(function (t) { return t.is_active; }).length;
+        var inactiveCount = tags.length - activeCount;
+        $total.text(tags.length);
+        $active.text(activeCount);
+        $inactive.text(inactiveCount);
+        $('.nw-cat-count').each(function () {
+            var cat = $(this).data('cat');
+            $(this).text(tags.filter(function (t) { return t.category === cat; }).length);
+        });
+    }
 
-	function badgeHtml( cat ) {
-		return '<span class="nw-badge nw-badge-' + escH( cat ) + '">' + escH( cat ) + '</span>';
-	}
+    /* ---------------------------------------------------------------- */
+    /*  Render table                                                      */
+    /* ---------------------------------------------------------------- */
+    function renderTable(tags) {
+        $tbody.empty();
+        if (!tags.length) {
+            $tbody.append('<tr class="nw-empty-row"><td colspan="5">No tags found.</td></tr>');
+            return;
+        }
+        tags.forEach(function (tag) {
+            var activeChecked = tag.is_active ? 'checked' : '';
+            var rowClass      = tag.is_active ? '' : 'nw-row-inactive';
+            $tbody.append(
+                '<tr class="' + rowClass + '" data-id="' + tag.id + '">' +
+                '<td><strong>' + escHtml(tag.tag_name) + '</strong></td>' +
+                '<td><span class="nw-cat-badge ' + escHtml(tag.category) + '">' + escHtml(tag.category) + '</span></td>' +
+                '<td>' + escHtml(tag.interpretation_en) + '</td>' +
+                '<td>' +
+                    '<label class="nw-toggle nw-toggle-cell">' +
+                    '<input type="checkbox" class="nw-quick-toggle" data-id="' + tag.id + '" ' + activeChecked + '>' +
+                    '<span class="nw-toggle-slider"></span>' +
+                    '</label>' +
+                '</td>' +
+                '<td><button class="nw-action-btn nw-edit-btn" data-id="' + tag.id + '">Edit</button></td>' +
+                '</tr>'
+            );
+        });
+    }
 
-	function showNotice( type, msg ) {
-		var $n = $( '#nw-notice' );
-		$n.removeClass( 'nw-notice-success nw-notice-error' )
-			.addClass( 'nw-notice-' + type )
-			.text( msg )
-			.show();
-		setTimeout( function () { $n.fadeOut(); }, 4000 );
-	}
+    /* ---------------------------------------------------------------- */
+    /*  Filter & search                                                   */
+    /* ---------------------------------------------------------------- */
+    function applyFilters() {
+        var cat    = $fCat.val();
+        var active = $fActive.val();
+        var search = $fSearch.val().toLowerCase();
 
-	/* ---------------------------------------------------------------- */
-	/*  Load & render                                                    */
-	/* ---------------------------------------------------------------- */
+        var filtered = allTags.filter(function (t) {
+            if (cat    && t.category !== cat)              return false;
+            if (active === '1' && !t.is_active)            return false;
+            if (active === '0' && t.is_active)             return false;
+            if (search && !t.tag_name.toLowerCase().includes(search) &&
+                          !t.interpretation_en.toLowerCase().includes(search)) return false;
+            return true;
+        });
+        renderTable(filtered);
+    }
 
-	function loadTags() {
-		$( '#nw-sd-tbody' ).html(
-			'<tr class="nw-loading-row"><td colspan="5"><div class="nw-spinner"></div> Loading tags…</td></tr>'
-		);
-		$.post(
-			ajaxurl,
-			{ action: 'nw_sd_get_all', nonce: nonce },
-			function ( r ) {
-				if ( ! r.success ) { showNotice( 'error', r.data ); return; }
-				allTags = r.data || [];
-				renderFiltered();
-			}
-		);
-	}
+    $fCat.on('change', applyFilters);
+    $fActive.on('change', applyFilters);
+    $fSearch.on('input', applyFilters);
 
-	function renderFiltered() {
-		var catF   = $( '#nw-filter-category' ).val();
-		var actF   = $( '#nw-filter-active' ).val();
-		var search = $( '#nw-filter-search' ).val().toLowerCase();
+    /* ---------------------------------------------------------------- */
+    /*  Load all tags                                                     */
+    /* ---------------------------------------------------------------- */
+    function loadTags() {
+        $tbody.html('<tr class="nw-loading-row"><td colspan="5"><div class="nw-spinner"></div> Loading tags…</td></tr>');
+        $.post(NW_SD.ajax_url, { action: 'nw_sd_get_all', nonce: NW_SD.nonce }, function (res) {
+            if (!res.success) { showNotice(res.data || 'Load failed.', true); return; }
+            allTags = res.data || [];
+            updateStats(allTags);
+            applyFilters();
+        }).fail(function () { showNotice('Network error.', true); });
+    }
 
-		var rows = allTags.filter( function ( t ) {
-			if ( catF && t.category !== catF ) return false;
-			if ( actF === '1' && ! t.is_active ) return false;
-			if ( actF === '0' &&   t.is_active ) return false;
-			if ( search && ! (
-				t.tag_name.toLowerCase().includes( search ) ||
-				t.interpretation_en.toLowerCase().includes( search )
-			) ) return false;
-			return true;
-		} );
+    /* ---------------------------------------------------------------- */
+    /*  Modal helpers                                                     */
+    /* ---------------------------------------------------------------- */
+    function openModal(tag) {
+        editingId = tag ? tag.id : null;
+        $form[0].reset();
+        $modalTitle.text(tag ? 'Edit Style Tag' : 'New Style Tag');
+        $saveLabel.text(tag ? 'Save Tag' : 'Create Tag');
+        $deleteBtn.toggle(!!tag);
 
-		renderTable( rows );
-	}
+        if (tag) {
+            $('#nw-field-id').val(tag.id);
+            $('#nw-field-tag_name').val(tag.tag_name);
+            $('#nw-field-category').val(tag.category);
+            $('#nw-field-interpretation_en').val(tag.interpretation_en);
+            $('#nw-field-is_active').prop('checked', !!tag.is_active);
+        }
+        $overlay.show();
+    }
 
-	function renderTable( rows ) {
-		var total    = allTags.length;
-		var active   = 0;
-		var inactive = 0;
-		var catCounts = {};
+    function closeModal() {
+        $overlay.hide();
+        editingId = null;
+    }
 
-		$.each( allTags, function ( _, t ) {
-			if ( t.is_active ) { active++; } else { inactive++; }
-			catCounts[ t.category ] = ( catCounts[ t.category ] || 0 ) + 1;
-		} );
+    /* ---------------------------------------------------------------- */
+    /*  Save                                                              */
+    /* ---------------------------------------------------------------- */
+    function saveTag() {
+        var payload = {
+            action : 'nw_sd_save',
+            nonce  : NW_SD.nonce,
+            tag    : {
+                id                : $('#nw-field-id').val(),
+                tag_name          : $('#nw-field-tag_name').val(),
+                category          : $('#nw-field-category').val(),
+                interpretation_en : $('#nw-field-interpretation_en').val(),
+                is_active         : $('#nw-field-is_active').is(':checked') ? '1' : '0',
+            }
+        };
+        $saveLabel.text('Saving…');
+        $.post(NW_SD.ajax_url, payload, function (res) {
+            $saveLabel.text(editingId ? 'Save Tag' : 'Create Tag');
+            if (!res.success) { showNotice(res.data || 'Save failed.', true); return; }
+            showNotice(editingId ? 'Tag updated.' : 'Tag created.');
+            closeModal();
+            loadTags();
+        }).fail(function () {
+            $saveLabel.text(editingId ? 'Save Tag' : 'Create Tag');
+            showNotice('Network error.', true);
+        });
+    }
 
-		$( '#nw-total' ).text( total );
-		$( '#nw-active' ).text( active );
-		$( '#nw-inactive' ).text( inactive );
-		$( '.nw-cat-count' ).each( function () {
-			var cat = $( this ).data( 'cat' );
-			$( this ).text( catCounts[ cat ] || 0 );
-		} );
+    /* ---------------------------------------------------------------- */
+    /*  Toggle is_active                                                  */
+    /* ---------------------------------------------------------------- */
+    function toggleTag(id, isActive) {
+        $.post(NW_SD.ajax_url, { action: 'nw_sd_toggle', nonce: NW_SD.nonce, tag_id: id, is_active: isActive ? '1' : '0' },
+            function (res) {
+                if (!res.success) { showNotice(res.data || 'Toggle failed.', true); loadTags(); return; }
+                /* update in-memory */
+                var tag = allTags.find(function (t) { return t.id == id; });
+                if (tag) tag.is_active = isActive;
+                updateStats(allTags);
+                var $row = $tbody.find('tr[data-id="' + id + '"]');
+                $row.toggleClass('nw-row-inactive', !isActive);
+            }
+        ).fail(function () { showNotice('Network error.', true); loadTags(); });
+    }
 
-		var html = '';
+    /* ---------------------------------------------------------------- */
+    /*  Delete                                                            */
+    /* ---------------------------------------------------------------- */
+    function deleteTag(id) {
+        if (!confirm('Delete this style tag? This cannot be undone.')) return;
+        $.post(NW_SD.ajax_url, { action: 'nw_sd_delete', nonce: NW_SD.nonce, tag_id: id }, function (res) {
+            if (!res.success) { showNotice(res.data || 'Delete failed.', true); return; }
+            showNotice('Tag deleted.');
+            closeModal();
+            loadTags();
+        }).fail(function () { showNotice('Network error.', true); });
+    }
 
-		if ( ! rows.length ) {
-			html = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#555;">No tags found.</td></tr>';
-		} else {
-			$.each( rows, function ( _, t ) {
-				var interp  = t.interpretation_en || '';
-				var preview = interp.length > 90 ? interp.substring( 0, 90 ) + '…' : interp;
-				html +=
-					'<tr data-id="' + escH( t.id ) + '">' +
-					'<td><div class="nw-tag-name">' + escH( t.tag_name ) + '</div></td>' +
-					'<td>' + badgeHtml( t.category ) + '</td>' +
-					'<td><div class="nw-interp">' + escH( preview ) + '</div></td>' +
-					'<td><label class="nw-toggle">' +
-					'<input type="checkbox" class="nw-toggle-active" data-id="' + escH( t.id ) + '"' + ( t.is_active ? ' checked' : '' ) + '>' +
-					'<span class="nw-toggle-slider"></span></label></td>' +
-					'<td><div class="nw-row-actions">' +
-					'<button class="nw-action-btn nw-edit-btn" data-id="' + escH( t.id ) + '">Edit</button>' +
-					'</div></td>' +
-					'</tr>';
-			} );
-		}
+    /* ---------------------------------------------------------------- */
+    /*  Event bindings                                                    */
+    /* ---------------------------------------------------------------- */
+    $('#nw-refresh-btn').on('click', loadTags);
+    $('#nw-add-btn').on('click', function () { openModal(null); });
+    $('#nw-cancel-btn, #nw-modal-close').on('click', closeModal);
+    $overlay.on('click', function (e) { if ($(e.target).is($overlay)) closeModal(); });
+    $('#nw-save-btn').on('click', saveTag);
+    $form.on('submit', function (e) { e.preventDefault(); saveTag(); });
+    $('#nw-delete-btn').on('click', function () { if (editingId) deleteTag(editingId); });
 
-		$( '#nw-sd-tbody' ).html( html );
-	}
+    /* delegated: edit button */
+    $tbody.on('click', '.nw-edit-btn', function () {
+        var id  = $(this).data('id');
+        var tag = allTags.find(function (t) { return t.id == id; });
+        if (tag) openModal(tag);
+    });
 
-	/* ---------------------------------------------------------------- */
-	/*  Filters                                                          */
-	/* ---------------------------------------------------------------- */
+    /* delegated: quick toggle */
+    $tbody.on('change', '.nw-quick-toggle', function () {
+        toggleTag($(this).data('id'), this.checked);
+    });
 
-	$( '#nw-filter-category, #nw-filter-active' ).on( 'change', renderFiltered );
-	$( '#nw-filter-search' ).on( 'input', renderFiltered );
+    /* keyboard close */
+    $(document).on('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+    });
 
-	/* ---------------------------------------------------------------- */
-	/*  Modal                                                            */
-	/* ---------------------------------------------------------------- */
+    /* ---------------------------------------------------------------- */
+    /*  Utility                                                           */
+    /* ---------------------------------------------------------------- */
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-	function openModal( tag ) {
-		editId = tag ? tag.id : null;
-		$( '#nw-modal-title' ).text( tag ? 'Edit Style Tag' : 'New Style Tag' );
-		$( '#nw-save-label' ).text( tag ? 'Save Tag' : 'Create Tag' );
-		$( '#nw-delete-btn' ).toggle( !! tag );
-		$( '#nw-field-id' ).val( tag ? tag.id : '' );
-		$( '#nw-field-tag_name' ).val( tag ? tag.tag_name : '' );
-		$( '#nw-field-category' ).val( tag ? tag.category : 'general' );
-		$( '#nw-field-interpretation_en' ).val( tag ? tag.interpretation_en : '' );
-		$( '#nw-field-is_active' ).prop( 'checked', tag ? tag.is_active : true );
-		$( '#nw-modal-overlay' ).show();
-		$( '#nw-field-tag_name' ).focus();
-	}
+    /* ---------------------------------------------------------------- */
+    /*  Init                                                              */
+    /* ---------------------------------------------------------------- */
+    loadTags();
 
-	function closeModal() {
-		$( '#nw-modal-overlay' ).hide();
-		editId = null;
-	}
-
-	/* ---------------------------------------------------------------- */
-	/*  Save                                                             */
-	/* ---------------------------------------------------------------- */
-
-	function saveTag() {
-		var data = { action: 'nw_sd_save', nonce: nonce, tag: {} };
-		$( '#nw-sd-form' ).serializeArray().forEach( function ( f ) {
-			data.tag[ f.name ] = f.value;
-		} );
-		data.tag.is_active = $( '#nw-field-is_active' ).is( ':checked' ) ? '1' : '0';
-
-		$( '#nw-save-btn' ).prop( 'disabled', true ).text( 'Saving…' );
-
-		$.post( ajaxurl, data, function ( r ) {
-			$( '#nw-save-btn' ).prop( 'disabled', false );
-			$( '#nw-save-label' ).text( editId ? 'Save Tag' : 'Create Tag' );
-			if ( ! r.success ) { showNotice( 'error', r.data ); return; }
-			showNotice( 'success', editId ? 'Tag updated.' : 'Tag created.' );
-			closeModal();
-			loadTags();
-		} );
-	}
-
-	/* ---------------------------------------------------------------- */
-	/*  Toggle active                                                    */
-	/* ---------------------------------------------------------------- */
-
-	$( document ).on( 'change', '.nw-toggle-active', function () {
-		var id    = $( this ).data( 'id' );
-		var state = $( this ).is( ':checked' );
-		$.post(
-			ajaxurl,
-			{ action: 'nw_sd_toggle', nonce: nonce, tag_id: id, is_active: state ? 1 : 0 },
-			function ( r ) {
-				if ( ! r.success ) { showNotice( 'error', r.data ); loadTags(); }
-			}
-		);
-	} );
-
-	/* ---------------------------------------------------------------- */
-	/*  Delete                                                           */
-	/* ---------------------------------------------------------------- */
-
-	$( '#nw-delete-btn' ).on( 'click', function () {
-		if ( ! editId || ! confirm( 'Delete this style tag? This cannot be undone.' ) ) return;
-		$.post(
-			ajaxurl,
-			{ action: 'nw_sd_delete', nonce: nonce, tag_id: editId },
-			function ( r ) {
-				if ( ! r.success ) { showNotice( 'error', r.data ); return; }
-				showNotice( 'success', 'Tag deleted.' );
-				closeModal();
-				loadTags();
-			}
-		);
-	} );
-
-	/* ---------------------------------------------------------------- */
-	/*  Event bindings                                                   */
-	/* ---------------------------------------------------------------- */
-
-	$( '#nw-add-btn' ).on( 'click', function () { openModal( null ); } );
-	$( '#nw-refresh-btn' ).on( 'click', loadTags );
-	$( '#nw-modal-close, #nw-cancel-btn' ).on( 'click', closeModal );
-	$( '#nw-modal-overlay' ).on( 'click', function ( e ) {
-		if ( $( e.target ).is( '#nw-modal-overlay' ) ) closeModal();
-	} );
-	$( '#nw-save-btn' ).on( 'click', saveTag );
-
-	$( document ).on( 'click', '.nw-edit-btn', function () {
-		var id  = $( this ).data( 'id' );
-		var tag = null;
-		$.each( allTags, function ( _, t ) {
-			if ( t.id === id ) { tag = t; return false; }
-		} );
-		if ( tag ) openModal( tag );
-	} );
-
-	/* ---------------------------------------------------------------- */
-	/*  Init                                                             */
-	/* ---------------------------------------------------------------- */
-
-	loadTags();
-} );
+}(jQuery));
