@@ -235,16 +235,17 @@ public function enqueue_assets( string $hook ): void {
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_races', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
         $res = $this->supa( 'GET',
             'cyber_races?select=id,name,parent_race,tags,gm_instructions,description,race_base_hp,img_url,preferred_tech,preferred_magic,preferred_gods,preferred_wealth,preferred_threat,preferred_moral,preferred_social,conflict_axis,conflict_side,race_base_mp,bonus,is_active&order=name.asc'
         );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
+        return;
     }
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_races', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
 
         $raw  = $_POST['race'] ?? [];
         $id   = sanitize_text_field( $raw['id'] ?? '' );
@@ -276,21 +277,25 @@ public function enqueue_assets( string $hook ): void {
             ? $this->supa( 'PATCH', 'cyber_races?id=eq.' . urlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_races', $payload );
 
-        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
+        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
         $code = $res['code'] ?? 0;
-        ( $code >= 200 && $code < 300 )
-            ? wp_send_json_success( $res['data'][0] ?? $res['data'] )
-            : wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+        if ( $code >= 200 && $code < 300 ) {
+            wp_send_json_success( $res['data'][0] ?? $res['data'] );
+        } else {
+            wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+        }
+        return;
     }
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_races', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
         $id    = sanitize_text_field( $_POST['race_id'] ?? '' );
         $state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
         $res = $this->supa( 'PATCH', 'cyber_races?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
+        return;
     }
 
     /* ---------------------------------------------------------------- */
