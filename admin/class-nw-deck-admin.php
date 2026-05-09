@@ -1,15 +1,6 @@
 <?php
 /**
  * NeoWeaver Admin Panel — Deck Cards (cyber_deck)
- *
- * Columns: id, name, description, deck_category, type, mechanic,
- *          mechanic_goal, cost_label, cost_number, effect, bonus,
- *          ai_instruction, gm, tags, requirement_tags, denied_tags,
- *          required_item_tags, required_location_tags, denied_location_tags,
- *          requirement_description, time_cost_minutes, cooldown_messages,
- *          entropy_on_fail, rarity, level, xp_current, xp_to_next,
- *          is_leveling, is_disposable, is_active, sound_effect, img_url,
- *          created_at, class_id
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -42,7 +33,7 @@ class NeoWeaver_Deck_Admin {
         add_submenu_page(
             $this->parent_slug,
             'NeoWeaver — Deck Cards',
-            '🃏 Deck Cards',
+            '\u{1F0CF} Deck Cards',
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
@@ -93,10 +84,17 @@ class NeoWeaver_Deck_Admin {
                 </h1>
                 <div class="nw-header-actions">
                     <div class="nw-filter-bar">
+                        <input type="search" id="nw-search" class="nw-search-input" placeholder="&#128269; Search cards&hellip;" autocomplete="off">
                         <select id="nw-filter-category" class="nw-select-filter">
                             <option value="">All categories</option>
                             <?php foreach ( $this->categories() as $c ) : ?>
                             <option value="<?php echo esc_attr($c); ?>"><?php echo esc_html(ucfirst($c)); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select id="nw-filter-type" class="nw-select-filter">
+                            <option value="">All types</option>
+                            <?php foreach ( $this->types() as $t ) : ?>
+                            <option value="<?php echo esc_attr($t); ?>"><?php echo esc_html(ucfirst($t)); ?></option>
                             <?php endforeach; ?>
                         </select>
                         <select id="nw-filter-rarity" class="nw-select-filter">
@@ -114,9 +112,10 @@ class NeoWeaver_Deck_Admin {
             <div id="nw-notice" class="nw-notice" style="display:none;"></div>
 
             <div class="nw-stats-bar">
-                <span class="nw-stat-pill">Total: <strong id="nw-total">—</strong></span>
-                <span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">—</strong></span>
-                <span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">—</strong></span>
+                <span class="nw-stat-pill">Total: <strong id="nw-total">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">&mdash;</strong></span>
+                <span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">&mdash;</strong></span>
+                <span class="nw-stat-pill" id="nw-filtered-pill" style="display:none;">Showing: <strong id="nw-filtered">&mdash;</strong></span>
             </div>
 
             <div class="nw-table-wrap">
@@ -124,7 +123,8 @@ class NeoWeaver_Deck_Admin {
                     <thead><tr>
                         <th class="nw-col-img"></th>
                         <th>Name</th>
-                        <th>Category / Type</th>
+                        <th>Category</th>
+                        <th>Type</th>
                         <th>Tags</th>
                         <th>Rarity / Level</th>
                         <th>Cost / Time</th>
@@ -132,7 +132,7 @@ class NeoWeaver_Deck_Admin {
                         <th>Actions</th>
                     </tr></thead>
                     <tbody id="nw-deck-tbody">
-                        <tr class="nw-loading-row"><td colspan="8"><div class="nw-spinner"></div> Loading cards…</td></tr>
+                        <tr class="nw-loading-row"><td colspan="9"><div class="nw-spinner"></div> Loading cards&hellip;</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -142,7 +142,7 @@ class NeoWeaver_Deck_Admin {
                 <div class="nw-modal">
                     <div class="nw-modal-header">
                         <h2 id="nw-modal-title">Edit Card</h2>
-                        <button class="nw-modal-close" id="nw-modal-close">✕</button>
+                        <button class="nw-modal-close" id="nw-modal-close">&times;</button>
                     </div>
                     <div class="nw-modal-body">
                         <form id="nw-deck-form">
@@ -177,11 +177,11 @@ class NeoWeaver_Deck_Admin {
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>Description</label>
-                                    <textarea id="nw-field-description" name="description" rows="2" placeholder="Card description visible to players…"></textarea>
+                                    <textarea id="nw-field-description" name="description" rows="2" placeholder="Card description visible to players&hellip;"></textarea>
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>Effect</label>
-                                    <textarea id="nw-field-effect" name="effect" rows="2" placeholder="What happens when this card is played…"></textarea>
+                                    <textarea id="nw-field-effect" name="effect" rows="2" placeholder="What happens when this card is played&hellip;"></textarea>
                                 </div>
                             </div>
 
@@ -223,7 +223,7 @@ class NeoWeaver_Deck_Admin {
                             </div>
 
                             <!-- Tags -->
-                            <div class="nw-section-label">Tags <span class="nw-hint" style="text-transform:none;letter-spacing:0">(comma-separated → JSON array)</span></div>
+                            <div class="nw-section-label">Tags <span class="nw-hint" style="text-transform:none;letter-spacing:0">(comma-separated &rarr; JSON array)</span></div>
                             <div class="nw-form-grid">
                                 <div class="nw-field nw-field-full">
                                     <label>Tags</label>
@@ -251,7 +251,7 @@ class NeoWeaver_Deck_Admin {
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>Requirement Description</label>
-                                    <textarea id="nw-field-requirement_description" name="requirement_description" rows="2" placeholder="Human-readable requirement description…"></textarea>
+                                    <textarea id="nw-field-requirement_description" name="requirement_description" rows="2" placeholder="Human-readable requirement description&hellip;"></textarea>
                                 </div>
                             </div>
 
@@ -260,11 +260,11 @@ class NeoWeaver_Deck_Admin {
                             <div class="nw-form-grid">
                                 <div class="nw-field nw-field-full">
                                     <label>AI Instruction <span class="nw-hint">(sent to the game AI)</span></label>
-                                    <textarea id="nw-field-ai_instruction" name="ai_instruction" rows="3" placeholder="Instructions for the AI game engine…"></textarea>
+                                    <textarea id="nw-field-ai_instruction" name="ai_instruction" rows="3" placeholder="Instructions for the AI game engine&hellip;"></textarea>
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>GM Note <span class="nw-hint">(visible only to GM)</span></label>
-                                    <textarea id="nw-field-gm" name="gm" rows="2" placeholder="Private Game Master note…"></textarea>
+                                    <textarea id="nw-field-gm" name="gm" rows="2" placeholder="Private Game Master note&hellip;"></textarea>
                                 </div>
                             </div>
 
@@ -308,14 +308,14 @@ class NeoWeaver_Deck_Admin {
                             <div class="nw-form-grid">
                                 <div class="nw-field nw-field-full">
                                     <label>Image URL</label>
-                                    <input type="url" id="nw-field-img_url" name="img_url" placeholder="https://…">
+                                    <input type="url" id="nw-field-img_url" name="img_url" placeholder="https://&hellip;">
                                     <div id="nw-img-preview-wrap" style="display:none;margin-top:6px;">
                                         <img id="nw-img-preview" src="" alt="preview" style="max-height:80px;border-radius:4px;border:1px solid #2e2e2e;">
                                     </div>
                                 </div>
                                 <div class="nw-field nw-field-full">
                                     <label>Sound Effect URL</label>
-                                    <input type="url" id="nw-field-sound_effect" name="sound_effect" placeholder="https://…/card.mp3">
+                                    <input type="url" id="nw-field-sound_effect" name="sound_effect" placeholder="https://&hellip;/card.mp3">
                                     <div id="nw-sound-wrap" style="display:none;margin-top:6px;">
                                         <audio id="nw-audio-preview" controls style="width:100%;height:32px;"></audio>
                                     </div>
@@ -337,7 +337,7 @@ class NeoWeaver_Deck_Admin {
                         </form>
                     </div><!-- .nw-modal-body -->
                     <div class="nw-modal-footer">
-                        <button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">🗑 Delete</button>
+                        <button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">&#128465; Delete</button>
                         <button class="nw-btn nw-btn-ghost" id="nw-cancel-btn">Cancel</button>
                         <button class="nw-btn nw-btn-primary" id="nw-save-btn"><span id="nw-save-label">Save Card</span></button>
                     </div>
@@ -354,6 +354,9 @@ class NeoWeaver_Deck_Admin {
 
     private function categories(): array {
         return ['action', 'magic', 'equipment'];
+    }
+    private function types(): array {
+        return ['Action', 'Spell', 'Gear', 'Trap', 'Support', 'Reaction', 'Passive'];
     }
     private function rarities(): array {
         return ['common', 'uncommon', 'rare', 'epic', 'legendary'];
@@ -390,10 +393,12 @@ class NeoWeaver_Deck_Admin {
 
         $category = sanitize_text_field( $_POST['filter_category'] ?? '' );
         $rarity   = sanitize_text_field( $_POST['filter_rarity']   ?? '' );
+        $type     = sanitize_text_field( $_POST['filter_type']     ?? '' );
 
         $qs = 'cyber_deck?select=id,name,description,deck_category,type,mechanic,mechanic_goal,cost_label,cost_number,effect,bonus,ai_instruction,gm,tags,requirement_tags,denied_tags,required_item_tags,required_location_tags,denied_location_tags,requirement_description,time_cost_minutes,cooldown_messages,entropy_on_fail,rarity,level,xp_current,xp_to_next,is_leveling,is_disposable,is_active,sound_effect,img_url,class_id&order=name.asc';
         if ( $category ) $qs .= '&deck_category=eq.' . urlencode( $category );
         if ( $rarity   ) $qs .= '&rarity=eq.'        . urlencode( $rarity );
+        if ( $type     ) $qs .= '&type=ilike.'        . urlencode( $type );
 
         $res = $this->supa( 'GET', $qs );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
