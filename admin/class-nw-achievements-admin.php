@@ -38,7 +38,8 @@ class NeoWeaver_Achievements_Admin {
 			'🏆 Achievements',
 			'manage_options',
 			$this->page_slug,
-			[ $this, 'render_page' ]
+			[ $this, 'render_page' ],
+			11
 		);
 	}
 
