@@ -32,7 +32,7 @@ class NeoWeaver_Deck_Admin {
     public function register_menu(): void {
         add_submenu_page(
             $this->parent_slug,
-            'NeoWeaver — Deck Cards',
+            'NeoWeaver \u2014 Deck Cards',
             '\u{1F0CF} Deck Cards',
             'manage_options',
             $this->page_slug,
@@ -104,7 +104,7 @@ class NeoWeaver_Deck_Admin {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">↻ Refresh</button>
+                    <button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">&#8635; Refresh</button>
                     <button class="nw-btn nw-btn-primary" id="nw-add-btn">+ New Card</button>
                 </div>
             </div>
@@ -120,8 +120,19 @@ class NeoWeaver_Deck_Admin {
 
             <div class="nw-table-wrap">
                 <table class="nw-table">
+                    <colgroup>
+                        <col class="nw-col-img">
+                        <col class="nw-col-name">
+                        <col class="nw-col-category">
+                        <col class="nw-col-type">
+                        <col class="nw-col-tags">
+                        <col class="nw-col-rarity">
+                        <col class="nw-col-cost">
+                        <col class="nw-col-active">
+                        <col class="nw-col-actions">
+                    </colgroup>
                     <thead><tr>
-                        <th class="nw-col-img"></th>
+                        <th></th>
                         <th>Name</th>
                         <th>Category</th>
                         <th>Type</th>
