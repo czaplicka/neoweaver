@@ -84,12 +84,10 @@ class NeoWeaver_Classes_Admin {
             true
         );
 
-        $upload_dir = wp_get_upload_dir();
-
         wp_localize_script( 'nw-classes-script', 'NWClasses', [
             'ajaxurl'     => admin_url( 'admin-ajax.php' ),
             'nonce'       => wp_create_nonce( 'neoweaver_classes' ),
-            'uploads_url' => untrailingslashit( $upload_dir['baseurl'] ),
+            'uploads_url' => untrailingslashit( content_url( 'uploads' ) ),
         ] );
     }
 
