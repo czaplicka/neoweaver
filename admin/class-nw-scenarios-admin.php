@@ -41,23 +41,29 @@ class NeoWeaver_Scenarios_Admin {
 
 	// ── assets ────────────────────────────────────────────────────────────
 
-	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, 'nw-scenarios' ) ) return;
-		wp_enqueue_style(
-			'nw-scenarios-css',
-			plugin_dir_url( __FILE__ ) . '../assets/css/nw-admin-tables.css',
-			[], '1.0'
-		);
-		wp_enqueue_script(
-			'nw-scenarios-js',
-			plugin_dir_url( __FILE__ ) . '../assets/js/scenarios-admin.js',
-			[ 'jquery' ], '1.0', true
-		);
-		wp_localize_script( 'nw-scenarios-js', 'NWScenarios', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'nw_scenarios_nonce' ),
-		] );
-	}
+public function enqueue_assets( string $hook ): void {
+    if ( ! str_contains( $hook, 'nw-scenarios' ) ) return;
+
+    wp_enqueue_style(
+        'chakra-petch',
+        'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+        [], null
+    );
+    wp_enqueue_style(
+        'nw-scenarios-css',
+        plugin_dir_url( __FILE__ ) . '../assets/css/scenarios-admin.css',
+        [ 'chakra-petch' ], '1.0.0'
+    );
+    wp_enqueue_script(
+        'nw-scenarios-js',
+        plugin_dir_url( __FILE__ ) . '../assets/js/scenarios-admin.js',
+        [ 'jquery' ], '1.0.0', true
+    );
+    wp_localize_script( 'nw-scenarios-js', 'NWScenarios', [
+        'ajaxurl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( 'nw_scenarios_nonce' ),
+    ] );
+}
 
 	// ── page HTML ─────────────────────────────────────────────────────────
 
