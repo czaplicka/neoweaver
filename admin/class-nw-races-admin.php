@@ -36,13 +36,28 @@ class NeoWeaver_Races_Admin {
             'manage_options', $this->page_slug, [ $this, 'render_page' ] );
     }
 
-    public function enqueue_assets( string $hook ): void {
-        if ( ! str_contains( $hook, $this->page_slug ) ) return;
-        wp_enqueue_style( 'chakra-petch',
-            'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
-        wp_add_inline_style( 'chakra-petch', $this->get_css() );
-        wp_add_inline_script( 'jquery', $this->get_js() );
-    }
+public function enqueue_assets( string $hook ): void {
+    if ( ! str_contains( $hook, $this->page_slug ) ) return;
+
+    wp_enqueue_style(
+        'chakra-petch',
+        'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+        [], null
+    );
+    wp_enqueue_style(
+        'nw-races-admin',
+        plugin_dir_url( __FILE__ ) . '../assets/css/races-admin.css',
+        [ 'chakra-petch' ], '1.0.0'
+    );
+    wp_enqueue_script(
+        'nw-races-admin',
+        plugin_dir_url( __FILE__ ) . '../assets/js/races-admin.js',
+        [ 'jquery' ], '1.0.0', true
+    );
+    wp_localize_script( 'nw-races-admin', 'nwRaces', [
+        'nonce' => wp_create_nonce( 'nw_races_nonce' ),
+    ] );
+}
 
     public function render_page(): void { ?>
         <div class="wrap nw-panel" id="nw-races-panel">
