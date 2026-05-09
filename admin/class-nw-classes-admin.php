@@ -1,6 +1,6 @@
 <?php
 /**
- * NeoWeaver Admin Panel — Classes (cyberclasses)
+ * NeoWeaver Admin Panel — Classes (cyber_classes)
  * Schema: id, name, description, tags (jsonb), starting_gold, gm_instructions,
  *         ai_personality_modifier, mechanics, attribute_bonuses (jsonb),
  *         vulnerability, icon_slug, img_url, is_active, skill_limit, created_at
@@ -48,11 +48,46 @@ class NeoWeaver_Classes_Admin {
 
     public function enqueue_assets( string $hook ): void {
         if ( ! str_contains( $hook, $this->page_slug ) ) return;
-        wp_enqueue_style( 'chakra-petch',
-            'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
-        wp_add_inline_style( 'chakra-petch', $this->get_css() );
-        wp_add_inline_script( 'jquery', $this->get_js() );
-        
+
+        // Font — register once, enqueue if not already done
+        if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+            wp_enqueue_style(
+                'chakra-petch',
+                'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+                [],
+                null
+            );
+        }
+
+        // Shared admin core styles
+        wp_enqueue_style(
+            'nw-admin-core',
+            NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+            [ 'chakra-petch' ],
+            NEOWEAVER_VERSION
+        );
+
+        // Classes-specific styles
+        wp_enqueue_style(
+            'nw-classes-style',
+            NEOWEAVER_PLUGIN_URL . 'assets/css/classes-admin.css',
+            [ 'chakra-petch', 'nw-admin-core' ],
+            NEOWEAVER_VERSION
+        );
+
+        // Classes JS
+        wp_enqueue_script(
+            'nw-classes-script',
+            NEOWEAVER_PLUGIN_URL . 'assets/js/classes-admin.js',
+            [ 'jquery' ],
+            NEOWEAVER_VERSION,
+            true
+        );
+
+        wp_localize_script( 'nw-classes-script', 'NWClasses', [
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'neoweaver_classes' ),
+        ] );
     }
 
     /* ---------------------------------------------------------------- */
@@ -206,7 +241,6 @@ class NeoWeaver_Classes_Admin {
                 </div>
             </div>
 
-            <input type="hidden" id="nw-nonce" value="<?php echo esc_attr( wp_create_nonce( 'neoweaver_classes' ) ); ?>">
         </div>
     <?php }
 
