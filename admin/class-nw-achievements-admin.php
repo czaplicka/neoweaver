@@ -54,6 +54,20 @@ class NeoWeaver_Achievements_Admin {
 			null
 		);
 
+		wp_enqueue_style(
+			'nw-admin-core',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/nw-admin-core.css',
+			[ 'chakra-petch' ],
+			NEOWEAVER_VERSION
+		);
+
+		wp_enqueue_style(
+			'nw-achievements-style',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/achievements-admin.css',
+			[ 'chakra-petch', 'nw-admin-core' ],
+			NEOWEAVER_VERSION
+		);
+
 		wp_enqueue_script(
 			'lucide',
 			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
@@ -62,38 +76,22 @@ class NeoWeaver_Achievements_Admin {
 			true
 		);
 
-		wp_add_inline_style( 'chakra-petch', $this->get_css() );
-
-		wp_register_script( 'nw-achievements-admin', false, [ 'jquery', 'lucide' ], null, true );
-		wp_enqueue_script( 'nw-achievements-admin' );
+		wp_enqueue_script(
+			'nw-achievements-script',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/js/achievements-admin.js',
+			[ 'jquery', 'lucide' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
 		wp_localize_script(
-			'nw-achievements-admin',
+			'nw-achievements-script',
 			'NWAch',
 			[
 				'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'neoweaver_achievements' ),
 			]
 		);
-
-		wp_add_inline_script( 'nw-achievements-admin', $this->get_js() );
-	}
-
-	private function get_css(): string {
-		return "
-			.nw-panel { font-family: 'Chakra Petch', sans-serif; }
-			.nw-accent { color: #adff00; font-weight: 700; }
-		";
-	}
-
-	private function get_js(): string {
-		return "
-			jQuery(function($){
-				if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-					lucide.createIcons();
-				}
-			});
-		";
 	}
 
 	/* ---------------------------------------------------------------- */
