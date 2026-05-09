@@ -84,9 +84,12 @@ class NeoWeaver_Classes_Admin {
             true
         );
 
+        $upload_dir = wp_get_upload_dir();
+
         wp_localize_script( 'nw-classes-script', 'NWClasses', [
-            'ajaxurl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( 'neoweaver_classes' ),
+            'ajaxurl'     => admin_url( 'admin-ajax.php' ),
+            'nonce'       => wp_create_nonce( 'neoweaver_classes' ),
+            'uploads_url' => untrailingslashit( $upload_dir['baseurl'] ),
         ] );
     }
 
@@ -222,8 +225,8 @@ class NeoWeaver_Classes_Admin {
                             <div class="nw-form-grid">
 
                                 <div class="nw-field nw-field-full">
-                                    <label>Image URL</label>
-                                    <input type="url" id="nw-field-img_url" name="img_url" placeholder="https://…">
+                                    <label>Image filename or URL</label>
+                                    <input type="text" id="nw-field-img_url" name="img_url" placeholder="psychic.svg or https://…">
                                     <div id="nw-img-preview-wrap" style="display:none;margin-top:6px;">
                                         <img id="nw-img-preview" src="" alt="preview" style="max-height:80px;border-radius:4px;border:1px solid #2e2e2e;">
                                     </div>
@@ -315,7 +318,7 @@ class NeoWeaver_Classes_Admin {
             'mechanics'               => sanitize_textarea_field( $raw['mechanics']               ?? '' ) ?: null,
             'gm_instructions'         => sanitize_textarea_field( $raw['gm_instructions']         ?? '' ) ?: null,
             'ai_personality_modifier' => sanitize_textarea_field( $raw['ai_personality_modifier'] ?? '' ) ?: null,
-            'img_url'                 => esc_url_raw(             $raw['img_url']                 ?? '' ) ?: null,
+            'img_url'                 => sanitize_text_field(     $raw['img_url']                 ?? '' ) ?: null,
             'starting_gold'           => isset( $raw['starting_gold'] ) && $raw['starting_gold'] !== '' ? (int) $raw['starting_gold'] : 100,
             'skill_limit'             => isset( $raw['skill_limit']   ) && $raw['skill_limit']   !== '' ? (int) $raw['skill_limit']   : 3,
             'is_active'               => ( ( $raw['is_active'] ?? '1' ) === '1' ),

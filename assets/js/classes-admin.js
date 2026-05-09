@@ -4,6 +4,7 @@ jQuery(function ($) {
     var cfg          = window.NWClasses || {};
     var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     var nonce        = cfg.nonce  || '';
+    var uploadsUrl   = (cfg.uploads_url || '').replace(/\/+$/, '');
 
     /* ── DOM refs ─────────────────────────────────────────── */
     var $notice       = $('#nw-notice');
@@ -28,6 +29,18 @@ jQuery(function ($) {
     /* ── Helpers ──────────────────────────────────────────── */
     function esc(s) {
         return $('<span>').text(s || '').html();
+    }
+
+    /**
+     * Resolves img_url stored in Supabase to a full URL.
+     * - Already a full URL (http/https)? → return as-is.
+     * - Just a filename (e.g. "psychic.svg")? → prepend uploads_url.
+     */
+    function resolveImgUrl(raw) {
+        if (!raw) return '';
+        raw = raw.trim();
+        if (/^https?:\/\//i.test(raw)) return raw;
+        return uploadsUrl + '/' + raw;
     }
 
     function notice(msg, type) {
@@ -105,15 +118,16 @@ jQuery(function ($) {
         }
 
         $tbody.html(data.map(function (c) {
-            var safeId = esc(c.id);
-            var tags   = Array.isArray(c.tags) ? c.tags : [];
+            var safeId  = esc(c.id);
+            var tags    = Array.isArray(c.tags) ? c.tags : [];
+            var fullImg = resolveImgUrl(c.img_url);
 
             var tagsH = tags.slice(0, 3).map(function (t) {
                 return '<span class="nw-tag">' + esc(t) + '</span>';
             }).join('') + (tags.length > 3 ? '<span class="nw-tag">+' + (tags.length - 3) + '</span>' : '');
 
-            var imgH = c.img_url
-                ? '<img src="' + esc(c.img_url) + '" class="nw-class-img" loading="lazy" data-fallback="1" alt="">'
+            var imgH = fullImg
+                ? '<img src="' + esc(fullImg) + '" class="nw-class-img" loading="lazy" data-fallback="1" alt="">'
                 : '<div class="nw-class-img-placeholder">⚔️</div>';
 
             var activeH = c.is_active
@@ -219,9 +233,10 @@ jQuery(function ($) {
                 c.attribute_bonuses ? JSON.stringify(c.attribute_bonuses) : ''
             );
 
+            // img_url: store raw value from DB, show resolved preview
             if (c.img_url) {
                 $fieldImgUrl.val(c.img_url);
-                $imgPreview.attr('src', c.img_url);
+                $imgPreview.attr('src', resolveImgUrl(c.img_url));
                 $imgPreviewWrap.show();
             }
 
@@ -240,7 +255,7 @@ jQuery(function ($) {
     /* ── Events ───────────────────────────────────────────── */
     $fieldImgUrl.on('input', function () {
         var v = $(this).val().trim();
-        if (v) { $imgPreview.attr('src', v); $imgPreviewWrap.show(); }
+        if (v) { $imgPreview.attr('src', resolveImgUrl(v)); $imgPreviewWrap.show(); }
         else   { $imgPreviewWrap.hide(); }
     });
 
