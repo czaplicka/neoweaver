@@ -1,0 +1,95 @@
+/*
+ * NeoWeaver Admin — Seasons Config
+ * Extracted from class-nw-seasons-admin.php
+ */
+
+:root { --nw-accent:#adff00; --nw-bg:#0d0d0d; --nw-surface:#141414; --nw-border:#2a2a2a; --nw-text:#e0e0e0; --nw-muted:#888; }
+
+.nw-seasons-wrap { font-family:'Chakra Petch',sans-serif; color:var(--nw-text); background:var(--nw-bg); padding:20px; min-height:80vh; }
+
+/* Header */
+.nw-page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.nw-page-title  { font-size:1.4rem; font-weight:700; color:var(--nw-accent); margin:0; }
+
+/* Inputs */
+.nw-input { background:#1a1a1a; border:1px solid var(--nw-border); color:var(--nw-text); padding:6px 10px; border-radius:4px; font-family:inherit; font-size:0.82rem; }
+.nw-input:focus { outline:none; border-color:var(--nw-accent); }
+.nw-textarea { width:100%; resize:vertical; min-height:55px; }
+
+/* Buttons */
+.nw-btn { padding:7px 16px; border-radius:4px; font-family:inherit; font-size:0.82rem; font-weight:600; cursor:pointer; border:none; transition:background .15s,color .15s; }
+.nw-btn-primary { background:var(--nw-accent); color:#0d0d0d; }
+.nw-btn-primary:hover { background:#c8ff1a; }
+.nw-btn-ghost { background:transparent; border:1px solid var(--nw-border); color:var(--nw-text); }
+.nw-btn-ghost:hover { border-color:var(--nw-accent); color:var(--nw-accent); }
+.nw-btn-danger { background:#c0392b; color:#fff; }
+.nw-btn-danger:hover { background:#e74c3c; }
+.nw-btn-xs { padding:3px 10px; font-size:0.75rem; }
+
+/* Spinner */
+.nw-spinner { width:28px; height:28px; border:3px solid var(--nw-border); border-top-color:var(--nw-accent); border-radius:50%; animation:nw-spin .7s linear infinite; }
+@keyframes nw-spin { to { transform:rotate(360deg); } }
+
+/* Table */
+.nw-season-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.nw-season-table th { background:var(--nw-surface); color:var(--nw-muted); text-align:left; padding:8px 12px; border-bottom:1px solid var(--nw-border); font-weight:600; white-space:nowrap; }
+.nw-season-table td { padding:9px 12px; border-bottom:1px solid var(--nw-border); vertical-align:middle; }
+.nw-season-table tr:hover td { background:#1a1a1a; }
+.nw-tbl-actions { display:flex; gap:6px; }
+
+/* Mini weather bar in table */
+.nw-mini-bar { display:flex; height:8px; border-radius:4px; overflow:hidden; width:120px; }
+.nw-mini-seg { height:100%; transition:width .3s; }
+
+/* Modal */
+.nw-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.nw-season-modal-box { background:#141414; border:1px solid var(--nw-border); border-radius:8px; width:min(680px,95vw); max-height:92vh; overflow-y:auto; display:flex; flex-direction:column; }
+.nw-modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--nw-border); position:sticky; top:0; background:#141414; z-index:2; }
+.nw-modal-title { margin:0; font-size:1.05rem; color:var(--nw-accent); }
+.nw-modal-close { background:none; border:none; color:var(--nw-muted); font-size:1.5rem; cursor:pointer; padding:0 4px; line-height:1; }
+.nw-modal-close:hover { color:var(--nw-text); }
+
+/* Form */
+#nw-season-form { padding:20px; }
+.nw-form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+.nw-field { display:flex; flex-direction:column; gap:5px; }
+.nw-field-full { grid-column:1/-1; }
+.nw-label { font-size:0.78rem; color:var(--nw-muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+.nw-required { color:var(--nw-accent); }
+.nw-field-hint { font-weight:400; text-transform:none; letter-spacing:0; color:#555; }
+
+/* Weights */
+.nw-weights-section { background:#1a1a1a; border:1px solid var(--nw-border); border-radius:6px; padding:16px; margin-bottom:20px; }
+.nw-weights-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.nw-weights-note { font-size:0.75rem; color:var(--nw-muted); margin:0 0 14px; }
+.nw-weights-sum-badge { font-size:0.8rem; padding:3px 10px; border-radius:99px; background:#222; border:1px solid var(--nw-border); }
+.nw-weights-sum-badge.ok  strong { color:var(--nw-accent); }
+.nw-weights-sum-badge.bad strong { color:#ff6b6b; }
+.nw-weights-grid { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.nw-weight-row { display:grid; grid-template-columns:28px 70px 1fr 64px 40px; align-items:center; gap:8px; }
+.nw-weight-icon { font-size:1.1rem; text-align:center; }
+.nw-weight-label { font-size:0.78rem; color:var(--nw-muted); }
+.nw-weight-range { -webkit-appearance:none; appearance:none; height:4px; background:var(--nw-border); border-radius:2px; cursor:pointer; outline:none; }
+.nw-weight-range::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--nw-accent); cursor:pointer; }
+.nw-weight-num { width:64px; text-align:center; padding:4px 6px; }
+.nw-weight-pct { font-size:0.75rem; color:var(--nw-muted); text-align:right; }
+
+/* Visual bar */
+.nw-weather-bar { display:flex; height:12px; border-radius:6px; overflow:hidden; margin-top:8px; }
+.nw-bar-seg { height:100%; transition:width .25s ease; }
+.nw-bar-sun    { background:#ffd700; }
+.nw-bar-cloudy { background:#9e9e9e; }
+.nw-bar-rain   { background:#4fc3f7; }
+.nw-bar-fog    { background:#b0bec5; }
+.nw-bar-storm  { background:#7e57c2; }
+.nw-bar-snow   { background:#e0f7fa; }
+
+/* Footer */
+.nw-modal-footer { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding-top:16px; border-top:1px solid var(--nw-border); }
+.nw-save-error { color:#ff6b6b; font-size:0.8rem; flex:1; }
+
+/* Color swatch in table */
+.nw-color-dot { display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; margin-right:5px; border:1px solid rgba(255,255,255,.15); }
+
+/* Empty */
+.nw-empty { text-align:center; padding:60px 20px; color:var(--nw-muted); }
