@@ -1,6 +1,6 @@
 jQuery(function ($) {
 
-  /* ── Cached selectors (Optimisation #1) ─────────────────────────── */
+  /* ── Cached selectors ────────────────────────────────────────────── */
   var $statChars     = $("#nw-stat-characters");
   var $statWorlds    = $("#nw-stat-worlds");
   var $statCampaigns = $("#nw-stat-campaigns");
@@ -22,22 +22,28 @@ jQuery(function ($) {
   var $deckActive    = $("#nw-deck-active");
   var $deckInactive  = $("#nw-deck-inactive");
 
-  /* ── In-flight guard (Bug #7) ────────────────────────────────────── */
+  /* ── In-flight guard ────────────────────────────────────────────── */
   var activeXhr = null;
 
-  /* ── escapeHtml with single-regex lookup (Optimisation #3) ─────── */
-  var escapeMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+  /* ── escapeHtml — unicode escapes avoid any server-side HTML mangling */
+  var escapeMap = {
+    "\u0026": "\u0026amp;",
+    "\u003c": "\u0026lt;",
+    "\u003e": "\u0026gt;",
+    "\u0022": "\u0026quot;",
+    "\u0027": "\u0026#039;"
+  };
   function escapeHtml(str) {
     return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) { return escapeMap[c]; });
   }
 
-  /* ── Safe CSS colour validator (Bug #5) ─────────────────────────── */
+  /* ── Safe CSS colour validator ───────────────────────────────────── */
   var safeCssColorRe = /^#[0-9a-fA-F]{3,8}$|^[a-zA-Z]+$|^rgba?\(/;
   function safeCssColor(color, fallback) {
     return safeCssColorRe.test(String(color || "")) ? color : fallback;
   }
 
-  /* ── Safe CSS class-name fragment (Bug #4) ──────────────────────── */
+  /* ── Safe CSS class-name fragment ───────────────────────────────── */
   function safeCssKey(str) {
     return String(str || "").toLowerCase().replace(/[^a-z0-9-_]/g, "_");
   }
@@ -45,13 +51,10 @@ jQuery(function ($) {
   function drawSparkline(el, series, color) {
     var $el = $(el);
     if (!series || !series.length) { $el.html('<div class="nw-chart-empty">No data yet</div>'); return; }
-    var values = series.map(function (p) { return parseInt(p.value ?? 0, 10); }); // Bug #8: ?? instead of ||
-    // Optimisation #2: avoid Math.max.apply() stack-limit issue
+    var values = series.map(function (p) { return parseInt(p.value || 0, 10); });
     var max = values.reduce(function (a, b) { return a > b ? a : b; }, 0);
     if (max <= 0) { $el.html('<div class="nw-chart-empty">No growth yet</div>'); return; }
-    // Optimisation #5: all-zero early exit already covered by max <= 0 check above
 
-    // Bug #5: validate color before injecting into SVG
     var safeColor = safeCssColor(color, "#adff00");
 
     var W = 320, H = 120, pad = 10;
@@ -76,11 +79,10 @@ jQuery(function ($) {
     var $w = $(containerId);
     if (!data || !Object.keys(data).length) { $w.html('<div class="nw-empty-state">No data</div>'); return; }
     var keys = Object.keys(data);
-    var max = keys.reduce(function (m, k) { return data[k] > m ? data[k] : m; }, 0); // Optimisation #2
+    var max = keys.reduce(function (m, k) { return data[k] > m ? data[k] : m; }, 0);
     if (max <= 0) { $w.html('<div class="nw-empty-state">No cards yet</div>'); return; }
     var html = keys.map(function (k) {
       var pct = Math.round((data[k] / max) * 100);
-      // Bug #4: sanitise key before using as CSS class fragment
       var safeKey = safeCssKey(k);
       return '<div class="nw-deck-bar-row">'
         + '<div class="nw-deck-bar-meta"><span>' + escapeHtml(k) + '</span><span class="nw-deck-bar-count">' + data[k] + '</span></div>'
@@ -109,7 +111,6 @@ jQuery(function ($) {
       if (log.data !== null && typeof log.data !== "undefined" && String(log.data).length) {
         dataText = typeof log.data === "object" ? JSON.stringify(log.data) : String(log.data);
       }
-      // Bug #3: use \u2014 as fallback BEFORE escapeHtml so the entity isn't double-escaped
       var contextText = log.context ? escapeHtml(log.context) : "\u2014";
       return '<div class="nw-log-item">'
         + '<div class="nw-log-top"><span class="nw-log-level nw-log-level-' + escapeHtml(lvl) + '">' + escapeHtml(lvl) + '</span><span class="nw-log-date">' + escapeHtml(log.created_at || "") + '</span></div>'
@@ -120,7 +121,6 @@ jQuery(function ($) {
   }
 
   function loadDashboard() {
-    /* ── In-flight guard: abort previous request if still running (Bug #7) */
     if (activeXhr) { activeXhr.abort(); activeXhr = null; }
 
     $statChars.add($statWorlds).add($statCampaigns).add($statDeck).html('<div class="nw-spinner"></div>');
@@ -132,8 +132,6 @@ jQuery(function ($) {
     $deckCats.add($deckRars).html('<div class="nw-spinner" style="margin:20px auto;display:block;"></div>');
     $deckActive.add($deckInactive).text("\u2014");
 
-    // Bug #1: use NWDashData.nonce (localised variable), NOT the hidden input
-    // Bug #2: use NWDashData.ajaxurl instead of bare global ajaxurl
     activeXhr = $.post(
       NWDashData.ajaxurl,
       { action: "nw_dashboard_data", nonce: NWDashData.nonce },
@@ -147,7 +145,6 @@ jQuery(function ($) {
         }
         var d = res.data || {}, c = d.counts || {}, r = d.recent || {}, g = d.growth || {}, h = d.health || {}, deck = d.deck_breakdown || {};
 
-        // Optimisation #6: debug output gated behind NWDashData.debug flag
         if (d._debug && NWDashData.debug === "1") {
           console.group("[NeoWeaver] Dashboard debug");
           console.log("Key type:", d._debug.key_type);
@@ -169,8 +166,8 @@ jQuery(function ($) {
         $healthCWC.text(h.campaigns_without_character || 0);
 
         drawSparkline("#nw-chart-characters", g.characters, "#adff00");
-        drawSparkline("#nw-chart-worlds", g.worlds, "#00d4ff");
-        drawSparkline("#nw-chart-campaigns", g.campaigns, "#ffb703");
+        drawSparkline("#nw-chart-worlds",     g.worlds,     "#00d4ff");
+        drawSparkline("#nw-chart-campaigns",  g.campaigns,  "#ffb703");
         drawSparkline("#nw-chart-deck-cards", g.deck_cards, "#ff5c5c");
 
         if (deck.categories) { renderDeckBars("#nw-deck-categories", deck.categories, "nw-deck-cat-"); }
@@ -184,10 +181,9 @@ jQuery(function ($) {
         renderLogs(d.logs || []);
       }
     )
-    // Bug #6: .fail() handler — shows error when AJAX itself fails (network, PHP 500, etc.)
     .fail(function (xhr, status) {
       activeXhr = null;
-      if (status === "abort") return; // intentional abort from in-flight guard — silently ignore
+      if (status === "abort") return;
       $statChars.add($statWorlds).add($statCampaigns).add($statDeck).text("\u2014");
       renderAlerts([{ level: "error", label: "Network", text: "Dashboard request failed (" + status + "). Check your connection or server logs." }]);
       $logs.html('<div class="nw-empty-state">Could not load logs.</div>');
@@ -196,7 +192,6 @@ jQuery(function ($) {
 
   loadDashboard();
 
-  /* Optimisation #4: debounced refresh button — 2 s cooldown */
   var refreshTimeout = null;
   $("#nw-refresh-dashboard").on("click", function () {
     if (refreshTimeout) return;
