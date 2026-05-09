@@ -53,9 +53,16 @@ class NeoWeaver_Abilities_Admin {
         );
 
         wp_enqueue_style(
+            'nw-admin-core',
+            NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+            [ 'chakra-petch' ],
+            NEOWEAVER_VERSION
+        );
+
+        wp_enqueue_style(
             'nw-abilities-style',
             NEOWEAVER_PLUGIN_URL . 'assets/css/abilities-admin.css',
-            [ 'chakra-petch' ],
+            [ 'chakra-petch', 'nw-admin-core' ],
             NEOWEAVER_VERSION
         );
 
