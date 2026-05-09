@@ -312,11 +312,13 @@ class NeoWeaver_Status_Tags_Admin {
 	public function ajax_toggle(): void {
 		check_ajax_referer( 'neoweaver_st', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+				return;
 
 		// fix(B1): was (int)$_POST['tag_id'] — UUIDs collapse to 0
 		$id    = $this->sanitize_uuid( $_POST['tag_id'] ?? '' );
 		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
 		if ( ! $id ) wp_send_json_error( 'Missing ID' );
+				return;
 
 		// fix(B1): rawurlencode($id) — was bare $id (int 0)
 		$res = $this->supa( 'PATCH', 'cyber_status_tags?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
@@ -330,10 +332,12 @@ class NeoWeaver_Status_Tags_Admin {
 	public function ajax_delete(): void {
 		check_ajax_referer( 'neoweaver_st', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+				return;
 
 		// fix(B1): was (int)$_POST['tag_id'] — UUIDs collapse to 0
 		$id = $this->sanitize_uuid( $_POST['tag_id'] ?? '' );
 		if ( ! $id ) wp_send_json_error( 'Missing ID' );
+				return;
 
 		// fix(B1): rawurlencode($id) — was bare $id (int 0)
 		$res = $this->supa( 'DELETE', 'cyber_status_tags?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
