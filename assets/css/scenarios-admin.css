@@ -1,0 +1,155 @@
+/*
+ * NeoWeaver Admin — Scenarios panel
+ * Scoped styles for the cyber_scenarios admin screen.
+ * Supplements nw-admin-tables.css with scenarios-specific UI.
+ * Font: Chakra Petch | Accent: #adff00
+ */
+
+/* ── Toolbar ────────────────────────────────────────────────────── */
+.nw-toolbar{
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 16px;
+	flex-wrap: wrap;
+}
+.nw-toolbar select,
+.nw-toolbar input[type="text"]{
+	font-family: 'Chakra Petch', monospace;
+	font-size: 12px;
+	padding: 6px 12px;
+	background: #111;
+	border: 1px solid #2a2a2a;
+	border-radius: 5px;
+	color: #e0e0e0;
+	outline: none;
+	transition: border-color .15s;
+}
+.nw-toolbar select:focus,
+.nw-toolbar input[type="text"]:focus{
+	border-color: #adff00;
+}
+
+/* ── Action buttons (scoped variants) ───────────────────────────── */
+.nw-action-btn{
+	font-family: 'Chakra Petch', monospace;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 7px 16px;
+	border-radius: 5px;
+	border: 1px solid #adff00;
+	background: #adff00;
+	color: #0a0a0a;
+	cursor: pointer;
+	text-transform: uppercase;
+	letter-spacing: .5px;
+	transition: background .15s, border-color .15s;
+}
+.nw-action-btn:hover{ background: #c8ff40; border-color: #c8ff40; }
+.nw-action-btn--secondary{
+	background: transparent;
+	color: #adff00;
+	border-color: #2e2e2e;
+}
+.nw-action-btn--secondary:hover{ border-color: #adff00; background: transparent; }
+.nw-action-btn--danger{
+	background: transparent;
+	color: #ff4444;
+	border-color: #3a0000;
+}
+.nw-action-btn--danger:hover{ border-color: #ff4444; }
+.nw-action-btn--small{ font-size: 11px; padding: 4px 10px; }
+
+/* ── Modal wide ────────────────────────────────────────────────── */
+.nw-modal--wide{ max-width: 840px; }
+
+/* ── Tabs ──────────────────────────────────────────────────────── */
+.nw-tabs{
+	display: flex;
+	gap: 2px;
+	padding: 12px 24px 0;
+	border-bottom: 1px solid #1e1e1e;
+}
+.nw-tab{
+	font-family: 'Chakra Petch', monospace;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	padding: 7px 16px;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: #555;
+	cursor: pointer;
+	transition: color .15s, border-color .15s;
+	margin-bottom: -1px;
+}
+.nw-tab:hover{ color: #aaa; }
+.nw-tab.active{ color: #adff00; border-bottom-color: #adff00; }
+
+/* ── Tab panels ───────────────────────────────────────────────── */
+.nw-tab-panel{ padding: 20px 24px; }
+.nw-help-text{
+	font-size: 12px;
+	color: #555;
+	margin-bottom: 10px;
+	font-family: 'Chakra Petch', monospace;
+}
+
+/* ── Form grid ───────────────────────────────────────────────── */
+.nw-form-grid{
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+}
+.nw-form-grid label{
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	color: #666;
+	font-weight: 600;
+	font-family: 'Chakra Petch', monospace;
+}
+.nw-span-2{ grid-column: 1 / -1; }
+.nw-form-grid input[type="text"],
+.nw-form-grid input[type="url"],
+.nw-form-grid input[type="number"],
+.nw-form-grid select,
+.nw-form-grid textarea{
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 5px;
+	color: #e0e0e0;
+	padding: 8px 10px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+	transition: border-color .15s;
+	width: 100%;
+	box-sizing: border-box;
+}
+.nw-form-grid input:focus,
+.nw-form-grid select:focus,
+.nw-form-grid textarea:focus{
+	outline: none;
+	border-color: #adff00;
+	box-shadow: 0 0 0 2px rgba(173,255,0,.08);
+}
+.nw-form-grid textarea{ resize: vertical; }
+.nw-checkbox-label{
+	text-transform: none !important;
+	letter-spacing: 0 !important;
+	flex-direction: row !important;
+	align-items: center !important;
+	gap: 8px !important;
+	cursor: pointer;
+	color: #aaa !important;
+}
+.nw-checkbox-label input[type="checkbox"]{
+	width: 16px;
+	height: 16px;
+	accent-color: #adff00;
+	cursor: pointer;
+}
