@@ -83,6 +83,16 @@ class NeoWeaver_Scenarios_Admin {
 		];
 	}
 
+	/**
+	 * Sanitise a UUID string — strips every character that is not
+	 * a hex digit or hyphen.  Mirrors the fix in Status Tags (B1).
+	 *
+	 * fix(B1)
+	 */
+	private function sanitize_uuid( $raw ): string {
+		return preg_replace( '/[^a-f0-9\-]/i', '', sanitize_text_field( (string) $raw ) );
+	}
+
 	/** Generic GET → returns ['ok', 'status', 'body', 'error', 'count'] */
 	private function supa_get( $path, $prefer = '' ) {
 		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . ltrim( $path, '/' );
@@ -122,9 +132,12 @@ class NeoWeaver_Scenarios_Admin {
 		return [ 'ok' => ( $code >= 200 && $code < 300 ), 'status' => $code, 'body' => $body ];
 	}
 
-	/** Generic PATCH (update by id) */
+	/**
+	 * Generic PATCH (update by UUID id).
+	 * fix(B1): was (int) $id — UUIDs collapsed to 0.
+	 */
 	private function supa_patch( $table, $id, $payload ) {
-		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $table . '?id=eq.' . (int) $id;
+		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $table . '?id=eq.' . rawurlencode( $this->sanitize_uuid( $id ) );
 		$res = wp_remote_request( $url, [
 			'method'  => 'PATCH',
 			'timeout' => 15,
@@ -137,9 +150,12 @@ class NeoWeaver_Scenarios_Admin {
 		return [ 'ok' => ( $code >= 200 && $code < 300 ), 'status' => $code, 'body' => $body ];
 	}
 
-	/** Generic DELETE by id */
+	/**
+	 * Generic DELETE by UUID id.
+	 * fix(B1): was (int) $id — UUIDs collapsed to 0.
+	 */
 	private function supa_delete( $table, $id ) {
-		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $table . '?id=eq.' . (int) $id;
+		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $table . '?id=eq.' . rawurlencode( $this->sanitize_uuid( $id ) );
 		$res = wp_remote_request( $url, [
 			'method'  => 'DELETE',
 			'timeout' => 15,
@@ -194,27 +210,33 @@ class NeoWeaver_Scenarios_Admin {
 		] );
 	}
 
-	/** Get single scenario by id */
+	/**
+	 * Get single scenario by UUID id.
+	 * fix(B1): was (int) $_POST['id'] — collapsed to 0 for UUIDs.
+	 */
 	public function ajax_get() {
 		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
-		$id  = (int) ( $_POST['id'] ?? 0 );
+		$id = $this->sanitize_uuid( $_POST['id'] ?? '' ); // fix(B1)
 		if ( ! $id ) wp_send_json_error( 'Invalid ID' );
 
-		$res = $this->supa_get( $this->table . '?id=eq.' . $id . '&limit=1' );
+		$res = $this->supa_get( $this->table . '?id=eq.' . rawurlencode( $id ) . '&limit=1' );
 		if ( ! $res['ok'] || empty( $res['body'][0] ) ) {
 			wp_send_json_error( 'Not found' );
 		}
 		wp_send_json_success( $res['body'][0] );
 	}
 
-	/** Save (insert or update) */
+	/**
+	 * Save (insert or update).
+	 * fix(B1): was (int) $_POST['id'] and (int) required_archetype_id.
+	 */
 	public function ajax_save() {
 		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
-		$id = (int) ( $_POST['id'] ?? 0 );
+		$id = $this->sanitize_uuid( $_POST['id'] ?? '' ); // fix(B1)
 
 		/* --- validate required --- */
 		$name = sanitize_text_field( $_POST['name'] ?? '' );
@@ -268,7 +290,8 @@ class NeoWeaver_Scenarios_Admin {
 			'kingdom_tech'          => strlen( $_POST['kingdom_tech']   ?? '' ) ? (int) $_POST['kingdom_tech']   : null,
 			'kingdom_magic'         => strlen( $_POST['kingdom_magic']  ?? '' ) ? (int) $_POST['kingdom_magic']  : null,
 			'kingdom_wealth'        => strlen( $_POST['kingdom_wealth'] ?? '' ) ? (int) $_POST['kingdom_wealth'] : null,
-			'required_archetype_id' => strlen( $_POST['required_archetype_id'] ?? '' ) ? (int) $_POST['required_archetype_id'] : null,
+			// fix(B1): was (int) — required_archetype_id is a UUID, not an integer
+			'required_archetype_id' => $this->sanitize_uuid( $_POST['required_archetype_id'] ?? '' ) ?: null,
 			'giver_npc_tag'         => $giver_npc_tag,
 		];
 
@@ -281,15 +304,18 @@ class NeoWeaver_Scenarios_Admin {
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( 'Save failed (HTTP ' . $res['status'] . ')' );
 		}
-		wp_send_json_success( [ 'id' => $id ?: ( $res['body'][0]['id'] ?? 0 ) ] );
+		wp_send_json_success( [ 'id' => $id ?: ( $res['body'][0]['id'] ?? '' ) ] );
 	}
 
-	/** Delete */
+	/**
+	 * Delete by UUID id.
+	 * fix(B1): was (int) $_POST['id'] — collapsed to 0 for UUIDs.
+	 */
 	public function ajax_delete() {
 		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
-		$id = (int) ( $_POST['id'] ?? 0 );
+		$id = $this->sanitize_uuid( $_POST['id'] ?? '' ); // fix(B1)
 		if ( ! $id ) wp_send_json_error( 'Invalid ID' );
 
 		$res = $this->supa_delete( $this->table, $id );
@@ -297,13 +323,16 @@ class NeoWeaver_Scenarios_Admin {
 		wp_send_json_success();
 	}
 
-	/** Toggle is_active */
+	/**
+	 * Toggle is_active.
+	 * fix(B1): was (int) $_POST['id'] and (bool) cast.
+	 */
 	public function ajax_toggle() {
 		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
-		$id    = (int)  ( $_POST['id']    ?? 0 );
-		$value = (bool) ( $_POST['value'] ?? false );
+		$id    = $this->sanitize_uuid( $_POST['id'] ?? '' ); // fix(B1)
+		$value = filter_var( $_POST['value'] ?? false, FILTER_VALIDATE_BOOLEAN ); // fix(B1)
 		if ( ! $id ) wp_send_json_error( 'Invalid ID' );
 
 		$res = $this->supa_patch( $this->table, $id, [ 'is_active' => $value ] );
@@ -460,7 +489,7 @@ class NeoWeaver_Scenarios_Admin {
 							<!-- Tags (JSON array displayed as comma list) -->
 							<div class="nw-field nw-field-full">
 								<label class="nw-label" for="nw-scen-tags">Tags <span class="nw-field-hint">(comma-separated)</span></label>
-								<input class="nw-input" type="text" id="nw-scen-tags" placeholder='e.g. "combat","dark"'>
+								<input class="nw-input" type="text" id="nw-scen-tags" placeholder='"combat","dark"'>
 							</div>
 							<div class="nw-field">
 								<label class="nw-label" for="nw-scen-required-tags">Required Tags</label>
@@ -510,7 +539,7 @@ class NeoWeaver_Scenarios_Admin {
 							</div>
 							<div class="nw-field">
 								<label class="nw-label" for="nw-scen-archetype">Required Archetype ID</label>
-								<input class="nw-input" type="number" id="nw-scen-archetype" name="required_archetype_id">
+								<input class="nw-input" type="text" id="nw-scen-archetype" name="required_archetype_id" placeholder="UUID or leave blank">
 							</div>
 
 							<!-- Giver NPC tag -->
