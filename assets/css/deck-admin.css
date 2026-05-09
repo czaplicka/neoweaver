@@ -25,12 +25,11 @@
 .nw-table tbody tr{border-bottom:1px solid #1e1e1e;transition:background .12s}
 .nw-table tbody tr:last-child{border-bottom:none}.nw-table tbody tr:hover{background:#161616}
 .nw-table td{padding:10px 14px;vertical-align:middle;overflow:hidden}
-/* column widths */
+/* column widths — nw-col-tags has no explicit width so it fills remaining space */
 col.nw-col-img     {width:56px}
 col.nw-col-name    {width:18%}
 col.nw-col-category{width:110px}
 col.nw-col-type    {width:110px}
-col.nw-col-tags    {width:auto}
 col.nw-col-rarity  {width:120px}
 col.nw-col-cost    {width:130px}
 col.nw-col-active  {width:70px}
@@ -54,10 +53,10 @@ col.nw-col-actions {width:90px}
 .nw-toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:#555;border-radius:50%;transition:.2s}
 .nw-toggle input:checked+.nw-toggle-slider{background:#1a3300;border-color:#adff00}
 .nw-toggle input:checked+.nw-toggle-slider::before{transform:translateX(16px);background:#adff00}
-.nw-toggle input:checked+.nw-toggle-blue{background:#00263a;border-color:#00d4ff}
-.nw-toggle input:checked+.nw-toggle-blue::before{background:#00d4ff}
-.nw-toggle input:checked+.nw-toggle-orange{background:#2a1500;border-color:#ff6b35}
-.nw-toggle input:checked+.nw-toggle-orange::before{background:#ff6b35}
+.nw-toggle input:checked+.nw-toggle-slider.nw-toggle-blue{background:#00263a;border-color:#00d4ff}
+.nw-toggle input:checked+.nw-toggle-slider.nw-toggle-blue::before{background:#00d4ff}
+.nw-toggle input:checked+.nw-toggle-slider.nw-toggle-orange{background:#2a1500;border-color:#ff6b35}
+.nw-toggle input:checked+.nw-toggle-slider.nw-toggle-orange::before{background:#ff6b35}
 .nw-action-btn{font-family:'Chakra Petch',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid #2e2e2e;background:transparent;color:#aaa;cursor:pointer;transition:all .12s;text-transform:uppercase;white-space:nowrap}
 .nw-action-btn:hover{border-color:#adff00;color:#adff00}
 .nw-loading-row td{text-align:center;padding:30px;color:#555}
