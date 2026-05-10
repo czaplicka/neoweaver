@@ -30,7 +30,7 @@ class NW_Classes_Admin {
 		add_submenu_page(
 			'neoweaver',
 			'Classes',
-			'Classes',
+			'🧬Classes',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
