@@ -12,7 +12,11 @@
  * CSS: admin/css/seasons-admin.css
  * JS:  admin/js/seasons-admin.js
  */
-if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class NeoWeaver_Seasons_Admin {
 
 	private $slug      = 'neoweaver';
@@ -42,7 +46,7 @@ class NeoWeaver_Seasons_Admin {
 	/*  MENU                                                             */
 	/* ================================================================ */
 
-	public function register_submenu() {
+	public function register_submenu(): void {
 		add_submenu_page(
 			$this->slug,
 			'Seasons Config',
@@ -57,11 +61,19 @@ class NeoWeaver_Seasons_Admin {
 	/*  ASSETS                                                           */
 	/* ================================================================ */
 
-	public function enqueue_assets( $hook ) {
-		if ( strpos( $hook, $this->page_slug ) === false ) return;
+	public function enqueue_assets( $hook ): void {
+		if ( strpos( $hook, $this->page_slug ) === false ) {
+			return;
+		}
 
-		$base = plugin_dir_url( dirname( __FILE__ ) ) . 'admin/';
-		$ver  = '1.0.0';
+		// Prefer global plugin URL constant if available; fall back to calculated path.
+		if ( defined( 'NEOWEAVER_PLUGIN_URL' ) ) {
+			$base = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'admin/';
+		} else {
+			$base = plugin_dir_url( dirname( __FILE__ ) ) . 'admin/';
+		}
+
+		$ver = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
 
 		wp_enqueue_style(
 			'chakra-petch',
@@ -82,14 +94,18 @@ class NeoWeaver_Seasons_Admin {
 			$base . 'js/seasons-admin.js',
 			[ 'jquery' ],
 			$ver,
-			true // load in footer
+			true
 		);
 
-		wp_localize_script( 'nw-seasons-admin', 'nwSeasonsData', [
-			'nonce'   => wp_create_nonce( 'nw_seasons_nonce' ),
-			'ajax'    => admin_url( 'admin-ajax.php' ),
-			'weights' => $this->weights,
-		] );
+		wp_localize_script(
+			'nw-seasons-admin',
+			'nwSeasonsData',
+			[
+				'nonce'   => wp_create_nonce( 'nw_seasons_nonce' ),
+				'ajax'    => admin_url( 'admin-ajax.php' ),
+				'weights' => $this->weights,
+			]
+		);
 	}
 
 	/* ================================================================ */
@@ -99,6 +115,7 @@ class NeoWeaver_Seasons_Admin {
 	private function supa_url() {
 		return function_exists( 'tw_supabase_url' ) ? trim( (string) tw_supabase_url() ) : '';
 	}
+
 	private function supa_key() {
 		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
 			return trim( (string) tw_supabase_service_key() );
@@ -108,73 +125,152 @@ class NeoWeaver_Seasons_Admin {
 		}
 		return '';
 	}
-	private function headers() {
+
+	private function headers(): array {
+		$key = $this->supa_key();
+
 		return [
-			'apikey'        => $this->supa_key(),
-			'Authorization' => 'Bearer ' . $this->supa_key(),
+			'apikey'        => $key,
+			'Authorization' => 'Bearer ' . $key,
 			'Content-Type'  => 'application/json',
 			'Accept'        => 'application/json',
 		];
 	}
 
-	private function supa_get( $path, $prefer = '' ) {
-		$url  = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . ltrim( $path, '/' );
-		$hdrs = $this->headers();
-		if ( $prefer ) $hdrs['Prefer'] = $prefer;
-		$res  = wp_remote_get( $url, [ 'timeout' => 15, 'headers' => $hdrs ] );
-		if ( is_wp_error( $res ) ) {
-			return [ 'ok' => false, 'body' => null, 'error' => $res->get_error_message() ];
+	private function supa_get( $path, $prefer = '' ): array {
+		$url_base = $this->supa_url();
+		if ( ! $url_base ) {
+			return [ 'ok' => false, 'body' => null, 'error' => 'Supabase URL not configured.' ];
 		}
+
+		$url  = rtrim( $url_base, '/' ) . '/rest/v1/' . ltrim( $path, '/' );
+		$hdrs = $this->headers();
+		if ( $prefer ) {
+			$hdrs['Prefer'] = $prefer;
+		}
+
+		$res = wp_remote_get(
+			$url,
+			[
+				'timeout' => 15,
+				'headers' => $hdrs,
+			]
+		);
+
+		if ( is_wp_error( $res ) ) {
+			return [
+				'ok'   => false,
+				'body' => null,
+				'error'=> $res->get_error_message(),
+			];
+		}
+
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+
 		return [
-			'ok'    => ( $code >= 200 && $code < 300 ),
-			'status'=> $code,
-			'body'  => $body,
-			'error' => ( $code < 200 || $code >= 300 ) ? substr( wp_remote_retrieve_body( $res ), 0, 400 ) : null,
+			'ok'     => ( $code >= 200 && $code < 300 ),
+			'status' => $code,
+			'body'   => $body,
+			'error'  => ( $code < 200 || $code >= 300 )
+				? substr( wp_remote_retrieve_body( $res ), 0, 400 )
+				: null,
 		];
 	}
 
-	private function supa_post( $path, $payload ) {
-		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . ltrim( $path, '/' );
-		$res = wp_remote_post( $url, [
-			'timeout' => 15,
-			'headers' => array_merge( $this->headers(), [ 'Prefer' => 'return=representation' ] ),
-			'body'    => wp_json_encode( $payload ),
-		] );
-		if ( is_wp_error( $res ) ) return [ 'ok' => false, 'error' => $res->get_error_message() ];
+	private function supa_post( $path, $payload ): array {
+		$url_base = $this->supa_url();
+		if ( ! $url_base ) {
+			return [ 'ok' => false, 'error' => 'Supabase URL not configured.' ];
+		}
+
+		$url = rtrim( $url_base, '/' ) . '/rest/v1/' . ltrim( $path, '/' );
+
+		$res = wp_remote_post(
+			$url,
+			[
+				'timeout' => 15,
+				'headers' => array_merge( $this->headers(), [ 'Prefer' => 'return=representation' ] ),
+				'body'    => wp_json_encode( $payload ),
+			]
+		);
+
+		if ( is_wp_error( $res ) ) {
+			return [ 'ok' => false, 'error' => $res->get_error_message() ];
+		}
+
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		$body = json_decode( wp_remote_retrieve_body( $res ), true );
-		return [ 'ok' => ( $code >= 200 && $code < 300 ), 'status' => $code, 'body' => $body ];
+
+		return [
+			'ok'     => ( $code >= 200 && $code < 300 ),
+			'status' => $code,
+			'body'   => $body,
+		];
 	}
 
 	/** PATCH by primary key (season_name is text PK) */
-	private function supa_patch( $season_name, $payload ) {
-		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $this->table
+	private function supa_patch( $season_name, $payload ): array {
+		$url_base = $this->supa_url();
+		if ( ! $url_base ) {
+			return [ 'ok' => false, 'error' => 'Supabase URL not configured.' ];
+		}
+
+		$url = rtrim( $url_base, '/' ) . '/rest/v1/' . $this->table
 			. '?season_name=eq.' . rawurlencode( $season_name );
-		$res = wp_remote_request( $url, [
-			'method'  => 'PATCH',
-			'timeout' => 15,
-			'headers' => array_merge( $this->headers(), [ 'Prefer' => 'return=representation' ] ),
-			'body'    => wp_json_encode( $payload ),
-		] );
-		if ( is_wp_error( $res ) ) return [ 'ok' => false, 'error' => $res->get_error_message() ];
+
+		$res = wp_remote_request(
+			$url,
+			[
+				'method'  => 'PATCH',
+				'timeout' => 15,
+				'headers' => array_merge( $this->headers(), [ 'Prefer' => 'return=representation' ] ),
+				'body'    => wp_json_encode( $payload ),
+			]
+		);
+
+		if ( is_wp_error( $res ) ) {
+			return [ 'ok' => false, 'error' => $res->get_error_message() ];
+		}
+
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		$body = json_decode( wp_remote_retrieve_body( $res ), true );
-		return [ 'ok' => ( $code >= 200 && $code < 300 ), 'status' => $code, 'body' => $body ];
+
+		return [
+			'ok'     => ( $code >= 200 && $code < 300 ),
+			'status' => $code,
+			'body'   => $body,
+		];
 	}
 
-	private function supa_delete( $season_name ) {
-		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $this->table
+	private function supa_delete( $season_name ): array {
+		$url_base = $this->supa_url();
+		if ( ! $url_base ) {
+			return [ 'ok' => false, 'error' => 'Supabase URL not configured.' ];
+		}
+
+		$url = rtrim( $url_base, '/' ) . '/rest/v1/' . $this->table
 			. '?season_name=eq.' . rawurlencode( $season_name );
-		$res = wp_remote_request( $url, [
-			'method'  => 'DELETE',
-			'timeout' => 15,
-			'headers' => $this->headers(),
-		] );
-		if ( is_wp_error( $res ) ) return [ 'ok' => false, 'error' => $res->get_error_message() ];
+
+		$res = wp_remote_request(
+			$url,
+			[
+				'method'  => 'DELETE',
+				'timeout' => 15,
+				'headers' => $this->headers(),
+			]
+		);
+
+		if ( is_wp_error( $res ) ) {
+			return [ 'ok' => false, 'error' => $res->get_error_message() ];
+		}
+
 		$code = (int) wp_remote_retrieve_response_code( $res );
-		return [ 'ok' => ( $code >= 200 && $code < 300 ), 'status' => $code ];
+
+		return [
+			'ok'     => ( $code >= 200 && $code < 300 ),
+			'status' => $code,
+		];
 	}
 
 	/* ================================================================ */
@@ -182,14 +278,17 @@ class NeoWeaver_Seasons_Admin {
 	/* ================================================================ */
 
 	/** Returns error string or empty string if valid */
-	private function validate_weights( $data ) {
+	private function validate_weights( $data ): string {
 		$sum = 0;
+
 		foreach ( array_keys( $this->weights ) as $key ) {
 			$sum += isset( $data[ $key ] ) ? (int) $data[ $key ] : 0;
 		}
+
 		if ( $sum !== 100 ) {
 			return 'Weather weights must sum to exactly 100 (current sum: ' . $sum . ').';
 		}
+
 		return '';
 	}
 
@@ -197,47 +296,50 @@ class NeoWeaver_Seasons_Admin {
 	/*  AJAX                                                             */
 	/* ================================================================ */
 
-	public function ajax_list() {
+	public function ajax_list(): void {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
-			return;
 		}
 
 		$res = $this->supa_get( $this->table . '?select=*&order=sort_order.asc,season_name.asc' );
+
 		if ( ! $res['ok'] ) {
-			wp_send_json_error( 'Supabase error: ' . $res['error'] );
-			return;
+			wp_send_json_error( 'Supabase error: ' . ( $res['error'] ?? 'Unknown error' ) );
 		}
+
 		wp_send_json_success( is_array( $res['body'] ) ? $res['body'] : [] );
 	}
 
-	public function ajax_get() {
+	public function ajax_get(): void {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
-			return;
 		}
 
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
 		if ( ! $name ) {
 			wp_send_json_error( 'Invalid name.' );
-			return;
 		}
 
-		$res = $this->supa_get( $this->table . '?season_name=eq.' . rawurlencode( $name ) . '&limit=1' );
+		$res = $this->supa_get(
+			$this->table . '?season_name=eq.' . rawurlencode( $name ) . '&limit=1'
+		);
+
 		if ( ! $res['ok'] || empty( $res['body'][0] ) ) {
 			wp_send_json_error( 'Not found.' );
-			return;
 		}
+
 		wp_send_json_success( $res['body'][0] );
 	}
 
-	public function ajax_save() {
+	public function ajax_save(): void {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
-			return;
 		}
 
 		$is_edit     = ! empty( $_POST['is_edit'] );
@@ -246,7 +348,6 @@ class NeoWeaver_Seasons_Admin {
 
 		if ( ! $season_name ) {
 			wp_send_json_error( 'Season name is required.' );
-			return;
 		}
 
 		$weights = [];
@@ -257,30 +358,35 @@ class NeoWeaver_Seasons_Admin {
 		$weight_err = $this->validate_weights( $weights );
 		if ( $weight_err ) {
 			wp_send_json_error( $weight_err );
-			return;
 		}
 
 		$temp_mod = (float) ( $_POST['temp_modifier'] ?? 1.0 );
 		if ( $temp_mod <= 0 ) {
 			wp_send_json_error( 'temp_modifier must be > 0.' );
-			return;
 		}
 
-		$payload = array_merge( [
-			'season_name'    => $season_name,
-			'description'    => sanitize_textarea_field( $_POST['description'] ?? '' ) ?: null,
-			'temp_modifier'  => $temp_mod,
-			'color'          => sanitize_text_field( $_POST['color']      ?? '' ) ?: null,
-			'icon'           => sanitize_text_field( $_POST['icon']       ?? '' ) ?: null,
-			'sort_order'     => strlen( $_POST['sort_order'] ?? '' ) ? (int) $_POST['sort_order'] : 0,
-		], $weights );
+		$payload = array_merge(
+			[
+				'season_name'   => $season_name,
+				'description'   => sanitize_textarea_field( $_POST['description'] ?? '' ) ?: null,
+				'temp_modifier' => $temp_mod,
+				'color'         => sanitize_text_field( $_POST['color'] ?? '' ) ?: null,
+				'icon'          => sanitize_text_field( $_POST['icon']  ?? '' ) ?: null,
+				'sort_order'    => strlen( $_POST['sort_order'] ?? '' )
+					? (int) $_POST['sort_order']
+					: 0,
+			],
+			$weights
+		);
 
 		if ( $is_edit && $orig_name ) {
 			if ( $orig_name !== $season_name ) {
+				// Rename: delete old record, then insert new one.
 				$del = $this->supa_delete( $orig_name );
 				if ( ! $del['ok'] ) {
-					wp_send_json_error( 'Could not rename: delete old record failed (HTTP ' . $del['status'] . ').' );
-					return;
+					wp_send_json_error(
+						'Could not rename: delete old record failed (HTTP ' . ( $del['status'] ?? 0 ) . ').'
+					);
 				}
 				$res = $this->supa_post( $this->table, $payload );
 			} else {
@@ -291,30 +397,34 @@ class NeoWeaver_Seasons_Admin {
 		}
 
 		if ( ! $res['ok'] ) {
-			wp_send_json_error( 'Save failed (HTTP ' . $res['status'] . ').' );
-			return;
+			wp_send_json_error(
+				'Save failed (HTTP ' . ( $res['status'] ?? 0 ) . ').'
+			);
 		}
+
 		wp_send_json_success( [ 'season_name' => $season_name ] );
 	}
 
-	public function ajax_delete() {
+	public function ajax_delete(): void {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
-			return;
 		}
 
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
 		if ( ! $name ) {
 			wp_send_json_error( 'Invalid name.' );
-			return;
 		}
 
 		$res = $this->supa_delete( $name );
+
 		if ( ! $res['ok'] ) {
-			wp_send_json_error( 'Delete failed (HTTP ' . $res['status'] . ').' );
-			return;
+			wp_send_json_error(
+				'Delete failed (HTTP ' . ( $res['status'] ?? 0 ) . ').'
+			);
 		}
+
 		wp_send_json_success();
 	}
 
@@ -322,7 +432,7 @@ class NeoWeaver_Seasons_Admin {
 	/*  RENDER                                                           */
 	/* ================================================================ */
 
-	public function render_page() {
+	public function render_page(): void {
 		?>
 		<div class="wrap nw-seasons-wrap">
 
@@ -434,16 +544,16 @@ class NeoWeaver_Seasons_Admin {
 								foreach ( $this->weights as $key => $label ) : ?>
 								<div class="nw-weight-row">
 									<span class="nw-weight-icon"><?php echo $icon_map[ $key ]; ?></span>
-									<label class="nw-weight-label" for="nw-<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label>
-									<input type="range" class="nw-weight-range" id="nw-<?php echo esc_attr($key); ?>-range"
-										data-target="nw-<?php echo esc_attr($key); ?>"
-										min="0" max="100" value="<?php echo $default_map[$key]; ?>">
+									<label class="nw-weight-label" for="nw-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label>
+									<input type="range" class="nw-weight-range" id="nw-<?php echo esc_attr( $key ); ?>-range"
+										data-target="nw-<?php echo esc_attr( $key ); ?>"
+										min="0" max="100" value="<?php echo (int) $default_map[ $key ]; ?>">
 									<input class="nw-input nw-weight-num" type="number"
-										id="nw-<?php echo esc_attr($key); ?>"
-										name="<?php echo esc_attr($key); ?>"
+										id="nw-<?php echo esc_attr( $key ); ?>"
+										name="<?php echo esc_attr( $key ); ?>"
 										min="0" max="100"
-										value="<?php echo $default_map[$key]; ?>">
-									<span class="nw-weight-pct" id="nw-<?php echo esc_attr($key); ?>-pct"><?php echo $default_map[$key]; ?>%</span>
+										value="<?php echo (int) $default_map[ $key ]; ?>">
+									<span class="nw-weight-pct" id="nw-<?php echo esc_attr( $key ); ?>-pct"><?php echo (int) $default_map[ $key ]; ?>%</span>
 								</div>
 								<?php endforeach; ?>
 							</div>
@@ -472,3 +582,15 @@ class NeoWeaver_Seasons_Admin {
 		<?php
 	}
 }
+
+/**
+ * Instantiate the Seasons admin so menus and AJAX handlers are registered.
+ * Use plugins_loaded to ensure supporting code is available.
+ */
+add_action(
+	'plugins_loaded',
+	static function () {
+		new NeoWeaver_Seasons_Admin();
+	},
+	20
+);
