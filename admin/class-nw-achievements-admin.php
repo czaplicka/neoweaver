@@ -48,12 +48,14 @@ class NeoWeaver_Achievements_Admin {
 			return;
 		}
 
-		wp_enqueue_style(
-			'chakra-petch',
-			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-			[],
-			null
-		);
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'chakra-petch',
+				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+				[],
+				null
+			);
+		}
 
 		wp_enqueue_style(
 			'nw-admin-core',
@@ -94,8 +96,7 @@ class NeoWeaver_Achievements_Admin {
 			]
 		);
 	}
-
-	/* ---------------------------------------------------------------- */
+/* ---------------------------------------------------------------- */
 	/*  SUPABASE                                                         */
 	/*                                                                   */
 	/*  Zawsze zwraca: [ 'ok' => bool, 'code' => int, 'data' => mixed,  */

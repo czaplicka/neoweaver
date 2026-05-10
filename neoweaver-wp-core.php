@@ -15,12 +15,14 @@ define( 'NEOWEAVER_VERSION', '0.7.1' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR);
 
 final class NeoWeaver_Core {
 
 	public static function init() {
 		self::load_files();
 
+		add_action( 'plugins_loaded', [ __CLASS__, 'load_admin_files' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
@@ -31,6 +33,8 @@ final class NeoWeaver_Core {
 	}
 
 	private static function load_files() {
+		require_once NW_PLUGIN_DIR . 'includes/trait-nw-transient-cache.php';
+
 		$files = [
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
@@ -101,16 +105,26 @@ final class NeoWeaver_Core {
 				require_once $path;
 			}
 		}
+	}
 
-		if ( is_admin() ) {
-			$admin_main = NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-admin.php';
-			if ( file_exists( $admin_main ) ) {
-				require_once $admin_main;
-			}
-			foreach ( glob( NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-*.php' ) ?: [] as $file ) {
-				if ( basename( $file ) !== 'class-nw-admin.php' ) {
-					require_once $file;
-				}
+	/**
+	 * Load admin class files on plugins_loaded so that helpers like
+	 * tw_supabase_url() are guaranteed to exist before any admin class
+	 * constructor runs (fixes B8).
+	 */
+	public static function load_admin_files(): void {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		$admin_main = NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-admin.php';
+		if ( file_exists( $admin_main ) ) {
+			require_once $admin_main;
+		}
+
+		foreach ( glob( NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-*.php' ) ?: [] as $file ) {
+			if ( basename( $file ) !== 'class-nw-admin.php' ) {
+				require_once $file;
 			}
 		}
 	}

@@ -204,7 +204,7 @@ public function enqueue_assets( string $hook ): void {
 
 		$difficulty = sanitize_text_field( $_POST['filter_difficulty'] ?? '' );
 		$qs = $this->table . '?order=sort_order.asc,title.asc&select=*';
-		if ( $difficulty ) $qs .= '&difficulty=eq.' . rawrawurlencode( $difficulty );
+		if ( $difficulty ) $qs .= '&difficulty=eq.' . rawurlencode( $difficulty );
 
 		$rows = $this->supa( 'GET', $qs );
 
@@ -225,7 +225,7 @@ public function enqueue_assets( string $hook ): void {
 		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawrawurlencode( $id ) . '&select=*' );
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*' );
 
 		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
 
@@ -270,7 +270,7 @@ public function enqueue_assets( string $hook ): void {
 		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
 
 		if ( $id ) {
-			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawrawurlencode( $id ), $payload,
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload,
 				[ 'Prefer' => 'return=representation' ] );
 		} else {
 			$res = $this->supa( 'POST', $this->table, $payload,
@@ -298,7 +298,7 @@ public function enqueue_assets( string $hook ): void {
 		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
+		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
 		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
 	}
 
@@ -311,7 +311,7 @@ public function enqueue_assets( string $hook ): void {
 		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
 		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
 	}
 }

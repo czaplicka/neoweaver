@@ -1,40 +1,28 @@
 <?php
-/**
- * NeoWeaver Admin Panel — Abilities (cyber_abilities)
- */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-class NeoWeaver_Abilities_Admin {
+class NW_Abilities_Admin {
 
-	private string $page_slug   = 'neoweaver-abilities';
-	private string $parent_slug = 'neoweaver';
-
-	private const ABILITY_TYPES = [ 'active', 'passive', 'triggered', 'ultimate' ];
-	private const COST_TYPES    = [ 'mp', 'hp', 'stamina', 'free', 'charge' ];
-	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'ally', 'all' ];
+	private string $page_slug = 'nw-abilities';
 
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_abilities_save',    [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_abilities_toggle',  [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_abilities_delete',  [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_get_abilities',    [ $this, 'ajax_get_abilities' ] );
+		add_action( 'wp_ajax_nw_save_ability',     [ $this, 'ajax_save_ability' ] );
+		add_action( 'wp_ajax_nw_delete_ability',   [ $this, 'ajax_delete_ability' ] );
+		add_action( 'wp_ajax_nw_reorder_abilities',[ $this, 'ajax_reorder_abilities' ] );
 	}
 
 	public function register_menu(): void {
 		add_submenu_page(
-			$this->parent_slug,
+			'neoweaver',
 			'NeoWeaver — Abilities',
 			'⚡ Abilities',
 			'manage_options',
 			$this->page_slug,
-			[ $this, 'render_page' ],
-			10
+			[ $this, 'render_page' ]
 		);
 	}
 
@@ -43,12 +31,14 @@ class NeoWeaver_Abilities_Admin {
 			return;
 		}
 
-		wp_enqueue_style(
-			'chakra-petch',
-			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-			[],
-			null
-		);
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'chakra-petch',
+				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+				[],
+				null
+			);
+		}
 
 		wp_enqueue_style(
 			'nw-admin-core',
@@ -80,196 +70,103 @@ class NeoWeaver_Abilities_Admin {
 			true
 		);
 
-		wp_localize_script(
-			'nw-abilities-script',
-			'NWAbl',
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
-			]
-		);
+		wp_localize_script( 'nw-abilities-script', 'NWAbilities', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+		] );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  SUPABASE                                                         */
-	/* ---------------------------------------------------------------- */
+	// ── AJAX ──────────────────────────────────────────────────────────────
 
-	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
-		$method = strtoupper( $method );
-
-		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
-			$parts = explode( '?', $endpoint, 2 );
-			$table = $parts[0];
-			$qs    = $parts[1] ?? '';
-			$query = [];
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-			$data = tw_supabase_get( $table, $query );
-			if ( ! is_array( $data ) ) {
-				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
-			}
-			if ( isset( $data['code'], $data['message'] ) ) {
-				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
-			}
-			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
-		}
-
-		if ( function_exists( 'tw_supabase_request' ) ) {
-			$parts      = explode( '?', $endpoint, 2 );
-			$table      = $parts[0];
-			$qs         = $parts[1] ?? '';
-			$query      = [];
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-			$extra_args = [];
-			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
-				$extra_args['headers']['Prefer'] = 'return=representation';
-			}
-			if ( 'DELETE' === $method ) {
-				$extra_args['headers']['Prefer'] = '';
-			}
-			if ( ! empty( $extra_headers ) ) {
-				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
-			}
-			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
-			$ok   = $res['ok']   ?? false;
-			$code = $res['code'] ?? 0;
-			$data = $res['data'] ?? null;
-			if ( ! $ok ) {
-				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
-				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
-			}
-			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
-		}
-
-		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
-	}
-
-	/* ---------------------------------------------------------------- */
-	/*  AJAX                                                             */
-	/* ---------------------------------------------------------------- */
-
-	public function ajax_get_all(): void {
+	public function ajax_get_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
 
-		$raw_type = sanitize_text_field( $_POST['filter_type'] ?? '' );
-		$type     = in_array( $raw_type, self::ABILITY_TYPES, true ) ? $raw_type : '';
+		global $wpdb;
+		$table = $wpdb->prefix . 'cyber_abilities';
 
-		$qs = 'cyber_abilities?select=id,title,description,ability_type,cost_type,cost_value,target_type,range_tiles,duration_turns,is_passive,is_active,tags&order=ability_type.asc,title.asc&limit=1000';
-		if ( $type ) {
-			$qs .= '&ability_type=eq.' . rawrawurlencode( $type );
-		}
-
-		$res = $this->supa( 'GET', $qs );
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Unknown error' );
-			return;
-		}
-		wp_send_json_success( $res['data'] ?? [] );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY sort_order ASC, id ASC" );
+		wp_send_json_success( $rows );
 	}
 
-	public function ajax_save(): void {
+	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'cyber_abilities';
+
+		$id          = isset( $_POST['id'] ) ? intval( $_POST['id'] ) : 0;
+		$name        = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$description = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$type        = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'active' ) );
+		$cost        = intval( $_POST['cost'] ?? 0 );
+		$tags        = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
+		$effect_json = wp_unslash( $_POST['effect_json'] ?? '{}' );
+		$active      = intval( $_POST['active'] ?? 1 );
+
+		if ( empty( $name ) ) {
+			wp_send_json_error( 'Name is required.' );
 		}
 
-		$raw     = $_POST['ability'] ?? [];
-		$orig_id = sanitize_text_field( $raw['original_id'] ?? '' );
-		$new_id  = sanitize_text_field( $raw['id'] ?? '' );
-
-		if ( ! $new_id ) {
-			wp_send_json_error( 'ID (slug) is required.' );
-			return;
+		// validate effect_json
+		json_decode( $effect_json );
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			$effect_json = '{}';
 		}
 
-		$ability_type = sanitize_text_field( $raw['ability_type'] ?? 'active' );
-		$cost_type    = sanitize_text_field( $raw['cost_type'] ?? 'mp' );
-		$target_type  = sanitize_text_field( $raw['target_type'] ?? 'single' );
-
-		$payload = [
-			'id'             => $new_id,
-			'title'          => sanitize_text_field( $raw['title'] ?? '' ),
-			'description'    => sanitize_textarea_field( $raw['description'] ?? '' ) ?: null,
-			'ability_type'   => in_array( $ability_type, self::ABILITY_TYPES, true ) ? $ability_type : 'active',
-			'cost_type'      => in_array( $cost_type, self::COST_TYPES, true ) ? $cost_type : 'mp',
-			'cost_value'     => max( 0, (int) ( $raw['cost_value'] ?? 0 ) ),
-			'target_type'    => in_array( $target_type, self::TARGET_TYPES, true ) ? $target_type : 'single',
-			'range_tiles'    => max( 0, (int) ( $raw['range_tiles'] ?? 1 ) ),
-			'duration_turns' => max( 0, (int) ( $raw['duration_turns'] ?? 0 ) ),
-			'is_passive'     => filter_var( $raw['is_passive'] ?? false, FILTER_VALIDATE_BOOLEAN ),
-			'is_active'      => filter_var( $raw['is_active'] ?? true,  FILTER_VALIDATE_BOOLEAN ),
-			'tags'           => sanitize_text_field( $raw['tags'] ?? '' ) ?: null,
+		$data = [
+			'name'        => $name,
+			'description' => $description,
+			'type'        => $type,
+			'cost'        => $cost,
+			'tags'        => $tags,
+			'effect_json' => $effect_json,
+			'active'      => $active,
 		];
 
-		if ( empty( $payload['title'] ) ) {
-			wp_send_json_error( 'Title is required.' );
-			return;
+		if ( $id > 0 ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->update( $table, $data, [ 'id' => $id ] );
+			wp_send_json_success( [ 'action' => 'updated', 'id' => $id ] );
+		} else {
+			$data['sort_order'] = 0;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->insert( $table, $data );
+			wp_send_json_success( [ 'action' => 'created', 'id' => $wpdb->insert_id ] );
 		}
-
-		$endpoint = $orig_id
-			? 'cyber_abilities?id=eq.' . rawrawurlencode( $orig_id )
-			: 'cyber_abilities';
-
-		$res = $this->supa( $orig_id ? 'PATCH' : 'POST', $endpoint, $payload );
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Supabase error ' . ( $res['code'] ?? 0 ) );
-			return;
-		}
-
-		$saved = $res['data'];
-		wp_send_json_success( is_array( $saved ) ? ( $saved[0] ?? $saved ) : $saved );
 	}
 
-	public function ajax_toggle(): void {
+	public function ajax_delete_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
+
+		$id = intval( $_POST['id'] ?? 0 );
+		if ( $id <= 0 ) {
+			wp_send_json_error( 'Invalid ID.' );
 		}
 
-		$id    = sanitize_text_field( $_POST['ability_id'] ?? '' );
-		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Missing ID' );
-			return;
-		}
-
-		$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Toggle failed' );
-			return;
-		}
-		wp_send_json_success( [ 'is_active' => $state ] );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->delete( $wpdb->prefix . 'cyber_abilities', [ 'id' => $id ] );
+		wp_send_json_success( [ 'deleted' => $id ] );
 	}
 
-	public function ajax_delete(): void {
+	public function ajax_reorder_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
+
+		$order = isset( $_POST['order'] ) ? array_map( 'intval', (array) $_POST['order'] ) : [];
+		if ( empty( $order ) ) {
+			wp_send_json_error( 'No order data.' );
 		}
 
-		$id = sanitize_text_field( $_POST['ability_id'] ?? '' );
-		if ( ! $id ) {
-			wp_send_json_error( 'Missing ID' );
-			return;
+		global $wpdb;
+		$table = $wpdb->prefix . 'cyber_abilities';
+
+		foreach ( $order as $position => $id ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->update( $table, [ 'sort_order' => $position ], [ 'id' => $id ] );
 		}
 
-		$res = $this->supa( 'DELETE', 'cyber_abilities?id=eq.' . rawrawurlencode( $id ) );
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Delete failed' );
-			return;
-		}
-		wp_send_json_success( 'deleted' );
+		wp_send_json_success( 'Reordered.' );
 	}
 
 	/* ---------------------------------------------------------------- */

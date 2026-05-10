@@ -157,10 +157,7 @@ class NeoWeaver_Starting_Packages_Admin {
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_sp', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $qs = 'cyber_starting_packages?select=id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable,head_item_id,torso_item_id,hand_r_item_id,hand_l_item_id,belt_item_id,compatible_class_ids,created_at&order=package_name.asc';
         $res = $this->supa( 'GET', $qs );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
@@ -168,20 +165,14 @@ class NeoWeaver_Starting_Packages_Admin {
 
     public function ajax_get_items(): void {
         check_ajax_referer( 'neoweaver_sp', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $res = $this->supa( 'GET', 'cyber_items?select=id,name,slot,type&order=name.asc&is_active=eq.true' );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
     }
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_sp', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $raw = $_POST['pkg'] ?? [];
         $id  = sanitize_text_field( $raw['id'] ?? '' );
         $csv_to_arr = function( string $val ): array {
@@ -208,12 +199,9 @@ class NeoWeaver_Starting_Packages_Admin {
             'compatible_class_ids' => $csv_to_arr( $raw['compatible_class_ids'] ?? '' ),
         ];
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_starting_packages', $payload );
-        if ( isset( $res['error'] ) ) {
-            wp_send_json_error( $res['error'] );
-            return;
-        }
+        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
         $code = $res['code'] ?? 0;
         ( $code >= 200 && $code < 300 )
             ? wp_send_json_success( $res['data'][0] ?? $res['data'] )
@@ -222,32 +210,20 @@ class NeoWeaver_Starting_Packages_Admin {
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_sp', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $id    = sanitize_text_field( $_POST['pkg_id']              ?? '' );
         $state = filter_var(           $_POST['is_player_selectable'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        if ( ! $id ) {
-            wp_send_json_error( 'Missing ID' );
-            return;
-        }
-        $res = $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), [ 'is_player_selectable' => $state ] );
+        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        $res = $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), [ 'is_player_selectable' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_player_selectable' => $state ] );
     }
 
     public function ajax_delete(): void {
         check_ajax_referer( 'neoweaver_sp', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $id = sanitize_text_field( $_POST['pkg_id'] ?? '' );
-        if ( ! $id ) {
-            wp_send_json_error( 'Missing ID' );
-            return;
-        }
-        $res = $this->supa( 'DELETE', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
+        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        $res = $this->supa( 'DELETE', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

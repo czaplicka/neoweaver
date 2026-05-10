@@ -174,10 +174,7 @@ class NeoWeaver_World_Tag_Defs_Admin {
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_wtd', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $res = $this->supa( 'GET',
             'cyber_world_tag_defs?select=id,code,label,icon,color,description,category,source,sort_order,is_active,created_at,impact&order=sort_order.asc,code.asc'
         );
@@ -186,10 +183,7 @@ class NeoWeaver_World_Tag_Defs_Admin {
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_wtd', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $raw    = $_POST['tag'] ?? [];
         $id     = sanitize_text_field( $raw['id'] ?? '' );
         $source = sanitize_text_field( $raw['source'] ?? 'system' );
@@ -209,21 +203,12 @@ class NeoWeaver_World_Tag_Defs_Admin {
             if ( $payload[ $f ] === '' ) $payload[ $f ] = null;
         }
         if ( $payload['sort_order'] === null ) unset( $payload['sort_order'] );
-        if ( empty( $payload['code'] ) ) {
-            wp_send_json_error( 'Code is required.' );
-            return;
-        }
-        if ( empty( $payload['label'] ) ) {
-            wp_send_json_error( 'Label is required.' );
-            return;
-        }
+        if ( empty( $payload['code'] ) )  { wp_send_json_error( 'Code is required.' ); }
+        if ( empty( $payload['label'] ) ) { wp_send_json_error( 'Label is required.' ); }
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_world_tag_defs', $payload );
-        if ( isset( $res['error'] ) ) {
-            wp_send_json_error( $res['error'] );
-            return;
-        }
+        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
         $code = $res['code'] ?? 0;
         ( $code >= 200 && $code < 300 )
             ? wp_send_json_success( $res['data'][0] ?? $res['data'] )
@@ -232,32 +217,20 @@ class NeoWeaver_World_Tag_Defs_Admin {
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_wtd', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $id    = sanitize_text_field( $_POST['tag_id']    ?? '' );
         $state = filter_var(           $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        if ( ! $id ) {
-            wp_send_json_error( 'Missing ID' );
-            return;
-        }
-        $res = $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
+        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        $res = $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
     public function ajax_delete(): void {
         check_ajax_referer( 'neoweaver_wtd', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Forbidden', 403 );
-            return;
-        }
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
         $id = sanitize_text_field( $_POST['tag_id'] ?? '' );
-        if ( ! $id ) {
-            wp_send_json_error( 'Missing ID' );
-            return;
-        }
-        $res = $this->supa( 'DELETE', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
+        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        $res = $this->supa( 'DELETE', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

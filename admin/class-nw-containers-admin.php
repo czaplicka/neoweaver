@@ -40,13 +40,14 @@ class NeoWeaver_Containers_Admin {
         if ( ! str_contains( $hook, $this->page_slug ) ) return;
 
         $plugin_url = plugin_dir_url( dirname( __FILE__ ) );
-
+if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
         wp_enqueue_style(
             'chakra-petch',
             'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
             [],
             null
         );
+}
 
         wp_enqueue_style(
             'nw-admin-core',
