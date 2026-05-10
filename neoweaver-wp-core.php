@@ -16,6 +16,9 @@ define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR);
+define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
+define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
+define( 'NW_VERSION', NEOWEAVER_VERSION );
 
 final class NeoWeaver_Core {
 
