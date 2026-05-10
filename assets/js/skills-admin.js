@@ -1,127 +1,170 @@
-private function get_js(): string { return <<<'JS'
-jQuery(function($){
-    var nonce   = $('#nw-nonce').val();
-    var editId  = null;
+// admin/js/skills-admin.js
+(function($) {
+    'use strict';
 
-    /* ---------- load ---------- */
-    function loadSkills(){
-        var cat = $('#nw-filter-category').val();
-        $('#nw-skills-tbody').html('<tr class="nw-loading-row"><td colspan="8"><div class="nw-spinner"></div> Loading skills…</td></tr>');
-        $.post(ajaxurl,{action:'nw_skills_get_all',nonce:nonce,filter_category:cat},function(r){
-            if(!r.success){showNotice('error',r.data);return;}
-            renderTable(r.data);
-        });
-    }
+    const NW_Skills = {
+        currentId: null,
 
-    function renderTable(rows){
-        var total=rows.length,active=0,inactive=0,html='';
-        if(!rows.length){html='<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;">No skills found.</td></tr>';}
-        $.each(rows,function(_,s){
-            if(s.is_active) active++; else inactive++;
-            var tags='';
-            if(s.tags&&s.tags.length){$.each(s.tags,function(_,t){tags+='<span class="nw-tag">'+escH(t)+'</span>';});}
-            var img=s.img_url
-                ?'<img class="nw-skill-img" src="'+escH(s.img_url)+'" alt="" loading="lazy">'
-                :'<div class="nw-skill-img-placeholder">⚡</div>';
-            var catCls='nw-cat-'+(s.category||'');
-            var cardEff=s.card_effect?'<span class="nw-card-effect" title="'+escH(s.card_effect)+'">'+escH(s.card_effect)+'</span>':'<span style="color:#333">—</span>';
-            html+='<tr class="'+(s.is_active?'':'nw-row-inactive')+'" data-id="'+escH(s.id)+'">'
-                +'<td>'+img+'</td>'
-                +'<td><div class="nw-skill-name">'+escH(s.name)+'</div>'+(s.description?'<div class="nw-skill-sub">'+escH(s.description.substring(0,60))+(s.description.length>60?'…':'')+'</div>':'')+'</td>'
-                +'<td>'+(s.category?'<span class="nw-category-badge '+catCls+'">'+escH(s.category)+'</span>':'<span style="color:#333">—</span>')+'</td>'
-                +'<td>'+(s.application?escH(s.application):'<span style="color:#333">—</span>')+'</td>'
-                +'<td><div class="nw-tags">'+tags+'</div></td>'
-                +'<td>'+cardEff+'</td>'
-                +'<td><label class="nw-toggle"><input type="checkbox" class="nw-toggle-active" data-id="'+escH(s.id)+'"'+(s.is_active?' checked':'')+'><span class="nw-toggle-slider"></span></label></td>'
-                +'<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="'+escH(s.id)+'">Edit</button></div></td>'
-                +'</tr>';
-        });
-        $('#nw-skills-tbody').html(html);
-        $('#nw-total').text(total);$('#nw-active').text(active);$('#nw-inactive').text(inactive);
-    }
+        init() {
+            this.bindEvents();
+            this.loadSkills();
+        },
 
-    /* ---------- modal ---------- */
-    function openModal(skill){
-        editId = skill ? skill.id : null;
-        $('#nw-modal-title').text(skill?'Edit Skill':'New Skill');
-        $('#nw-save-label').text(skill?'Save Skill':'Create Skill');
-        $('#nw-delete-btn').toggle(!!skill);
-        $('#nw-field-id').val(skill?skill.id:'');
-        $('#nw-field-name').val(skill?skill.name:'');
-        $('#nw-field-category').val(skill&&skill.category?skill.category:'');
-        $('#nw-field-application').val(skill?skill.application||'':'');
-        $('#nw-field-description').val(skill?skill.description||'':'');
-        $('#nw-field-card_effect').val(skill?skill.card_effect||'':'');
-        $('#nw-field-img_url').val(skill?skill.img_url||'':'');
-        $('#nw-field-tags').val(skill&&skill.tags?skill.tags.join(', '):'');
-        $('#nw-field-linked_attributes').val(skill&&skill.linked_attributes?skill.linked_attributes.join(', '):'');
-        $('#nw-field-is_active').prop('checked',skill?skill.is_active:true);
-        updateImgPreview($('#nw-field-img_url').val());
-        $('#nw-modal-overlay').show();
-    }
-    function closeModal(){ $('#nw-modal-overlay').hide(); editId=null; }
+        bindEvents() {
+            $('#nw-add-skill-btn').on('click', () => this.showForm());
+            $('#nw-save-skill-btn').on('click', () => this.saveSkill());
+            $('#nw-cancel-skill-btn').on('click', () => this.hideForm());
+            $(document).on('click', '.nw-edit-skill', (e) => this.editSkill(e));
+            $(document).on('click', '.nw-delete-skill', (e) => this.deleteSkill(e));
+        },
 
-    function updateImgPreview(url){
-        if(url){$('#nw-img-preview').attr('src',url);$('#nw-img-preview-wrap').show();}
-        else{$('#nw-img-preview-wrap').hide();}
-    }
+        showForm(skill = null) {
+            this.currentId = skill ? skill.id : null;
+            $('#nw-form-title').text(skill ? 'Edit Skill' : 'Add Skill');
+            $('#nw-field-name').val(skill ? skill.name : '');
+            $('#nw-field-description').val(skill ? skill.description || '' : '');
+            $('#nw-field-category').val(skill ? skill.category || '' : '');
+            $('#nw-field-stat').val(skill ? skill.stat || '' : '');
+            $('#nw-skill-form-wrap').slideDown(200);
+        },
 
-    /* ---------- save ---------- */
-    function saveSkill(){
-        var data={action:'nw_skills_save',nonce:nonce,skill:{}};
-        $('#nw-skill-form').serializeArray().forEach(function(f){data.skill[f.name]=f.value;});
-        data.skill.is_active=$('#nw-field-is_active').is(':checked')?'1':'0';
-        $('#nw-save-btn').prop('disabled',true).text('Saving…');
-        $.post(ajaxurl,data,function(r){
-            $('#nw-save-btn').prop('disabled',false);
-            $('#nw-save-label').text(editId?'Save Skill':'Create Skill');
-            if(!r.success){showNotice('error',r.data);return;}
-            showNotice('success',editId?'Skill updated.':'Skill created.');
-            closeModal(); loadSkills();
-        });
-    }
+        hideForm() {
+            this.currentId = null;
+            $('#nw-skill-form-wrap').slideUp(200);
+            $('#nw-field-name, #nw-field-description, #nw-field-category, #nw-field-stat').val('');
+            this.clearNotice();
+        },
 
-    /* ---------- toggle ---------- */
-    $(document).on('change','.nw-toggle-active',function(){
-        var id=$(this).data('id'), state=$(this).is(':checked');
-        $.post(ajaxurl,{action:'nw_skills_toggle',nonce:nonce,skill_id:id,is_active:state?1:0},function(r){
-            if(!r.success){showNotice('error',r.data);loadSkills();}
-            else{$(document).find('tr[data-id="'+id+'"]').toggleClass('nw-row-inactive',!state);}
-        });
-    });
+        loadSkills() {
+            $('#nw-skill-table-wrap').html('<p>Loading…</p>');
+            
+            $.post(NW_SK.ajax_url, {
+                action: 'nw_skills_load',
+                nonce: NW_SK.nonce
+            }, (res) => {
+                if (res.success) {
+                    this.renderTable(res.data);
+                } else {
+                    this.showNotice('Error loading skills: ' + res.data, 'error');
+                    $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
+                }
+            });
+        },
 
-    /* ---------- delete ---------- */
-    $('#nw-delete-btn').on('click',function(){
-        if(!editId||!confirm('Delete this skill? This cannot be undone.')) return;
-        $.post(ajaxurl,{action:'nw_skills_delete',nonce:nonce,skill_id:editId},function(r){
-            if(!r.success){showNotice('error',r.data);return;}
-            showNotice('success','Skill deleted.');
-            closeModal(); loadSkills();
-        });
-    });
+        renderTable(skills) {
+            if (!skills || skills.length === 0) {
+                $('#nw-skill-table-wrap').html('<p>No skills found. Click "Add Skill" to create one.</p>');
+                return;
+            }
 
-    /* ---------- events ---------- */
-    $('#nw-add-btn').on('click',function(){openModal(null);});
-    $('#nw-refresh-btn').on('click',loadSkills);
-    $('#nw-filter-category').on('change',loadSkills);
-    $('#nw-modal-close,#nw-cancel-btn').on('click',closeModal);
-    $('#nw-modal-overlay').on('click',function(e){if($(e.target).is('#nw-modal-overlay'))closeModal();});
-    $('#nw-save-btn').on('click',saveSkill);
-    $('#nw-field-img_url').on('input',function(){updateImgPreview($(this).val());});
-    $(document).on('click','.nw-edit-btn',function(){
-        var id=$(this).data('id');
-        var row=$('tr[data-id="'+id+'"]');
-        /* fetch full row from server to get all fields */
-        $.post(ajaxurl,{action:'nw_skills_get_all',nonce:nonce,filter_category:''},function(r){
-            if(!r.success) return;
-            var skill=null; $.each(r.data,function(_,s){if(s.id===id){skill=s;return false;}});
-            if(skill) openModal(skill);
-        });
-    });
+            let html = '<table class="wp-list-table widefat fixed striped"><thead><tr>';
+            html += '<th>Name</th><th>Category</th><th>Linked Stat</th><th>Description</th><th>Actions</th>';
+            html += '</tr></thead><tbody>';
 
-    function showNotice(type,msg){
-        var $n=$('#nw-notice');
-        $n.removeClass('nw-notice-success nw-notice-error').addClass('nw-notice-'+type).text(msg).show();
-        setTimeout(function(){$n.fadeOut();},4000);
-    }
-    function escH(s){return $('<div>').text(String(s||'')).html();}
+            skills.forEach(skill => {
+                html += `<tr data-id="${this.esc(skill.id)}">
+                    <td><strong>${this.esc(skill.name)}</strong></td>
+                    <td>${this.esc(skill.category || '—')}</td>
+                    <td>${this.esc(skill.stat || '—')}</td>
+                    <td>${this.esc(skill.description || '—')}</td>
+                    <td>
+                        <button class="button button-small nw-edit-skill" data-id="${skill.id}">Edit</button>
+                        <button class="button button-small button-link-delete nw-delete-skill" data-id="${skill.id}">Delete</button>
+                    </td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            $('#nw-skill-table-wrap').html(html);
+        },
+
+        editSkill(e) {
+            const id = $(e.currentTarget).data('id');
+            
+            // Załaduj wszystkie skills i znajdź ten konkretny
+            $.post(NW_SK.ajax_url, {
+                action: 'nw_skills_load',
+                nonce: NW_SK.nonce
+            }, (res) => {
+                if (res.success) {
+                    const skill = res.data.find(s => s.id == id);
+                    if (skill) {
+                        this.showForm(skill);
+                    }
+                }
+            });
+        },
+
+        saveSkill() {
+            const name = $('#nw-field-name').val().trim();
+            
+            if (!name) {
+                this.showNotice('Skill name is required.', 'error');
+                return;
+            }
+
+            const data = {
+                action: 'nw_skills_save',
+                nonce: NW_SK.nonce,
+                id: this.currentId || '',
+                name: name,
+                description: $('#nw-field-description').val(),
+                category: $('#nw-field-category').val(),
+                stat: $('#nw-field-stat').val()
+            };
+
+            $('#nw-save-skill-btn').prop('disabled', true).text('Saving…');
+
+            $.post(NW_SK.ajax_url, data, (res) => {
+                $('#nw-save-skill-btn').prop('disabled', false).text('Save Skill');
+                
+                if (res.success) {
+                    this.showNotice(this.currentId ? 'Skill updated.' : 'Skill created.', 'success');
+                    this.hideForm();
+                    this.loadSkills();
+                } else {
+                    this.showNotice('Error: ' + res.data, 'error');
+                }
+            });
+        },
+
+        deleteSkill(e) {
+            if (!confirm('Are you sure you want to delete this skill? This cannot be undone.')) {
+                return;
+            }
+
+            const id = $(e.currentTarget).data('id');
+
+            $.post(NW_SK.ajax_url, {
+                action: 'nw_skills_delete',
+                nonce: NW_SK.nonce,
+                id: id
+            }, (res) => {
+                if (res.success) {
+                    this.showNotice('Skill deleted.', 'success');
+                    this.loadSkills();
+                } else {
+                    this.showNotice('Error: ' + res.data, 'error');
+                }
+            });
+        },
+
+        showNotice(msg, type) {
+            const cls = type === 'error' ? 'notice-error' : 'notice-success';
+            $('#nw-form-notice').html(`<div class="notice ${cls} is-dismissible"><p>${msg}</p></div>`);
+            setTimeout(() => this.clearNotice(), 4000);
+        },
+
+        clearNotice() {
+            $('#nw-form-notice').html('');
+        },
+
+        esc(str) {
+            if (!str && str !== 0) return '';
+            return $('<div>').text(String(str)).html();
+        }
+    };
+
+    $(document).ready(() => NW_Skills.init());
+
+})(jQuery);
