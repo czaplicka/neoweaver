@@ -57,7 +57,10 @@ class NW_Races_Admin extends NW_Admin_Base {
 	public function ajax_get_race() {
 		$this->verify_nonce();
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
-		if ( ! $id ) wp_send_json_error( 'Missing id' );
+		if ( ! $id ) {
+			wp_send_json_error( 'Missing id' );
+			return;
+		}
 
 		$res = $this->supa( 'GET', 'cyber_races?id=eq.' . rawurlencode( $id ) . '&select=*' );
 		wp_send_json_success( $res[0] ?? null );
@@ -106,7 +109,10 @@ class NW_Races_Admin extends NW_Admin_Base {
 		$id    = sanitize_text_field( $_POST['id']    ?? '' );
 		$state = filter_var( $_POST['state'] ?? false, FILTER_VALIDATE_BOOLEAN );
 
-		if ( ! $id ) wp_send_json_error( 'Missing id' );
+		if ( ! $id ) {
+			wp_send_json_error( 'Missing id' );
+			return;
+		}
 
 		$res = $this->supa( 'PATCH', 'cyber_races?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
 		wp_send_json_success( $res );
@@ -117,7 +123,10 @@ class NW_Races_Admin extends NW_Admin_Base {
 	public function ajax_delete_race() {
 		$this->verify_nonce();
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
-		if ( ! $id ) wp_send_json_error( 'Missing id' );
+		if ( ! $id ) {
+			wp_send_json_error( 'Missing id' );
+			return;
+		}
 
 		$res = $this->supa( 'DELETE', 'cyber_races?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
 		wp_send_json_success( $res );
@@ -215,7 +224,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 							<tr><th><label for="nw-race-tags"><?php esc_html_e('Tags (comma-separated)','neoweaver'); ?></label></th>
 								<td><input type="text" id="nw-race-tags" class="large-text"
-									placeholder="<?php esc_attr_e('tag1, tag2, tag3','neoweaver'); ?>"></td></tr>
+								placeholder="<?php esc_attr_e('tag1, tag2, tag3','neoweaver'); ?>"></td></tr>
 
 							<tr><th><label for="nw-race-active-chk"><?php esc_html_e('Active','neoweaver'); ?></label></th>
 								<td><input type="checkbox" id="nw-race-active-chk" checked></td></tr>
