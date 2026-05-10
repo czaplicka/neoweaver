@@ -35,7 +35,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 			add_submenu_page(
 				'neoweaver',
 				'Races',
-				'Races',
+				'👾Races',
 				'manage_options',
 				'nw-races',
 				[ $this, 'render_page' ]
