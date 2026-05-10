@@ -400,7 +400,10 @@ class NeoWeaver_Deck_Admin {
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_deck', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
 
         $category = sanitize_text_field( $_POST['filter_category'] ?? '' );
         $rarity   = sanitize_text_field( $_POST['filter_rarity']   ?? '' );
@@ -429,7 +432,10 @@ class NeoWeaver_Deck_Admin {
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_deck', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
 
         $raw = $_POST['card'] ?? [];
         $id  = sanitize_text_field( $raw['id'] ?? '' );
@@ -477,7 +483,10 @@ class NeoWeaver_Deck_Admin {
             ? $this->supa( 'PATCH', 'cyber_deck?id=eq.' . urlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_deck', $payload );
 
-        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
+        if ( isset( $res['error'] ) ) {
+            wp_send_json_error( $res['error'] );
+            return;
+        }
         $code = $res['code'] ?? 0;
         ( $code >= 200 && $code < 300 )
             ? wp_send_json_success( $res['data'][0] ?? $res['data'] )
@@ -490,10 +499,16 @@ class NeoWeaver_Deck_Admin {
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_deck', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $id    = sanitize_text_field( $_POST['card_id']   ?? '' );
         $state = filter_var(           $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Missing ID' );
+            return;
+        }
         $res = $this->supa( 'PATCH', 'cyber_deck?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
@@ -504,9 +519,15 @@ class NeoWeaver_Deck_Admin {
 
     public function ajax_delete(): void {
         check_ajax_referer( 'neoweaver_deck', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $id = sanitize_text_field( $_POST['card_id'] ?? '' );
-        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Missing ID' );
+            return;
+        }
         $res = $this->supa( 'DELETE', 'cyber_deck?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
