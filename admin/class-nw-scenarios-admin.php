@@ -47,7 +47,7 @@ class NeoWeaver_Scenarios_Admin {
 		add_submenu_page(
 			'neoweaver',
 			'Scenarios',
-			'Scenarios',
+			'📋Scenarios',
 			'manage_options',
 			'nw-scenarios',
 			[ $this, 'render_page' ]
