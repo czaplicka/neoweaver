@@ -29,7 +29,7 @@ class NW_Skills_Admin {
 		add_submenu_page(
 			'neoweaver',
 			'Skills',
-			'Skills',
+			'✨Skills',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
