@@ -27,7 +27,7 @@ class NW_Items_Admin {
 		add_submenu_page(
 			'neoweaver',
 			'Items',
-			'Items',
+			'🧰Items',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
