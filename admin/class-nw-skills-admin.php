@@ -36,8 +36,6 @@ class NW_Skills_Admin {
 		);
 	}
 
-	private string $page_hook = '';
-
 public function enqueue( string $hook ): void {
 	if ( $hook !== $this->page_hook ) {
 		return;
