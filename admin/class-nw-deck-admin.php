@@ -65,11 +65,18 @@ class NW_Deck_Admin {
 			return;
 		}
 
+		wp_enqueue_style(
+			'nw-admin-shared',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/deck-admin.css',
+			[],
+			defined( 'NW_VERSION' ) ? NW_VERSION : null
+		);
+
 		wp_enqueue_script(
-			'nw-deck-admin',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'admin/js/deck-admin.js',
+			'nw-skills',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/deck-admin.js',
 			[ 'jquery' ],
-			defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0',
+			defined( 'NW_VERSION' ) ? NW_VERSION : null,
 			true
 		);
 
