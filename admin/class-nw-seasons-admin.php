@@ -12,9 +12,7 @@
  * CSS: admin/css/seasons-admin.css
  * JS:  admin/js/seasons-admin.js
  */
-
 if ( ! defined( 'ABSPATH' ) ) exit;
-
 class NeoWeaver_Seasons_Admin {
 
 	private $slug      = 'neoweaver';
