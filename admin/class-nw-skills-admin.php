@@ -44,18 +44,17 @@ class NW_Skills_Admin {
 		}
 
 		wp_enqueue_style(
-			'nw-admin-shared',
-			NEOWEAVER_PLUGIN_URL . 'admin/css/skills-admin.css',
-			[],
-			defined( 'NW_VERSION' ) ? NW_VERSION : null
+			'nw-admin-core',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/skills-admin.css',
+			[ 'chakra-petch' ],
+			NEOWEAVER_VERSION
 		);
 
-		wp_enqueue_script(
-			'nw-skills',
-			NEOWEAVER_PLUGIN_URL . 'admin/js/skills-admin.js',
-			[ 'jquery' ],
-			defined( 'NW_VERSION' ) ? NW_VERSION : null,
-			true
+		wp_enqueue_style(
+			'nw-abilities-style',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/skills-admin.css',
+			[ 'chakra-petch', 'nw-admin-core' ],
+			NEOWEAVER_VERSION
 		);
 
 		wp_localize_script(
