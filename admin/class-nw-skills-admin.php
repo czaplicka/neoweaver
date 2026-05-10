@@ -192,7 +192,10 @@ class NeoWeaver_Skills_Admin {
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_skills', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $category = sanitize_text_field( $_POST['filter_category'] ?? '' );
         $qs = 'cyber_skills?select=id,name,description,category,application,card_effect,img_url,tags,linked_attributes,is_active,created_at&order=name.asc';
         if ( $category ) $qs .= '&category=eq.' . rawurlencode( $category );
@@ -202,7 +205,10 @@ class NeoWeaver_Skills_Admin {
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_skills', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $raw  = $_POST['skill'] ?? [];
         $id   = sanitize_text_field( $raw['id'] ?? '' );
         $tags  = array_values( array_filter( array_map( 'trim', explode( ',', sanitize_text_field( $raw['tags'] ?? '' ) ) ) ) );
@@ -221,7 +227,10 @@ class NeoWeaver_Skills_Admin {
         $res = $id
             ? $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_skills', $payload );
-        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); }
+        if ( isset( $res['error'] ) ) {
+            wp_send_json_error( $res['error'] );
+            return;
+        }
         $code = $res['code'] ?? 0;
         ( $code >= 200 && $code < 300 )
             ? wp_send_json_success( $res['data'][0] ?? $res['data'] )
@@ -230,19 +239,31 @@ class NeoWeaver_Skills_Admin {
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_skills', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $id    = sanitize_text_field( $_POST['skill_id']  ?? '' );
         $state = filter_var(           $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Missing ID' );
+            return;
+        }
         $res = $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
     public function ajax_delete(): void {
         check_ajax_referer( 'neoweaver_skills', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
         $id = sanitize_text_field( $_POST['skill_id'] ?? '' );
-        if ( ! $id ) wp_send_json_error( 'Missing ID' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Missing ID' );
+            return;
+        }
         $res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
