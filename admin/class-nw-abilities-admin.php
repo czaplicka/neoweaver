@@ -169,110 +169,170 @@ class NW_Abilities_Admin {
 		wp_send_json_success( 'Reordered.' );
 	}
 
-	// ── Render ────────────────────────────────────────────────────────────
+	/* ---------------------------------------------------------------- */
+	/*  RENDER                                                           */
+	/* ---------------------------------------------------------------- */
 
-	public function render_page(): void {
-		?>
-		<div class="wrap nw-admin-wrap">
-			<div class="nw-admin-header">
-				<h1 class="nw-admin-heading">⚡ Abilities</h1>
-				<div class="nw-admin-actions">
-					<button id="nw-add-btn" class="nw-btn nw-btn-primary">+ Add Ability</button>
-					<button id="nw-refresh-btn" class="nw-btn nw-btn-secondary">↺ Refresh</button>
+	public function render_page(): void { ?>
+		<div class="wrap nw-panel" id="nw-abilities-panel">
+			<div class="nw-panel-header">
+				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Abilities</span></h1>
+				<div class="nw-header-actions">
+					<select id="nw-filter-type" class="nw-select-filter">
+						<option value="">All types</option>
+						<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
+							<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<select id="nw-filter-active" class="nw-select-filter">
+						<option value="">Active &amp; Inactive</option>
+						<option value="1">Active only</option>
+						<option value="0">Inactive only</option>
+					</select>
+					<input type="text" id="nw-search" class="nw-search-input" placeholder="Search id or title&hellip;">
+					<button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">&#8635; Refresh</button>
+					<button class="nw-btn nw-btn-primary" id="nw-add-btn">+ New Ability</button>
 				</div>
 			</div>
 
 			<div id="nw-notice" class="nw-notice" style="display:none;"></div>
 
-			<div class="nw-filter-bar">
-				<select id="nw-filter-type" class="nw-select">
-					<option value="">All Types</option>
-					<option value="active">Active</option>
-					<option value="passive">Passive</option>
-					<option value="reaction">Reaction</option>
-				</select>
-				<select id="nw-filter-active" class="nw-select">
-					<option value="">All Status</option>
-					<option value="1">Active</option>
-					<option value="0">Inactive</option>
-				</select>
-				<input type="text" id="nw-search" class="nw-input" placeholder="Search abilities…" />
+			<div class="nw-stats-bar">
+				<span class="nw-stat-pill">Total: <strong id="nw-total">&mdash;</strong></span>
+				<span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">&mdash;</strong></span>
+				<span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">&mdash;</strong></span>
+				<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
+					<span class="nw-stat-pill"><?php echo esc_html( ucfirst( $t ) ); ?>: <strong id="nw-count-<?php echo esc_attr( $t ); ?>">&mdash;</strong></span>
+				<?php endforeach; ?>
 			</div>
 
 			<div class="nw-table-wrap">
-				<table class="nw-table" id="nw-abilities-table">
-					<thead>
-						<tr>
-							<th class="nw-col-sort">⇅</th>
-							<th>Name</th>
-							<th>Type</th>
-							<th>Cost</th>
-							<th>Tags</th>
-							<th>Status</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
+				<table class="nw-table">
+					<thead><tr>
+						<th>ID / Title</th>
+						<th>Type</th>
+						<th>Cost</th>
+						<th>Target</th>
+						<th>Range</th>
+						<th>Duration</th>
+						<th>Passive</th>
+						<th>Active</th>
+						<th>Actions</th>
+					</tr></thead>
 					<tbody id="nw-abilities-tbody">
-						<tr><td colspan="7" class="nw-loading">Loading…</td></tr>
+						<tr><td colspan="9" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading&hellip;</td></tr>
 					</tbody>
 				</table>
 			</div>
-		</div>
 
-		<!-- Modal -->
-		<div id="nw-modal" class="nw-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title">
-			<div class="nw-modal-backdrop"></div>
-			<div class="nw-modal-box">
-				<div class="nw-modal-header">
-					<h2 id="nw-modal-title" class="nw-modal-heading">Ability</h2>
-					<button class="nw-modal-close" aria-label="Close">&times;</button>
+			<div class="nw-modal-overlay" id="nw-modal-overlay" style="display:none;">
+				<div class="nw-modal">
+					<div class="nw-modal-header">
+						<h2 id="nw-modal-title">Edit Ability</h2>
+						<button class="nw-modal-close" id="nw-modal-close">&#x2715;</button>
+					</div>
+					<div class="nw-modal-body">
+						<form id="nw-ability-form">
+							<input type="hidden" id="nw-field-original_id" name="original_id">
+
+							<div class="nw-section-label">Identity</div>
+							<div class="nw-form-grid">
+								<div class="nw-field">
+									<label>ID (slug) <span class="nw-req">*</span></label>
+									<input type="text" id="nw-field-id" name="id" required placeholder="e.g. fireball">
+								</div>
+								<div class="nw-field">
+									<label>Title <span class="nw-req">*</span></label>
+									<input type="text" id="nw-field-title" name="title" required placeholder="e.g. Fireball">
+								</div>
+								<div class="nw-field nw-field-full">
+									<label>Description</label>
+									<textarea id="nw-field-description" name="description" rows="3" placeholder="Ability description&hellip;"></textarea>
+								</div>
+								<div class="nw-field nw-field-full">
+									<label>Tags <span class="nw-hint">(comma-separated slugs)</span></label>
+									<input type="text" id="nw-field-tags" name="tags" placeholder="e.g. fire,aoe,damage">
+								</div>
+							</div>
+
+							<div class="nw-section-label">Mechanics</div>
+							<div class="nw-form-grid">
+								<div class="nw-field">
+									<label>Ability Type <span class="nw-req">*</span></label>
+									<select id="nw-field-ability_type" name="ability_type" class="nw-select">
+										<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
+											<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+								<div class="nw-field">
+									<label>Cost Type</label>
+									<select id="nw-field-cost_type" name="cost_type" class="nw-select">
+										<?php foreach ( self::COST_TYPES as $c ) : ?>
+											<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+								<div class="nw-field">
+									<label>Cost Value</label>
+									<input type="number" id="nw-field-cost_value" name="cost_value" min="0" value="0">
+								</div>
+								<div class="nw-field">
+									<label>Target Type</label>
+									<select id="nw-field-target_type" name="target_type" class="nw-select">
+										<?php foreach ( self::TARGET_TYPES as $tt ) : ?>
+											<option value="<?php echo esc_attr( $tt ); ?>"><?php echo esc_html( ucfirst( $tt ) ); ?></option>
+										<?php endforeach; ?>
+									</select>
+								</div>
+								<div class="nw-field">
+									<label>Range (tiles)</label>
+									<input type="number" id="nw-field-range_tiles" name="range_tiles" min="0" value="1">
+								</div>
+								<div class="nw-field">
+									<label>Duration (turns)</label>
+									<input type="number" id="nw-field-duration_turns" name="duration_turns" min="0" value="0">
+								</div>
+							</div>
+
+							<div class="nw-section-label">Status</div>
+							<div class="nw-form-grid">
+								<div class="nw-field nw-field-toggles">
+									<div class="nw-toggle-row">
+										<label class="nw-toggle-label">
+											<span class="nw-toggle">
+												<input type="checkbox" id="nw-field-is_passive" name="is_passive">
+												<span class="nw-toggle-slider nw-toggle-orange"></span>
+											</span>
+											<span>Passive ability</span>
+										</label>
+										<label class="nw-toggle-label">
+											<span class="nw-toggle">
+												<input type="checkbox" id="nw-field-is_active" name="is_active" checked>
+												<span class="nw-toggle-slider"></span>
+											</span>
+											<span>Active (available in game)</span>
+										</label>
+									</div>
+								</div>
+							</div>
+						</form>
+					</div>
+					<div class="nw-modal-footer">
+						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">&#128465; Delete</button>
+						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn">Cancel</button>
+						<button class="nw-btn nw-btn-primary" id="nw-save-btn"><span id="nw-save-label">Save Ability</span></button>
+					</div>
 				</div>
-				<form id="nw-ability-form" class="nw-form">
-					<input type="hidden" name="id" id="nw-field-id" value="0" />
-					<div class="nw-form-row">
-						<label for="nw-field-name" class="nw-label">Name *</label>
-						<input type="text" id="nw-field-name" name="name" class="nw-input" required />
-					</div>
-					<div class="nw-form-row">
-						<label for="nw-field-description" class="nw-label">Description</label>
-						<textarea id="nw-field-description" name="description" class="nw-textarea" rows="3"></textarea>
-					</div>
-					<div class="nw-form-row nw-form-row--half">
-						<div>
-							<label for="nw-field-type" class="nw-label">Type</label>
-							<select id="nw-field-type" name="type" class="nw-select">
-								<option value="active">Active</option>
-								<option value="passive">Passive</option>
-								<option value="reaction">Reaction</option>
-							</select>
-						</div>
-						<div>
-							<label for="nw-field-cost" class="nw-label">Cost</label>
-							<input type="number" id="nw-field-cost" name="cost" class="nw-input" value="0" min="0" />
-						</div>
-					</div>
-					<div class="nw-form-row">
-						<label for="nw-field-tags" class="nw-label">Tags (comma-separated)</label>
-						<input type="text" id="nw-field-tags" name="tags" class="nw-input" />
-					</div>
-					<div class="nw-form-row">
-						<label for="nw-field-effect-json" class="nw-label">Effect JSON</label>
-						<textarea id="nw-field-effect-json" name="effect_json" class="nw-textarea nw-textarea--mono" rows="4">{}</textarea>
-					</div>
-					<div class="nw-form-row nw-form-row--toggle">
-						<label class="nw-label">Active</label>
-						<label class="nw-toggle">
-							<input type="checkbox" id="nw-field-active" name="active" value="1" checked />
-							<span class="nw-toggle-slider"></span>
-						</label>
-					</div>
-					<div class="nw-form-actions">
-						<button type="submit" class="nw-btn nw-btn-primary">Save</button>
-						<button type="button" class="nw-modal-close nw-btn nw-btn-ghost">Cancel</button>
-					</div>
-				</form>
 			</div>
 		</div>
-		<?php
-	}
+	<?php }
 }
+
+add_action(
+	'plugins_loaded',
+	static function () {
+		new NeoWeaver_Abilities_Admin();
+	},
+	20
+);
