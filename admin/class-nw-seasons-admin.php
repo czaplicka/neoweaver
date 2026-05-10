@@ -201,34 +201,55 @@ class NeoWeaver_Seasons_Admin {
 
 	public function ajax_list() {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
 		$res = $this->supa_get( $this->table . '?select=*&order=sort_order.asc,season_name.asc' );
-		if ( ! $res['ok'] ) wp_send_json_error( 'Supabase error: ' . $res['error'] );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( 'Supabase error: ' . $res['error'] );
+			return;
+		}
 		wp_send_json_success( is_array( $res['body'] ) ? $res['body'] : [] );
 	}
 
 	public function ajax_get() {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
-		if ( ! $name ) wp_send_json_error( 'Invalid name.' );
+		if ( ! $name ) {
+			wp_send_json_error( 'Invalid name.' );
+			return;
+		}
 
 		$res = $this->supa_get( $this->table . '?season_name=eq.' . rawurlencode( $name ) . '&limit=1' );
-		if ( ! $res['ok'] || empty( $res['body'][0] ) ) wp_send_json_error( 'Not found.' );
+		if ( ! $res['ok'] || empty( $res['body'][0] ) ) {
+			wp_send_json_error( 'Not found.' );
+			return;
+		}
 		wp_send_json_success( $res['body'][0] );
 	}
 
 	public function ajax_save() {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
 		$is_edit     = ! empty( $_POST['is_edit'] );
 		$orig_name   = sanitize_text_field( $_POST['orig_season_name'] ?? '' );
 		$season_name = sanitize_text_field( $_POST['season_name'] ?? '' );
 
-		if ( ! $season_name ) wp_send_json_error( 'Season name is required.' );
+		if ( ! $season_name ) {
+			wp_send_json_error( 'Season name is required.' );
+			return;
+		}
 
 		$weights = [];
 		foreach ( array_keys( $this->weights ) as $key ) {
@@ -236,10 +257,16 @@ class NeoWeaver_Seasons_Admin {
 		}
 
 		$weight_err = $this->validate_weights( $weights );
-		if ( $weight_err ) wp_send_json_error( $weight_err );
+		if ( $weight_err ) {
+			wp_send_json_error( $weight_err );
+			return;
+		}
 
 		$temp_mod = (float) ( $_POST['temp_modifier'] ?? 1.0 );
-		if ( $temp_mod <= 0 ) wp_send_json_error( 'temp_modifier must be > 0.' );
+		if ( $temp_mod <= 0 ) {
+			wp_send_json_error( 'temp_modifier must be > 0.' );
+			return;
+		}
 
 		$payload = array_merge( [
 			'season_name'    => $season_name,
@@ -253,7 +280,10 @@ class NeoWeaver_Seasons_Admin {
 		if ( $is_edit && $orig_name ) {
 			if ( $orig_name !== $season_name ) {
 				$del = $this->supa_delete( $orig_name );
-				if ( ! $del['ok'] ) wp_send_json_error( 'Could not rename: delete old record failed (HTTP ' . $del['status'] . ').' );
+				if ( ! $del['ok'] ) {
+					wp_send_json_error( 'Could not rename: delete old record failed (HTTP ' . $del['status'] . ').' );
+					return;
+				}
 				$res = $this->supa_post( $this->table, $payload );
 			} else {
 				$res = $this->supa_patch( $orig_name, $payload );
@@ -264,19 +294,29 @@ class NeoWeaver_Seasons_Admin {
 
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( 'Save failed (HTTP ' . $res['status'] . ').' );
+			return;
 		}
 		wp_send_json_success( [ 'season_name' => $season_name ] );
 	}
 
 	public function ajax_delete() {
 		check_ajax_referer( 'nw_seasons_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
-		if ( ! $name ) wp_send_json_error( 'Invalid name.' );
+		if ( ! $name ) {
+			wp_send_json_error( 'Invalid name.' );
+			return;
+		}
 
 		$res = $this->supa_delete( $name );
-		if ( ! $res['ok'] ) wp_send_json_error( 'Delete failed (HTTP ' . $res['status'] . ').' );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( 'Delete failed (HTTP ' . $res['status'] . ').' );
+			return;
+		}
 		wp_send_json_success();
 	}
 
