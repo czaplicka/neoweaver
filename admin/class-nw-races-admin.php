@@ -1,3 +1,4 @@
+
 <?php
 /**
  * NeoWeaver Admin Panel — Races (cyber_races)
@@ -32,6 +33,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 	public function ajax_get_races() {
 		$this->verify_nonce();
+		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
 		$world_id  = sanitize_text_field( $_POST['world_id']  ?? '' );
 		$search    = sanitize_text_field( $_POST['search']    ?? '' );
@@ -56,6 +58,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 	public function ajax_get_race() {
 		$this->verify_nonce();
+		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
 		if ( ! $id ) {
 			wp_send_json_error( 'Missing id' );
@@ -70,6 +73,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 	public function ajax_save_race() {
 		$this->verify_nonce();
+		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
 
@@ -106,6 +110,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 	public function ajax_toggle_race() {
 		$this->verify_nonce();
+		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 		$id    = sanitize_text_field( $_POST['id']    ?? '' );
 		$state = filter_var( $_POST['state'] ?? false, FILTER_VALIDATE_BOOLEAN );
 
@@ -122,6 +127,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 	public function ajax_delete_race() {
 		$this->verify_nonce();
+		if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
 		if ( ! $id ) {
 			wp_send_json_error( 'Missing id' );
