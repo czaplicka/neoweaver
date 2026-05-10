@@ -104,22 +104,30 @@ class NW_Skills_Admin {
 		<?php
 	}
 
-	public function ajax_load(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$rows = $this->cached_get_all( $this->table, 'name' );
-		if ( isset( $rows['error'] ) ) {
-			wp_send_json_error( $rows['error'] );
-			return;
-		}
-
-		wp_send_json_success( $rows );
+public function ajax_load(): void {
+		error_log( 'Received nonce: ' . ( $_POST['nonce'] ?? 'MISSING' ) );
+	error_log( 'Expected action: ' . $this->nonce_action );
+	error_log( 'Verify result: ' . ( wp_verify_nonce( $_POST['nonce'] ?? '', $this->nonce_action ) ? 'VALID' : 'INVALID' ) );
+	// Zamiast check_ajax_referer (które wywala 403), użyj wp_verify_nonce
+	$nonce = $_POST['nonce'] ?? '';
+	if ( ! wp_verify_nonce( $nonce, $this->nonce_action ) ) {
+		wp_send_json_error( 'Invalid nonce', 403 );
+		return;
 	}
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Forbidden', 403 );
+		return;
+	}
+
+	$rows = $this->cached_get_all( $this->table, 'name' );
+	if ( isset( $rows['error'] ) ) {
+		wp_send_json_error( $rows['error'] );
+		return;
+	}
+
+	wp_send_json_success( $rows );
+}
 
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
