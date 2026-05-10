@@ -38,17 +38,6 @@ class NW_Skills_Admin {
 
 	private string $page_hook = '';
 
-public function register_menu(): void {
-	$this->page_hook = add_submenu_page(
-		'neoweaver',
-		'Skills',
-		'✨Skills',
-		'manage_options',
-		$this->page_slug,
-		[ $this, 'render_page' ]
-	);
-}
-
 public function enqueue( string $hook ): void {
 	if ( $hook !== $this->page_hook ) {
 		return;
