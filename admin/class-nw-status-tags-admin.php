@@ -36,7 +36,7 @@ class NW_Status_Tags_Admin {
 		add_submenu_page(
 			'neoweaver',
 			'Status Tags',
-			'Status Tags',
+			'🔖Status Tags',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
