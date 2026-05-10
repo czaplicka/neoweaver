@@ -6,13 +6,19 @@ class NW_Abilities_Admin {
 
 	private string $page_slug = 'nw-abilities';
 
+	// BUG 2 FIX: Define the missing constants referenced in render_page() and ajax_save_ability().
+	// Values match the cyber_abilities schema; extend as needed.
+	private const ABILITY_TYPES = [ 'active', 'passive', 'reaction', 'aura' ];
+	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
+	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
+
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_get_abilities',    [ $this, 'ajax_get_abilities' ] );
-		add_action( 'wp_ajax_nw_save_ability',     [ $this, 'ajax_save_ability' ] );
-		add_action( 'wp_ajax_nw_delete_ability',   [ $this, 'ajax_delete_ability' ] );
-		add_action( 'wp_ajax_nw_reorder_abilities',[ $this, 'ajax_reorder_abilities' ] );
+		add_action( 'wp_ajax_nw_get_abilities',     [ $this, 'ajax_get_abilities'    ] );
+		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'     ] );
+		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'   ] );
+		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities'] );
 	}
 
 	public function register_menu(): void {
@@ -76,45 +82,110 @@ class NW_Abilities_Admin {
 		] );
 	}
 
+	// ── Supabase helper ───────────────────────────────────────────────────
+
+	/**
+	 * Thin wrapper around the shared Supabase REST helpers.
+	 * Returns [ 'ok' => bool, 'code' => int, 'data' => mixed, 'error' => string|null ].
+	 */
+	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
+		$method = strtoupper( $method );
+
+		// GET — delegate to tw_supabase_get() when available.
+		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+			$data = tw_supabase_get( $table, $query );
+			if ( ! is_array( $data ) ) {
+				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
+			}
+			if ( isset( $data['code'], $data['message'] ) ) {
+				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+			}
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
+		}
+
+		// POST / PATCH / DELETE — delegate to tw_supabase_request() when available.
+		if ( function_exists( 'tw_supabase_request' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+			$extra_args = [];
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
+			}
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+			if ( ! $ok ) {
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+			}
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
+		}
+
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
+	}
+
 	// ── AJAX ──────────────────────────────────────────────────────────────
 
 	public function ajax_get_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_abilities';
+		// BUG 5 FIX: Query Supabase via REST, not the local WP database.
+		$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY sort_order ASC, id ASC" );
-		wp_send_json_success( $rows );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
+			return;
+		}
+
+		wp_send_json_success( $res['data'] ?? [] );
 	}
 
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
 
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_abilities';
-
-		$id          = isset( $_POST['id'] ) ? intval( $_POST['id'] ) : 0;
+		// BUG 4 FIX: UUID primary key — never cast with intval(); use sanitize_text_field().
+		$id          = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 		$name        = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 		$description = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
 		$type        = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'active' ) );
 		$cost        = intval( $_POST['cost'] ?? 0 );
 		$tags        = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
 		$effect_json = wp_unslash( $_POST['effect_json'] ?? '{}' );
-		$active      = intval( $_POST['active'] ?? 1 );
+		$active      = (bool) intval( $_POST['active'] ?? 1 );
 
+		// BUG 3 FIX: Add return so execution stops when name is missing.
 		if ( empty( $name ) ) {
 			wp_send_json_error( 'Name is required.' );
+			return;
 		}
 
-		// validate effect_json
+		// Validate / sanitise effect_json.
 		json_decode( $effect_json );
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
 			$effect_json = '{}';
 		}
 
-		$data = [
+		$payload = [
 			'name'        => $name,
 			'description' => $description,
 			'type'        => $type,
@@ -124,46 +195,78 @@ class NW_Abilities_Admin {
 			'active'      => $active,
 		];
 
-		if ( $id > 0 ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->update( $table, $data, [ 'id' => $id ] );
+		// BUG 5 FIX: Write to Supabase, not local WP database.
+		if ( $id ) {
+			// Update existing row — filter by UUID.
+			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), $payload );
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Update failed.' );
+				return;
+			}
 			wp_send_json_success( [ 'action' => 'updated', 'id' => $id ] );
 		} else {
-			$data['sort_order'] = 0;
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->insert( $table, $data );
-			wp_send_json_success( [ 'action' => 'created', 'id' => $wpdb->insert_id ] );
+			// Insert new row; Supabase returns the created record.
+			$res = $this->supa( 'POST', 'cyber_abilities', $payload );
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Insert failed.' );
+				return;
+			}
+			$created = $res['data'][0] ?? $res['data'];
+			wp_send_json_success( [ 'action' => 'created', 'id' => $created['id'] ?? null ] );
 		}
 	}
 
 	public function ajax_delete_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-
-		$id = intval( $_POST['id'] ?? 0 );
-		if ( $id <= 0 ) {
-			wp_send_json_error( 'Invalid ID.' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
 
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$wpdb->delete( $wpdb->prefix . 'cyber_abilities', [ 'id' => $id ] );
+		// BUG 4+5 FIX: UUID — no intval(); delete via Supabase REST.
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		if ( ! $id ) {
+			wp_send_json_error( 'Invalid ID.' );
+			return;
+		}
+
+		$res = $this->supa( 'DELETE', 'cyber_abilities?id=eq.' . rawurlencode( $id ) );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Delete failed.' );
+			return;
+		}
+
 		wp_send_json_success( [ 'deleted' => $id ] );
 	}
 
 	public function ajax_reorder_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-
-		$order = isset( $_POST['order'] ) ? array_map( 'intval', (array) $_POST['order'] ) : [];
-		if ( empty( $order ) ) {
-			wp_send_json_error( 'No order data.' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
 
-		global $wpdb;
-		$table = $wpdb->prefix . 'cyber_abilities';
+		// BUG 4+5 FIX: IDs are UUIDs — keep as strings; update via Supabase REST.
+		$order = isset( $_POST['order'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['order'] ) ) : [];
+		if ( empty( $order ) ) {
+			wp_send_json_error( 'No order data.' );
+			return;
+		}
 
+		$errors = [];
 		foreach ( $order as $position => $id ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->update( $table, [ 'sort_order' => $position ], [ 'id' => $id ] );
+			if ( ! $id ) {
+				continue;
+			}
+			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'sort_order' => (int) $position ] );
+			if ( ! $res['ok'] ) {
+				$errors[] = $id;
+			}
+		}
+
+		if ( $errors ) {
+			wp_send_json_error( 'Reorder partially failed for IDs: ' . implode( ', ', $errors ) );
+			return;
 		}
 
 		wp_send_json_success( 'Reordered.' );
@@ -329,10 +432,11 @@ class NW_Abilities_Admin {
 	<?php }
 }
 
+// BUG 1 FIX: Instantiate the correct class name (NW_Abilities_Admin, not NeoWeaver_Abilities_Admin).
 add_action(
 	'plugins_loaded',
 	static function () {
-		new NeoWeaver_Abilities_Admin();
+		new NW_Abilities_Admin();
 	},
 	20
 );
