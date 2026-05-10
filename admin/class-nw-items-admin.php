@@ -5,137 +5,370 @@
  * @package NeoWeaver
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class NW_Items_Admin {
 
-    use NW_Transient_Cache;
+	private string $page_slug    = 'nw-items';
+	private string $table        = 'cyber_items';
+	private string $nonce_action = 'nw_items_nonce';
 
-    private string $page_slug    = 'nw-items';
-    private string $table        = 'cyber_items';
-    private string $nonce_action = 'nw_items_nonce';
+	public function __construct() {
+		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
+		add_action( 'wp_ajax_nw_items_load',   [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_items_save',   [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_items_delete', [ $this, 'ajax_delete' ] );
+	}
 
-    public function __construct() {
-        add_action( 'admin_menu',            [ $this, 'register_menu' ] );
-        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
-        add_action( 'wp_ajax_nw_items_load',   [ $this, 'ajax_load' ] );
-        add_action( 'wp_ajax_nw_items_save',   [ $this, 'ajax_save' ] );
-        add_action( 'wp_ajax_nw_items_delete', [ $this, 'ajax_delete' ] );
-    }
+	public function register_menu(): void {
+		add_submenu_page(
+			'neoweaver',
+			'Items',
+			'Items',
+			'manage_options',
+			$this->page_slug,
+			[ $this, 'render_page' ]
+		);
+	}
 
-    public function register_menu(): void {
-        add_submenu_page(
-            'neoweaver', 'Items', 'Items', 'manage_options',
-            $this->page_slug, [ $this, 'render_page' ]
-        );
-    }
+	public function enqueue( string $hook ): void {
+		if ( ! str_contains( $hook, $this->page_slug ) ) {
+			return;
+		}
 
-    public function enqueue( string $hook ): void {
-        if ( ! str_contains( $hook, $this->page_slug ) ) return;
-        wp_enqueue_style( 'nw-admin-shared', NW_PLUGIN_URL . 'admin/css/nw-admin-shared.css', [], NW_VERSION );
-        wp_enqueue_script( 'nw-items', NW_PLUGIN_URL . 'admin/js/nw-items.js', [ 'jquery' ], NW_VERSION, true );
-        wp_localize_script( 'nw-items', 'NW_IT', [
-            'ajax_url' => admin_url( 'admin-ajax.php' ),
-            'nonce'    => wp_create_nonce( $this->nonce_action ),
-        ] );
-    }
+		$plugin_url = defined( 'NW_PLUGIN_URL' )
+			? NW_PLUGIN_URL
+			: plugin_dir_url( dirname( __FILE__ ) );
 
-    public function render_page(): void {
-        ?>
-        <div class="wrap nw-admin-wrap">
-            <h1>Items</h1>
-            <button id="nw-add-item-btn" class="button button-primary">+ Add Item</button>
-            <div id="nw-item-form-wrap" style="display:none;" class="nw-card">
-                <h2 id="nw-form-title">Add Item</h2>
-                <table class="form-table" role="presentation">
-                    <tr>
-                        <th><label for="nw-field-name">Name *</label></th>
-                        <td><input type="text" id="nw-field-name" class="regular-text" /></td>
-                    </tr>
-                    <tr>
-                        <th><label for="nw-field-description">Description</label></th>
-                        <td><textarea id="nw-field-description" class="large-text" rows="3"></textarea></td>
-                    </tr>
-                    <tr>
-                        <th><label for="nw-field-type">Type</label></th>
-                        <td><input type="text" id="nw-field-type" class="regular-text" /></td>
-                    </tr>
-                    <tr>
-                        <th><label for="nw-field-rarity">Rarity</label></th>
-                        <td><input type="text" id="nw-field-rarity" class="regular-text" /></td>
-                    </tr>
-                    <tr>
-                        <th><label for="nw-field-value">Value</label></th>
-                        <td><input type="number" id="nw-field-value" class="small-text" value="0" /></td>
-                    </tr>
-                </table>
-                <p>
-                    <button id="nw-save-item-btn" class="button button-primary">Save Item</button>
-                    <button id="nw-cancel-item-btn" class="button">Cancel</button>
-                </p>
-                <div id="nw-form-notice" role="alert" aria-live="polite"></div>
-            </div>
-            <div id="nw-item-table-wrap"><p>Loading…</p></div>
-        </div>
-        <?php
-    }
+		$version = defined( 'NW_VERSION' )
+			? NW_VERSION
+			: ( defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0' );
 
-    public function ajax_load(): void {
-        check_ajax_referer( $this->nonce_action, 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+		wp_enqueue_style(
+			'nw-admin-shared',
+			$plugin_url . 'admin/css/nw-admin-shared.css',
+			[],
+			$version
+		);
 
-        $rows = $this->cached_get_all( $this->table, 'name' );
-        if ( isset( $rows['error'] ) ) { wp_send_json_error( $rows['error'] ); return; }
+		wp_enqueue_script(
+			'nw-items',
+			$plugin_url . 'admin/js/nw-items.js',
+			[ 'jquery' ],
+			$version,
+			true
+		);
 
-        wp_send_json_success( $rows );
-    }
+		wp_localize_script(
+			'nw-items',
+			'NW_IT',
+			[
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'nonce'    => wp_create_nonce( $this->nonce_action ),
+			]
+		);
+	}
 
-    public function ajax_save(): void {
-        check_ajax_referer( $this->nonce_action, 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+	public function render_page(): void {
+		?>
+		<div class="wrap nw-admin-wrap">
+			<h1>Items</h1>
+			<button id="nw-add-item-btn" class="button button-primary">+ Add Item</button>
+			<div id="nw-item-form-wrap" style="display:none;" class="nw-card">
+				<h2 id="nw-form-title">Add Item</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th><label for="nw-field-name">Name *</label></th>
+						<td><input type="text" id="nw-field-name" class="regular-text" /></td>
+					</tr>
+					<tr>
+						<th><label for="nw-field-description">Description</label></th>
+						<td><textarea id="nw-field-description" class="large-text" rows="3"></textarea></td>
+					</tr>
+					<tr>
+						<th><label for="nw-field-type">Type</label></th>
+						<td><input type="text" id="nw-field-type" class="regular-text" /></td>
+					</tr>
+					<tr>
+						<th><label for="nw-field-rarity">Rarity</label></th>
+						<td><input type="text" id="nw-field-rarity" class="regular-text" /></td>
+					</tr>
+					<tr>
+						<th><label for="nw-field-value">Value</label></th>
+						<td><input type="number" id="nw-field-value" class="small-text" value="0" /></td>
+					</tr>
+				</table>
+				<p>
+					<button id="nw-save-item-btn" class="button button-primary">Save Item</button>
+					<button id="nw-cancel-item-btn" class="button">Cancel</button>
+				</p>
+				<div id="nw-form-notice" role="alert" aria-live="polite"></div>
+			</div>
+			<div id="nw-item-table-wrap"><p>Loading…</p></div>
+		</div>
+		<?php
+	}
 
-        $id          = sanitize_text_field( $_POST['id']          ?? '' );
-        $name        = sanitize_text_field( $_POST['name']        ?? '' );
-        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $type        = sanitize_text_field( $_POST['type']        ?? '' );
-        $rarity      = sanitize_text_field( $_POST['rarity']      ?? '' );
-        $value       = intval( $_POST['value'] ?? 0 );
+	/* ---------------------------------------------------------------- */
+	/*  SUPABASE                                                         */
+	/* ---------------------------------------------------------------- */
 
-        if ( ! $name ) { wp_send_json_error( 'Name is required' ); return; }
+	/**
+	 * Normalized Supabase wrapper.
+	 *
+	 * Returns:
+	 * [
+	 *   'ok'    => bool,
+	 *   'code'  => int,
+	 *   'data'  => mixed,
+	 *   'error' => string|null,
+	 * ]
+	 */
+	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
+		$method = strtoupper( $method );
 
-        $payload = compact( 'name', 'description', 'type', 'rarity', 'value' );
+		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
 
-        if ( $id ) {
-            $res  = NW_Supabase::patch( $this->table, $id, $payload );
-        } else {
-            $res  = NW_Supabase::insert( $this->table, $payload );
-        }
-        $item = $res['data'][0] ?? null;
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
 
-        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+			$data = tw_supabase_get( $table, $query );
 
-        $code = $res['code'] ?? 0;
-        if ( $code >= 400 ) {
-            wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
-            return;
-        }
+			if ( ! is_array( $data ) ) {
+				return [
+					'ok'    => false,
+					'code'  => 0,
+					'data'  => null,
+					'error' => 'tw_supabase_get returned non-array',
+				];
+			}
 
-        $this->bust_cache( $this->table );
-        wp_send_json_success( $item );
-    }
+			if ( isset( $data['code'], $data['message'] ) ) {
+				return [
+					'ok'    => false,
+					'code'  => (int) $data['code'],
+					'data'  => null,
+					'error' => $data['message'],
+				];
+			}
 
-    public function ajax_delete(): void {
-        check_ajax_referer( $this->nonce_action, 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+			return [
+				'ok'    => true,
+				'code'  => 200,
+				'data'  => $data,
+				'error' => null,
+			];
+		}
 
-        $id = sanitize_text_field( $_POST['id'] ?? '' );
-        if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
+		if ( function_exists( 'tw_supabase_request' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
 
-        $res = NW_Supabase::delete( $this->table, $id );
-        if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
 
-        $this->bust_cache( $this->table );
-        wp_send_json_success( 'deleted' );
-    }
+			$extra_args = [];
+
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
+			}
+
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+
+			$res = tw_supabase_request(
+				$method,
+				$table,
+				$query,
+				empty( $body ) ? null : $body,
+				$extra_args
+			);
+
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+
+			if ( ! $ok ) {
+				$msg = is_array( $data )
+					? ( $data['message'] ?? 'Supabase error ' . $code )
+					: 'Supabase error ' . $code;
+
+				return [
+					'ok'    => false,
+					'code'  => $code,
+					'data'  => $data,
+					'error' => $msg,
+				];
+			}
+
+			return [
+				'ok'    => true,
+				'code'  => $code,
+				'data'  => $data,
+				'error' => null,
+			];
+		}
+
+		return [
+			'ok'    => false,
+			'code'  => 0,
+			'data'  => null,
+			'error' => 'Supabase helper functions not available.',
+		];
+	}
+
+	/* ---------------------------------------------------------------- */
+	/*  CACHE FALLBACK                                                   */
+	/* ---------------------------------------------------------------- */
+
+	private function get_cache_key( string $suffix ): string {
+		return 'nw_' . md5( $suffix );
+	}
+
+	private function bust_cache( string $scope ): void {
+		delete_transient( $this->get_cache_key( $scope . '_all' ) );
+	}
+
+	private function cached_get_all( string $table, string $order_by = 'name' ): array {
+		$cache_key = $this->get_cache_key( $table . '_all' );
+
+		$cached = get_transient( $cache_key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$res = $this->supa(
+			'GET',
+			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.asc'
+		);
+
+		if ( ! $res['ok'] ) {
+			return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
+		}
+
+		$rows = is_array( $res['data'] ) ? $res['data'] : [];
+		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+
+		return $rows;
+	}
+
+	/* ---------------------------------------------------------------- */
+	/*  AJAX                                                             */
+	/* ---------------------------------------------------------------- */
+
+	public function ajax_load(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$rows = $this->cached_get_all( $this->table, 'name' );
+
+		if ( isset( $rows['error'] ) ) {
+			wp_send_json_error( $rows['error'] );
+			return;
+		}
+
+		wp_send_json_success( $rows );
+	}
+
+	public function ajax_save(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$id          = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$name        = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$description = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$type        = sanitize_text_field( wp_unslash( $_POST['type'] ?? '' ) );
+		$rarity      = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? '' ) );
+		$value       = intval( $_POST['value'] ?? 0 );
+
+		if ( ! $name ) {
+			wp_send_json_error( 'Name is required' );
+			return;
+		}
+
+		$payload = [
+			'name'        => $name,
+			'description' => $description ?: null,
+			'type'        => $type ?: null,
+			'rarity'      => $rarity ?: null,
+			'value'       => $value,
+		];
+
+		if ( $id ) {
+			$res = $this->supa(
+				'PATCH',
+				$this->table . '?id=eq.' . rawurlencode( $id ),
+				$payload
+			);
+		} else {
+			$res = $this->supa(
+				'POST',
+				$this->table,
+				$payload
+			);
+		}
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Save failed.' );
+			return;
+		}
+
+		$item = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+
+		$this->bust_cache( $this->table );
+		wp_send_json_success( $item );
+	}
+
+	public function ajax_delete(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+
+		if ( ! $id ) {
+			wp_send_json_error( 'Missing ID' );
+			return;
+		}
+
+		$res = $this->supa(
+			'DELETE',
+			$this->table . '?id=eq.' . rawurlencode( $id )
+		);
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Delete failed' );
+			return;
+		}
+
+		$this->bust_cache( $this->table );
+		wp_send_json_success( 'deleted' );
+	}
 }
-new NeoWeaver_Items_Admin();
+
+add_action(
+	'plugins_loaded',
+	static function () {
+		new NW_Items_Admin();
+	},
+	20
+);
