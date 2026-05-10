@@ -1,1 +1,169 @@
-PD9waHAKLyoqCiAqIE5lb1dlYXZlciBBZG1pbiBQYW5lbCDigJQgQ29udGFpbmVycyAoY3liZXJfY29udGFpbmVycykKICogQ29sdW1uczogaWQsIG5hbWUsIGRlc2NyaXB0aW9uLCB0b3RhbF9zbG90cywgYWxsb3dlZF9zaXplcywKICogICAgICAgICAgaW1nX3VybCwgcmFyaXR5LCBpc19hY3RpdmUsIGNyZWF0ZWRfYXQsIHBhcmVudF9pZAogKi8KaWYgKCAhIGRlZmluZWQoICdBQlNQQVRIJyApICkgZXhpdDsKCmNsYXNzIE5lb1dlYXZlcl9Db250YWluZXJzX0FkbWluIHsKCiAgICBwcml2YXRlIHN0cmluZyAkc3VwYWJhc2VfdXJsOwogICAgcHJpdmF0ZSBzdHJpbmcgJHN1cGFiYXNlX2tleTsKICAgIHByaXZhdGUgc3RyaW5nICRwYWdlX3NsdWcgPSAnbmVvd2VhdmVyLWNvbnRhaW5lcnMnOwogICAgcHJpdmF0ZSBzdHJpbmcgJG1lbnVfc2x1ZyA9ICduZW93ZWF2ZXInOwoKICAgIHB1YmxpYyBmdW5jdGlvbiBfX2NvbnN0cnVjdCgpIHsKICAgICAgICAkdGhpcy0+c3VwYWJhc2VfdXJsID0gcnRyaW0oIHR3X3N1cGFiYXNlX3VybCgpLCAnLycgKTsKICAgICAgICAkdGhpcy0+c3VwYWJhc2Vfa2V5ID0gdHdfc3VwYWJhc2VfYW5vbl9rZXkoKTsKCiAgICAgICAgYWRkX2FjdGlvbiggJ2FkbWluX21lbnUnLCAgICAgICAgICAgIFsgJHRoaXMsICdyZWdpc3Rlcl9tZW51JyAgXSApOwogICAgICAgIGFkZF9hY3Rpb24oICdhZG1pbl9lbnF1ZXVlX3NjcmlwdHMnLCBbICR0aGlzLCAnZW5xdWV1ZV9hc3NldHMnIF0gKTsKCiAgICAgICAgYWRkX2FjdGlvbiggJ3dwX2FqYXhfbndfc29udGFpbmVyc19nZXRfYWxsJywgWyAkdGhpcywgJ2FqYXhfZ2V0X2FsbCcgXSApOwogICAgICAgIGFkZF9hY3Rpb24oICd3cF9hamF4X253X2NvbnRhaW5lcnNfc2F2ZScsICAgIFsgJHRoaXMsICdhamF4X3NhdmUnICAgIF0gKTsKICAgICAgICBhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19jb250YWluZXJzX3RvZ2dsZScsICBbICR0aGlzLCAnYWpheF90b2dnbGUnICBdICk7CiAgICB9CgogICAgcHVibGljIGZ1bmN0aW9uIHJlZ2lzdGVyX21lbnUoKTogdm9pZCB7CiAgICAgICAgYWRkX3N1Ym1lbnVfcGFnZSgKICAgICAgICAgICAgJHRoaXMtPm1lbnVfc2x1ZywKICAgICAgICAgICAgJ05lb1dlYXZlciDigJQgQ29udGFpbmVycycsCiAgICAgICAgICAgICfwn5SmIENvbnRhaW5lcnMnLAogICAgICAgICAgICAnbWFuYWdlX29wdGlvbnMnLAogICAgICAgICAgICAkdGhpcy0+cGFnZV9zbHVnLAogICAgICAgICAgICBbICR0aGlzLCAncmVuZGVyX3BhZ2UnIF0KICAgICAgICApOwogICAgfQoKICAgIHB1YmxpYyBmdW5jdGlvbiBlbnF1ZXVlX2Fzc2V0cyggc3RyaW5nICRob29rICk6IHZvaWQgewogICAgICAgIGlmICggISBzdHJfY29udGFpbnMoICRob29rLCAkdGhpcy0+cGFnZV9zbHVnICkgKSByZXR1cm47CgogICAgICAgICRwbHVnaW5fdXJsID0gcGx1Z2luX2Rpcl91cmwoIGRpcm5hbWUoIF9fRklMRV9fICkgKTsKCiAgICAgICAgaWYgKCAhIHdwX3N0eWxlX2lzKCAnY2hha3JhLXBldGNoJywgJ2VucXVldWVkJyApICkgewogICAgICAgICAgICB3cF9lbnF1ZXVlX3N0eWxlKAogICAgICAgICAgICAgICAgJ2NoYWtyYS1wZXRjaCcsCiAgICAgICAgICAgICAgICAnaHR0cHM6Ly9mb250cy5nb29nbGVhcGlzLmNvbS9jc3MyP2ZhbWlseT1DaGFrcmErUGV0Y2g6d2dodEA0MDA7NjAwOzcwMCZkaXNwbGF5PXN3YXAnLAogICAgICAgICAgICAgICAgW10sCiAgICAgICAgICAgICAgICBudWxsCiAgICAgICAgICAgICk7CiAgICAgICAgfQoKICAgICAgICB3cF9lbnF1ZXVlX3N0eWxlKAogICAgICAgICAgICAnbmctYWRtaW4tY29yZScsCiAgICAgICAgICAgICRwbHVnaW5fdXJsIC4gJ2Fzc2V0cy9jc3MvbnctYWRtaW4tY29yZS5jc3MnLAogICAgICAgICAgICBbICdjaGFrcmEtcGV0Y2gnIF0sCiAgICAgICAgICAgIE5FT1dFQVZFUl9WRVJTSU9OCiAgICAgICAgKTsKCiAgICAgICAgd3BfZW5xdWV1ZV9zdHlsZSgKICAgICAgICAgICAgJ253LWNvbnRhaW5lcnMtc3R5bGUnLAogICAgICAgICAgICAkcGx1Z2luX3VybCAuICdhc3NldHMvY3NzL2NvbnRhaW5lcnMtYWRtaW4uY3NzJywKICAgICAgICAgICAgWyAnY2hha3JhLXBldGNoJywgJ253LWFkbWluLWNvcmUnIF0sCiAgICAgICAgICAgIE5FT1dFQVZFUl9WRVJTSU9OCiAgICAgICAgKTsKCiAgICAgICAgd3BfZW5xdWV1ZV9zY3JpcHQoCiAgICAgICAgICAgICdud19jb250YWluZXJzLXNjcmlwdCcsCiAgICAgICAgICAgICRwbHVnaW5fdXJsIC4gJ2Fzc2V0cy9qcy9jb250YWluZXJzLWFkbWluLmpzJywKICAgICAgICAgICAgWyAnanF1ZXJ5JyBdLAogICAgICAgICAgICBORU9XRUFWRVJWRVJTSU9OLAogICAgICAgICAgICB0cnVlCiAgICAgICAgKTsKCiAgICAgICAgd3BfbG9jYWxpemVfc2NyaXB0KAogICAgICAgICAgICAnbndfc29udGFpbmVycy1zY3JpcHQnLAogICAgICAgICAgICAnTldDb250YWluZXJzJywKICAgICAgICAgICAgWwogICAgICAgICAgICAgICAgJ2FqYXh1cmwnID0+IGFkbWluX3VybCggJ2FkbWluLWFqYXgucGhwJyApLAogICAgICAgICAgICAgICAgJ25vbmNlJyAgID0+IHdwX2NyZWF0ZV9ub25jZSggJ25lb3dlYXZlcl9jb250YWluZXJzJyApLAogICAgICAgICAgICBdCiAgICAgICAgKTsKICAgIH0KfQo=
+<?php
+/**
+ * NeoWeaver Admin Panel — Containers (cyber_containers)
+ * Columns: id, name, description, total_slots, allowed_sizes,
+ *          img_url, rarity, is_active, created_at, parent_id
+ */
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class NeoWeaver_Containers_Admin {
+
+    private string $supabase_url;
+    private string $supabase_key;
+    private string $page_slug = 'neoweaver-containers';
+    private string $menu_slug = 'neoweaver';
+
+    public function __construct() {
+        $this->supabase_url = rtrim( tw_supabase_url(), '/' );
+        $this->supabase_key = tw_supabase_anon_key();
+
+        add_action( 'admin_menu',            [ $this, 'register_menu'  ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+        add_action( 'wp_ajax_nw_containers_get_all', [ $this, 'ajax_get_all' ] );
+        add_action( 'wp_ajax_nw_containers_save',    [ $this, 'ajax_save'    ] );
+        add_action( 'wp_ajax_nw_containers_toggle',  [ $this, 'ajax_toggle'  ] );
+    }
+
+    public function register_menu(): void {
+        add_submenu_page(
+            $this->menu_slug,
+            'NeoWeaver — Containers',
+            '📦 Containers',
+            'manage_options',
+            $this->page_slug,
+            [ $this, 'render_page' ]
+        );
+    }
+
+    public function enqueue_assets( string $hook ): void {
+        if ( ! str_contains( $hook, $this->page_slug ) ) return;
+
+        $plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+
+        if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+            wp_enqueue_style(
+                'chakra-petch',
+                'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+                [],
+                null
+            );
+        }
+
+        wp_enqueue_style(
+            'nw-admin-core',
+            $plugin_url . 'assets/css/nw-admin-core.css',
+            [ 'chakra-petch' ],
+            NEOWEAVER_VERSION
+        );
+
+        wp_enqueue_style(
+            'nw-containers-style',
+            $plugin_url . 'assets/css/containers-admin.css',
+            [ 'chakra-petch', 'nw-admin-core' ],
+            NEOWEAVER_VERSION
+        );
+
+        wp_enqueue_script(
+            'nw-containers-script',
+            $plugin_url . 'assets/js/containers-admin.js',
+            [ 'jquery' ],
+            NEOWEAVER_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'nw-containers-script',
+            'NWContainers',
+            [
+                'ajaxurl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'neoweaver_containers' ),
+                'supa_url' => $this->supabase_url,
+                'supa_key' => $this->supabase_key,
+            ]
+        );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Supabase helper                                                    */
+    /* ------------------------------------------------------------------ */
+
+    private function supa( string $method, string $endpoint, array $body = [] ): array {
+        $url  = $this->supabase_url . '/rest/v1/' . $endpoint;
+        $args = [
+            'method'  => $method,
+            'headers' => [
+                'apikey'        => $this->supabase_key,
+                'Authorization' => 'Bearer ' . $this->supabase_key,
+                'Content-Type'  => 'application/json',
+                'Prefer'        => 'return=representation',
+            ],
+        ];
+        if ( ! empty( $body ) ) {
+            $args['body'] = wp_json_encode( $body );
+        }
+        $response = wp_remote_request( $url, $args );
+        if ( is_wp_error( $response ) ) {
+            return [ 'error' => $response->get_error_message() ];
+        }
+        return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  AJAX — get all                                                     */
+    /* ------------------------------------------------------------------ */
+
+    public function ajax_get_all(): void {
+        check_ajax_referer( 'neoweaver_containers', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
+
+        $rows = $this->supa( 'GET', 'cyber_containers?select=*&order=name.asc' );
+        isset( $rows['error'] ) ? wp_send_json_error( $rows['error'] ) : wp_send_json_success( $rows );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  AJAX — save (insert or update)                                     */
+    /* ------------------------------------------------------------------ */
+
+    public function ajax_save(): void {
+        check_ajax_referer( 'neoweaver_containers', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
+
+        $id   = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+        $data = [
+            'name'         => sanitize_text_field(     $_POST['name']         ?? '' ),
+            'description'  => sanitize_textarea_field( $_POST['description']  ?? '' ),
+            'total_slots'  => absint(                  $_POST['total_slots']  ?? 0  ),
+            'allowed_sizes'=> sanitize_text_field(     $_POST['allowed_sizes']?? '' ),
+            'img_url'      => esc_url_raw(             $_POST['img_url']      ?? '' ),
+            'rarity'       => sanitize_text_field(     $_POST['rarity']       ?? 'common' ),
+            'is_active'    => filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
+        ];
+
+        if ( $id ) {
+            $res = $this->supa( 'PATCH', 'cyber_containers?id=eq.' . $id, $data );
+        } else {
+            $res = $this->supa( 'POST',  'cyber_containers', $data );
+        }
+
+        isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res );
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  AJAX — toggle active                                               */
+    /* ------------------------------------------------------------------ */
+
+    public function ajax_toggle(): void {
+        check_ajax_referer( 'neoweaver_containers', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Forbidden', 403 );
+
+        $id    = absint( $_POST['id'] ?? 0 );
+        $state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
+        if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
+        $res = $this->supa( 'PATCH', 'cyber_containers?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
+        isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
+    }
+
+}
+
+new NeoWeaver_Containers_Admin();
