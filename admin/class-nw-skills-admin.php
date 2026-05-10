@@ -45,14 +45,14 @@ class NW_Skills_Admin {
 
 	wp_enqueue_style(
 		'nw-admin-shared',
-		NEOWEAVER_PLUGIN_URL . 'admin/css/nw-admin-shared.css',
+		NEOWEAVER_PLUGIN_URL . 'admin/css/skills-admin.css',
 		[],
 		defined( 'NW_VERSION' ) ? NW_VERSION : null
 	);
 
 	wp_enqueue_script(
 		'nw-skills',
-		NEOWEAVER_PLUGIN_URL . 'admin/js/nw-skills.js',
+		NEOWEAVER_PLUGIN_URL . 'admin/js/skills-admin.js',
 		[ 'jquery' ],
 		defined( 'NW_VERSION' ) ? NW_VERSION : null,
 		true
