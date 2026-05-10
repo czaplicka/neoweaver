@@ -35,21 +35,29 @@
             this.clearNotice();
         },
 
-        loadSkills() {
-            $('#nw-skill-table-wrap').html('<p>Loading…</p>');
-            
-            $.post(NW_SK.ajax_url, {
-                action: 'nw_skills_load',
-                nonce: NW_SK.nonce
-            }, (res) => {
-                if (res.success) {
-                    this.renderTable(res.data);
-                } else {
-                    this.showNotice('Error loading skills: ' + res.data, 'error');
-                    $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
-                }
-            });
-        },
+       loadSkills() {
+    $('#nw-skill-table-wrap').html('<p>Loading…</p>');
+
+    $.post(NW_SK.ajax_url, {
+        action: 'nw_skills_load',
+        nonce: NW_SK.nonce
+    }, (res) => {
+        console.log('nw_skills_load response:', res);
+
+        if (!res || !res.success) {
+            this.showNotice('Error loading skills: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
+            $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
+            return;
+        }
+
+        const rows = Array.isArray(res.data) ? res.data : [];
+        this.renderTable(rows);
+    }).fail((xhr) => {
+        console.log('nw_skills_load fail:', xhr.responseText);
+        this.showNotice('AJAX request failed.', 'error');
+        $('#nw-skill-table-wrap').html('<p style="color:#d63638;">AJAX failed.</p>');
+    });
+}
 
         renderTable(skills) {
             if (!skills || skills.length === 0) {
@@ -78,22 +86,31 @@
             $('#nw-skill-table-wrap').html(html);
         },
 
-        editSkill(e) {
-            const id = $(e.currentTarget).data('id');
-            
-            // Załaduj wszystkie skills i znajdź ten konkretny
-            $.post(NW_SK.ajax_url, {
-                action: 'nw_skills_load',
-                nonce: NW_SK.nonce
-            }, (res) => {
-                if (res.success) {
-                    const skill = res.data.find(s => s.id == id);
-                    if (skill) {
-                        this.showForm(skill);
-                    }
-                }
-            });
-        },
+       editSkill(e) {
+    const id = $(e.currentTarget).data('id');
+
+    $.post(NW_SK.ajax_url, {
+        action: 'nw_skills_load',
+        nonce: NW_SK.nonce
+    }, (res) => {
+        console.log('edit load response:', res);
+
+        if (!res || !res.success || !Array.isArray(res.data)) {
+            this.showNotice('Could not load skill data.', 'error');
+            return;
+        }
+
+        const skill = res.data.find(s => String(s.id) === String(id));
+        if (skill) {
+            this.showForm(skill);
+        } else {
+            this.showNotice('Skill not found.', 'error');
+        }
+    }).fail((xhr) => {
+        console.log('edit fail:', xhr.responseText);
+        this.showNotice('AJAX request failed.', 'error');
+    });
+}
 
         saveSkill() {
             const name = $('#nw-field-name').val().trim();
