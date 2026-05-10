@@ -24,6 +24,7 @@ class NW_Skills_Admin {
 		add_action( 'wp_ajax_nw_skills_load',   [ $this, 'ajax_load' ] );
 		add_action( 'wp_ajax_nw_skills_save',   [ $this, 'ajax_save' ] );
 		add_action( 'wp_ajax_nw_skills_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_skills_get_all', [ $this, 'ajax_load' ] );
 	}
 
 	public function register_menu(): void {
