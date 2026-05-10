@@ -96,7 +96,8 @@ class NeoWeaver_Achievements_Admin {
 			]
 		);
 	}
-/* ---------------------------------------------------------------- */
+
+	/* ---------------------------------------------------------------- */
 	/*  SUPABASE                                                         */
 	/*                                                                   */
 	/*  Zawsze zwraca: [ 'ok' => bool, 'code' => int, 'data' => mixed,  */
@@ -108,11 +109,10 @@ class NeoWeaver_Achievements_Admin {
 
 		/* --- GET: tw_supabase_get zwraca bezpośrednio tablicę danych --- */
 		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
-			// Rozbij endpoint na tabelę i query string
-			$parts    = explode( '?', $endpoint, 2 );
-			$table    = $parts[0];
-			$qs       = $parts[1] ?? '';
-			$query    = [];
+			$parts = explode( '?', $endpoint, 2 );
+			$table = $parts[0];
+			$qs    = $parts[1] ?? '';
+			$query = [];
 
 			if ( $qs ) {
 				parse_str( $qs, $query );
@@ -124,7 +124,6 @@ class NeoWeaver_Achievements_Admin {
 				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
 			}
 
-			// Supabase zwraca błąd jako ['code' => ..., 'message' => ...] zamiast tablicy wierszy
 			if ( isset( $data['code'], $data['message'] ) ) {
 				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
 			}
@@ -134,17 +133,15 @@ class NeoWeaver_Achievements_Admin {
 
 		/* --- POST/PATCH/DELETE: tw_supabase_request zwraca ['ok','code','data'] --- */
 		if ( function_exists( 'tw_supabase_request' ) ) {
-			// Rozbij endpoint na tabelę i query string
-			$parts  = explode( '?', $endpoint, 2 );
-			$table  = $parts[0];
-			$qs     = $parts[1] ?? '';
-			$query  = [];
+			$parts = explode( '?', $endpoint, 2 );
+			$table = $parts[0];
+			$qs    = $parts[1] ?? '';
+			$query = [];
 
 			if ( $qs ) {
 				parse_str( $qs, $query );
 			}
 
-			// Dodaj Prefer header dla write operations
 			$extra_args = [];
 			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
 				$extra_args['headers']['Prefer'] = 'return=representation';
@@ -158,7 +155,6 @@ class NeoWeaver_Achievements_Admin {
 
 			$res = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
 
-			// Normalizuj — helper już zwraca ['ok', 'code', 'data']
 			$ok   = $res['ok']   ?? false;
 			$code = $res['code'] ?? 0;
 			$data = $res['data'] ?? null;
@@ -195,11 +191,11 @@ class NeoWeaver_Achievements_Admin {
 		$qs = 'cyber_achievements?select=id,title,description,icon_slug,bg_color,scope,goal,hidden_until_earned,category,is_active&order=category.asc,title.asc&limit=1000';
 
 		if ( $cat ) {
-			$qs .= '&category=eq.' . rawrawurlencode( $cat );
+			$qs .= '&category=eq.' . rawurlencode( $cat );
 		}
 
 		if ( $sc ) {
-			$qs .= '&scope=eq.' . rawrawurlencode( $sc );
+			$qs .= '&scope=eq.' . rawurlencode( $sc );
 		}
 
 		$res = $this->supa( 'GET', $qs );
@@ -252,7 +248,7 @@ class NeoWeaver_Achievements_Admin {
 		}
 
 		$endpoint = $orig_id
-			? 'cyber_achievements?id=eq.' . rawrawurlencode( $orig_id )
+			? 'cyber_achievements?id=eq.' . rawurlencode( $orig_id )
 			: 'cyber_achievements';
 
 		$res = $this->supa( $orig_id ? 'PATCH' : 'POST', $endpoint, $payload );
@@ -284,7 +280,7 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa(
 			'PATCH',
-			'cyber_achievements?id=eq.' . rawrawurlencode( $id ),
+			'cyber_achievements?id=eq.' . rawurlencode( $id ),
 			[ 'is_active' => $state ]
 		);
 
@@ -313,7 +309,7 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa(
 			'DELETE',
-			'cyber_achievements?id=eq.' . rawrawurlencode( $id )
+			'cyber_achievements?id=eq.' . rawurlencode( $id )
 		);
 
 		if ( ! $res['ok'] ) {

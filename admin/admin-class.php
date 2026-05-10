@@ -31,29 +31,18 @@ class NeoWeaver_Admin {
 	/* ------------------------------------------------------------------ */
 
 public function register_menu(): void {
+    $svg_icon = 'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg( 20, '#a0a0a0' ) );
+
     add_menu_page(
         'NeoWeaver',
         'NeoWeaver',
         'manage_options',
         $this->slug,
         array( $this, 'render_page' ),
-        'none',   // ← tymczasowo none
+        $svg_icon,   // ← bezpośrednio base64 SVG
         30
     );
-
-    // Ikona przez CSS — niezawodna metoda
-    add_action( 'admin_head', function() {
-        $svg = base64_encode( $this->logo_svg( 20, '#a0a0a0' ) );
-        echo '<style>
-            #adminmenu .menu-icon-neoweaver div.wp-menu-image:before {
-                content: "" !important;
-                background-image: url("data:image/svg+xml;base64,' . $svg . '") !important;
-                background-repeat: no-repeat;
-                background-position: center;
-                background-size: 20px 20px;
-            }
-        </style>';
-    });
+    // Usuń osobny add_action dla admin_head z CSS — nie jest już potrzebny
 }
 
 	public function rename_first_submenu(): void {

@@ -6,8 +6,6 @@ class NW_Abilities_Admin {
 
 	private string $page_slug = 'nw-abilities';
 
-	// BUG 2 FIX: Define the missing constants referenced in render_page() and ajax_save_ability().
-	// Values match the cyber_abilities schema; extend as needed.
 	private const ABILITY_TYPES = [ 'active', 'passive', 'reaction', 'aura' ];
 	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
@@ -15,10 +13,11 @@ class NW_Abilities_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_get_abilities',     [ $this, 'ajax_get_abilities'    ] );
-		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'     ] );
-		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'   ] );
-		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities'] );
+		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
+		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
+		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'      ] );
+		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'    ] );
+		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
 	}
 
 	public function register_menu(): void {
@@ -84,14 +83,9 @@ class NW_Abilities_Admin {
 
 	// ── Supabase helper ───────────────────────────────────────────────────
 
-	/**
-	 * Thin wrapper around the shared Supabase REST helpers.
-	 * Returns [ 'ok' => bool, 'code' => int, 'data' => mixed, 'error' => string|null ].
-	 */
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
-		// GET — delegate to tw_supabase_get() when available.
 		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
 			$query = [];
@@ -108,7 +102,6 @@ class NW_Abilities_Admin {
 			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
 
-		// POST / PATCH / DELETE — delegate to tw_supabase_request() when available.
 		if ( function_exists( 'tw_supabase_request' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
 			$query = [];
@@ -145,7 +138,6 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		// BUG 5 FIX: Query Supabase via REST, not the local WP database.
 		$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
 
 		if ( ! $res['ok'] ) {
@@ -163,41 +155,51 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		// BUG 4 FIX: UUID primary key — never cast with intval(); use sanitize_text_field().
-		$id          = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name        = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$description = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
-		$type        = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'active' ) );
-		$cost        = intval( $_POST['cost'] ?? 0 );
-		$tags        = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
-		$effect_json = wp_unslash( $_POST['effect_json'] ?? '{}' );
-		$active      = (bool) intval( $_POST['active'] ?? 1 );
+		$id             = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$name           = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$title          = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
+		$description    = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$ability_type   = sanitize_text_field( wp_unslash( $_POST['ability_type'] ?? 'active' ) );
+		$cost_type      = sanitize_text_field( wp_unslash( $_POST['cost_type'] ?? 'none' ) );
+		$cost_value     = intval( $_POST['cost_value'] ?? 0 );
+		$target_type    = sanitize_text_field( wp_unslash( $_POST['target_type'] ?? 'self' ) );
+		$range_tiles    = intval( $_POST['range_tiles'] ?? 1 );
+		$duration_turns = intval( $_POST['duration_turns'] ?? 0 );
+		$is_passive     = (bool) intval( $_POST['is_passive'] ?? 0 );
+		$is_active      = (bool) intval( $_POST['is_active'] ?? 1 );
+		$tags           = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
+		$img_url        = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
+		$source         = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
+		$gm_notes       = sanitize_textarea_field( wp_unslash( $_POST['gm_notes'] ?? '' ) );
 
-		// BUG 3 FIX: Add return so execution stops when name is missing.
-		if ( empty( $name ) ) {
-			wp_send_json_error( 'Name is required.' );
+		if ( empty( $name ) && empty( $title ) ) {
+			wp_send_json_error( 'Name or Title is required.' );
 			return;
 		}
 
-		// Validate / sanitise effect_json.
-		json_decode( $effect_json );
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			$effect_json = '{}';
-		}
+		// Use title as name fallback and vice-versa.
+		if ( empty( $name ) ) $name = $title;
+		if ( empty( $title ) ) $title = $name;
 
 		$payload = [
-			'name'        => $name,
-			'description' => $description,
-			'type'        => $type,
-			'cost'        => $cost,
-			'tags'        => $tags,
-			'effect_json' => $effect_json,
-			'active'      => $active,
+			'name'           => $name,
+			'title'          => $title,
+			'description'    => $description,
+			'ability_type'   => $ability_type,
+			'cost_type'      => $cost_type,
+			'cost_value'     => $cost_value,
+			'target_type'    => $target_type,
+			'range_tiles'    => $range_tiles,
+			'duration_turns' => $duration_turns,
+			'is_passive'     => $is_passive,
+			'is_active'      => $is_active,
+			'tags'           => $tags,
+			'img_url'        => $img_url ?: null,
+			'source'         => $source ?: null,
+			'gm_notes'       => $gm_notes ?: null,
 		];
 
-		// BUG 5 FIX: Write to Supabase, not local WP database.
 		if ( $id ) {
-			// Update existing row — filter by UUID.
 			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), $payload );
 			if ( ! $res['ok'] ) {
 				wp_send_json_error( $res['error'] ?? 'Update failed.' );
@@ -205,7 +207,6 @@ class NW_Abilities_Admin {
 			}
 			wp_send_json_success( [ 'action' => 'updated', 'id' => $id ] );
 		} else {
-			// Insert new row; Supabase returns the created record.
 			$res = $this->supa( 'POST', 'cyber_abilities', $payload );
 			if ( ! $res['ok'] ) {
 				wp_send_json_error( $res['error'] ?? 'Insert failed.' );
@@ -216,6 +217,30 @@ class NW_Abilities_Admin {
 		}
 	}
 
+	public function ajax_toggle_ability(): void {
+		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$id        = sanitize_text_field( wp_unslash( $_POST['ability_id'] ?? '' ) );
+		$is_active = (bool) intval( $_POST['is_active'] ?? 0 );
+
+		if ( ! $id ) {
+			wp_send_json_error( 'Invalid ID.' );
+			return;
+		}
+
+		$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'is_active' => $is_active ] );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Toggle failed.' );
+			return;
+		}
+
+		wp_send_json_success( [ 'id' => $id, 'is_active' => $is_active ] );
+	}
+
 	public function ajax_delete_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -223,7 +248,6 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		// BUG 4+5 FIX: UUID — no intval(); delete via Supabase REST.
 		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -246,7 +270,6 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		// BUG 4+5 FIX: IDs are UUIDs — keep as strings; update via Supabase REST.
 		$order = isset( $_POST['order'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['order'] ) ) : [];
 		if ( empty( $order ) ) {
 			wp_send_json_error( 'No order data.' );
@@ -255,13 +278,9 @@ class NW_Abilities_Admin {
 
 		$errors = [];
 		foreach ( $order as $position => $id ) {
-			if ( ! $id ) {
-				continue;
-			}
+			if ( ! $id ) continue;
 			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'sort_order' => (int) $position ] );
-			if ( ! $res['ok'] ) {
-				$errors[] = $id;
-			}
+			if ( ! $res['ok'] ) $errors[] = $id;
 		}
 
 		if ( $errors ) {
@@ -353,8 +372,25 @@ class NW_Abilities_Admin {
 									<textarea id="nw-field-description" name="description" rows="3" placeholder="Ability description&hellip;"></textarea>
 								</div>
 								<div class="nw-field nw-field-full">
+									<label>Image URL <span class="nw-hint">(optional)</span></label>
+									<div class="nw-img-url-wrap">
+										<input type="url" id="nw-field-img_url" name="img_url" placeholder="https://&hellip;" class="nw-img-url-input">
+										<div class="nw-img-preview" id="nw-img-preview" style="display:none;">
+											<img id="nw-img-preview-img" src="" alt="Preview" style="max-height:80px;border-radius:4px;margin-top:6px;">
+										</div>
+									</div>
+								</div>
+								<div class="nw-field nw-field-full">
 									<label>Tags <span class="nw-hint">(comma-separated slugs)</span></label>
 									<input type="text" id="nw-field-tags" name="tags" placeholder="e.g. fire,aoe,damage">
+								</div>
+								<div class="nw-field">
+									<label>Source</label>
+									<input type="text" id="nw-field-source" name="source" placeholder="e.g. Core Rulebook">
+								</div>
+								<div class="nw-field nw-field-full">
+									<label>GM Notes <span class="nw-hint">(not visible to players)</span></label>
+									<textarea id="nw-field-gm_notes" name="gm_notes" rows="2" placeholder="Internal notes&hellip;"></textarea>
 								</div>
 							</div>
 
@@ -432,7 +468,6 @@ class NW_Abilities_Admin {
 	<?php }
 }
 
-// BUG 1 FIX: Instantiate the correct class name (NW_Abilities_Admin, not NeoWeaver_Abilities_Admin).
 add_action(
 	'plugins_loaded',
 	static function () {

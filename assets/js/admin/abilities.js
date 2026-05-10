@@ -36,6 +36,10 @@ jQuery(function ($) {
     var $fieldIsPassive     = $('#nw-field-is_passive');
     var $fieldIsActive      = $('#nw-field-is_active');
     var $fieldTags          = $('#nw-field-tags');
+    var $fieldImgUrl        = $('#nw-field-img_url');
+    var $fieldSource        = $('#nw-field-source');
+    var $fieldGmNotes       = $('#nw-field-gm_notes');
+    var $imgPreview         = $('#nw-img-preview');
 
     /* ---------------------------------------------------------------- */
     /*  STATE                                                             */
@@ -95,6 +99,17 @@ jQuery(function ($) {
         };
     }
 
+    /* Img URL preview */
+    function updateImgPreview(url) {
+        if (!$imgPreview || !$imgPreview.length) return;
+        var trimmed = (url || '').trim();
+        if (trimmed) {
+            $imgPreview.attr('src', trimmed).show();
+        } else {
+            $imgPreview.hide().attr('src', '');
+        }
+    }
+
     /* ---------------------------------------------------------------- */
     /*  DATA NORMALISATION                                                */
     /* ---------------------------------------------------------------- */
@@ -120,7 +135,10 @@ jQuery(function ($) {
             duration_turns: item.duration_turns != null ? item.duration_turns : 0,
             is_passive:     !!item.is_passive,
             is_active:      item.is_active !== false,
-            tags:           tags
+            tags:           tags,
+            img_url:        item.img_url        || '',
+            source:         item.source         || '',
+            gm_notes:       item.gm_notes       || ''
         };
     }
 
@@ -190,8 +208,12 @@ jQuery(function ($) {
                 ? '<span class="nw-pill nw-pill-yes">Active</span>'
                 : '<span class="nw-pill nw-pill-no">Inactive</span>';
 
+            var imgThumb = a.img_url
+                ? '<img src="' + esc(a.img_url) + '" alt="" width="32" height="32" style="object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;">'
+                : '';
+
             return '<tr data-id="' + safeId + '">'
-                + '<td><div class="nw-ability-id">' + safeId + '</div>'
+                + '<td>' + imgThumb + '<div class="nw-ability-id">' + safeId + '</div>'
                 + '<div class="nw-ability-title">' + esc(a.title) + '</div></td>'
                 + '<td>' + typeH + '</td>'
                 + '<td>' + costH + '</td>'
@@ -331,6 +353,7 @@ jQuery(function ($) {
         $fieldId.val('');
         $fieldIsActive.prop('checked', true);
         $fieldIsPassive.prop('checked', false);
+        updateImgPreview('');
 
         if (id) {
             var a = all.find(function (x) { return x.id === id; });
@@ -349,6 +372,10 @@ jQuery(function ($) {
             $fieldIsPassive.prop('checked', a.is_passive);
             $fieldIsActive.prop('checked',  a.is_active);
             $fieldTags.val(tagsStr(a.tags));
+            if ($fieldImgUrl.length)   $fieldImgUrl.val(a.img_url);
+            if ($fieldSource.length)   $fieldSource.val(a.source);
+            if ($fieldGmNotes.length)  $fieldGmNotes.val(a.gm_notes);
+            updateImgPreview(a.img_url);
 
             $('#nw-modal-title').text('Edit Ability');
             $saveLabel.text('Save Changes');
@@ -392,7 +419,10 @@ jQuery(function ($) {
             'ability[duration_turns]': $fieldDurationTurns.val(),
             'ability[is_passive]':     $fieldIsPassive.is(':checked') ? '1' : '0',
             'ability[is_active]':      $fieldIsActive.is(':checked')  ? '1' : '0',
-            'ability[tags]':           $fieldTags.val()
+            'ability[tags]':           $fieldTags.val(),
+            'ability[img_url]':        $fieldImgUrl.length  ? $fieldImgUrl.val().trim()  : '',
+            'ability[source]':         $fieldSource.length  ? $fieldSource.val().trim()  : '',
+            'ability[gm_notes]':       $fieldGmNotes.length ? $fieldGmNotes.val().trim() : ''
         };
 
         $.post(ajaxEndpoint, payload, function (res) {
@@ -437,6 +467,13 @@ jQuery(function ($) {
                 notice('Delete request failed.', 'error');
             });
         });
+    });
+
+    /* ---------------------------------------------------------------- */
+    /*  IMG URL live preview                                              */
+    /* ---------------------------------------------------------------- */
+    $(document).on('input change', '#nw-field-img_url', function () {
+        updateImgPreview($(this).val());
     });
 
     /* ---------------------------------------------------------------- */

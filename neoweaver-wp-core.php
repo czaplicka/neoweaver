@@ -11,11 +11,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Primary constants (NEOWEAVER_* namespace)
 define( 'NEOWEAVER_VERSION', '0.7.1' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR);
+
+// Legacy aliases (NW_* namespace) for backward compatibility
+define( 'NW_VERSION', NEOWEAVER_VERSION );
+define( 'NW_PLUGIN_FILE', NEOWEAVER_PLUGIN_FILE );
+define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
+define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );  // PATH = DIR (ścieżka systemowa)
+define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 
 final class NeoWeaver_Core {
 
