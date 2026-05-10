@@ -138,3 +138,4 @@ class NW_Items_Admin {
         wp_send_json_success( 'deleted' );
     }
 }
+new NeoWeaver_Items_Admin();
