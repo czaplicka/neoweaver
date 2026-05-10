@@ -37,34 +37,36 @@ class NW_Skills_Admin {
 	}
 
 	public function enqueue( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
-			return;
-		}
-
-		wp_enqueue_style(
-			'nw-admin-shared',
-			NW_PLUGIN_URL . 'admin/css/nw-admin-shared.css',
-			[],
-			NW_VERSION
-		);
-
-		wp_enqueue_script(
-			'nw-skills',
-			NW_PLUGIN_URL . 'admin/js/nw-skills.js',
-			[ 'jquery' ],
-			NW_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			'nw-skills',
-			'NW_SK',
-			[
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( $this->nonce_action ),
-			]
-		);
+	if ( ! str_contains( $hook, $this->page_slug ) ) {
+		return;
 	}
+
+	$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+
+	wp_enqueue_style(
+		'nw-admin-shared',
+		$plugin_url . 'admin/css/nw-admin-shared.css',
+		[],
+		defined( 'NW_VERSION' ) ? NW_VERSION : null
+	);
+
+	wp_enqueue_script(
+		'nw-skills',
+		$plugin_url . 'admin/js/nw-skills.js',
+		[ 'jquery' ],
+		defined( 'NW_VERSION' ) ? NW_VERSION : null,
+		true
+	);
+
+	wp_localize_script(
+		'nw-skills',
+		'NW_SK',
+		[
+			'ajax_url' => admin_url( 'admin-ajax.php' ),
+			'nonce'    => wp_create_nonce( $this->nonce_action ),
+		]
+	);
+}
 
 	public function render_page(): void {
 		?>
