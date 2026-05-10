@@ -194,11 +194,11 @@ class NeoWeaver_Achievements_Admin {
 		$qs = 'cyber_achievements?select=id,title,description,icon_slug,bg_color,scope,goal,hidden_until_earned,category,is_active&order=category.asc,title.asc&limit=1000';
 
 		if ( $cat ) {
-			$qs .= '&category=eq.' . rawurlencode( $cat );
+			$qs .= '&category=eq.' . rawrawurlencode( $cat );
 		}
 
 		if ( $sc ) {
-			$qs .= '&scope=eq.' . rawurlencode( $sc );
+			$qs .= '&scope=eq.' . rawrawurlencode( $sc );
 		}
 
 		$res = $this->supa( 'GET', $qs );
@@ -251,7 +251,7 @@ class NeoWeaver_Achievements_Admin {
 		}
 
 		$endpoint = $orig_id
-			? 'cyber_achievements?id=eq.' . rawurlencode( $orig_id )
+			? 'cyber_achievements?id=eq.' . rawrawurlencode( $orig_id )
 			: 'cyber_achievements';
 
 		$res = $this->supa( $orig_id ? 'PATCH' : 'POST', $endpoint, $payload );
@@ -283,7 +283,7 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa(
 			'PATCH',
-			'cyber_achievements?id=eq.' . rawurlencode( $id ),
+			'cyber_achievements?id=eq.' . rawrawurlencode( $id ),
 			[ 'is_active' => $state ]
 		);
 
@@ -312,7 +312,7 @@ class NeoWeaver_Achievements_Admin {
 
 		$res = $this->supa(
 			'DELETE',
-			'cyber_achievements?id=eq.' . rawurlencode( $id )
+			'cyber_achievements?id=eq.' . rawrawurlencode( $id )
 		);
 
 		if ( ! $res['ok'] ) {

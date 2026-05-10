@@ -198,7 +198,7 @@ class NeoWeaver_Skills_Admin {
         }
         $category = sanitize_text_field( $_POST['filter_category'] ?? '' );
         $qs = 'cyber_skills?select=id,name,description,category,application,card_effect,img_url,tags,linked_attributes,is_active,created_at&order=name.asc';
-        if ( $category ) $qs .= '&category=eq.' . rawurlencode( $category );
+        if ( $category ) $qs .= '&category=eq.' . rawrawurlencode( $category );
         $res = $this->supa( 'GET', $qs );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
     }
@@ -225,7 +225,7 @@ class NeoWeaver_Skills_Admin {
             'is_active'         => filter_var( $raw['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
         ];
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawrawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_skills', $payload );
         if ( isset( $res['error'] ) ) {
             wp_send_json_error( $res['error'] );
@@ -249,7 +249,7 @@ class NeoWeaver_Skills_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
@@ -264,7 +264,7 @@ class NeoWeaver_Skills_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+        $res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

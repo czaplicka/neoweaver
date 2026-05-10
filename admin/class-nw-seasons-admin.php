@@ -153,7 +153,7 @@ class NeoWeaver_Seasons_Admin {
 	/** PATCH by primary key (season_name is text PK) */
 	private function supa_patch( $season_name, $payload ) {
 		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $this->table
-			. '?season_name=eq.' . rawurlencode( $season_name );
+			. '?season_name=eq.' . rawrawurlencode( $season_name );
 		$res = wp_remote_request( $url, [
 			'method'  => 'PATCH',
 			'timeout' => 15,
@@ -168,7 +168,7 @@ class NeoWeaver_Seasons_Admin {
 
 	private function supa_delete( $season_name ) {
 		$url = rtrim( $this->supa_url(), '/' ) . '/rest/v1/' . $this->table
-			. '?season_name=eq.' . rawurlencode( $season_name );
+			. '?season_name=eq.' . rawrawurlencode( $season_name );
 		$res = wp_remote_request( $url, [
 			'method'  => 'DELETE',
 			'timeout' => 15,
@@ -215,7 +215,7 @@ class NeoWeaver_Seasons_Admin {
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
 		if ( ! $name ) wp_send_json_error( 'Invalid name.' );
 
-		$res = $this->supa_get( $this->table . '?season_name=eq.' . rawurlencode( $name ) . '&limit=1' );
+		$res = $this->supa_get( $this->table . '?season_name=eq.' . rawrawurlencode( $name ) . '&limit=1' );
 		if ( ! $res['ok'] || empty( $res['body'][0] ) ) wp_send_json_error( 'Not found.' );
 		wp_send_json_success( $res['body'][0] );
 	}

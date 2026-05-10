@@ -163,7 +163,7 @@ class NeoWeaver_Abilities_Admin {
 
 		$qs = 'cyber_abilities?select=id,title,description,ability_type,cost_type,cost_value,target_type,range_tiles,duration_turns,is_passive,is_active,tags&order=ability_type.asc,title.asc&limit=1000';
 		if ( $type ) {
-			$qs .= '&ability_type=eq.' . rawurlencode( $type );
+			$qs .= '&ability_type=eq.' . rawrawurlencode( $type );
 		}
 
 		$res = $this->supa( 'GET', $qs );
@@ -215,7 +215,7 @@ class NeoWeaver_Abilities_Admin {
 		}
 
 		$endpoint = $orig_id
-			? 'cyber_abilities?id=eq.' . rawurlencode( $orig_id )
+			? 'cyber_abilities?id=eq.' . rawrawurlencode( $orig_id )
 			: 'cyber_abilities';
 
 		$res = $this->supa( $orig_id ? 'PATCH' : 'POST', $endpoint, $payload );
@@ -243,7 +243,7 @@ class NeoWeaver_Abilities_Admin {
 			return;
 		}
 
-		$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+		$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( $res['error'] ?? 'Toggle failed' );
 			return;
@@ -264,7 +264,7 @@ class NeoWeaver_Abilities_Admin {
 			return;
 		}
 
-		$res = $this->supa( 'DELETE', 'cyber_abilities?id=eq.' . rawurlencode( $id ) );
+		$res = $this->supa( 'DELETE', 'cyber_abilities?id=eq.' . rawrawurlencode( $id ) );
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( $res['error'] ?? 'Delete failed' );
 			return;

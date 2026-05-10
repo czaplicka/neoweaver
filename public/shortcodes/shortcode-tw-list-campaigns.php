@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *       obiekt (jeden rekord) zamiast tablicy — obsługujemy oba przypadki.
  *       Dodano data-character na przycisk ENTER MATRIX.
  *
- * v14 – FIX: rawurlencode() kodowało ! na %21, psując hinty FK.
+ * v14 – FIX: rawrawurlencode() kodowało ! na %21, psując hinty FK.
  * v13 – explicit FK hints (zepsute przez rawurlencode)
  * v12 – world przez cyber_campaign_worlds junction
  */

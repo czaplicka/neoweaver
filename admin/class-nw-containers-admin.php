@@ -264,7 +264,7 @@ class NeoWeaver_Containers_Admin {
         ];
 
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_containers?id=eq.' . urlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_containers?id=eq.' . rawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_containers', $payload );
 
         if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
@@ -280,7 +280,7 @@ class NeoWeaver_Containers_Admin {
         $id    = sanitize_text_field( $_POST['container_id'] ?? '' );
         $state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
         if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
-        $res = $this->supa( 'PATCH', 'cyber_containers?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_containers?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 

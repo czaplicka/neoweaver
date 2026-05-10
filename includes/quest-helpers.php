@@ -107,7 +107,7 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 	];
 
 	// 1. Fetch active quest + linked scenario via PostgREST foreign-key join.
-	$q_url    = $base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id )
+	$q_url    = $base_url . 'cyber_active_quests?id=eq.' . rawrawurlencode( $active_quest_id )
 		. '&select=*,cyber_scenarios:quest_origin_id(*)';
 	$response = wp_remote_get( $q_url, [ 'headers' => $headers ] );
 
@@ -144,7 +144,7 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 	//    Tags must NOT be written directly to cyber_characters — that column
 	//    does not exist and doing so would bypass Make.com entirely.
 	wp_remote_request(
-		$base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id ),
+		$base_url . 'cyber_active_quests?id=eq.' . rawrawurlencode( $active_quest_id ),
 		[
 			'method'  => 'PATCH',
 			'headers' => $json_headers,

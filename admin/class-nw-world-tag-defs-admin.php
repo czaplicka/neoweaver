@@ -218,7 +218,7 @@ class NeoWeaver_World_Tag_Defs_Admin {
             return;
         }
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_world_tag_defs', $payload );
         if ( isset( $res['error'] ) ) {
             wp_send_json_error( $res['error'] );
@@ -242,7 +242,7 @@ class NeoWeaver_World_Tag_Defs_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
@@ -257,7 +257,7 @@ class NeoWeaver_World_Tag_Defs_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'DELETE', 'cyber_world_tag_defs?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+        $res = $this->supa( 'DELETE', 'cyber_world_tag_defs?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

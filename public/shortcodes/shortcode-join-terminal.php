@@ -51,7 +51,7 @@ function tw_ajax_join_campaign() {
         'limit'      => 1,
     ], $base . 'cyber_characters' );
 
-    // BUG-FIX 5 note: no urlencode() — add_query_arg() handles encoding.
+    // BUG-FIX 5 note: no rawurlencode() — add_query_arg() handles encoding.
     $camp_url = add_query_arg( [
         'join_code' => 'eq.' . $join_code,
         'select'    => 'id',

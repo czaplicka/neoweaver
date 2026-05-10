@@ -208,7 +208,7 @@ class NeoWeaver_Starting_Packages_Admin {
             'compatible_class_ids' => $csv_to_arr( $raw['compatible_class_ids'] ?? '' ),
         ];
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_starting_packages', $payload );
         if ( isset( $res['error'] ) ) {
             wp_send_json_error( $res['error'] );
@@ -232,7 +232,7 @@ class NeoWeaver_Starting_Packages_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), [ 'is_player_selectable' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), [ 'is_player_selectable' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_player_selectable' => $state ] );
     }
 
@@ -247,7 +247,7 @@ class NeoWeaver_Starting_Packages_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'DELETE', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+        $res = $this->supa( 'DELETE', 'cyber_starting_packages?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

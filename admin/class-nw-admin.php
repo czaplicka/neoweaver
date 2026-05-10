@@ -270,7 +270,7 @@ public function register_menu(): void {
 		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( $days * DAY_IN_SECONDS ) );
 
 		$res = wp_remote_get(
-			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&created_at=gte.' . rawurlencode( $since ),
+			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&created_at=gte.' . rawrawurlencode( $since ),
 			[
 				'timeout' => 10,
 				'headers' => [
@@ -312,7 +312,7 @@ public function register_menu(): void {
 
 		$path = $table
 			. '?select=created_at'
-			. '&created_at=gte.' . rawurlencode( $since )
+			. '&created_at=gte.' . rawrawurlencode( $since )
 			. '&order=created_at.asc'
 			. '&limit=5000';
 

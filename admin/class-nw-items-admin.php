@@ -207,8 +207,8 @@ class NeoWeaver_Items_Admin {
 		$rarity = sanitize_text_field( $_POST['filter_rarity'] ?? '' );
 
 		$qs = $this->table . '?order=sort_order.asc,name.asc&select=*';
-		if ( $type )   $qs .= '&item_type=eq.' . rawurlencode( $type );
-		if ( $rarity ) $qs .= '&rarity=eq.'    . rawurlencode( $rarity );
+		if ( $type )   $qs .= '&item_type=eq.' . rawrawurlencode( $type );
+		if ( $rarity ) $qs .= '&rarity=eq.'    . rawrawurlencode( $rarity );
 
 		$rows = $this->supa( 'GET', $qs );
 
@@ -229,7 +229,7 @@ class NeoWeaver_Items_Admin {
 		$id = sanitize_text_field( $_POST['item_id'] ?? '' );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*' );
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawrawurlencode( $id ) . '&select=*' );
 
 		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
 
@@ -271,7 +271,7 @@ class NeoWeaver_Items_Admin {
 		$id = sanitize_text_field( $_POST['item_id'] ?? '' );
 
 		if ( $id ) {
-			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload,
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawrawurlencode( $id ), $payload,
 				[ 'Prefer' => 'return=representation' ] );
 		} else {
 			$res = $this->supa( 'POST', $this->table, $payload,
@@ -302,7 +302,7 @@ class NeoWeaver_Items_Admin {
 		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
 		if ( isset( $res['error'] ) ) {
 			wp_send_json_error( $res['error'] );
 			return;
@@ -319,7 +319,7 @@ class NeoWeaver_Items_Admin {
 		$id = sanitize_text_field( $_POST['item_id'] ?? '' );
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
-		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
 		if ( isset( $res['error'] ) ) {
 			wp_send_json_error( $res['error'] );
 			return;

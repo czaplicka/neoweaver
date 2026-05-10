@@ -107,7 +107,7 @@ if ( ! function_exists( 'nw_find_tag_defs_by_labels' ) ) {
 
         $or_filters = array_map(
             static function ( $label ) {
-                return 'label.ilike.' . rawurlencode( $label );
+                return 'label.ilike.' . rawrawurlencode( $label );
             },
             $normalized
         );

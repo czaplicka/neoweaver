@@ -410,9 +410,9 @@ class NeoWeaver_Deck_Admin {
         $type     = sanitize_text_field( $_POST['filter_type']     ?? '' );
 
         $qs = 'cyber_deck?select=id,name,description,deck_category,type,mechanic,mechanic_goal,cost_label,cost_number,effect,bonus,ai_instruction,gm,tags,requirement_tags,denied_tags,required_item_tags,required_location_tags,denied_location_tags,requirement_description,time_cost_minutes,cooldown_messages,entropy_on_fail,rarity,level,xp_current,xp_to_next,is_leveling,is_disposable,is_active,sound_effect,img_url,class_id&order=name.asc';
-        if ( $category ) $qs .= '&deck_category=eq.' . urlencode( $category );
-        if ( $rarity   ) $qs .= '&rarity=eq.'        . urlencode( $rarity );
-        if ( $type     ) $qs .= '&type=ilike.'        . urlencode( $type );
+        if ( $category ) $qs .= '&deck_category=eq.' . rawurlencode( $category );
+        if ( $rarity   ) $qs .= '&rarity=eq.'        . rawurlencode( $rarity );
+        if ( $type     ) $qs .= '&type=ilike.'        . rawurlencode( $type );
 
         $res = $this->supa( 'GET', $qs );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res['data'] );
@@ -480,7 +480,7 @@ class NeoWeaver_Deck_Admin {
         ];
 
         $res = $id
-            ? $this->supa( 'PATCH', 'cyber_deck?id=eq.' . urlencode( $id ), $payload )
+            ? $this->supa( 'PATCH', 'cyber_deck?id=eq.' . rawurlencode( $id ), $payload )
             : $this->supa( 'POST',  'cyber_deck', $payload );
 
         if ( isset( $res['error'] ) ) {
@@ -509,7 +509,7 @@ class NeoWeaver_Deck_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'PATCH', 'cyber_deck?id=eq.' . urlencode( $id ), [ 'is_active' => $state ] );
+        $res = $this->supa( 'PATCH', 'cyber_deck?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
     }
 
@@ -528,7 +528,7 @@ class NeoWeaver_Deck_Admin {
             wp_send_json_error( 'Missing ID' );
             return;
         }
-        $res = $this->supa( 'DELETE', 'cyber_deck?id=eq.' . urlencode( $id ), [], [ 'Prefer' => '' ] );
+        $res = $this->supa( 'DELETE', 'cyber_deck?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
     }
 }

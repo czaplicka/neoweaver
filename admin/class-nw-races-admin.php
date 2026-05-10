@@ -42,8 +42,8 @@ class NW_Races_Admin extends NW_Admin_Base {
 
 		$qs = 'cyber_races?select=*&order=name.asc';
 
-		if ( $world_id  ) $qs .= '&world_id=eq.'  . rawurlencode( $world_id );
-		if ( $search    ) $qs .= '&name=ilike.*'  . rawurlencode( $search ) . '*';
+		if ( $world_id  ) $qs .= '&world_id=eq.'  . rawrawurlencode( $world_id );
+		if ( $search    ) $qs .= '&name=ilike.*'  . rawrawurlencode( $search ) . '*';
 		if ( $is_active !== '' ) $qs .= '&is_active=eq.' . ( $is_active ? 'true' : 'false' );
 
 		$qs .= '&limit=' . $per_page . '&offset=' . $offset;
@@ -62,7 +62,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 			return;
 		}
 
-		$res = $this->supa( 'GET', 'cyber_races?id=eq.' . rawurlencode( $id ) . '&select=*' );
+		$res = $this->supa( 'GET', 'cyber_races?id=eq.' . rawrawurlencode( $id ) . '&select=*' );
 		wp_send_json_success( $res[0] ?? null );
 	}
 
@@ -96,7 +96,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 		];
 
 		$res = $id
-			? $this->supa( 'PATCH', 'cyber_races?id=eq.' . rawurlencode( $id ), $payload )
+			? $this->supa( 'PATCH', 'cyber_races?id=eq.' . rawrawurlencode( $id ), $payload )
 			: $this->supa( 'POST',  'cyber_races', $payload );
 
 		wp_send_json_success( $res );
@@ -114,7 +114,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 			return;
 		}
 
-		$res = $this->supa( 'PATCH', 'cyber_races?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+		$res = $this->supa( 'PATCH', 'cyber_races?id=eq.' . rawrawurlencode( $id ), [ 'is_active' => $state ] );
 		wp_send_json_success( $res );
 	}
 
@@ -128,7 +128,7 @@ class NW_Races_Admin extends NW_Admin_Base {
 			return;
 		}
 
-		$res = $this->supa( 'DELETE', 'cyber_races?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+		$res = $this->supa( 'DELETE', 'cyber_races?id=eq.' . rawrawurlencode( $id ), [], [ 'Prefer' => '' ] );
 		wp_send_json_success( $res );
 	}
 

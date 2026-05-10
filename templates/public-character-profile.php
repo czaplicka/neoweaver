@@ -508,7 +508,7 @@ body.character-profile {
     // to api.qrserver.com as a third-party HTTP request from the user's browser,
     // which could expose the URL (and indirectly the user's IP) to that service.
     $qr_api_url = add_query_arg(
-        [ 'size' => '80x80', 'data' => rawurlencode( $profile_url ) ],
+        [ 'size' => '80x80', 'data' => rawrawurlencode( $profile_url ) ],
         'https://api.qrserver.com/v1/create-qr-code/'
     );
     $qr_resp = wp_remote_get( $qr_api_url, [ 'timeout' => 5 ] );

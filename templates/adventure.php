@@ -96,7 +96,7 @@ if ( $active_session_id > 0 && $supabase_base ) {
     $grid_units = tw_get_data(
         $supabase_base . 'cyber_battle_grid'
         . '?select=*'
-        . '&session_id=eq.' . rawurlencode( $active_session_id ),
+        . '&session_id=eq.' . rawrawurlencode( $active_session_id ),
         $auth_headers
     );
 } else {
