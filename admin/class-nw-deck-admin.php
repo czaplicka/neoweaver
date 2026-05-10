@@ -1,4 +1,3 @@
-
 <?php
 /**
  * NeoWeaver — Deck Admin
@@ -15,6 +14,14 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class NW_Deck_Admin {
+
+    /* ---------------------------------------------------------------- */
+    /*  Single source of truth for enum values                           */
+    /* ---------------------------------------------------------------- */
+
+    private const CATEGORIES = [ 'action', 'spell', 'trap', 'event', 'item', 'special' ];
+    private const TYPES      = [ 'attack', 'defense', 'support', 'utility', 'movement', 'other' ];
+    private const RARITIES   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
 
     /* ---------------------------------------------------------------- */
     /*  Bootstrap                                                         */
@@ -113,9 +120,6 @@ class NW_Deck_Admin {
     /* ---------------------------------------------------------------- */
 
     public function render_page(): void {
-        $categories = [ 'action', 'spell', 'trap', 'event', 'item', 'special' ];
-        $types      = [ 'attack', 'defense', 'support', 'utility', 'movement', 'other' ];
-        $rarities   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
         ?>
         <div class="wrap">
             <h1><?php esc_html_e( 'NeoWeaver — Deck', 'neoweaver' ); ?></h1>
@@ -123,21 +127,21 @@ class NW_Deck_Admin {
             <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
                 <select id="nw-deck-filter-category">
                     <option value=""><?php esc_html_e( 'All categories', 'neoweaver' ); ?></option>
-                    <?php foreach ( $categories as $c ) : ?>
+                    <?php foreach ( self::CATEGORIES as $c ) : ?>
                         <option value="<?php echo esc_attr($c); ?>"><?php echo esc_html(ucfirst($c)); ?></option>
                     <?php endforeach; ?>
                 </select>
 
                 <select id="nw-deck-filter-type">
                     <option value=""><?php esc_html_e( 'All types', 'neoweaver' ); ?></option>
-                    <?php foreach ( $types as $t ) : ?>
+                    <?php foreach ( self::TYPES as $t ) : ?>
                         <option value="<?php echo esc_attr($t); ?>"><?php echo esc_html(ucfirst($t)); ?></option>
                     <?php endforeach; ?>
                 </select>
 
                 <select id="nw-deck-filter-rarity">
                     <option value=""><?php esc_html_e( 'All rarities', 'neoweaver' ); ?></option>
-                    <?php foreach ( $rarities as $r ) : ?>
+                    <?php foreach ( self::RARITIES as $r ) : ?>
                         <option value="<?php echo esc_attr($r); ?>"><?php echo esc_html(ucfirst($r)); ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -187,7 +191,7 @@ class NW_Deck_Admin {
                             <th><label for="nw-deck-category"><?php esc_html_e( 'Category', 'neoweaver' ); ?></label></th>
                             <td>
                                 <select id="nw-deck-category">
-                                    <?php foreach ( $categories as $c ) : ?>
+                                    <?php foreach ( self::CATEGORIES as $c ) : ?>
                                         <option value="<?php echo esc_attr($c); ?>"><?php echo esc_html(ucfirst($c)); ?></option>
                                     <?php endforeach; ?>
                                 </select>
@@ -197,7 +201,7 @@ class NW_Deck_Admin {
                             <th><label for="nw-deck-type"><?php esc_html_e( 'Type', 'neoweaver' ); ?></label></th>
                             <td>
                                 <select id="nw-deck-type">
-                                    <?php foreach ( $types as $t ) : ?>
+                                    <?php foreach ( self::TYPES as $t ) : ?>
                                         <option value="<?php echo esc_attr($t); ?>"><?php echo esc_html(ucfirst($t)); ?></option>
                                     <?php endforeach; ?>
                                 </select>
@@ -207,7 +211,7 @@ class NW_Deck_Admin {
                             <th><label for="nw-deck-rarity"><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></label></th>
                             <td>
                                 <select id="nw-deck-rarity">
-                                    <?php foreach ( $rarities as $r ) : ?>
+                                    <?php foreach ( self::RARITIES as $r ) : ?>
                                         <option value="<?php echo esc_attr($r); ?>"><?php echo esc_html(ucfirst($r)); ?></option>
                                     <?php endforeach; ?>
                                 </select>
@@ -351,11 +355,26 @@ class NW_Deck_Admin {
             wp_send_json_error( 'Name is required.' ); return;
         }
 
+        // Validate enum fields against the single source of truth.
+        $category = sanitize_text_field( $_POST['deck_category'] ?? '' );
+        $type     = sanitize_text_field( $_POST['type']          ?? '' );
+        $rarity   = sanitize_text_field( $_POST['rarity']        ?? '' );
+
+        if ( $category && ! in_array( $category, self::CATEGORIES, true ) ) {
+            wp_send_json_error( 'Invalid category.' ); return;
+        }
+        if ( $type && ! in_array( $type, self::TYPES, true ) ) {
+            wp_send_json_error( 'Invalid type.' ); return;
+        }
+        if ( $rarity && ! in_array( $rarity, self::RARITIES, true ) ) {
+            wp_send_json_error( 'Invalid rarity.' ); return;
+        }
+
         $payload = [
             'name'          => $name,
-            'deck_category' => sanitize_text_field( $_POST['deck_category'] ?? 'action' ),
-            'type'          => sanitize_text_field( $_POST['type']          ?? '' ),
-            'rarity'        => sanitize_text_field( $_POST['rarity']        ?? 'common' ),
+            'deck_category' => $category ?: self::CATEGORIES[0],
+            'type'          => $type,
+            'rarity'        => $rarity ?: self::RARITIES[0],
             'description'   => sanitize_textarea_field( $_POST['description'] ?? '' ),
             'effect'        => sanitize_textarea_field( $_POST['effect']       ?? '' ),
             'level'         => intval( $_POST['level']        ?? 1 ),
