@@ -76,19 +76,94 @@ class NeoWeaver_Containers_Admin {
             'nw-containers-script',
             'NWContainers',
             [
-                'ajaxurl' => admin_url( 'admin-ajax.php' ),
-                'nonce'   => wp_create_nonce( 'neoweaver_containers' ),
-                'supa_url' => $this->supabase_url,
-                'supa_key' => $this->supabase_key,
+                'ajaxurl'   => admin_url( 'admin-ajax.php' ),
+                'nonce'     => wp_create_nonce( 'neoweaver_containers' ),
+                'supa_url'  => $this->supabase_url,
+                'supa_key'  => $this->supabase_key,
             ]
         );
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Supabase helper                                                    */
-    /* ------------------------------------------------------------------ */
+    /* ================================================================== */
+    /*  Page HTML                                                         */
+    /* ================================================================== */
 
-    private function supa( string $method, string $endpoint, array $body = [] ): array {
+    public function render_page(): void { ?>
+    <div class="wrap nw-admin-wrap">
+        <div class="nw-admin-header">
+            <h1>📦 Containers</h1>
+            <button id="nw-add-container" class="nw-btn nw-btn-primary">+ Add Container</button>
+        </div>
+
+        <div id="nw-notice" class="nw-notice" style="display:none"></div>
+
+        <!-- Modal -->
+        <div id="nw-modal" class="nw-modal" style="display:none">
+            <div class="nw-modal-inner">
+                <h2 id="nw-modal-title">Add Container</h2>
+                <form id="nw-container-form">
+                    <input type="hidden" id="nw-id" name="id" value="0">
+
+                    <label>Name *</label>
+                    <input type="text" id="nw-name" name="name" required>
+
+                    <label>Description</label>
+                    <textarea id="nw-description" name="description" rows="3"></textarea>
+
+                    <label>Total Slots</label>
+                    <input type="number" id="nw-total-slots" name="total_slots" min="0" value="0">
+
+                    <label>Allowed Sizes <small>(comma-separated: small,medium,large)</small></label>
+                    <input type="text" id="nw-allowed-sizes" name="allowed_sizes" placeholder="small,medium,large">
+
+                    <label>Image URL</label>
+                    <input type="url" id="nw-img-url" name="img_url">
+
+                    <label>Rarity</label>
+                    <select id="nw-rarity" name="rarity">
+                        <option value="common">Common</option>
+                        <option value="uncommon">Uncommon</option>
+                        <option value="rare">Rare</option>
+                        <option value="epic">Epic</option>
+                        <option value="legendary">Legendary</option>
+                    </select>
+
+                    <label class="nw-checkbox-label">
+                        <input type="checkbox" id="nw-is-active" name="is_active" checked> Active
+                    </label>
+
+                    <div class="nw-modal-actions">
+                        <button type="submit" class="nw-btn nw-btn-primary">Save</button>
+                        <button type="button" id="nw-cancel" class="nw-btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <table class="nw-table" id="nw-containers-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Slots</th>
+                    <th>Allowed Sizes</th>
+                    <th>Rarity</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="nw-containers-body">
+                <tr><td colspan="6">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <?php }
+
+    /* ================================================================== */
+    /*  Supabase helper                                                   */
+    /* ================================================================== */
+
+    private function supa( string $method, string $endpoint, array $body = [], array $extra = [] ): array {
         $url  = $this->supabase_url . '/rest/v1/' . $endpoint;
         $args = [
             'method'  => $method,
@@ -109,9 +184,9 @@ class NeoWeaver_Containers_Admin {
         return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  AJAX — get all                                                     */
-    /* ------------------------------------------------------------------ */
+    /* ================================================================== */
+    /*  AJAX — get all                                                    */
+    /* ================================================================== */
 
     public function ajax_get_all(): void {
         check_ajax_referer( 'neoweaver_containers', 'nonce' );
@@ -121,9 +196,9 @@ class NeoWeaver_Containers_Admin {
         isset( $rows['error'] ) ? wp_send_json_error( $rows['error'] ) : wp_send_json_success( $rows );
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  AJAX — save (insert or update)                                     */
-    /* ------------------------------------------------------------------ */
+    /* ================================================================== */
+    /*  AJAX — save                                                       */
+    /* ================================================================== */
 
     public function ajax_save(): void {
         check_ajax_referer( 'neoweaver_containers', 'nonce' );
@@ -131,27 +206,27 @@ class NeoWeaver_Containers_Admin {
 
         $id   = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
         $data = [
-            'name'         => sanitize_text_field(     $_POST['name']         ?? '' ),
-            'description'  => sanitize_textarea_field( $_POST['description']  ?? '' ),
-            'total_slots'  => absint(                  $_POST['total_slots']  ?? 0  ),
-            'allowed_sizes'=> sanitize_text_field(     $_POST['allowed_sizes']?? '' ),
-            'img_url'      => esc_url_raw(             $_POST['img_url']      ?? '' ),
-            'rarity'       => sanitize_text_field(     $_POST['rarity']       ?? 'common' ),
-            'is_active'    => filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
+            'name'          => sanitize_text_field(     $_POST['name']          ?? '' ),
+            'description'   => sanitize_textarea_field( $_POST['description']   ?? '' ),
+            'total_slots'   => absint(                  $_POST['total_slots']   ?? 0  ),
+            'allowed_sizes' => sanitize_text_field(     $_POST['allowed_sizes'] ?? '' ),
+            'img_url'       => esc_url_raw(             $_POST['img_url']       ?? '' ),
+            'rarity'        => sanitize_text_field(     $_POST['rarity']        ?? 'common' ),
+            'is_active'     => filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
         ];
 
         if ( $id ) {
             $res = $this->supa( 'PATCH', 'cyber_containers?id=eq.' . $id, $data );
         } else {
-            $res = $this->supa( 'POST',  'cyber_containers', $data );
+            $res = $this->supa( 'POST', 'cyber_containers', $data );
         }
 
         isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( $res );
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  AJAX — toggle active                                               */
-    /* ------------------------------------------------------------------ */
+    /* ================================================================== */
+    /*  AJAX — toggle                                                     */
+    /* ================================================================== */
 
     public function ajax_toggle(): void {
         check_ajax_referer( 'neoweaver_containers', 'nonce' );
