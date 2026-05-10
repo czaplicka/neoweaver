@@ -49,7 +49,7 @@ class NW_Deck_Admin {
 		add_submenu_page(
 			'neoweaver',
 			__( 'NeoWeaver — Deck', 'neoweaver' ),
-			__( 'Deck', 'neoweaver' ),
+			__( '🃏Deck', 'neoweaver' ),
 			'manage_options',
 			'neoweaver-deck',
 			[ $this, 'render_page' ]
