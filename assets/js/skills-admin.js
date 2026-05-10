@@ -1,11 +1,12 @@
 // admin/js/skills-admin.js
-(function($) {
+(function ($) {
     'use strict';
 
     const NW_Skills = {
         currentId: null,
 
         init() {
+            console.log('NW_SK object:', window.NW_SK);
             this.bindEvents();
             this.loadSkills();
         },
@@ -18,60 +19,92 @@
             $(document).on('click', '.nw-delete-skill', (e) => this.deleteSkill(e));
         },
 
+        getAjaxConfig() {
+            const ajaxUrl = window.NW_SK && window.NW_SK.ajax_url ? window.NW_SK.ajax_url : '';
+            const nonce = window.NW_SK && window.NW_SK.nonce ? window.NW_SK.nonce : '';
+
+            console.log('Using ajaxUrl:', ajaxUrl);
+            console.log('Using nonce:', nonce);
+
+            return { ajaxUrl, nonce };
+        },
+
+        request(data, onSuccess, onErrorMessage = 'AJAX request failed.') {
+            const { ajaxUrl, nonce } = this.getAjaxConfig();
+
+            if (!ajaxUrl) {
+                this.showNotice('Missing AJAX URL.', 'error');
+                return;
+            }
+
+            if (!nonce) {
+                this.showNotice('Missing security token. Refresh the page.', 'error');
+                return;
+            }
+
+            const payload = Object.assign({}, data, { nonce: nonce });
+
+            console.log('Sending payload:', payload);
+
+            $.ajax({
+                url: ajaxUrl,
+                method: 'POST',
+                dataType: 'json',
+                data: payload,
+                success: (res) => {
+                    console.log('AJAX success:', res);
+                    if (typeof onSuccess === 'function') {
+                        onSuccess(res);
+                    }
+                },
+                error: (xhr) => {
+                    console.log('AJAX error status:', xhr.status);
+                    console.log('AJAX error response:', xhr.responseText);
+                    this.showNotice(onErrorMessage, 'error');
+                }
+            });
+        },
+
         showForm(skill = null) {
             this.currentId = skill ? skill.id : null;
             $('#nw-form-title').text(skill ? 'Edit Skill' : 'Add Skill');
             $('#nw-field-name').val(skill ? skill.name : '');
-            $('#nw-field-description').val(skill ? skill.description || '' : '');
-            $('#nw-field-category').val(skill ? skill.category || '' : '');
-            $('#nw-field-stat').val(skill ? skill.stat || '' : '');
+            $('#nw-field-description').val(skill ? (skill.description || '') : '');
+            $('#nw-field-category').val(skill ? (skill.category || '') : '');
+            $('#nw-field-stat').val(skill ? (skill.stat || '') : '');
             $('#nw-skill-form-wrap').slideDown(200);
         },
 
         hideForm() {
             this.currentId = null;
             $('#nw-skill-form-wrap').slideUp(200);
-            $('#nw-field-name, #nw-field-description, #nw-field-category, #nw-field-stat').val('');
+            $('#nw-field-name').val('');
+            $('#nw-field-description').val('');
+            $('#nw-field-category').val('');
+            $('#nw-field-stat').val('');
             this.clearNotice();
         },
 
-       loadSkills() {
-    $('#nw-skill-table-wrap').html('<p>Loading…</p>');
+        loadSkills() {
+            $('#nw-skill-table-wrap').html('<p>Loading…</p>');
 
-    const nonce = window.NW_SK && window.NW_SK.nonce ? window.NW_SK.nonce : '';
-    const ajaxUrl = window.NW_SK && window.NW_SK.ajax_url ? window.NW_SK.ajax_url : '';
+            this.request(
+                {
+                    action: 'nw_skills_load'
+                },
+                (res) => {
+                    if (!res || !res.success) {
+                        this.showNotice('Error loading skills: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
+                        $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
+                        return;
+                    }
 
-    console.log('Using nonce:', nonce);
-    console.log('Using ajaxUrl:', ajaxUrl);
-
-    $.ajax({
-        url: ajaxUrl,
-        method: 'POST',
-        dataType: 'json',
-        data: {
-            action: 'nw_skills_load',
-            nonce: nonce
+                    const rows = Array.isArray(res.data) ? res.data : [];
+                    this.renderTable(rows);
+                },
+                'Failed to load skills.'
+            );
         },
-        success: (res) => {
-            console.log('load success:', res);
-
-            if (!res || !res.success) {
-                this.showNotice('Error loading skills: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
-                $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
-                return;
-            }
-
-            const rows = Array.isArray(res.data) ? res.data : [];
-            this.renderTable(rows);
-        },
-        error: (xhr) => {
-            console.log('load error status:', xhr.status);
-            console.log('load error response:', xhr.responseText);
-            this.showNotice('AJAX request failed.', 'error');
-            $('#nw-skill-table-wrap').html('<p style="color:#d63638;">AJAX failed.</p>');
-        }
-    });
-}
 
         renderTable(skills) {
             if (!skills || skills.length === 0) {
@@ -83,15 +116,15 @@
             html += '<th>Name</th><th>Category</th><th>Linked Stat</th><th>Description</th><th>Actions</th>';
             html += '</tr></thead><tbody>';
 
-            skills.forEach(skill => {
+            skills.forEach((skill) => {
                 html += `<tr data-id="${this.esc(skill.id)}">
                     <td><strong>${this.esc(skill.name)}</strong></td>
                     <td>${this.esc(skill.category || '—')}</td>
                     <td>${this.esc(skill.stat || '—')}</td>
                     <td>${this.esc(skill.description || '—')}</td>
                     <td>
-                        <button class="button button-small nw-edit-skill" data-id="${skill.id}">Edit</button>
-                        <button class="button button-small button-link-delete nw-delete-skill" data-id="${skill.id}">Delete</button>
+                        <button type="button" class="button button-small nw-edit-skill" data-id="${this.esc(skill.id)}">Edit</button>
+                        <button type="button" class="button button-small button-link-delete nw-delete-skill" data-id="${this.esc(skill.id)}">Delete</button>
                     </td>
                 </tr>`;
             });
@@ -100,63 +133,64 @@
             $('#nw-skill-table-wrap').html(html);
         },
 
-       editSkill(e) {
-    const id = $(e.currentTarget).data('id');
+        editSkill(e) {
+            const id = $(e.currentTarget).data('id');
 
-    $.post(NW_SK.ajax_url, {
-        action: 'nw_skills_load',
-        nonce: NW_SK.nonce
-    }, (res) => {
-        console.log('edit load response:', res);
+            this.request(
+                {
+                    action: 'nw_skills_load'
+                },
+                (res) => {
+                    if (!res || !res.success || !Array.isArray(res.data)) {
+                        this.showNotice('Could not load skill data.', 'error');
+                        return;
+                    }
 
-        if (!res || !res.success || !Array.isArray(res.data)) {
-            this.showNotice('Could not load skill data.', 'error');
-            return;
-        }
+                    const skill = res.data.find((s) => String(s.id) === String(id));
 
-        const skill = res.data.find(s => String(s.id) === String(id));
-        if (skill) {
-            this.showForm(skill);
-        } else {
-            this.showNotice('Skill not found.', 'error');
-        }
-    }).fail((xhr) => {
-        console.log('edit fail:', xhr.responseText);
-        this.showNotice('AJAX request failed.', 'error');
-    });
-}
+                    if (skill) {
+                        this.showForm(skill);
+                    } else {
+                        this.showNotice('Skill not found.', 'error');
+                    }
+                },
+                'Failed to load skill details.'
+            );
+        },
 
         saveSkill() {
-            const name = $('#nw-field-name').val().trim();
-            
+            const name = ($('#nw-field-name').val() || '').trim();
+
             if (!name) {
                 this.showNotice('Skill name is required.', 'error');
                 return;
             }
 
-            const data = {
-                action: 'nw_skills_save',
-                nonce: NW_SK.nonce,
-                id: this.currentId || '',
-                name: name,
-                description: $('#nw-field-description').val(),
-                category: $('#nw-field-category').val(),
-                stat: $('#nw-field-stat').val()
-            };
-
             $('#nw-save-skill-btn').prop('disabled', true).text('Saving…');
 
-            $.post(NW_SK.ajax_url, data, (res) => {
-                $('#nw-save-skill-btn').prop('disabled', false).text('Save Skill');
-                
-                if (res.success) {
+            this.request(
+                {
+                    action: 'nw_skills_save',
+                    id: this.currentId || '',
+                    name: name,
+                    description: $('#nw-field-description').val() || '',
+                    category: $('#nw-field-category').val() || '',
+                    stat: $('#nw-field-stat').val() || ''
+                },
+                (res) => {
+                    $('#nw-save-skill-btn').prop('disabled', false).text('Save Skill');
+
+                    if (!res || !res.success) {
+                        this.showNotice('Error: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
+                        return;
+                    }
+
                     this.showNotice(this.currentId ? 'Skill updated.' : 'Skill created.', 'success');
                     this.hideForm();
                     this.loadSkills();
-                } else {
-                    this.showNotice('Error: ' + res.data, 'error');
-                }
-            });
+                },
+                'Failed to save skill.'
+            );
         },
 
         deleteSkill(e) {
@@ -166,23 +200,27 @@
 
             const id = $(e.currentTarget).data('id');
 
-            $.post(NW_SK.ajax_url, {
-                action: 'nw_skills_delete',
-                nonce: NW_SK.nonce,
-                id: id
-            }, (res) => {
-                if (res.success) {
+            this.request(
+                {
+                    action: 'nw_skills_delete',
+                    id: id
+                },
+                (res) => {
+                    if (!res || !res.success) {
+                        this.showNotice('Error: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
+                        return;
+                    }
+
                     this.showNotice('Skill deleted.', 'success');
                     this.loadSkills();
-                } else {
-                    this.showNotice('Error: ' + res.data, 'error');
-                }
-            });
+                },
+                'Failed to delete skill.'
+            );
         },
 
         showNotice(msg, type) {
             const cls = type === 'error' ? 'notice-error' : 'notice-success';
-            $('#nw-form-notice').html(`<div class="notice ${cls} is-dismissible"><p>${msg}</p></div>`);
+            $('#nw-form-notice').html(`<div class="notice ${cls} is-dismissible"><p>${this.esc(msg)}</p></div>`);
             setTimeout(() => this.clearNotice(), 4000);
         },
 
@@ -191,11 +229,16 @@
         },
 
         esc(str) {
-            if (!str && str !== 0) return '';
+            if (str === null || typeof str === 'undefined') {
+                return '';
+            }
+
             return $('<div>').text(String(str)).html();
         }
     };
 
-    $(document).ready(() => NW_Skills.init());
+    $(document).ready(function () {
+        NW_Skills.init();
+    });
 
 })(jQuery);
