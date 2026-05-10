@@ -32,6 +32,8 @@ final class NeoWeaver_Core {
 	}
 
 	private static function load_files() {
+		require_once NW_PLUGIN_DIR . 'includes/trait-nw-transient-cache.php';
+
 		$files = [
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
