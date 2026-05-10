@@ -15,10 +15,10 @@ class NW_Abilities_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_get_abilities',     [ $this, 'ajax_get_abilities'    ] );
-		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'     ] );
-		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'   ] );
-		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities'] );
+		add_action( 'wp_ajax_nw_get_abilities',     [ $this, 'ajax_get_abilities'     ] );
+		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'      ] );
+		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'    ] );
+		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
 	}
 
 	public function register_menu(): void {
