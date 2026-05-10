@@ -16,6 +16,7 @@ class NW_Skills_Admin {
 	private string $page_slug    = 'nw-skills';
 	private string $table        = 'cyber_skills';
 	private string $nonce_action = 'nw_skills_nonce';
+	private string $page_hook    = '';
 
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
@@ -26,7 +27,7 @@ class NW_Skills_Admin {
 	}
 
 	public function register_menu(): void {
-		add_submenu_page(
+		$this->page_hook = add_submenu_page(
 			'neoweaver',
 			'Skills',
 			'✨Skills',
@@ -36,35 +37,35 @@ class NW_Skills_Admin {
 		);
 	}
 
-public function enqueue( string $hook ): void {
-	if ( $hook !== $this->page_hook ) {
-		return;
+	public function enqueue( string $hook ): void {
+		if ( $hook !== $this->page_hook ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'nw-admin-shared',
+			NEOWEAVER_PLUGIN_URL . 'admin/css/skills-admin.css',
+			[],
+			defined( 'NW_VERSION' ) ? NW_VERSION : null
+		);
+
+		wp_enqueue_script(
+			'nw-skills',
+			NEOWEAVER_PLUGIN_URL . 'admin/js/skills-admin.js',
+			[ 'jquery' ],
+			defined( 'NW_VERSION' ) ? NW_VERSION : null,
+			true
+		);
+
+		wp_localize_script(
+			'nw-skills',
+			'NW_SK',
+			[
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'nonce'    => wp_create_nonce( $this->nonce_action ),
+			]
+		);
 	}
-
-	wp_enqueue_style(
-		'nw-admin-shared',
-		NEOWEAVER_PLUGIN_URL . 'admin/css/skills-admin.css',
-		[],
-		defined( 'NW_VERSION' ) ? NW_VERSION : null
-	);
-
-	wp_enqueue_script(
-		'nw-skills',
-		NEOWEAVER_PLUGIN_URL . 'admin/js/skills-admin.js',
-		[ 'jquery' ],
-		defined( 'NW_VERSION' ) ? NW_VERSION : null,
-		true
-	);
-
-	wp_localize_script(
-		'nw-skills',
-		'NW_SK',
-		[
-			'ajax_url' => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( $this->nonce_action ),
-		]
-	);
-}
 
 	public function render_page(): void {
 		?>
