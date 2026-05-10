@@ -1,1 +1,319 @@
-PD9waHAKLyoqCiAqIE5lb1dlYXZlciBBZG1pbiBQYW5lbCDigJQgU2NlbmFyaW9zIChjeWJlcl9zY2VuYXJpb3MpCiAqCiAqIEZpZWxkczogaWQsIHRpdGxlLCBkZXNjcmlwdGlvbiwgZGlmZmljdWx0eSwgc2V0dGluZywgb2JqZWN0aXZlc1tdLAogKiAgICAgICAgIHJld2FyZHN7fSwgcHJlcmVxdWlzaXRlc3t9LCB0YWdzW10sIGlzX2FjdGl2ZSwgc29ydF9vcmRlciwKICogICAgICAgICBpbWFnZV91cmwsIGVzdGltYXRlZF9kdXJhdGlvbl9taW51dGVzLgogKgogKiBQb3N0Z1JFU1QgaGludHM6CiAqICAgR0VUIC9jeWJlcl9zY2VuYXJpb3M/c2VsZWN0PSogIOKGkiBhcnJheSBvZiByb3dzCiAqICAgUE9TVCAvY3liZXJfc2NlbmFyaW9zICAgICAgICAgICDihpIgaW5zZXJ0IChQcmVmZXI6IHJldHVybj1yZXByZXNlbnRhdGlvbikKICogICBQQVRDSCAvY3liZXJfc2NlbmFyaW9zP2lkPWVxLntpZH0g4oaSIHVwZGF0ZQogKiAgIERFTEVURSAvY3liZXJfc2NlbmFyaW9zP2lkPWVxLntpZH0g4oaSIGRlbGV0ZQogKi8KCmlmICggISBkZWZpbmVkKCAnQUJTUEFUSCcgKSApIGV4aXQ7CgpjbGFzcyBOZW9XZWF2ZXJfU2NlbmFyaW9zX0FkbWluIHsKCglwcml2YXRlIHN0cmluZyAkdGFibGUgPSAnY3liZXJfc2NlbmFyaW9zJzsKCglwdWJsaWMgZnVuY3Rpb24gX19jb25zdHJ1Y3QoKSB7CgkJYWRkX2FjdGlvbiggJ2FkbWluX21lbnUnLCAgICAgICAgICAgIFsgJHRoaXMsICdyZWdpc3Rlcl9tZW51JyAgIF0gKTsKCQlhZGRfYWN0aW9uKCAnYWRtaW5fZW5xdWV1ZV9zY3JpcHRzJywgWyAkdGhpcywgJ2VucXVldWVfYXNzZXRzJyAgXSApOwoKCQlhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19zY2VuYXJpb3NfZ2V0X2FsbCcsICAgIFsgJHRoaXMsICdhamF4X2dldF9hbGwnICAgIF0gKTsKCQlhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19zY2VuYXJpb3NfZ2V0X29uZScsICAgIFsgJHRoaXMsICdhamF4X2dldF9vbmUnICAgIF0gKTsKCQlhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19zY2VuYXJpb3Nfc2F2ZScsICAgICAgIFsgJHRoaXMsICdhamF4X3NhdmUnICAgICAgIF0gKTsKCQlhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19zY2VuYXJpb3NfdG9nZ2xlJywgICAgIFsgJHRoaXMsICdhamF4X3RvZ2dsZScgICAgIF0gKTsKCQlhZGRfYWN0aW9uKCAnd3BfYWpheF9ud19zY2VuYXJpb3NfZGVsZXRlJywgICAgIFsgJHRoaXMsICdhamF4X2RlbGV0ZScgICAgIF0gKTsKCX0KCgkvLyDilJQgbWVudSAg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACgoJcHVibGljIGZ1bmN0aW9uIHJlZ2lzdGVyX21lbnUoKTogdm9pZCB7CgkJYWRkX3N1Ym1lbnVfcGFnZSgKCQkJJ25lb3dlYXZlcicsICdTY2VuYXJpb3MnLCAnU2NlbmFyaW9zJywgJ21hbmFnZV9vcHRpb25zJywKCQkJJ253LXNjZW5hcmlvcycsIFsgJHRoaXMsICdyZW5kZXJfcGFnZScgXQoJCSk7Cgl9CgoJLy8g4pSUIGFzc2V0cyAg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACgpwdWJsaWMgZnVuY3Rpb24gZW5xdWV1ZV9hc3NldHMoIHN0cmluZyAkaG9vayApOiB2b2lkIHsKICAgIGlmICggISBzdHJfY29udGFpbnMoICRob29rLCAnbnctc2NlbmFyaW9zJyApICkgcmV0dXJuOwoKICAgIHdwX2VucXVldWVfc3R5bGUoCiAgICAgICAgJ2NoYWtyYS1wZXRjaCcsCiAgICAgICAgJ2h0dHBzOi8vZm9udHMuZ29vZ2xlYXBpcy5jb20vY3NzMj9mYW1pbHk9Q2hha3JhK1BldGNoOndnaHRANDAwOzYwMDs3MDAmZGlzcGxheT1zd2FwJywKICAgICAgICBbXSwgbnVsbAogICAgKTsKICAgIHdwX2VucXVldWVfc3R5bGUoCiAgICAgICAgJ253LXNjZW5hcmlvcy1jc3MnLAogICAgICAgIHBsdWdpbl9kaXJfdXJsKCBfX0ZJTEVfXyApIC4gJy4uL2Fzc2V0cy9jc3Mvc2NlbmFyaW9zLWFkbWluLmNzcycsCiAgICAgICAgWyAnY2hha3JhLXBldGNoJyBdLCAnMS4wLjAnCiAgICApOwogICAgd3BfZW5xdWV1ZV9zY3JpcHQoCiAgICAgICAgJ253LXNjZW5hcmlvcy1qcycsCiAgICAgICAgcGx1Z2luX2Rpcl91cmwoIF9fRklMRV9fICkgLiAnLi4vYXNzZXRzL2pzL3NjZW5hcmlvcy1hZG1pbi5qcycsCiAgICAgICAgWyAnanF1ZXJ5JyBdLCAnMS4wLjAnLCB0cnVlCiAgICApOwogICAgd3BfbG9jYWxpemVfc2NyaXB0KCAnbnctc2NlbmFyaW9zLWpzJywgJ05XU2NlbmFyaW9zJywgWwogICAgICAgICdhamF4dXJsJyA9PiBhZG1pbl91cmwoICdhZG1pbi1hamF4LnBocCcgKSwKICAgICAgICAnbm9uY2UnICAgPT4gd3BfY3JlYXRlX25vbmNlKCAnbndfc2NlbmFyaW9zX25vbmNlJyApLAogICAgXSApOwp9CgoJLy8g4pSUIHBhZ2UgSFRNTCDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJAKCglwdWJsaWMgZnVuY3Rpb24gcmVuZGVyX3BhZ2UoKTogdm9pZCB7CgkJPz4KCQk8ZGl2IGNsYXNzPSJ3cmFwIG53LWFkbWluLXdyYXAiPgoJCTxoMSBjbGFzcz0ibnctYWRtaW4taGVhZGluZyI+8J+OrSBTY2VuYXJpb3M8L2gxPgoKCQk8ZGl2IGlkPSJudy1ub3RpY2UiIGNsYXNzPSJudy1ub3RpY2UiIHN0eWxlPSJkaXNwbGF5Om5vbmUiPjwvZGl2PgoKCQk8ZGl2IGNsYXNzPSJudy10b29sYmFyIj4KCQkJPGJ1dHRvbiBpZD0ibnctYWRkLWJ0biIgY2xhc3M9Im53LWFjdGlvbi1idG4iPisgQWRkIFNjZW5hcmlvPC9idXR0b24+CgkJCTxidXR0b24gaWQ9Im53LXJlZnJlc2gtYnRuIiBjbGFzcz0ibnctYWN0aW9uLWJ0biBudy1hY3Rpb24tYnRuLS1zZWNvbmRhcnkiPuKGuiBSZWZyZXNoPC9idXR0b24+CgkJCTxzZWxlY3QgaWQ9Im53LWZpbHRlci1kaWZmaWN1bHR5Ij4KCQkJCTxvcHRpb24gdmFsdWU9IiI+QWxsIERpZmZpY3VsdGllczwvb3B0aW9uPgoJCQkJPG9wdGlvbiB2YWx1ZT0idHJpdmlhbCI+VHJpdmlhbDwvb3B0aW9uPgoJCQkJPG9wdGlvbiB2YWx1ZT0iZWFzeSI+RWFzeTwvb3B0aW9uPgoJCQkJPG9wdGlvbiB2YWx1ZT0ibWVkaXVtIj5NZWRpdW08L29wdGlvbj4KCQkJCTxvcHRpb24gdmFsdWU9ImhhcmQiPkhhcmQ8L29wdGlvbj4KCQkJCTxvcHRpb24gdmFsdWU9ImRlYWRseSI+RGVhZGx5PC9vcHRpb24+CgkJCTwvc2VsZWN0PgoJCQk8aW5wdXQgdHlwZT0idGV4dCIgaWQ9Im53LXNlYXJjaCIgcGxhY2Vob2xkZXI9IlNlYXJjaCBzY2VuYXJpb3PigKYiIC8+CgkJPC9kaXY+CgoJCTx0YWJsZSBjbGFzcz0ibnctdGFibGUiIGlkPSJudy1zY2VuYXJpb3MtdGFibGUiPgoJCQk8dGhlYWQ+CgkJCQk8dHI+CgkJCQkJPHRoPlRpdGxlPC90aD4KCQkJCQk8dGg+RGlmZmljdWx0eTwvdGg+CgkJCQkJPHRoPlNldHRpbmc8L3RoPgoJCQkJCTx0aD5EdXJhdGlvbjwvdGg+CgkJCQkJPHRoPlRhZ3M8L3RoPgoJCQkJCTx0aD5BY3RpdmU8L3RoPgoJCQkJCTx0aD5BY3Rpb25zPC90aD4KCQkJCTwvdHI+CgkJCTwvdGhlYWQ+CgkJCTx0Ym9keSBpZD0ibnctc2NlbmFyaW9zLXRib2R5Ij48L3Rib2R5PgoJCTwvdGFibGU+CgoJCTwhLS0g4pSQIE1vZGFsIOKUkCAtLT4KCQk8ZGl2IGlkPSJudy1tb2RhbC1vdmVybGF5IiBjbGFzcz0ibnctbW9kYWwtb3ZlcmxheSIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+CgkJCTxkaXYgY2xhc3M9Im53LW1vZGFsIG53LW1vZGFsLS13aWRlIj4KCQkJCTxkaXYgY2xhc3M9Im53LW1vZGFsLWhlYWRlciI+CgkJCQkJPGgyIGlkPSJudy1tb2RhbC10aXRsZSI+U2NlbmFyaW88L2gyPgoJCQkJCTxidXR0b24gaWQ9Im53LW1vZGFsLWNsb3NlIiBjbGFzcz0ibnctbW9kYWwtY2xvc2UiPuKchTwvYnV0dG9uPgoJCQkJPC9kaXY+CgkJCQk8Zm9ybSBpZD0ibnctc2NlbmFyaW8tZm9ybSI+CgkJCQk8aW5wdXQgdHlwZT0iaGlkZGVuIiBuYW1lPSJzY2VuYXJpb19pZCIgaWQ9Im53LWZpZWxkLWlkIiAvPgoKCQkJCTwhLS0gVGFiIG5hdiAtLT4KCQkJCTxkaXYgY2xhc3M9Im53LXRhYnMiPgoJCQkJCTxidXR0b24gdHlwZT0iYnV0dG9uIiBjbGFzcz0ibnctdGFiIGFjdGl2ZSIgZGF0YS10YWI9ImJhc2ljIj5CYXNpYzwvYnV0dG9uPgoJCQkJCTxidXR0b24gdHlwZT0iYnV0dG9uIiBjbGFzcz0ibnctdGFiIiBkYXRhLXRhYj0ib2JqZWN0aXZlcyI+T2JqZWN0aXZlczwvYnV0dG9uPgoJCQkJCTxidXR0b24gdHlwZT0iYnV0dG9uIiBjbGFzcz0ibnctdGFiIiBkYXRhLXRhYj0icmV3YXJkcyI+UmV3YXJkczwvYnV0dG9uPgoJCQkJCTxidXR0b24gdHlwZT0iYnV0dG9uIiBjbGFzcz0ibnctdGFiIiBkYXRhLXRhYj0icHJlcmVxdWlzaXRlcyI+UHJlcmVxdWlzaXRlczwvYnV0dG9uPgoJCQkJPC9kaXY+CgoJCQkJPCEtLSBUYWI6IEJhc2ljIC0tPgoJCQkJPGRpdiBjbGFzcz0ibnctdGFiLXBhbmVsIGFjdGl2ZSIgaWQ9Im53LXRhYi1iYXNpYyI+CgkJCQk8ZGl2IGNsYXNzPSJudy1mb3JtLWdyaWQiPgoJCQkJCTxsYWJlbD5UaXRsZSAqPGlucHV0IHR5cGU9InRleHQiIG5hbWU9InRpdGxlIiBpZD0ibnctZmllbGQtdGl0bGUiIHJlcXVpcmVkIC8+PC9sYWJlbD4KCQkJCQk8bGFiZWw+U2V0dGluZzxpbnB1dCB0eXBlPSJ0ZXh0IiBuYW1lPSJzZXR0aW5nIiBpZD0ibnctZmllbGQtc2V0dGluZyIgLz48L2xhYmVsPgoJCQkJCTxsYWJlbCBjbGFzcz0ibnctc3Bhbi0yIj5EZXNjcmlwdGlvbjx0ZXh0YXJlYSBuYW1lPSJkZXNjcmlwdGlvbiIgaWQ9Im53LWZpZWxkLWRlc2MiIHJvd3M9IjQiPjwvdGV4dGFyZWE+PC9sYWJlbD4KCQkJCQk8bGFiZWw+RGlmZmljdWx0eQoJCQkJCQk8c2VsZWN0IG5hbWU9ImRpZmZpY3VsdHkiIGlkPSJudy1maWVsZC1kaWZmaWN1bHR5Ij4KCQkJCQkJCTxvcHRpb24gdmFsdWU9InRyaXZpYWwiPlRyaXZpYWw8L29wdGlvbj4KCQkJCQkJCTxvcHRpb24gdmFsdWU9ImVhc3kiPkVhc3k8L29wdGlvbj4KCQkJCQkJCTxvcHRpb24gdmFsdWU9Im1lZGl1bSIgc2VsZWN0ZWQ+TWVkaXVtPC9vcHRpb24+CgkJCQkJCQk8b3B0aW9uIHZhbHVlPSJoYXJkIj5IYXJkPC9vcHRpb24+CgkJCQkJCQk8b3B0aW9uIHZhbHVlPSJkZWFkbHkiPkRlYWRseTwvb3B0aW9uPgoJCQkJCQk8L3NlbGVjdD4KCQkJCQk8L2xhYmVsPgoJCQkJCTxsYWJlbD5EdXJhdGlvbiAobWluKTxpbnB1dCB0eXBlPSJudW1iZXIiIG5hbWU9ImVzdGltYXRlZF9kdXJhdGlvbl9taW51dGVzIiBpZD0ibnctZmllbGQtZHVyYXRpb24iIHZhbHVlPSI2MCIgbWluPSIwIiAvPjwvbGFiZWw+CgkJCQkJPGxhYmVsPlNvcnQgT3JkZXI8aW5wdXQgdHlwZT0ibnVtYmVyIiBuYW1lPSJzb3J0X29yZGVyIiBpZD0ibnctZmllbGQtc29ydCIgdmFsdWU9IjAiIC8+PC9sYWJlbD4KCQkJCQk8bGFiZWw+SW1hZ2UgVVJMPGlucHV0IHR5cGU9InVybCIgbmFtZT0iaW1hZ2VfdXJsIiBpZD0ibnctZmllbGQtaW1hZ2UiIC8+PC9sYWJlbD4KCQkJCQk8bGFiZWw+VGFncyAoY29tbWEtc2VwYXJhdGVkKTxpbnB1dCB0eXBlPSJ0ZXh0IiBuYW1lPSJ0YWdzIiBpZD0ibnctZmllbGQtdGFncyIgLz48L2xhYmVsPgoJCQkJCTxsYWJlbCBjbGFzcz0ibnctY2hlY2tib3gtbGFiZWwiPjxpbnB1dCB0eXBlPSJjaGVja2JveCIgbmFtZT0iaXNfYWN0aXZlIiBpZD0ibnctZmllbGQtYWN0aXZlIiB2YWx1ZT0iMSIgY2hlY2tlZCAvPiBBY3RpdmU8L2xhYmVsPgoJCQkJPC9kaXY+CgkJCQk8L2Rpdj48IS0tIC90YWItYmFzaWMgLS0+CgoJCQkJPCEtLSBUYWI6IE9iamVjdGl2ZXMgLS0+CgkJCQk8ZGl2IGNsYXNzPSJudy10YWItcGFuZWwiIGlkPSJudy10YWItb2JqZWN0aXZlcyIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+CgkJCQkJPHAgY2xhc3M9Im53LWhlbHAtdGV4dCI+QWRkIG9iamVjdGl2ZXMgKG9uZSBwZXIgbGluZSBvciBKU09OIGFycmF5KS48L3A+CgkJCQkJPHRleHRhcmVhIG5hbWU9Im9iamVjdGl2ZXMiIGlkPSJudy1maWVsZC1vYmplY3RpdmVzIiByb3dzPSI4IiBzdHlsZT0id2lkdGg6MTAwJSI+PC90ZXh0YXJlYT4KCQkJCTwvZGl2PgoKCQkJCTwhLS0gVGFiOiBSZXdhcmRzIC0tPgoJCQkJPGRpdiBjbGFzcz0ibnctdGFiLXBhbmVsIiBpZD0ibnctdGFiLXJld2FyZHMiIHN0eWxlPSJkaXNwbGF5Om5vbmUiPgoJCQkJCTxwIGNsYXNzPSJudy1oZWxwLXRleHQiPlJld2FyZHMgYXMgSlNPTiBvYmplY3QsIGUuZy4geyJ4cCI6MTAwLCJjcmVkaXRzIjo1MH0uPC9wPgoJCQkJCTx0ZXh0YXJlYSBuYW1lPSJyZXdhcmRzIiBpZD0ibnctZmllbGQtcmV3YXJkcyIgcm93cz0iNiIgc3R5bGU9IndpZHRoOjEwMCUiPjwvdGV4dGFyZWE+CgkJCQk8L2Rpdj4KCgkJCQk8IS0tIFRhYjogUHJlcmVxdWlzaXRlcyAtLT4KCQkJCTxkaXYgY2xhc3M9Im53LXRhYi1wYW5lbCIgaWQ9Im53LXRhYi1wcmVyZXF1aXNpdGVzIiBzdHlsZT0iZGlzcGxheTpub25lIj4KCQkJCQk8cCBjbGFzcz0ibnctaGVscC10ZXh0Ij5QcmVyZXF1aXNpdGVzIGFzIEpTT04gb2JqZWN0LjwvcD4KCQkJCQk8dGV4dGFyZWEgbmFtZT0icHJlcmVxdWlzaXRlcyIgaWQ9Im53LWZpZWxkLXByZXJlcXVpc2l0ZXMiIHJvd3M9IjYiIHN0eWxlPSJ3aWR0aDoxMDAlIj48L3RleHRhcmVhPgoJCQkJPC9kaXY+CgoJCQkJPC9mb3JtPjwhLS0gL2Zvcm0gLS0+CgoJCQkJPGRpdiBjbGFzcz0ibnctbW9kYWwtZm9vdGVyIj4KCQkJCQk8YnV0dG9uIGlkPSJudy1zYXZlLWJ0biIgY2xhc3M9Im53LWFjdGlvbi1idG4iPlNhdmU8L2J1dHRvbj4KCQkJCQk8YnV0dG9uIGlkPSJudy1jYW5jZWwtYnRuIiBjbGFzcz0ibnctYWN0aW9uLWJ0biBudy1hY3Rpb24tYnRuLS1zZWNvbmRhcnkiPkNhbmNlbDwvYnV0dG9uPgoJCQkJCTxidXR0b24gaWQ9Im53LWRlbGV0ZS1idG4iIGNsYXNzPSJudy1hY3Rpb24tYnRuIG53LWFjdGlvbi1idG4tLWRhbmdlciIgc3R5bGU9ImRpc3BsYXk6bm9uZSI+RGVsZXRlPC9idXR0b24+CgkJCQk8L2Rpdj4KCQkJPC9kaXY+CgkJPC9kaXY+PCEtLSAvbW9kYWwtb3ZlcmxheSAtLT4KCQk8L2Rpdj48IS0tIC93cmFwIC0tPgoJCTw/cGhwCgl9CgoJLy8g4pSUIGhlbHBlcnMgIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKCXByaXZhdGUgZnVuY3Rpb24gc3VwYSggc3RyaW5nICRtZXRob2QsIHN0cmluZyAkcGF0aCwgYXJyYXkgJGJvZHkgPSBbXSwgYXJyYXkgJGV4dHJhID0gW10gKTogYXJyYXkgewoJCXJldHVybiBud19zdXBhYmFzZV9yZXF1ZXN0KCAkbWV0aG9kLCAkcGF0aCwgJGJvZHksICRleHRyYSApOwoJfQoKCS8qKgoJICogRGVjb2RlIHRleHRhcmVhIGlucHV0IHRoYXQgbWF5IGJlIGVpdGhlcjoKCSAqIC0gcGxhaW4gdGV4dCAob25lIGl0ZW0gcGVyIGxpbmUpICDigpIgY29udmVydCB0byBKU09OIGFycmF5CgkgKiAtIEpTT04gYXJyYXkgYWxyZWFkeSAgICAgICAgICAgICAgIOKGkiByZXR1cm4gYXMtaXMKCSAqIC0gSlNPTiBvYmplY3QgICAgICAgICAgICAgICAgICAgICAg4oaSIHJldHVybiBhcy1pcwoJICovCglwcml2YXRlIGZ1bmN0aW9uIGRlY29kZV90ZXh0YXJlYV9maWVsZCggc3RyaW5nICRyYXcgKTogbWl4ZWQgewoJCSRyYXcgPSB0cmltKCAkcmF3ICk7CgkJaWYgKCAkcmF3ID09PSAnJyApIHJldHVybiBbXTsKCQkkZGVjb2RlZCA9IGpzb25fZGVjb2RlKCAkcmF3LCB0cnVlICk7CgkJaWYgKCBqc29uX2xhc3RfZXJyb3IoKSA9PT0gSlNPTl9FUlJPUl9OT05FICkgcmV0dXJuICRkZWNvZGVkOwoJCS8vIFBsYWluIHRleHQg4oaSIGFycmF5IG9mIG5vbi1lbXB0eSBsaW5lcwoJCXJldHVybiBhcnJheV92YWx1ZXMoIGFycmF5X2ZpbHRlciggYXJyYXlfbWFwKCAndHJpbScsIGV4cGxvZGUoICJcbiIsICRyYXcgKSApICkgKTsKCX0KCgkvLyDilJQgQUpBWDogZ2V0IGFsbCDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJAKCglwdWJsaWMgZnVuY3Rpb24gYWpheF9nZXRfYWxsKCk6IHZvaWQgewoJCWNoZWNrX2FqYXhfcmVmZXJlciggJ253X3NjZW5hcmlvc19ub25jZScsICdub25jZScgKTsKCQlpZiAoICEgY3VycmVudF91c2VyX2NhbiggJ21hbmFnZV9vcHRpb25zJyApICkgeyB3cF9zZW5kX2pzb25fZXJyb3IoICdGb3JiaWRkZW4nLCA0MDMgKTsgcmV0dXJuOyB9CgoJCSRkaWZmaWN1bHR5ID0gc2FuaXRpemVfdGV4dF9maWVsZCggJF9QT1NUWydmaWx0ZXJfZGlmZmljdWx0eSddID8/ICcnICk7CgkJJHFzID0gJHRoaXMtPnRhYmxlIC4gJz9vcmRlcj1zb3J0X29yZGVyLmFzYyx0aXRsZS5hc2Mmc2VsZWN0PSonOwoJCWlmICggJGRpZmZpY3VsdHkgKSAkcXMgLj0gJyZkaWZmaWN1bHR5PWVxLicgLiByYXd1cmxlbmNvZGUoICRkaWZmaWN1bHR5ICk7CgoJCSRyb3dzID0gJHRoaXMtPnN1cGEoICdHRVQnLCAkcXMgKTsKCgkJaWYgKCBpc3NldCggJHJvd3NbJ2Vycm9yJ10gKSApIHsKCQkJd3Bfc2VuZF9qc29uX2Vycm9yKCAkcm93c1snZXJyb3InXSApOwoJCQlyZXR1cm47CgkJfQoKCQl3cF9zZW5kX2pzb25fc3VjY2VzcyggJHJvd3NbJ2RhdGEnXSA/PyBbXSApOwoJfQoKCS8vIOKUlCBBSkFYOiBnZXQgb25lIChmdWxsIHJlY29yZCBmb3IgZWRpdGluZykgIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKCXB1YmxpYyBmdW5jdGlvbiBhamF4X2dldF9vbmUoKTogdm9pZCB7CgkJY2hlY2tfYWpheF9yZWZlcmVyKCAnbndfc2NlbmFyaW9zX25vbmNlJywgJ25vbmNlJyApOwoJCWlmICggISBjdXJyZW50X3VzZXJfY2FuKCAnbWFuYWdlX29wdGlvbnMnICkgKSB7IHdwX3NlbmRfanNvbl9lcnJvciggJ0ZvcmJpZGRlbicsIDQwMyApOyByZXR1cm47IH0KCgkJJGlkID0gc2FuaXRpemVfdGV4dF9maWVsZCggJF9QT1NUWydzY2VuYXJpb19pZCddID8/ICcnICk7CgkJaWYgKCAhICRpZCApIHsgd3Bfc2VuZF9qc29uX2Vycm9yKCAnTWlzc2luZyBJRCcgKTsgcmV0dXJuOyB9CgoJCSRyZXMgPSAkdGhpcy0+c3VwYSggJ0dFVCcsICR0aGlzLT50YWJsZSAuICc/aWQ9ZXEuJyAuIHJhd3VybGVuY29kZSggJGlkICkgLiAnJnNlbGVjdD0qJyApOwoKCQlpZiAoIGlzc2V0KCAkcmVzWydlcnJvciddICkgKSB7IHdwX3NlbmRfanNvbl9lcnJvciggJHJlc1snZXJyb3InXSApOyByZXR1cm47IH0KCgkJJGRhdGEgPSAkcmVzWydkYXRhJ10gPz8gW107CgkJaWYgKCBlbXB0eSggJGRhdGEgKSApIHsgd3Bfc2VuZF9qc29uX2Vycm9yKCAnTm90IGZvdW5kJyApOyByZXR1cm47IH0KCgkJd3Bfc2VuZF9qc29uX3N1Y2Nlc3MoICRkYXRhWzBdICk7Cgl9CgoJLy8g4pSUIEFKQVg6IHNhdmUg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCgoJcHVibGljIGZ1bmN0aW9uIGFqYXhfc2F2ZSgpOiB2b2lkIHsKCQljaGVja19hamF4X3JlZmVyZXIoICdud19zY2VuYXJpb3Nfbm9uY2UnLCAnbm9uY2UnICk7CgkJaWYgKCAhIGN1cnJlbnRfdXNlcl9jYW4oICdtYW5hZ2Vfb3B0aW9ucycgKSApIHsgd3Bfc2VuZF9qc29uX2Vycm9yKCAnRm9yYmlkZGVuJywgNDAzICk7IHJldHVybjsgfQoKCQkkdGl0bGUgPSBzYW5pdGl6ZV90ZXh0X2ZpZWxkKCAkX1BPU1RbJ3RpdGxlJ10gPz8gJycgKTsKCQlpZiAoICEgJHRpdGxlICkgeyB3cF9zZW5kX2pzb25fZXJyb3IoICdUaXRsZSBpcyByZXF1aXJlZCcgKTsgcmV0dXJuOyB9CgoJCSR0YWdzID0gYXJyYXlfdmFsdWVzKCBhcnJheV9maWx0ZXIoIGFycmF5X21hcCgKCQkJJ3RyaW0nLCBleHBsb2RlKCAnLCcsIHNhbml0aXplX3RleHRfZmllbGQoICRfUE9TVFsndGFncyddID8/ICcnICkgKQoJCSkgKSApOwoKCQkkb2JqZWN0aXZlcyAgICA9ICR0aGlzLT5kZWNvZGVfdGV4dGFyZWFfZmllbGQoIHdwX3Vuc2xhc2goICRfUE9TVFsnb2JqZWN0aXZlcyddICAgID8/ICcnICkgKTsKCQkkcmV3YXJkcyAgICAgICA9ICR0aGlzLT5kZWNvZGVfdGV4dGFyZWFfZmllbGQoIHdwX3Vuc2xhc2goICRfUE9TVFsncmV3YXJkcyddICAgICAgID8/ICcnICkgKTsKCQkkcHJlcmVxdWlzaXRlcyA9ICR0aGlzLT5kZWNvZGVfdGV4dGFyZWFfZmllbGQoIHdwX3Vuc2xhc2goICRfUE9TVFsncHJlcmVxdWlzaXRlcyddID8/ICcnICkgKTsKCgkJJHBheWxvYWQgPSBbCgkJCSd0aXRsZScgICAgICAgICAgICAgICAgICAgICAgID0+ICR0aXRsZSwKCQkJJ2Rlc2NyaXB0aW9uJyAgICAgICAgICAgICAgICAgPT4gc2FuaXRpemVfdGV4dGFyZWFfZmllbGQoICRfUE9TVFsnZGVzY3JpcHRpb24nXSA/PyAnJyApLAoJCQknZGlmZmljdWx0eScgICAgICAgICAgICAgICAgICA9PiBzYW5pdGl6ZV90ZXh0X2ZpZWxkKCAkX1BPU1RbJ2RpZmZpY3VsdHknXSA/PyAnbWVkaXVtJyApLAoJCQknc2V0dGluZycgICAgICAgICAgICAgICAgICAgICA9PiBzYW5pdGl6ZV90ZXh0X2ZpZWxkKCAkX1BPU1RbJ3NldHRpbmcnXSA/PyAnJyApLAoJCQknb2JqZWN0aXZlcycgICAgICAgICAgICAgICAgICA9PiAkb2JqZWN0aXZlcywKCQkJJ3Jld2FyZHMnICAgICAgICAgICAgICAgICAgICAgPT4gJHJld2FyZHMsCgkJCSdwcmVyZXF1aXNpdGVzJyAgICAgICAgICAgICAgID0+ICRwcmVyZXF1aXNpdGVzLAoJCQkndGFncycgICAgICAgICAgICAgICAgICAgICAgICA9PiAkdGFncywKCQkJJ2lzX2FjdGl2ZScgICAgICAgICAgICAgICAgICAgPT4gISBlbXB0eSggJF9QT1NUWydpc19hY3RpdmUnXSApLAoJCQknc29ydF9vcmRlcicgICAgICAgICAgICAgICAgICA9PiAoaW50KSAoICRfUE9TVFsnc29ydF9vcmRlciddID8/IDAgKSwKCQkJJ2ltYWdlX3VybCcgICAgICAgICAgICAgICAgICAgPT4gZXNjX3VybF9yYXcoICRfUE9TVFsnaW1hZ2VfdXJsJ10gPz8gJycgKSwKCQkJJ2VzdGltYXRlZF9kdXJhdGlvbl9taW51dGVzJyAgPT4gKGludCkgKCAkX1BPU1RbJ2VzdGltYXRlZF9kdXJhdGlvbl9taW51dGVzJ10gPz8gNjAgKSwKCQldOwoKCQkkaWQgPSBzYW5pdGl6ZV90ZXh0X2ZpZWxkKCAkX1BPU1RbJ3NjZW5hcmlvX2lkJ10gPz8gJycgKTsKCgkJaWYgKCAkaWQgKSB7CgkJCSRyZXMgPSAkdGhpcy0+c3VwYSggJ1BBVENIJywgJHRoaXMtPnRhYmxlIC4gJz9pZD1lcS4nIC4gcmF3dXJsZW5jb2RlKCAkaWQgKSwgJHBheWxvYWQsCgkJCQlbICdQcmVmZXInID0+ICdyZXR1cm49cmVwcmVzZW50YXRpb24nIF0gKTsKCQl9IGVsc2UgewoJCQkkcmVzID0gJHRoaXMtPnN1cGEoICdQT1NUJywgJHRoaXMtPnRhYmxlLCAkcGF5bG9hZCwKCQkJCVsgJ1ByZWZlcicgPT4gJ3JldHVybj1yZXByZXNlbnRhdGlvbicgXSApOwoJCX0KCgkJaWYgKCBpc3NldCggJHJlc1snZXJyb3InXSApICkgeyB3cF9zZW5kX2pzb25fZXJyb3IoICRyZXNbJ2Vycm9yJ10gKTsgcmV0dXJuOyB9CgoJCSRjb2RlID0gJHJlc1snY29kZSddID8/IDA7CgkJJGRhdGEgPSAkcmVzWydkYXRhJ10gPz8gW107CgkJJGl0ZW0gPSBpc19hcnJheSggJGRhdGEgKSAmJiBpc3NldCggJGRhdGFbMF0gKSA/ICRkYXRhWzBdIDogJGRhdGE7CgoJCWlmICggJGNvZGUgPj0gMjAwICYmICRjb2RlIDwgMzAwICkgewoJCQl3cF9zZW5kX2pzb25fc3VjY2VzcyggJGl0ZW0gKTsKCQl9IGVsc2UgewoJCQl3cF9zZW5kX2pzb25fZXJyb3IoICRyZXNbJ2RhdGEnXVsnbWVzc2FnZSddID8/ICdTdXBhYmFzZSBlcnJvciAnIC4gJGNvZGUgKTsKCQkJcmV0dXJuOwoJCX0KCX0KCgkvLyDilJQgQUpBWDogdG9nZ2xlIGFjdGl2ZSDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJAKCglwdWJsaWMgZnVuY3Rpb24gYWpheF90b2dnbGUoKTogdm9pZCB7CgkJY2hlY2tfYWpheF9yZWZlcmVyKCAnbndfc2NlbmFyaW9zX25vbmNlJywgJ25vbmNlJyApOwoJCWlmICggISBjdXJyZW50X3VzZXJfY2FuKCAnbWFuYWdlX29wdGlvbnMnICkgKSB7IHdwX3NlbmRfanNvbl9lcnJvciggJ0ZvcmJpZGRlbicsIDQwMyApOyByZXR1cm47IH0KCgkJJGlkICAgID0gc2FuaXRpemVfdGV4dF9maWVsZCggJF9QT1NUWydzY2VuYXJpb19pZCddID8/ICcnICk7CgkJJHN0YXRlID0gZmlsdGVyX3ZhciggJF9QT1NUWydpc19hY3RpdmUnXSA/PyBmYWxzZSwgRklMVEVSX1ZBTElEQVRFX0JPT0xFQU4gKTsKCQlpZiAoICEgJGlkICkgeyB3cF9zZW5kX2pzb25fZXJyb3IoICdNaXNzaW5nIElEJyApOyByZXR1cm47IH0KCgkJJHJlcyA9ICR0aGlzLT5zdXBhKCAnUEFUQ0gnLCAkdGhpcy0+dGFibGUgLiAnP2lkPWVxLicgLiByYXd1cmxlbmNvZGUoICRpZCApLCBbICdpc19hY3RpdmUnID0+ICRzdGF0ZSBdICk7CgkJaWYgKCBpc3NldCggJHJlc1snZXJyb3InXSApICkgewoJCQl3cF9zZW5kX2pzb25fZXJyb3IoICRyZXNbJ2Vycm9yJ10gKTsKCQkJcmV0dXJuOwoJCX0KCQl3cF9zZW5kX2pzb25fc3VjY2VzcyggWyAnaXNfYWN0aXZlJyA9PiAkc3RhdGUgXSApOwoJfQoKCS8vIOKUlCBBSkFYOiBkZWxldGUg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSACgoJcHVibGljIGZ1bmN0aW9uIGFqYXhfZGVsZXRlKCk6IHZvaWQgewoJCWNoZWNrX2FqYXhfcmVmZXJlciggJ253X3NjZW5hcmlvc19ub25jZScsICdub25jZScgKTsKCQlpZiAoICEgY3VycmVudF91c2VyX2NhbiggJ21hbmFnZV9vcHRpb25zJyApICkgeyB3cF9zZW5kX2pzb25fZXJyb3IoICdGb3JiaWRkZW4nLCA0MDMgKTsgcmV0dXJuOyB9CgoJCSRpZCA9IHNhbml0aXplX3RleHRfZmllbGQoICRfUE9TVFsnc2NlbmFyaW9faWQnXSA/PyAnJyApOwoJCWlmICggISAkaWQgKSB7IHdwX3NlbmRfanNvbl9lcnJvciggJ01pc3NpbmcgSUQnICk7IHJldHVybjsgfQoKCQkkcmVzID0gJHRoaXMtPnN1cGEoICdERUxFVEUnLCAkdGhpcy0+dGFibGUgLiAnP2lkPWVxLicgLiByYXd1cmxlbmNvZGUoICRpZCApLCBbXSwgWyAnUHJlZmVyJyA9PiAnJyBdICk7CgkJaWYgKCBpc3NldCggJHJlc1snZXJyb3InXSApICkgewoJCQl3cF9zZW5kX2pzb25fZXJyb3IoICRyZXNbJ2Vycm9yJ10gKTsKCQkJcmV0dXJuOwoJCX0KCQl3cF9zZW5kX2pzb25fc3VjY2VzcyggJ2RlbGV0ZWQnICk7Cgl9Cn0KCm5ldyBOZW9XZWF2ZXJfU2NlbmFyaW9zX0FkbWluKCk7Cg==
+<?php
+/**
+ * NeoWeaver Admin Panel — Scenarios (cyber_scenarios)
+ *
+ * Fields: id, title, description, difficulty, setting, objectives[],
+ *         rewards{}, prerequisites{}, tags[], is_active, sort_order,
+ *         image_url, estimated_duration_minutes.
+ *
+ * PostgREST hints:
+ *   GET  /cyber_scenarios?select=*  → array of rows
+ *   POST /cyber_scenarios           → insert (Prefer: return=representation)
+ *   PATCH /cyber_scenarios?id=eq.{id} → update
+ *   DELETE /cyber_scenarios?id=eq.{id} → delete
+ */
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class NeoWeaver_Scenarios_Admin {
+
+	private string $table = 'cyber_scenarios';
+
+	public function __construct() {
+		add_action( 'admin_menu',            [ $this, 'register_menu'   ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'  ] );
+
+		add_action( 'wp_ajax_nw_scenarios_get_all',    [ $this, 'ajax_get_all'    ] );
+		add_action( 'wp_ajax_nw_scenarios_get_one',    [ $this, 'ajax_get_one'    ] );
+		add_action( 'wp_ajax_nw_scenarios_save',       [ $this, 'ajax_save'       ] );
+		add_action( 'wp_ajax_nw_scenarios_toggle',     [ $this, 'ajax_toggle'     ] );
+		add_action( 'wp_ajax_nw_scenarios_delete',     [ $this, 'ajax_delete'     ] );
+	}
+
+	// ── menu ──────────────────────────────────────────────────────────────
+
+	public function register_menu(): void {
+		add_submenu_page(
+			'neoweaver', 'Scenarios', 'Scenarios', 'manage_options',
+			'nw-scenarios', [ $this, 'render_page' ]
+		);
+	}
+
+	// ── assets ────────────────────────────────────────────────────────────
+
+public function enqueue_assets( string $hook ): void {
+    if ( ! str_contains( $hook, 'nw-scenarios' ) ) return;
+
+    wp_enqueue_style(
+        'chakra-petch',
+        'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+        [], null
+    );
+    wp_enqueue_style(
+        'nw-scenarios-css',
+        plugin_dir_url( __FILE__ ) . '../assets/css/scenarios-admin.css',
+        [ 'chakra-petch' ], '1.0.0'
+    );
+    wp_enqueue_script(
+        'nw-scenarios-js',
+        plugin_dir_url( __FILE__ ) . '../assets/js/scenarios-admin.js',
+        [ 'jquery' ], '1.0.0', true
+    );
+    wp_localize_script( 'nw-scenarios-js', 'NWScenarios', [
+        'ajaxurl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( 'nw_scenarios_nonce' ),
+    ] );
+}
+
+	// ── page HTML ─────────────────────────────────────────────────────────
+
+	public function render_page(): void {
+		?>
+		<div class="wrap nw-admin-wrap">
+		<h1 class="nw-admin-heading">🎭 Scenarios</h1>
+
+		<div id="nw-notice" class="nw-notice" style="display:none"></div>
+
+		<div class="nw-toolbar">
+			<button id="nw-add-btn" class="nw-action-btn">+ Add Scenario</button>
+			<button id="nw-refresh-btn" class="nw-action-btn nw-action-btn--secondary">↺ Refresh</button>
+			<select id="nw-filter-difficulty">
+				<option value="">All Difficulties</option>
+				<option value="trivial">Trivial</option>
+				<option value="easy">Easy</option>
+				<option value="medium">Medium</option>
+				<option value="hard">Hard</option>
+				<option value="deadly">Deadly</option>
+			</select>
+			<input type="text" id="nw-search" placeholder="Search scenarios…" />
+		</div>
+
+		<table class="nw-table" id="nw-scenarios-table">
+			<thead>
+				<tr>
+					<th>Title</th>
+					<th>Difficulty</th>
+					<th>Setting</th>
+					<th>Duration</th>
+					<th>Tags</th>
+					<th>Active</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody id="nw-scenarios-tbody"></tbody>
+		</table>
+
+		<!-- ─── Modal ─── -->
+		<div id="nw-modal-overlay" class="nw-modal-overlay" style="display:none">
+			<div class="nw-modal nw-modal--wide">
+				<div class="nw-modal-header">
+					<h2 id="nw-modal-title">Scenario</h2>
+					<button id="nw-modal-close" class="nw-modal-close">✕</button>
+				</div>
+				<form id="nw-scenario-form">
+				<input type="hidden" name="scenario_id" id="nw-field-id" />
+
+				<!-- Tab nav -->
+				<div class="nw-tabs">
+					<button type="button" class="nw-tab active" data-tab="basic">Basic</button>
+					<button type="button" class="nw-tab" data-tab="objectives">Objectives</button>
+					<button type="button" class="nw-tab" data-tab="rewards">Rewards</button>
+					<button type="button" class="nw-tab" data-tab="prerequisites">Prerequisites</button>
+				</div>
+
+				<!-- Tab: Basic -->
+				<div class="nw-tab-panel active" id="nw-tab-basic">
+				<div class="nw-form-grid">
+					<label>Title *<input type="text" name="title" id="nw-field-title" required /></label>
+					<label>Setting<input type="text" name="setting" id="nw-field-setting" /></label>
+					<label class="nw-span-2">Description<textarea name="description" id="nw-field-desc" rows="4"></textarea></label>
+					<label>Difficulty
+						<select name="difficulty" id="nw-field-difficulty">
+							<option value="trivial">Trivial</option>
+							<option value="easy">Easy</option>
+							<option value="medium" selected>Medium</option>
+							<option value="hard">Hard</option>
+							<option value="deadly">Deadly</option>
+						</select>
+					</label>
+					<label>Duration (min)<input type="number" name="estimated_duration_minutes" id="nw-field-duration" value="60" min="0" /></label>
+					<label>Sort Order<input type="number" name="sort_order" id="nw-field-sort" value="0" /></label>
+					<label>Image URL<input type="url" name="image_url" id="nw-field-image" /></label>
+					<label>Tags (comma-separated)<input type="text" name="tags" id="nw-field-tags" /></label>
+					<label class="nw-checkbox-label"><input type="checkbox" name="is_active" id="nw-field-active" value="1" checked /> Active</label>
+				</div>
+				</div><!-- /tab-basic -->
+
+				<!-- Tab: Objectives -->
+				<div class="nw-tab-panel" id="nw-tab-objectives" style="display:none">
+					<p class="nw-help-text">Add objectives (one per line or JSON array).</p>
+					<textarea name="objectives" id="nw-field-objectives" rows="8" style="width:100%"></textarea>
+				</div>
+
+				<!-- Tab: Rewards -->
+				<div class="nw-tab-panel" id="nw-tab-rewards" style="display:none">
+					<p class="nw-help-text">Rewards as JSON object, e.g. {"xp":100,"credits":50}.</p>
+					<textarea name="rewards" id="nw-field-rewards" rows="6" style="width:100%"></textarea>
+				</div>
+
+				<!-- Tab: Prerequisites -->
+				<div class="nw-tab-panel" id="nw-tab-prerequisites" style="display:none">
+					<p class="nw-help-text">Prerequisites as JSON object.</p>
+					<textarea name="prerequisites" id="nw-field-prerequisites" rows="6" style="width:100%"></textarea>
+				</div>
+
+				</form><!-- /form -->
+
+				<div class="nw-modal-footer">
+					<button id="nw-save-btn" class="nw-action-btn">Save</button>
+					<button id="nw-cancel-btn" class="nw-action-btn nw-action-btn--secondary">Cancel</button>
+					<button id="nw-delete-btn" class="nw-action-btn nw-action-btn--danger" style="display:none">Delete</button>
+				</div>
+			</div>
+		</div><!-- /modal-overlay -->
+		</div><!-- /wrap -->
+		<?php
+	}
+
+	// ── helpers ───────────────────────────────────────────────────────────
+
+	private function supa( string $method, string $path, array $body = [], array $extra = [] ): array {
+		return nw_supabase_request( $method, $path, $body, $extra );
+	}
+
+	/**
+	 * Decode textarea input that may be either:
+	 * - plain text (one item per line)  → convert to JSON array
+	 * - JSON array already               → return as-is
+	 * - JSON object                      → return as-is
+	 */
+	private function decode_textarea_field( string $raw ): mixed {
+		$raw = trim( $raw );
+		if ( $raw === '' ) return [];
+		$decoded = json_decode( $raw, true );
+		if ( json_last_error() === JSON_ERROR_NONE ) return $decoded;
+		// Plain text → array of non-empty lines
+		return array_values( array_filter( array_map( 'trim', explode( "\n", $raw ) ) ) );
+	}
+
+	// ── AJAX: get all ─────────────────────────────────────────────────────
+
+	public function ajax_get_all(): void {
+		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$difficulty = sanitize_text_field( $_POST['filter_difficulty'] ?? '' );
+		$qs = $this->table . '?order=sort_order.asc,title.asc&select=*';
+		if ( $difficulty ) $qs .= '&difficulty=eq.' . rawurlencode( $difficulty );
+
+		$rows = $this->supa( 'GET', $qs );
+
+		if ( isset( $rows['error'] ) ) {
+			wp_send_json_error( $rows['error'] );
+			return;
+		}
+
+		wp_send_json_success( $rows['data'] ?? [] );
+	}
+
+	// ── AJAX: get one (full record for editing) ───────────────────────────
+
+	public function ajax_get_one(): void {
+		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
+
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*' );
+
+		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+
+		$data = $res['data'] ?? [];
+		if ( empty( $data ) ) { wp_send_json_error( 'Not found' ); return; }
+
+		wp_send_json_success( $data[0] );
+	}
+
+	// ── AJAX: save ────────────────────────────────────────────────────────
+
+	public function ajax_save(): void {
+		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$title = sanitize_text_field( $_POST['title'] ?? '' );
+		if ( ! $title ) { wp_send_json_error( 'Title is required' ); return; }
+
+		$tags = array_values( array_filter( array_map(
+			'trim', explode( ',', sanitize_text_field( $_POST['tags'] ?? '' ) )
+		) ) );
+
+		$objectives    = $this->decode_textarea_field( wp_unslash( $_POST['objectives']    ?? '' ) );
+		$rewards       = $this->decode_textarea_field( wp_unslash( $_POST['rewards']       ?? '' ) );
+		$prerequisites = $this->decode_textarea_field( wp_unslash( $_POST['prerequisites'] ?? '' ) );
+
+		$payload = [
+			'title'                       => $title,
+			'description'                 => sanitize_textarea_field( $_POST['description'] ?? '' ),
+			'difficulty'                  => sanitize_text_field( $_POST['difficulty'] ?? 'medium' ),
+			'setting'                     => sanitize_text_field( $_POST['setting'] ?? '' ),
+			'objectives'                  => $objectives,
+			'rewards'                     => $rewards,
+			'prerequisites'               => $prerequisites,
+			'tags'                        => $tags,
+			'is_active'                   => ! empty( $_POST['is_active'] ),
+			'sort_order'                  => (int) ( $_POST['sort_order'] ?? 0 ),
+			'image_url'                   => esc_url_raw( $_POST['image_url'] ?? '' ),
+			'estimated_duration_minutes'  => (int) ( $_POST['estimated_duration_minutes'] ?? 60 ),
+		];
+
+		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+
+		if ( $id ) {
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload,
+				[ 'Prefer' => 'return=representation' ] );
+		} else {
+			$res = $this->supa( 'POST', $this->table, $payload,
+				[ 'Prefer' => 'return=representation' ] );
+		}
+
+		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+
+		$code = $res['code'] ?? 0;
+		$data = $res['data'] ?? [];
+		$item = is_array( $data ) && isset( $data[0] ) ? $data[0] : $data;
+
+		$code >= 200 && $code < 300
+			? wp_send_json_success( $item )
+			: wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+	}
+
+	// ── AJAX: toggle active ───────────────────────────────────────────────
+
+	public function ajax_toggle(): void {
+		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$id    = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
+		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
+
+		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
+		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
+	}
+
+	// ── AJAX: delete ──────────────────────────────────────────────────────
+
+	public function ajax_delete(): void {
+		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
+
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
+		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
+	}
+}
+
+new NeoWeaver_Scenarios_Admin();
