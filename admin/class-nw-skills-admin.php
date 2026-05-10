@@ -36,12 +36,23 @@ class NW_Skills_Admin {
 		);
 	}
 
-	public function enqueue( string $hook ): void {
-	if ( ! str_contains( $hook, $this->page_slug ) ) {
+	private string $page_hook = '';
+
+public function register_menu(): void {
+	$this->page_hook = add_submenu_page(
+		'neoweaver',
+		'Skills',
+		'✨Skills',
+		'manage_options',
+		$this->page_slug,
+		[ $this, 'render_page' ]
+	);
+}
+
+public function enqueue( string $hook ): void {
+	if ( $hook !== $this->page_hook ) {
 		return;
 	}
-
-	$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 
 	wp_enqueue_style(
 		'nw-admin-shared',
