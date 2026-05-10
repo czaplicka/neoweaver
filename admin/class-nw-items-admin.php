@@ -284,9 +284,12 @@ class NeoWeaver_Items_Admin {
 		$data = $res['data'] ?? [];
 		$item = is_array( $data ) && isset( $data[0] ) ? $data[0] : $data;
 
-		$code >= 200 && $code < 300
-			? wp_send_json_success( $item )
-			: wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+		if ( $code >= 200 && $code < 300 ) {
+			wp_send_json_success( $item );
+		} else {
+			wp_send_json_error( $res['data']['message'] ?? 'Supabase error ' . $code );
+			return;
+		}
 	}
 
 	// ── AJAX: toggle active ───────────────────────────────────────────────
@@ -300,7 +303,11 @@ class NeoWeaver_Items_Admin {
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
 		$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), [ 'is_active' => $state ] );
-		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( [ 'is_active' => $state ] );
+		if ( isset( $res['error'] ) ) {
+			wp_send_json_error( $res['error'] );
+			return;
+		}
+		wp_send_json_success( [ 'is_active' => $state ] );
 	}
 
 	// ── AJAX: delete ──────────────────────────────────────────────────────
@@ -313,7 +320,11 @@ class NeoWeaver_Items_Admin {
 		if ( ! $id ) { wp_send_json_error( 'Missing ID' ); return; }
 
 		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], [ 'Prefer' => '' ] );
-		isset( $res['error'] ) ? wp_send_json_error( $res['error'] ) : wp_send_json_success( 'deleted' );
+		if ( isset( $res['error'] ) ) {
+			wp_send_json_error( $res['error'] );
+			return;
+		}
+		wp_send_json_success( 'deleted' );
 	}
 }
 
