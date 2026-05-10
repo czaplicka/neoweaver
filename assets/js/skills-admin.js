@@ -38,24 +38,38 @@
        loadSkills() {
     $('#nw-skill-table-wrap').html('<p>Loading…</p>');
 
-    $.post(NW_SK.ajax_url, {
-        action: 'nw_skills_load',
-        nonce: NW_SK.nonce
-    }, (res) => {
-        console.log('nw_skills_load response:', res);
+    const nonce = window.NW_SK && window.NW_SK.nonce ? window.NW_SK.nonce : '';
+    const ajaxUrl = window.NW_SK && window.NW_SK.ajax_url ? window.NW_SK.ajax_url : '';
 
-        if (!res || !res.success) {
-            this.showNotice('Error loading skills: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
-            $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
-            return;
+    console.log('Using nonce:', nonce);
+    console.log('Using ajaxUrl:', ajaxUrl);
+
+    $.ajax({
+        url: ajaxUrl,
+        method: 'POST',
+        dataType: 'json',
+        data: {
+            action: 'nw_skills_load',
+            nonce: nonce
+        },
+        success: (res) => {
+            console.log('load success:', res);
+
+            if (!res || !res.success) {
+                this.showNotice('Error loading skills: ' + (res && res.data ? res.data : 'Unknown error'), 'error');
+                $('#nw-skill-table-wrap').html('<p style="color:#d63638;">Failed to load skills.</p>');
+                return;
+            }
+
+            const rows = Array.isArray(res.data) ? res.data : [];
+            this.renderTable(rows);
+        },
+        error: (xhr) => {
+            console.log('load error status:', xhr.status);
+            console.log('load error response:', xhr.responseText);
+            this.showNotice('AJAX request failed.', 'error');
+            $('#nw-skill-table-wrap').html('<p style="color:#d63638;">AJAX failed.</p>');
         }
-
-        const rows = Array.isArray(res.data) ? res.data : [];
-        this.renderTable(rows);
-    }).fail((xhr) => {
-        console.log('nw_skills_load fail:', xhr.responseText);
-        this.showNotice('AJAX request failed.', 'error');
-        $('#nw-skill-table-wrap').html('<p style="color:#d63638;">AJAX failed.</p>');
     });
 }
 
