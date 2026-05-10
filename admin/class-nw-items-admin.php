@@ -261,11 +261,11 @@ class NeoWeaver_Items_Admin {
 			'rarity'      => sanitize_text_field( $_POST['rarity']    ?? 'common' ),
 			'tags'        => $tags,
 			'properties'  => $properties,
-			'is_active'   => ! empty( $_POST['is_active'] ),
-			'sort_order'  => (int) ( $_POST['sort_order'] ?? 0 ),
+			'is_active'   => filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN ),
+			'sort_order'  => intval( $_POST['sort_order'] ?? 0 ),
 			'image_url'   => esc_url_raw( $_POST['image_url'] ?? '' ),
-			'weight'      => (float) ( $_POST['weight'] ?? 0 ),
-			'value'       => (int)   ( $_POST['value']  ?? 0 ),
+			'weight'      => (float) filter_var( $_POST['weight'] ?? 0, FILTER_VALIDATE_FLOAT ),
+			'value'       => intval( $_POST['value'] ?? 0 ),
 		];
 
 		$id = sanitize_text_field( $_POST['item_id'] ?? '' );
