@@ -457,3 +457,4 @@ class NW_Deck_Admin {
         wp_send_json_success( [ 'deleted' => true ] );
     }
 }
+new NeoWeaver_Deck_Admin();
