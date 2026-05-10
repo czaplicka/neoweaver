@@ -9,8 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class NeoWeaver_Stats_Widget {
 
-    private string $supabase_url;
-    private string $supabase_key;
+    private $supabase_url;
+    private $supabase_key;
 
     public function __construct() {
         // Use the same credential helpers as the rest of the plugin.
@@ -25,9 +25,9 @@ class NeoWeaver_Stats_Widget {
                 ? tw_supabase_anon_key()
                 : ( defined( 'SUPABASE_KEY' ) ? SUPABASE_KEY : '' ) );
 
-        add_action( 'wp_dashboard_setup',          [ $this, 'register_widget'     ] );
+        add_action( 'wp_dashboard_setup',              [ $this, 'register_widget'     ] );
         add_action( 'wp_ajax_neoweaver_refresh_stats', [ $this, 'ajax_refresh_stats' ] );
-        add_action( 'admin_enqueue_scripts',        [ $this, 'enqueue_assets'      ] );
+        add_action( 'admin_enqueue_scripts',           [ $this, 'enqueue_assets'      ] );
     }
 
     public function register_widget(): void {
@@ -39,13 +39,21 @@ class NeoWeaver_Stats_Widget {
     }
 
     public function enqueue_assets( string $hook ): void {
-        if ( $hook !== 'index.php' ) return;
+        if ( $hook !== 'index.php' ) {
+            return;
+        }
 
         wp_add_inline_style( 'dashicons', $this->get_widget_css() );
         wp_add_inline_script( 'jquery', $this->get_widget_js() );
     }
 
-    private function get_count( string $table ): int|string {
+    /**
+     * Fetch count from Supabase.
+     *
+     * @param string $table
+     * @return int|string Numeric count or fallback marker (e.g. 'N/A', '—', '?')
+     */
+    private function get_count( string $table ) {
         if ( empty( $this->supabase_url ) || empty( $this->supabase_key ) ) {
             return 'N/A';
         }
@@ -68,7 +76,7 @@ class NeoWeaver_Stats_Widget {
 
         // Supabase returns count in Content-Range header: 0-0/TOTAL
         $content_range = wp_remote_retrieve_header( $response, 'content-range' );
-        if ( $content_range && str_contains( $content_range, '/' ) ) {
+        if ( $content_range && strpos( $content_range, '/' ) !== false ) {
             $parts = explode( '/', $content_range );
             return (int) end( $parts );
         }
@@ -154,6 +162,7 @@ class NeoWeaver_Stats_Widget {
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
+            return; // IMPORTANT: stop further execution for unauthorized users.
         }
 
         delete_transient( 'neoweaver_stats_counts' );
