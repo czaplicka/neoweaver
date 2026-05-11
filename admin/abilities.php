@@ -20,11 +20,11 @@ class NW_Abilities_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_abilities_get_all',  [ $this, 'ajax_get_abilities'   ] );
-		add_action( 'wp_ajax_nw_abilities_toggle',   [ $this, 'ajax_toggle_ability'  ] );
-		add_action( 'wp_ajax_nw_save_ability',       [ $this, 'ajax_save_ability'    ] );
-		add_action( 'wp_ajax_nw_delete_ability',     [ $this, 'ajax_delete_ability'  ] );
-		add_action( 'wp_ajax_nw_reorder_abilities',  [ $this, 'ajax_reorder_abilities' ] );
+		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
+		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
+		add_action( 'wp_ajax_nw_save_ability', [ $this, 'ajax_save_ability' ] );
+		add_action( 'wp_ajax_nw_delete_ability', [ $this, 'ajax_delete_ability' ] );
+		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
 	}
 
 	public function register_menu(): void {
@@ -42,9 +42,6 @@ class NW_Abilities_Admin {
 		if ( ! str_contains( $hook, $this->page_slug ) ) {
 			return;
 		}
-
-		// Chakra Petch i Lucide są rejestrowane globalnie w NeoWeaver_Core.
-		// Tu tylko dodajemy zależności od tych handlerów.
 
 		wp_enqueue_style(
 			'nw-admin-core',
@@ -73,8 +70,6 @@ class NW_Abilities_Admin {
 			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
 		] );
 	}
-
-	// ── Supabase helper ───────────────────────────────────────────────────
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
@@ -109,23 +104,52 @@ class NW_Abilities_Admin {
 				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
 			}
 			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
-			$ok   = $res['ok']   ?? false;
+			$ok   = $res['ok'] ?? false;
 			$code = $res['code'] ?? 0;
 			$data = $res['data'] ?? null;
+
 			if ( ! $ok ) {
 				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
 				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
 			}
+
 			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
 
 		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
 	}
 
-	// ── AJAX ──────────────────────────────────────────────────────────────
+	private function normalize_tags( $raw ): array {
+		$raw = wp_unslash( $raw );
+
+		if ( is_array( $raw ) ) {
+			return array_values( array_filter( array_map( 'sanitize_text_field', $raw ) ) );
+		}
+
+		$raw = trim( (string) $raw );
+		if ( '' === $raw ) {
+			return [];
+		}
+
+		$decoded = json_decode( $raw, true );
+		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+			return array_values( array_filter( array_map( 'sanitize_text_field', $decoded ) ) );
+		}
+
+		$parts = array_map( 'trim', explode( ',', $raw ) );
+		return array_values( array_filter( array_map( 'sanitize_text_field', $parts ) ) );
+	}
+
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match(
+			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
+			$value
+		);
+	}
 
 	public function ajax_get_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
@@ -143,12 +167,13 @@ class NW_Abilities_Admin {
 
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
 		}
 
-		$id             = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$record_id      = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 		$name           = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 		$title          = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
 		$description    = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
@@ -160,7 +185,7 @@ class NW_Abilities_Admin {
 		$duration_turns = intval( $_POST['duration_turns'] ?? 0 );
 		$is_passive     = (bool) intval( $_POST['is_passive'] ?? 0 );
 		$is_active      = (bool) intval( $_POST['is_active'] ?? 1 );
-		$tags           = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
+		$tags           = $this->normalize_tags( $_POST['tags'] ?? '' );
 		$img_url        = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
 		$source         = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
 		$gm_notes       = sanitize_textarea_field( wp_unslash( $_POST['gm_notes'] ?? '' ) );
@@ -170,47 +195,82 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		if ( empty( $name ) )  $name  = $title;
-		if ( empty( $title ) ) $title = $name;
+		if ( empty( $name ) ) {
+			$name = $title;
+		}
+
+		if ( empty( $title ) ) {
+			$title = $name;
+		}
+
+		if ( ! in_array( $ability_type, self::ABILITY_TYPES, true ) ) {
+			$ability_type = 'active';
+		}
+
+		if ( ! in_array( $cost_type, self::COST_TYPES, true ) ) {
+			$cost_type = 'none';
+		}
+
+		if ( ! in_array( $target_type, self::TARGET_TYPES, true ) ) {
+			$target_type = 'self';
+		}
 
 		$payload = [
 			'name'           => $name,
 			'title'          => $title,
-			'description'    => $description,
+			'description'    => $description ?: null,
 			'ability_type'   => $ability_type,
-			'cost_type'      => $cost_type,
-			'cost_value'     => $cost_value,
-			'target_type'    => $target_type,
-			'range_tiles'    => $range_tiles,
-			'duration_turns' => $duration_turns,
-			'is_passive'     => $is_passive,
-			'is_active'      => $is_active,
-			'tags'           => $tags,
-			'img_url'        => $img_url ?: null,
 			'source'         => $source ?: null,
 			'gm_notes'       => $gm_notes ?: null,
+			'img_url'        => $img_url ?: null,
+			'tags'           => $tags,
+			'cost_type'      => $cost_type,
+			'cost_value'     => max( 0, $cost_value ),
+			'target_type'    => $target_type,
+			'range_tiles'    => max( 0, $range_tiles ),
+			'duration_turns' => max( 0, $duration_turns ),
+			'is_passive'     => $is_passive,
+			'is_active'      => $is_active,
 		];
 
-		if ( $id ) {
-			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), $payload );
+		if ( $record_id ) {
+			if ( ! $this->is_uuid( $record_id ) ) {
+				wp_send_json_error( 'Invalid UUID for ability record.' );
+				return;
+			}
+
+			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $record_id ), $payload );
+
 			if ( ! $res['ok'] ) {
 				wp_send_json_error( $res['error'] ?? 'Update failed.' );
 				return;
 			}
-			wp_send_json_success( [ 'action' => 'updated', 'id' => $id ] );
-		} else {
-			$res = $this->supa( 'POST', 'cyber_abilities', $payload );
-			if ( ! $res['ok'] ) {
-				wp_send_json_error( $res['error'] ?? 'Insert failed.' );
-				return;
-			}
-			$created = $res['data'][0] ?? $res['data'];
-			wp_send_json_success( [ 'action' => 'created', 'id' => $created['id'] ?? null ] );
+
+			wp_send_json_success( [
+				'action' => 'updated',
+				'id'     => $record_id,
+			] );
+			return;
 		}
+
+		$res = $this->supa( 'POST', 'cyber_abilities', $payload );
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Insert failed.' );
+			return;
+		}
+
+		$created = $res['data'][0] ?? $res['data'] ?? [];
+
+		wp_send_json_success( [
+			'action' => 'created',
+			'id'     => $created['id'] ?? null,
+		] );
 	}
 
 	public function ajax_toggle_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
@@ -219,34 +279,45 @@ class NW_Abilities_Admin {
 		$id        = sanitize_text_field( wp_unslash( $_POST['ability_id'] ?? '' ) );
 		$is_active = (bool) intval( $_POST['is_active'] ?? 0 );
 
-		if ( ! $id ) {
+		if ( ! $id || ! $this->is_uuid( $id ) ) {
 			wp_send_json_error( 'Invalid ID.' );
 			return;
 		}
 
-		$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'is_active' => $is_active ] );
+		$res = $this->supa(
+			'PATCH',
+			'cyber_abilities?id=eq.' . rawurlencode( $id ),
+			[ 'is_active' => $is_active ]
+		);
+
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( $res['error'] ?? 'Toggle failed.' );
 			return;
 		}
 
-		wp_send_json_success( [ 'id' => $id, 'is_active' => $is_active ] );
+		wp_send_json_success( [
+			'id'        => $id,
+			'is_active' => $is_active,
+		] );
 	}
 
 	public function ajax_delete_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
 		}
 
 		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		if ( ! $id ) {
+
+		if ( ! $id || ! $this->is_uuid( $id ) ) {
 			wp_send_json_error( 'Invalid ID.' );
 			return;
 		}
 
 		$res = $this->supa( 'DELETE', 'cyber_abilities?id=eq.' . rawurlencode( $id ) );
+
 		if ( ! $res['ok'] ) {
 			wp_send_json_error( $res['error'] ?? 'Delete failed.' );
 			return;
@@ -257,6 +328,7 @@ class NW_Abilities_Admin {
 
 	public function ajax_reorder_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
@@ -272,25 +344,31 @@ class NW_Abilities_Admin {
 		}
 
 		$errors = [];
+
 		foreach ( $order as $position => $id ) {
-			if ( ! $id ) continue;
-			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'sort_order' => (int) $position ] );
+			if ( ! $id || ! $this->is_uuid( $id ) ) {
+				$errors[] = $id;
+				continue;
+			}
+
+			$res = $this->supa(
+				'PATCH',
+				'cyber_abilities?id=eq.' . rawurlencode( $id ),
+				[ 'sort_order' => (int) $position ]
+			);
+
 			if ( ! $res['ok'] ) {
 				$errors[] = $id;
 			}
 		}
 
 		if ( $errors ) {
-			wp_send_json_error( 'Reorder partially failed for IDs: ' . implode( ', ', $errors ) );
+			wp_send_json_error( 'Reorder partially failed for IDs: ' . implode( ', ', array_filter( $errors ) ) );
 			return;
 		}
 
 		wp_send_json_success( 'Reordered.' );
 	}
-
-	/* ---------------------------------------------------------------- */
-	/*  RENDER                                                           */
-	/* ---------------------------------------------------------------- */
 
 	public function render_page(): void { ?>
 		<div class="wrap nw-panel" id="nw-abilities-panel">
@@ -308,7 +386,7 @@ class NW_Abilities_Admin {
 						<option value="1">Active only</option>
 						<option value="0">Inactive only</option>
 					</select>
-					<input type="text" id="nw-search" class="nw-search-input" placeholder="Search id or title&hellip;">
+					<input type="text" id="nw-search" class="nw-search-input" placeholder="Search UUID, name or title&hellip;">
 					<button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">&#8635; Refresh</button>
 					<button class="nw-btn nw-btn-primary" id="nw-add-btn">+ New Ability</button>
 				</div>
@@ -328,7 +406,7 @@ class NW_Abilities_Admin {
 			<div class="nw-table-wrap">
 				<table class="nw-table">
 					<thead><tr>
-						<th>ID / Title</th>
+						<th>UUID / Title</th>
 						<th>Type</th>
 						<th>Cost</th>
 						<th>Target</th>
@@ -348,17 +426,17 @@ class NW_Abilities_Admin {
 				<div class="nw-modal">
 					<div class="nw-modal-header">
 						<h2 id="nw-modal-title">Edit Ability</h2>
-						<button class="nw-modal-close" id="nw-modal-close">&#x2715;</button>
+						<button class="nw-modal-close" id="nw-modal-close" type="button">&#x2715;</button>
 					</div>
 					<div class="nw-modal-body">
 						<form id="nw-ability-form">
-							<input type="hidden" id="nw-field-original_id" name="original_id">
+							<input type="hidden" id="nw-field-id" name="id">
 
 							<div class="nw-section-label">Identity</div>
 							<div class="nw-form-grid">
 								<div class="nw-field">
-									<label>ID (slug) <span class="nw-req">*</span></label>
-									<input type="text" id="nw-field-id" name="id" required placeholder="e.g. fireball">
+									<label>Name / slug <span class="nw-req">*</span></label>
+									<input type="text" id="nw-field-name" name="name" required placeholder="e.g. fireball">
 								</div>
 								<div class="nw-field">
 									<label>Title <span class="nw-req">*</span></label>
@@ -455,9 +533,9 @@ class NW_Abilities_Admin {
 						</form>
 					</div>
 					<div class="nw-modal-footer">
-						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" style="display:none;margin-right:auto;">&#128465; Delete</button>
-						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn">Cancel</button>
-						<button class="nw-btn nw-btn-primary" id="nw-save-btn"><span id="nw-save-label">Save Ability</span></button>
+						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" type="button" style="display:none;margin-right:auto;">&#128465; Delete</button>
+						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn" type="button">Cancel</button>
+						<button class="nw-btn nw-btn-primary" id="nw-save-btn" type="button"><span id="nw-save-label">Save Ability</span></button>
 					</div>
 				</div>
 			</div>
