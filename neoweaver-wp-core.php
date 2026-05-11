@@ -124,27 +124,23 @@ final class NeoWeaver_Core {
 	 * Classes must NOT have their own add_action('plugins_loaded') at the bottom.
 	 */
 	public static function load_admin_files(): void {
-		if ( ! is_admin() ) {
-			return;
-		}
+    if ( ! is_admin() ) {
+        return;
+    }
 
-		// Main admin class first (menu registration depends on it)
-		$admin_main = NEOWEAVER_PLUGIN_DIR . 'admin/admin.php';
-		if ( file_exists( $admin_main ) ) {
-			require_once $admin_main;
-		}
+    // 1. Root menu — musi być pierwszy
+    $root = NW_PLUGIN_DIR . 'admin/admin.php';
+    if ( file_exists( $root ) ) {
+        require_once $root;
+    }
 
-		// All other admin classes (class-nw-*.php pattern)
-		foreach ( glob( NEOWEAVER_PLUGIN_DIR . 'admin/class-nw-*.php' ) ?: [] as $file ) {
-			require_once $file;
-		}
-
-		// Instantiate — single place, no add_action inside class files
-		if ( class_exists( 'NW_Admin' ) )            new NW_Admin();
-		if ( class_exists( 'NW_Abilities_Admin' ) )  new NW_Abilities_Admin();
-		if ( class_exists( 'NW_Skills_Admin' ) )     new NW_Skills_Admin();
-		// Add further admin classes here as you create them
-	}
+    // 2. Bootstrap wszystkich klas subpage
+    $bootstrap = NW_PLUGIN_DIR . 'admin/class-admin.php';
+    if ( file_exists( $bootstrap ) ) {
+        require_once $bootstrap;
+    }
+}
+	
 
 	// ── Global asset registration ─────────────────────────────────────────
 
