@@ -4,8 +4,6 @@
  *
  * Loaded FIRST (explicitly, before glob) so the top-level "neoweaver"
  * menu slug exists when all submenu files run add_submenu_page().
- *
- * @package NeoWeaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,6 +15,9 @@ class NeoWeaver_Admin {
 	private string $slug = 'neoweaver';
 
 	public function __construct() {
+		if ( ! is_admin() ) {
+			return;
+		}
 		add_action( 'admin_menu',            [ $this, 'register_menu'        ] );
 		add_action( 'admin_menu',            [ $this, 'rename_first_submenu' ], 999 );
 		add_action( 'admin_menu',            [ $this, 'sort_submenu'         ], 9999 );
@@ -58,7 +59,7 @@ class NeoWeaver_Admin {
 
 		$dashboard = array_shift( $submenu[ $this->slug ] );
 
-		usort( $submenu[ $this->slug ], static function ( $a, $b ) {
+		usort( $submenu[ $this->slug ], static function ( array $a, array $b ): int {
 			return strcasecmp( $a[0], $b[0] );
 		} );
 
@@ -74,28 +75,46 @@ class NeoWeaver_Admin {
 			return;
 		}
 
-		// Chakra Petch and Lucide are registered globally by NeoWeaver_Core.
-		// We only declare them as dependencies here.
+		/*
+		 * Use plugin_dir_url() relative to this file instead of relying on
+		 * NEOWEAVER_PLUGIN_URL / NW_PLUGIN_URL being defined — avoids the
+		 * "Undefined constant" fatal that hits when the bootstrap file hasn't
+		 * run yet or the constant name doesn't match.
+		 *
+		 * dirname(__FILE__) = .../neoweaver-wp-core-main/admin
+		 * dirname(dirname(__FILE__)) = .../neoweaver-wp-core-main/
+		 */
+		$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 
-		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
-		);
+		/*
+		 * Version string: use the constant if available, otherwise null
+		 * (WordPress will omit the ?ver= query string).
+		 */
+		$version = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
+				 : ( defined( 'NW_VERSION' )      ? NW_VERSION
+				 : null );
+
+		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'chakra-petch',
+				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+				[],
+				null
+			);
+		}
 
 		wp_enqueue_style(
 			'nw-dashboard-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/dashboard.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
+			$plugin_url . 'assets/css/admin-dashboard.css',
+			[ 'chakra-petch' ],
+			$version
 		);
 
 		wp_enqueue_script(
 			'nw-dashboard-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/dashboard.js',
-			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
+			$plugin_url . 'assets/js/admin-dashboard.js',
+			[ 'jquery' ],
+			$version,
 			true
 		);
 
@@ -211,7 +230,7 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
@@ -226,7 +245,7 @@ class NeoWeaver_Admin {
 			return 0;
 		}
 
-		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( $days * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( $days * DAY_IN_SECONDS ) );
 
 		$res = wp_remote_get(
 			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&created_at=gte.' . rawurlencode( $since ),
@@ -247,7 +266,7 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
@@ -262,7 +281,7 @@ class NeoWeaver_Admin {
 			return $cached;
 		}
 
-		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
 
 		$path = $table
 			. '?select=created_at'
@@ -338,7 +357,7 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
@@ -374,7 +393,7 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
@@ -404,8 +423,8 @@ class NeoWeaver_Admin {
 		$res  = $this->supa_get( $path );
 		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : [];
 
-		$categories     = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
-		$rarities       = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
+		$categories = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
+		$rarities   = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
 		$active_count   = 0;
 		$inactive_count = 0;
 
@@ -443,26 +462,6 @@ class NeoWeaver_Admin {
 	/*  AJAX: DASHBOARD                                                    */
 	/* ------------------------------------------------------------------ */
 
-	/**
-	 * Attempt a single RPC call to get all counts at once.
-	 * Falls back to individual calls if the RPC is not available.
-	 *
-	 * Expected Supabase RPC:
-	 *
-	 *   CREATE OR REPLACE FUNCTION nw_dashboard_counts()
-	 *   RETURNS json LANGUAGE sql STABLE AS $$
-	 *     SELECT json_build_object(
-	 *       'characters',  (SELECT count(*) FROM cyber_characters),
-	 *       'worlds',      (SELECT count(*) FROM cyber_worlds),
-	 *       'campaigns',   (SELECT count(*) FROM cyber_campaign),
-	 *       'deck_cards',  (SELECT count(*) FROM cyber_deck),
-	 *       'chars_7d',    (SELECT count(*) FROM cyber_characters  WHERE created_at >= now() - interval '7 days'),
-	 *       'worlds_7d',   (SELECT count(*) FROM cyber_worlds      WHERE created_at >= now() - interval '7 days'),
-	 *       'camps_7d',    (SELECT count(*) FROM cyber_campaign    WHERE created_at >= now() - interval '7 days'),
-	 *       'deck_7d',     (SELECT count(*) FROM cyber_deck        WHERE created_at >= now() - interval '7 days')
-	 *     );
-	 *   $$;
-	 */
 	private function supa_all_counts(): ?array {
 		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 			return null;
@@ -537,7 +536,9 @@ class NeoWeaver_Admin {
 		];
 
 		$deck_breakdown = $this->supa_deck_breakdown();
-		$logs           = $this->supa_recent_logs( 10 );
+
+		$logs       = $this->supa_recent_logs( 10 );
+		$logs_table = self::DEBUG_LOGS_TABLE;
 
 		$alerts = [];
 
@@ -576,7 +577,7 @@ class NeoWeaver_Admin {
 			'_debug'         => [
 				'key_type'    => $this->get_supa_key_type(),
 				'rpc_used'    => ! is_null( $rpc ),
-				'logs_table'  => self::DEBUG_LOGS_TABLE,
+				'logs_table'  => $logs_table,
 				'growth_meta' => [
 					'characters' => [
 						'rows_found'  => $growth_raw['characters']['rows_found'],
@@ -614,6 +615,12 @@ class NeoWeaver_Admin {
 	public function render_page(): void {
 		$supa_url = $this->get_supa_url();
 		$key_ok   = (bool) $this->get_supa_key();
+		$version  = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
+				  : ( defined( 'NW_VERSION' )      ? NW_VERSION : '—' );
+
+		$allowed_html = [
+			'span' => [ 'class' => [] ],
+		];
 		?>
 		<div class="wrap nw-dash" id="nw-dashboard">
 
@@ -622,7 +629,7 @@ class NeoWeaver_Admin {
 					<?php echo wp_kses_post( $this->logo_svg( 44, '#adff00' ) ); ?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
-						<span class="nw-logo-version">v<?php echo esc_html( NEOWEAVER_VERSION ); ?> &mdash; Game Ops Dashboard</span>
+						<span class="nw-logo-version">v<?php echo esc_html( $version ); ?> &mdash; Game Ops Dashboard</span>
 					</div>
 				</div>
 				<button class="nw-btn nw-btn-ghost" id="nw-refresh-dashboard">&#8635; Refresh</button>
@@ -763,22 +770,26 @@ class NeoWeaver_Admin {
 					<div class="nw-sysinfo">
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Plugin version</span>
-							<span class="nw-sysinfo-val"><?php echo esc_html( NEOWEAVER_VERSION ); ?></span>
+							<span class="nw-sysinfo-val"><?php echo esc_html( $version ); ?></span>
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Supabase URL</span>
 							<span class="nw-sysinfo-val">
-								<?php echo $supa_url
-									? esc_html( $supa_url )
-									: '<span class="nw-text-danger">Not configured</span>'; ?>
+								<?php if ( $supa_url ) : ?>
+									<?php echo esc_html( $supa_url ); ?>
+								<?php else : ?>
+									<span class="nw-text-danger">Not configured</span>
+								<?php endif; ?>
 							</span>
 						</div>
 						<div class="nw-sysinfo-row">
 							<span class="nw-sysinfo-label">Supabase Key</span>
 							<span class="nw-sysinfo-val">
-								<?php echo $key_ok
-									? '<span class="nw-text-good">Configured (' . esc_html( $this->get_supa_key_type() ) . ')</span>'
-									: '<span class="nw-text-danger">Missing</span>'; ?>
+								<?php if ( $key_ok ) : ?>
+									<span class="nw-text-good">Configured (<?php echo esc_html( $this->get_supa_key_type() ); ?>)</span>
+								<?php else : ?>
+									<span class="nw-text-danger">Missing</span>
+								<?php endif; ?>
 							</span>
 						</div>
 						<div class="nw-sysinfo-row">
@@ -807,4 +818,22 @@ class NeoWeaver_Admin {
 			. '<polyline points="11,27 11,13 20,24 29,13 29,27" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
 			. '</svg>';
 	}
+
 }
+
+/*
+ * Instantiate after plugins_loaded (priority 10) so that:
+ * - NEOWEAVER_VERSION / NW_VERSION are already defined by the main plugin file
+ * - supabase-helpers functions (tw_supabase_*) are available
+ * - is_admin() is reliable
+ *
+ * Priority 10 (default) — submenu files that call add_submenu_page() should
+ * use priority >= 20 so the parent menu slug already exists when they run.
+ */
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		new NeoWeaver_Admin();
+	},
+	10
+);
