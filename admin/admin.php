@@ -626,7 +626,10 @@ class NeoWeaver_Admin {
 
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
-					<?php echo wp_kses_post( $this->logo_svg( 44, '#adff00' ) ); ?>
+					<?php 					$svg = $this->logo_svg( 44, '#adff00' );
+if ( $svg ) {
+    echo wp_kses_post( $svg );
+} 	?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
 						<span class="nw-logo-version">v<?php echo esc_html( $version ); ?> &mdash; Game Ops Dashboard</span>
