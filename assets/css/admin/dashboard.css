@@ -269,3 +269,155 @@
 		justify-content: center;
 	}
 }
+/* ===== Header: right side controls ===== */
+#nw-dashboard .nw-dash-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+#nw-dashboard .nw-dash-logo {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+#nw-dashboard .nw-dash-actions {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* ===== Force-styled controls in admin ===== */
+#nw-dashboard .nw-dash-actions .nw-btn,
+#nw-dashboard .nw-dash-actions .nw-range-btn,
+#nw-dashboard #nw-refresh-dashboard {
+	appearance: none;
+	-webkit-appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 40px;
+	padding: 0 14px;
+	border-radius: 999px;
+	border: 1px solid rgba(173, 255, 0, 0.18);
+	background: rgba(255, 255, 255, 0.04);
+	color: #d9d9d9;
+	font-family: "Chakra Petch", sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	text-decoration: none;
+	box-shadow: none;
+	cursor: pointer;
+	transition:
+		background-color .18s ease,
+		color .18s ease,
+		border-color .18s ease,
+		box-shadow .18s ease,
+		transform .18s ease;
+}
+
+#nw-dashboard .nw-dash-actions .nw-btn:hover,
+#nw-dashboard .nw-dash-actions .nw-range-btn:hover,
+#nw-dashboard #nw-refresh-dashboard:hover {
+	background: rgba(173, 255, 0, 0.08);
+	border-color: rgba(173, 255, 0, 0.28);
+	color: #fff;
+}
+
+#nw-dashboard .nw-dash-actions .nw-btn:focus,
+#nw-dashboard .nw-dash-actions .nw-btn:focus-visible,
+#nw-dashboard .nw-dash-actions .nw-range-btn:focus,
+#nw-dashboard .nw-dash-actions .nw-range-btn:focus-visible,
+#nw-dashboard #nw-refresh-dashboard:focus,
+#nw-dashboard #nw-refresh-dashboard:focus-visible {
+	outline: none;
+	color: #fff;
+	box-shadow:
+		0 0 0 2px rgba(10, 10, 10, 0.95),
+		0 0 0 4px rgba(173, 255, 0, 0.95);
+}
+
+#nw-dashboard .nw-dash-actions .nw-btn:active,
+#nw-dashboard .nw-dash-actions .nw-range-btn:active,
+#nw-dashboard #nw-refresh-dashboard:active {
+	transform: translateY(1px);
+}
+
+/* ===== Segmented control ===== */
+#nw-dashboard .nw-range-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	border: 1px solid rgba(173, 255, 0, 0.16);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.025);
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+#nw-dashboard .nw-range-switch .nw-range-btn {
+	min-width: 56px;
+	padding: 0 14px;
+	background: transparent;
+	border-color: transparent;
+	color: #a8a8a8;
+}
+
+#nw-dashboard .nw-range-switch .nw-range-btn.is-active,
+#nw-dashboard .nw-range-switch .nw-range-btn[aria-pressed="true"] {
+	background: #adff00;
+	border-color: #adff00;
+	color: #11160a;
+	box-shadow: 0 4px 14px rgba(173, 255, 0, 0.24);
+}
+
+/* ===== Refresh button a bit distinct ===== */
+#nw-dashboard #nw-refresh-dashboard {
+	padding-inline: 16px;
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 782px) {
+	#nw-dashboard .nw-dash-actions {
+		margin-left: 0;
+		width: 100%;
+		justify-content: space-between;
+	}
+
+	#nw-dashboard .nw-range-switch {
+		flex: 1 1 auto;
+	}
+
+	#nw-dashboard #nw-refresh-dashboard {
+		flex: 0 0 auto;
+	}
+}
+
+@media (max-width: 560px) {
+	#nw-dashboard .nw-dash-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	#nw-dashboard .nw-range-switch {
+		width: 100%;
+		justify-content: stretch;
+	}
+
+	#nw-dashboard .nw-range-switch .nw-range-btn {
+		flex: 1 1 0;
+	}
+
+	#nw-dashboard #nw-refresh-dashboard {
+		width: 100%;
+	}
+}
