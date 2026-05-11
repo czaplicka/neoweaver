@@ -824,19 +824,4 @@ if ( $svg ) {
 
 }
 
-/*
- * Instantiate after plugins_loaded (priority 10) so that:
- * - NEOWEAVER_VERSION / NW_VERSION are already defined by the main plugin file
- * - supabase-helpers functions (tw_supabase_*) are available
- * - is_admin() is reliable
- *
- * Priority 10 (default) — submenu files that call add_submenu_page() should
- * use priority >= 20 so the parent menu slug already exists when they run.
- */
-add_action(
-	'plugins_loaded',
-	static function (): void {
-		new NeoWeaver_Admin();
-	},
-	10
-);
+new NeoWeaver_Admin();
