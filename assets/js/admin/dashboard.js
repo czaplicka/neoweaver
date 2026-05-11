@@ -1,37 +1,32 @@
 jQuery(function ($) {
-
-  /* ── Cached selectors ────────────────────────────────────────────── */
-  var $statChars          = $("#nw-stat-characters");
-  var $statWorlds         = $("#nw-stat-worlds");
-  var $statCampaigns      = $("#nw-stat-campaigns");
+  var $statChars = $("#nw-stat-characters");
+  var $statWorlds = $("#nw-stat-worlds");
+  var $statCampaigns = $("#nw-stat-campaigns");
   var $statActiveSessions = $("#nw-stat-active-sessions");
 
-  var $recentChars        = $("#nw-recent-characters");
-  var $recentWorlds       = $("#nw-recent-worlds");
-  var $recentCamps        = $("#nw-recent-campaigns");
-  var $recentActive       = $("#nw-recent-active-sessions");
+  var $recentChars = $("#nw-recent-characters");
+  var $recentWorlds = $("#nw-recent-worlds");
+  var $recentCamps = $("#nw-recent-campaigns");
+  var $recentActive = $("#nw-recent-active-sessions");
 
-  var $statMessagesTotal  = $("#nw-stat-messages-total");
-  var $statMessages7d     = $("#nw-stat-messages-7d");
-  var $statMessages30d    = $("#nw-stat-messages-30d");
+  var $statMessagesTotal = $("#nw-stat-messages-total");
+  var $statMessages7d = $("#nw-stat-messages-7d");
+  var $statMessages30d = $("#nw-stat-messages-30d");
 
-  var $healthWWC          = $("#nw-health-worlds-without-campaigns");
-  var $healthCWC          = $("#nw-health-campaigns-without-character");
+  var $healthWWC = $("#nw-health-worlds-without-campaigns");
+  var $healthCWC = $("#nw-health-campaigns-without-character");
 
-  var $alerts             = $("#nw-alerts");
-  var $logs               = $("#nw-logs");
+  var $alerts = $("#nw-alerts");
+  var $logs = $("#nw-logs");
 
-  var $chartChars         = $("#nw-chart-characters");
-  var $chartWorlds        = $("#nw-chart-worlds");
-  var $chartCamps         = $("#nw-chart-campaigns");
+  var $chartChars = $("#nw-chart-characters");
+  var $chartWorlds = $("#nw-chart-worlds");
+  var $chartCamps = $("#nw-chart-campaigns");
 
-  var $rangeBtns          = $(".nw-range-btn");
-  var currentRange        = 30;
-
-  /* ── In-flight guard ─────────────────────────────────────────────── */
+  var $rangeBtns = $(".nw-range-btn");
+  var currentRange = 30;
   var activeXhr = null;
 
-  /* ── escapeHtml ──────────────────────────────────────────────────── */
   var escapeMap = {
     "&": "&amp;",
     "<": "&lt;",
@@ -46,8 +41,8 @@ jQuery(function ($) {
     });
   }
 
-  /* ── Safe CSS colour validator ───────────────────────────────────── */
   var safeCssColorRe = /^#[0-9a-fA-F]{3,8}$|^[a-zA-Z]+$|^rgba?\(/;
+
   function safeCssColor(color, fallback) {
     return safeCssColorRe.test(String(color || "")) ? color : fallback;
   }
@@ -151,7 +146,7 @@ jQuery(function ($) {
         dataText = typeof log.data === "object" ? JSON.stringify(log.data) : String(log.data);
       }
 
-      var contextText = log.context ? escapeHtml(log.context) : "—";
+      var contextText = log.context ? escapeHtml(log.context) : "-";
 
       return '<div class="nw-log-item">' +
         '<div class="nw-log-top">' +
@@ -177,19 +172,18 @@ jQuery(function ($) {
     $recentChars
       .add($recentWorlds)
       .add($recentCamps)
-      .text("Last 7d: —");
+      .text("Last 7d: -");
 
-    $recentActive.text("Campaigns live: —");
+    $recentActive.text("Campaigns live: -");
+    $healthWWC.add($healthCWC).text("-");
 
-    $healthWWC.add($healthCWC).text("—");
-
-    $alerts.html('<div class="nw-alert-card nw-alert-card-loading"><div class="nw-spinner"></div><span>Refreshing…</span></div>');
-    $logs.html('<div class="nw-empty-state">Loading recent events…</div>');
+    $alerts.html('<div class="nw-alert-card nw-alert-card-loading"><div class="nw-spinner"></div><span>Refreshing...</span></div>');
+    $logs.html('<div class="nw-empty-state">Loading recent events...</div>');
 
     $chartChars
       .add($chartWorlds)
       .add($chartCamps)
-      .html('<div class="nw-chart-empty">Loading…</div>');
+      .html('<div class="nw-chart-empty">Loading...</div>');
   }
 
   function setErrorState(message) {
@@ -200,7 +194,7 @@ jQuery(function ($) {
       .add($statMessagesTotal)
       .add($statMessages7d)
       .add($statMessages30d)
-      .text("—");
+      .text("-");
 
     renderAlerts([{
       level: "error",
@@ -272,8 +266,8 @@ jQuery(function ($) {
         $healthCWC.text(h.campaigns_without_character || 0);
 
         drawSparkline("#nw-chart-characters", g.characters, "#adff00");
-        drawSparkline("#nw-chart-worlds",     g.worlds,     "#00d4ff");
-        drawSparkline("#nw-chart-campaigns",  g.campaigns,  "#ffb703");
+        drawSparkline("#nw-chart-worlds", g.worlds, "#00d4ff");
+        drawSparkline("#nw-chart-campaigns", g.campaigns, "#ffb703");
 
         renderAlerts(d.alerts || []);
         renderLogs(d.logs || []);
@@ -288,10 +282,8 @@ jQuery(function ($) {
     });
   }
 
-  /* ── Init ────────────────────────────────────────────────────────── */
   loadDashboard(currentRange);
 
-  /* ── Manual refresh ──────────────────────────────────────────────── */
   var refreshTimeout = null;
   $("#nw-refresh-dashboard").on("click", function () {
     if (refreshTimeout) {
@@ -303,7 +295,6 @@ jQuery(function ($) {
     }, 2000);
   });
 
-  /* ── Range switch ────────────────────────────────────────────────── */
   $rangeBtns.on("click", function () {
     var nextRange = parseInt($(this).data("range"), 10);
     if (nextRange !== 7 && nextRange !== 30) {
@@ -314,5 +305,4 @@ jQuery(function ($) {
     }
     loadDashboard(nextRange);
   });
-
 });
