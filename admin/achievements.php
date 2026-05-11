@@ -58,14 +58,14 @@ class NeoWeaver_Achievements_Admin {
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			NW_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+			NW_PLUGIN_URL . 'assets/css/admin-core.css',
 			[ 'chakra-petch' ],
 			NW_VERSION
 		);
 
 		wp_enqueue_style(
 			'nw-achievements-style',
-			NW_PLUGIN_URL . 'assets/css/achievements-admin.css',
+			NW_PLUGIN_URL . 'assets/css/admin/achievements.css',
 			[ 'chakra-petch', 'nw-admin-core' ],
 			NW_VERSION
 		);
@@ -80,7 +80,7 @@ class NeoWeaver_Achievements_Admin {
 
 		wp_enqueue_script(
 			'nw-achievements-script',
-			NW_PLUGIN_URL . 'assets/js/achievements-admin.js',
+			NW_PLUGIN_URL . 'assets/js/admin/achievements.js',
 			[ 'jquery', 'lucide' ],
 			NW_VERSION,
 			true
@@ -181,8 +181,8 @@ class NeoWeaver_Achievements_Admin {
 			return;
 		}
 
-		$raw_cat = sanitize_text_field( $_POST['filter_category'] ?? '' );
-		$raw_sc  = sanitize_text_field( $_POST['filter_scope'] ?? '' );
+		$raw_cat = sanitize_text_field( wp_unslash( $_POST['filter_category'] ?? '' ) );
+$raw_sc  = sanitize_text_field( wp_unslash( $_POST['filter_scope'] ?? '' ) );
 
 		$cat = in_array( $raw_cat, self::CATEGORIES, true ) ? $raw_cat : '';
 		$sc  = in_array( $raw_sc, self::SCOPES, true ) ? $raw_sc : '';
@@ -217,13 +217,18 @@ class NeoWeaver_Achievements_Admin {
 
 		$raw = $_POST['achievement'] ?? [];
 
-		$orig_id = sanitize_text_field( $raw['original_id'] ?? '' );
-		$new_id  = sanitize_text_field( $raw['id'] ?? '' );
+$orig_id = sanitize_text_field( wp_unslash( $raw['original_id'] ?? '' ) );
+$new_id  = sanitize_text_field( wp_unslash( $raw['id'] ?? '' ) );
 
-		if ( ! $new_id ) {
-			wp_send_json_error( 'ID (slug) is required.' );
-			return;
-		}
+if ( ! $new_id ) {
+	wp_send_json_error( 'ID (slug) is required.' );
+	return;
+}
+
+if ( $orig_id && $orig_id !== $new_id ) {
+	wp_send_json_error( 'Changing achievement ID is not allowed.' );
+	return;
+}
 
 		$scope = sanitize_text_field( $raw['scope'] ?? 'account' );
 		$cat   = sanitize_text_field( $raw['category'] ?? '' );
