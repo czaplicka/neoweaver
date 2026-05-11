@@ -48,7 +48,7 @@ class NW_Abilities_Admin {
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
 			[ 'nw-font-chakra-petch' ],
 			NEOWEAVER_VERSION
 		);
