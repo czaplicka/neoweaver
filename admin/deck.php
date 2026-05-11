@@ -2,11 +2,7 @@
 /**
  * NeoWeaver — Deck Admin
  *
- * Manages cyber_deck table (cards):
- *   id, name, deck_category, type, rarity, description, effect,
- *   level, action_cost, time_cost, duration, target, range,
- *   hp_cost, mana_cost, stamina_cost, gold_cost, tags, img_url,
- *   gm_notes, is_active.
+ * Manages cyber_deck table.
  *
  * @package NeoWeaver
  */
@@ -17,23 +13,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class NW_Deck_Admin {
 
-	/* ---------------------------------------------------------------- */
-	/*  Single source of truth for enum values                          */
-	/* ---------------------------------------------------------------- */
+	private string $page_slug = 'neoweaver-deck';
 
-	private const CATEGORIES = [ 'action', 'spell', 'trap', 'event', 'item', 'special' ];
-	private const TYPES      = [ 'attack', 'defense', 'support', 'utility', 'movement', 'other' ];
+	private const CATEGORIES = [ 'action', 'magic', 'equipment' ];
 	private const RARITIES   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
-
-	/* ---------------------------------------------------------------- */
-	/*  Bootstrap                                                       */
-	/* ---------------------------------------------------------------- */
 
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
-		// AJAX — admin-only
 		add_action( 'wp_ajax_nw_deck_list',   [ $this, 'ajax_list' ] );
 		add_action( 'wp_ajax_nw_deck_get',    [ $this, 'ajax_get' ] );
 		add_action( 'wp_ajax_nw_deck_save',   [ $this, 'ajax_save' ] );
@@ -41,57 +29,53 @@ class NW_Deck_Admin {
 		add_action( 'wp_ajax_nw_deck_delete', [ $this, 'ajax_delete' ] );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  Menu                                                            */
-	/* ---------------------------------------------------------------- */
-
 	public function register_menu(): void {
 		add_submenu_page(
 			'neoweaver',
 			__( 'NeoWeaver — Deck', 'neoweaver' ),
-			__( '🃏Deck', 'neoweaver' ),
+			__( '🃏 Deck', 'neoweaver' ),
 			'manage_options',
-			'neoweaver-deck',
+			$this->page_slug,
 			[ $this, 'render_page' ]
 		);
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  Assets                                                          */
-	/* ---------------------------------------------------------------- */
-
 	public function enqueue_assets( string $hook ): void {
-		if ( 'neoweaver_page_neoweaver-deck' !== $hook ) {
+		if ( ! str_contains( $hook, $this->page_slug ) ) {
 			return;
 		}
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/deck-admin.css',
-			[ 'chakra-petch' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+			[ 'nw-font-chakra-petch' ],
 			NEOWEAVER_VERSION
 		);
 
 		wp_enqueue_style(
-			'nw-abilities-style',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/deck-admin.css',
-			[ 'chakra-petch', 'nw-admin-core' ],
+			'nw-deck-style',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/decks.css',
+			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 			NEOWEAVER_VERSION
 		);
 
+		wp_enqueue_script(
+			'nw-deck-script',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/decks.js',
+			[ 'jquery', 'nw-lucide' ],
+			NEOWEAVER_VERSION,
+			true
+		);
+
 		wp_localize_script(
-			'nw-deck-admin',
-			'NW_Deck',
+			'nw-deck-script',
+			'NWDeck',
 			[
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'neoweaver_deck' ),
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'neoweaver_deck' ),
 			]
 		);
 	}
-
-	/* ---------------------------------------------------------------- */
-	/*  Supabase helper (uses shared WP helpers)                        */
-	/* ---------------------------------------------------------------- */
 
 	/**
 	 * Normalized Supabase wrapper.
@@ -107,7 +91,6 @@ class NW_Deck_Admin {
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
-		// GET via tw_supabase_get if available.
 		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', ltrim( $endpoint, '/' ), 2 ), 2, '' );
 			$query = [];
@@ -144,7 +127,6 @@ class NW_Deck_Admin {
 			];
 		}
 
-		// POST / PATCH / DELETE via tw_supabase_request if available.
 		if ( function_exists( 'tw_supabase_request' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', ltrim( $endpoint, '/' ), 2 ), 2, '' );
 			$query = [];
@@ -158,11 +140,12 @@ class NW_Deck_Admin {
 			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
 				$extra_args['headers']['Prefer'] = 'return=representation';
 			}
+
 			if ( ! empty( $extra_headers ) ) {
 				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
 			}
 
-			$res  = tw_supabase_request(
+			$res = tw_supabase_request(
 				$method,
 				$table,
 				$query,
@@ -203,9 +186,69 @@ class NW_Deck_Admin {
 		];
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  Page render                                                      */
-	/* ---------------------------------------------------------------- */
+	private function parse_json_array_field( $value ): array {
+		if ( is_array( $value ) ) {
+			$items = $value;
+		} else {
+			$value = trim( (string) $value );
+
+			if ( '' === $value ) {
+				return [];
+			}
+
+			$decoded = json_decode( $value, true );
+
+			if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+				$items = $decoded;
+			} else {
+				$items = array_map( 'trim', explode( ',', $value ) );
+			}
+		}
+
+		$items = array_map( 'sanitize_text_field', $items );
+		$items = array_values( array_filter( array_unique( $items ), static fn( $v ) => '' !== $v ) );
+
+		return $items;
+	}
+
+	private function parse_json_object_field( $value ): array {
+		if ( is_array( $value ) ) {
+			return $value;
+		}
+
+		$value = trim( (string) $value );
+
+		if ( '' === $value ) {
+			return [];
+		}
+
+		$decoded = json_decode( $value, true );
+
+		return ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) ? $decoded : [];
+	}
+
+	private function maybe_null_text( $value ): ?string {
+		$value = trim( sanitize_text_field( (string) $value ) );
+		return '' === $value ? null : $value;
+	}
+
+	private function maybe_null_textarea( $value ): ?string {
+		$value = trim( sanitize_textarea_field( (string) $value ) );
+		return '' === $value ? null : $value;
+	}
+
+	private function maybe_uuid( $value ): ?string {
+		$value = trim( sanitize_text_field( (string) $value ) );
+
+		if ( '' === $value ) {
+			return null;
+		}
+
+		return preg_match(
+			'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+			$value
+		) ? $value : null;
+	}
 
 	public function render_page(): void {
 		?>
@@ -217,13 +260,6 @@ class NW_Deck_Admin {
 					<option value=""><?php esc_html_e( 'All categories', 'neoweaver' ); ?></option>
 					<?php foreach ( self::CATEGORIES as $c ) : ?>
 						<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-deck-filter-type">
-					<option value=""><?php esc_html_e( 'All types', 'neoweaver' ); ?></option>
-					<?php foreach ( self::TYPES as $t ) : ?>
-						<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
 					<?php endforeach; ?>
 				</select>
 
@@ -262,9 +298,8 @@ class NW_Deck_Admin {
 				</tbody>
 			</table>
 
-			<!-- Modal -->
 			<div id="nw-deck-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:9999; overflow-y:auto;">
-				<div style="background:#fff; margin:40px auto; padding:24px; max-width:700px; border-radius:6px; position:relative;">
+				<div style="background:#fff; margin:40px auto; padding:24px; max-width:900px; border-radius:6px; position:relative;">
 					<button id="nw-deck-modal-close" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
 					<h2 id="nw-deck-modal-title"><?php esc_html_e( 'Card', 'neoweaver' ); ?></h2>
 
@@ -287,13 +322,7 @@ class NW_Deck_Admin {
 						</tr>
 						<tr>
 							<th><label for="nw-deck-type"><?php esc_html_e( 'Type', 'neoweaver' ); ?></label></th>
-							<td>
-								<select id="nw-deck-type">
-									<?php foreach ( self::TYPES as $t ) : ?>
-										<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</td>
+							<td><input type="text" id="nw-deck-type" class="regular-text"></td>
 						</tr>
 						<tr>
 							<th><label for="nw-deck-rarity"><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></label></th>
@@ -314,56 +343,111 @@ class NW_Deck_Admin {
 							<td><textarea id="nw-deck-effect" rows="3" class="large-text"></textarea></td>
 						</tr>
 						<tr>
+							<th><label for="nw-deck-mechanic"><?php esc_html_e( 'Mechanic', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-mechanic" class="regular-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-mechanic-goal"><?php esc_html_e( 'Mechanic Goal', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-mechanic-goal" class="regular-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-cost-label"><?php esc_html_e( 'Cost Label', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-cost-label" class="regular-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-cost-number"><?php esc_html_e( 'Cost Number', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-cost-number" min="0" value="0" style="width:80px;"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-time-cost-minutes"><?php esc_html_e( 'Time Cost Minutes', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-time-cost-minutes" min="0" value="0" style="width:80px;"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-cooldown-messages"><?php esc_html_e( 'Cooldown Messages', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-cooldown-messages" min="0" value="0" style="width:80px;"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-entropy-on-fail"><?php esc_html_e( 'Entropy on Fail', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-entropy-on-fail" min="0" value="0" style="width:80px;"></td>
+						</tr>
+						<tr>
 							<th><label for="nw-deck-level"><?php esc_html_e( 'Level', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-level" min="1" value="1" style="width:80px;"></td>
+							<td><input type="number" id="nw-deck-level" min="1" max="10" value="1" style="width:80px;"></td>
 						</tr>
 						<tr>
-							<th><?php esc_html_e( 'Costs', 'neoweaver' ); ?></th>
-							<td>
-								<label><?php esc_html_e( 'Action:', 'neoweaver' ); ?> <input type="number" id="nw-deck-action-cost" min="0" value="0" style="width:60px;"></label>&nbsp;
-								<label><?php esc_html_e( 'HP:', 'neoweaver' ); ?> <input type="number" id="nw-deck-hp-cost" min="0" value="0" style="width:60px;"></label>&nbsp;
-								<label><?php esc_html_e( 'Mana:', 'neoweaver' ); ?> <input type="number" id="nw-deck-mana-cost" min="0" value="0" style="width:60px;"></label>&nbsp;
-								<label><?php esc_html_e( 'Stamina:', 'neoweaver' ); ?> <input type="number" id="nw-deck-stamina-cost" min="0" value="0" style="width:60px;"></label>&nbsp;
-								<label><?php esc_html_e( 'Gold:', 'neoweaver' ); ?> <input type="number" id="nw-deck-gold-cost" min="0" value="0" style="width:60px;"></label>
-							</td>
+							<th><label for="nw-deck-xp-current"><?php esc_html_e( 'XP Current', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-xp-current" min="0" value="0" style="width:80px;"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-time-cost"><?php esc_html_e( 'Time Cost', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-time-cost" class="regular-text"></td>
+							<th><label for="nw-deck-xp-to-next"><?php esc_html_e( 'XP to Next', 'neoweaver' ); ?></label></th>
+							<td><input type="number" id="nw-deck-xp-to-next" min="0" value="10" style="width:80px;"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-duration"><?php esc_html_e( 'Duration', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-duration" class="regular-text"></td>
+							<th><label for="nw-deck-bonus"><?php esc_html_e( 'Bonus JSON', 'neoweaver' ); ?></label></th>
+							<td><textarea id="nw-deck-bonus" rows="3" class="large-text" placeholder='{"damage":2}'></textarea></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-target"><?php esc_html_e( 'Target', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-target" class="regular-text"></td>
+							<th><label for="nw-deck-tags"><?php esc_html_e( 'Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-tags" class="large-text" placeholder="comma,separated,tags"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-range"><?php esc_html_e( 'Range', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-range" class="regular-text"></td>
+							<th><label for="nw-deck-requirement-tags"><?php esc_html_e( 'Requirement Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-requirement-tags" class="large-text"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-tags"><?php esc_html_e( 'Tags (comma-separated)', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-tags" class="regular-text"></td>
+							<th><label for="nw-deck-denied-tags"><?php esc_html_e( 'Denied Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-denied-tags" class="large-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-required-item-tags"><?php esc_html_e( 'Required Item Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-required-item-tags" class="large-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-required-location-tags"><?php esc_html_e( 'Required Location Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-required-location-tags" class="large-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-denied-location-tags"><?php esc_html_e( 'Denied Location Tags', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-denied-location-tags" class="large-text"></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-requirement-description"><?php esc_html_e( 'Requirement Description', 'neoweaver' ); ?></label></th>
+							<td><textarea id="nw-deck-requirement-description" rows="3" class="large-text"></textarea></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-ai-instruction"><?php esc_html_e( 'AI Instruction', 'neoweaver' ); ?></label></th>
+							<td><textarea id="nw-deck-ai-instruction" rows="3" class="large-text"></textarea></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-gm"><?php esc_html_e( 'GM Notes', 'neoweaver' ); ?></label></th>
+							<td><textarea id="nw-deck-gm" rows="3" class="large-text"></textarea></td>
+						</tr>
+						<tr>
+							<th><label for="nw-deck-sound-effect"><?php esc_html_e( 'Sound Effect URL', 'neoweaver' ); ?></label></th>
+							<td><input type="url" id="nw-deck-sound-effect" class="large-text"></td>
 						</tr>
 						<tr>
 							<th><label for="nw-deck-img-url"><?php esc_html_e( 'Image URL', 'neoweaver' ); ?></label></th>
 							<td><input type="url" id="nw-deck-img-url" class="large-text"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-gm-notes"><?php esc_html_e( 'GM Notes', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-gm-notes" rows="3" class="large-text"></textarea></td>
+							<th><label for="nw-deck-class-id"><?php esc_html_e( 'Class ID', 'neoweaver' ); ?></label></th>
+							<td><input type="text" id="nw-deck-class-id" class="regular-text"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-is-active"><?php esc_html_e( 'Active', 'neoweaver' ); ?></label></th>
-							<td><input type="checkbox" id="nw-deck-is-active" checked></td>
+							<th><?php esc_html_e( 'Flags', 'neoweaver' ); ?></th>
+							<td>
+								<label><input type="checkbox" id="nw-deck-is-leveling" checked> <?php esc_html_e( 'Is leveling', 'neoweaver' ); ?></label><br>
+								<label><input type="checkbox" id="nw-deck-is-disposable"> <?php esc_html_e( 'Is disposable', 'neoweaver' ); ?></label><br>
+								<label><input type="checkbox" id="nw-deck-is-active" checked> <?php esc_html_e( 'Is active', 'neoweaver' ); ?></label>
+							</td>
 						</tr>
 					</table>
 
 					<p>
 						<button class="button button-primary" id="nw-deck-save-btn"><?php esc_html_e( 'Save', 'neoweaver' ); ?></button>
 						<button class="button" id="nw-deck-cancel-btn"><?php esc_html_e( 'Cancel', 'neoweaver' ); ?></button>
+						<button class="button button-link-delete" id="nw-deck-delete-btn" style="display:none;"><?php esc_html_e( 'Delete', 'neoweaver' ); ?></button>
 						<span id="nw-deck-msg" style="margin-left:12px;"></span>
 					</p>
 				</div>
@@ -371,10 +455,6 @@ class NW_Deck_Admin {
 		</div>
 		<?php
 	}
-
-	/* ---------------------------------------------------------------- */
-	/*  AJAX — list                                                     */
-	/* ---------------------------------------------------------------- */
 
 	public function ajax_list(): void {
 		check_ajax_referer( 'neoweaver_deck', 'nonce' );
@@ -384,26 +464,25 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$category = sanitize_text_field( $_POST['category'] ?? '' );
-		$type     = sanitize_text_field( $_POST['type']     ?? '' );
-		$rarity   = sanitize_text_field( $_POST['rarity']   ?? '' );
-		$search   = sanitize_text_field( $_POST['search']   ?? '' );
-		$active   = sanitize_text_field( $_POST['active']   ?? '' );
+		$category = sanitize_text_field( wp_unslash( $_POST['category'] ?? '' ) );
+		$rarity   = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? '' ) );
+		$search   = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
+		$active   = sanitize_text_field( wp_unslash( $_POST['active'] ?? '' ) );
 
 		$endpoint = 'cyber_deck?select=*&order=name.asc';
 
-		if ( $category ) {
+		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
 			$endpoint .= '&deck_category=eq.' . rawurlencode( $category );
 		}
-		if ( $type ) {
-			$endpoint .= '&type=eq.' . rawurlencode( $type );
-		}
-		if ( $rarity ) {
+
+		if ( $rarity && in_array( $rarity, self::RARITIES, true ) ) {
 			$endpoint .= '&rarity=eq.' . rawurlencode( $rarity );
 		}
+
 		if ( '' !== $active ) {
-			$endpoint .= '&is_active=eq.' . ( $active ? 'true' : 'false' );
+			$endpoint .= '&is_active=eq.' . ( '1' === $active ? 'true' : 'false' );
 		}
+
 		if ( $search ) {
 			$endpoint .= '&name=ilike.*' . rawurlencode( $search ) . '*';
 		}
@@ -423,10 +502,6 @@ class NW_Deck_Admin {
 		wp_send_json_success( $result['data'] ?? [] );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  AJAX — get single                                               */
-	/* ---------------------------------------------------------------- */
-
 	public function ajax_get(): void {
 		check_ajax_referer( 'neoweaver_deck', 'nonce' );
 
@@ -435,8 +510,8 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		// UUID as string, never intval().
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$id = absint( $_POST['id'] ?? 0 );
+
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
 			return;
@@ -444,7 +519,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'GET',
-			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=*'
+			'cyber_deck?id=eq.' . $id . '&select=*'
 		);
 
 		if ( ! $result['ok'] ) {
@@ -456,10 +531,6 @@ class NW_Deck_Admin {
 		wp_send_json_success( is_array( $data ) ? ( $data[0] ?? null ) : null );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  AJAX — save (create / update)                                   */
-	/* ---------------------------------------------------------------- */
-
 	public function ajax_save(): void {
 		check_ajax_referer( 'neoweaver_deck', 'nonce' );
 
@@ -468,8 +539,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		// UUID as string.
-		$id   = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$id   = absint( $_POST['id'] ?? 0 );
 		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 
 		if ( ! $name ) {
@@ -477,50 +547,58 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$category = sanitize_text_field( wp_unslash( $_POST['deck_category'] ?? '' ) );
-		$type     = sanitize_text_field( wp_unslash( $_POST['type']          ?? '' ) );
-		$rarity   = sanitize_text_field( wp_unslash( $_POST['rarity']        ?? '' ) );
+		$category = sanitize_text_field( wp_unslash( $_POST['deck_category'] ?? 'action' ) );
+		$rarity   = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
 
-		if ( $category && ! in_array( $category, self::CATEGORIES, true ) ) {
+		if ( ! in_array( $category, self::CATEGORIES, true ) ) {
 			wp_send_json_error( 'Invalid category.' );
 			return;
 		}
-		if ( $type && ! in_array( $type, self::TYPES, true ) ) {
-			wp_send_json_error( 'Invalid type.' );
-			return;
-		}
-		if ( $rarity && ! in_array( $rarity, self::RARITIES, true ) ) {
+
+		if ( ! in_array( $rarity, self::RARITIES, true ) ) {
 			wp_send_json_error( 'Invalid rarity.' );
 			return;
 		}
 
 		$payload = [
-			'name'          => $name,
-			'deck_category' => $category ?: self::CATEGORIES[0],
-			'type'          => $type,
-			'rarity'        => $rarity ?: self::RARITIES[0],
-			'description'   => sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) ),
-			'effect'        => sanitize_textarea_field( wp_unslash( $_POST['effect']       ?? '' ) ),
-			'level'         => intval( $_POST['level']        ?? 1 ),
-			'action_cost'   => intval( $_POST['action_cost']  ?? 0 ),
-			'time_cost'     => sanitize_text_field( wp_unslash( $_POST['time_cost']  ?? '' ) ),
-			'duration'      => sanitize_text_field( wp_unslash( $_POST['duration']   ?? '' ) ),
-			'target'        => sanitize_text_field( wp_unslash( $_POST['target']     ?? '' ) ),
-			'range'         => sanitize_text_field( wp_unslash( $_POST['range']      ?? '' ) ),
-			'hp_cost'       => intval( $_POST['hp_cost']      ?? 0 ),
-			'mana_cost'     => intval( $_POST['mana_cost']    ?? 0 ),
-			'stamina_cost'  => intval( $_POST['stamina_cost'] ?? 0 ),
-			'gold_cost'     => intval( $_POST['gold_cost']    ?? 0 ),
-			'tags'          => sanitize_text_field( wp_unslash( $_POST['tags']       ?? '' ) ),
-			'img_url'       => esc_url_raw( $_POST['img_url'] ?? '' ),
-			'gm_notes'      => sanitize_textarea_field( wp_unslash( $_POST['gm_notes'] ?? '' ) ),
-			'is_active'     => filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN ),
+			'name'                    => $name,
+			'description'             => $this->maybe_null_textarea( wp_unslash( $_POST['description'] ?? '' ) ),
+			'deck_category'           => $category,
+			'type'                    => $this->maybe_null_text( wp_unslash( $_POST['type'] ?? '' ) ) ?: 'Action',
+			'mechanic'                => $this->maybe_null_text( wp_unslash( $_POST['mechanic'] ?? '' ) ),
+			'mechanic_goal'           => $this->maybe_null_text( wp_unslash( $_POST['mechanic_goal'] ?? '' ) ),
+			'cost_label'              => $this->maybe_null_text( wp_unslash( $_POST['cost_label'] ?? '' ) ),
+			'cost_number'             => max( 0, intval( $_POST['cost_number'] ?? 0 ) ),
+			'effect'                  => $this->maybe_null_textarea( wp_unslash( $_POST['effect'] ?? '' ) ),
+			'bonus'                   => $this->parse_json_object_field( wp_unslash( $_POST['bonus'] ?? '' ) ),
+			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
+			'gm'                      => $this->maybe_null_textarea( wp_unslash( $_POST['gm'] ?? '' ) ),
+			'tags'                    => $this->parse_json_array_field( wp_unslash( $_POST['tags'] ?? '' ) ),
+			'requirement_tags'        => $this->parse_json_array_field( wp_unslash( $_POST['requirement_tags'] ?? '' ) ),
+			'denied_tags'             => $this->parse_json_array_field( wp_unslash( $_POST['denied_tags'] ?? '' ) ),
+			'required_item_tags'      => $this->parse_json_array_field( wp_unslash( $_POST['required_item_tags'] ?? '' ) ),
+			'required_location_tags'  => $this->parse_json_array_field( wp_unslash( $_POST['required_location_tags'] ?? '' ) ),
+			'denied_location_tags'    => $this->parse_json_array_field( wp_unslash( $_POST['denied_location_tags'] ?? '' ) ),
+			'requirement_description' => $this->maybe_null_textarea( wp_unslash( $_POST['requirement_description'] ?? '' ) ),
+			'time_cost_minutes'       => max( 0, intval( $_POST['time_cost_minutes'] ?? 0 ) ),
+			'cooldown_messages'       => max( 0, intval( $_POST['cooldown_messages'] ?? 0 ) ),
+			'entropy_on_fail'         => max( 0, intval( $_POST['entropy_on_fail'] ?? 0 ) ),
+			'rarity'                  => $rarity,
+			'level'                   => min( 10, max( 1, intval( $_POST['level'] ?? 1 ) ) ),
+			'xp_current'              => max( 0, intval( $_POST['xp_current'] ?? 0 ) ),
+			'xp_to_next'              => max( 0, intval( $_POST['xp_to_next'] ?? 10 ) ),
+			'is_leveling'             => filter_var( $_POST['is_leveling'] ?? false, FILTER_VALIDATE_BOOLEAN ),
+			'is_disposable'           => filter_var( $_POST['is_disposable'] ?? false, FILTER_VALIDATE_BOOLEAN ),
+			'is_active'               => filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
+			'sound_effect'            => esc_url_raw( wp_unslash( $_POST['sound_effect'] ?? '' ) ) ?: null,
+			'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
+			'class_id'                => $this->maybe_uuid( wp_unslash( $_POST['class_id'] ?? '' ) ),
 		];
 
 		if ( $id ) {
 			$result = $this->supa(
 				'PATCH',
-				'cyber_deck?id=eq.' . rawurlencode( $id ),
+				'cyber_deck?id=eq.' . $id,
 				$payload
 			);
 		} else {
@@ -540,10 +618,6 @@ class NW_Deck_Admin {
 		wp_send_json_success( is_array( $data ) ? ( $data[0] ?? $data ) : $data );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  AJAX — toggle                                                   */
-	/* ---------------------------------------------------------------- */
-
 	public function ajax_toggle(): void {
 		check_ajax_referer( 'neoweaver_deck', 'nonce' );
 
@@ -552,7 +626,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id    = sanitize_text_field( wp_unslash( $_POST['id']    ?? '' ) );
+		$id    = absint( $_POST['id'] ?? 0 );
 		$state = filter_var( $_POST['state'] ?? false, FILTER_VALIDATE_BOOLEAN );
 
 		if ( ! $id ) {
@@ -562,7 +636,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'PATCH',
-			'cyber_deck?id=eq.' . rawurlencode( $id ),
+			'cyber_deck?id=eq.' . $id,
 			[ 'is_active' => $state ]
 		);
 
@@ -574,10 +648,6 @@ class NW_Deck_Admin {
 		wp_send_json_success( [ 'toggled' => true, 'state' => $state ] );
 	}
 
-	/* ---------------------------------------------------------------- */
-	/*  AJAX — delete                                                   */
-	/* ---------------------------------------------------------------- */
-
 	public function ajax_delete(): void {
 		check_ajax_referer( 'neoweaver_deck', 'nonce' );
 
@@ -586,7 +656,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$id = absint( $_POST['id'] ?? 0 );
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -595,7 +665,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'DELETE',
-			'cyber_deck?id=eq.' . rawurlencode( $id )
+			'cyber_deck?id=eq.' . $id
 		);
 
 		if ( ! $result['ok'] ) {
@@ -607,7 +677,6 @@ class NW_Deck_Admin {
 	}
 }
 
-// BUG: wrong class instantiated — fix to NW_Deck_Admin.
 add_action(
 	'plugins_loaded',
 	static function () {
