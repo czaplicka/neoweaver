@@ -2,8 +2,12 @@
 /**
  * NeoWeaver Admin — Main Menu & Dashboard
  *
- * Loaded FIRST (explicitly, before glob) so the top-level "neoweaver"
- * menu slug exists when all submenu files run add_submenu_page().
+ * Reworked dashboard:
+ * - Overview: Characters, Worlds, Campaigns, Active Sessions
+ * - Messages: total, 7d, 30d
+ * - Trends: Characters, Worlds, Campaigns with 7/30 day filter
+ * - World Health
+ * - Recent System Events
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -14,10 +18,15 @@ class NeoWeaver_Admin {
 
 	private string $slug = 'neoweaver';
 
+	private const DEBUG_LOGS_TABLE     = 'cyber_logs';
+	private const CHAT_MESSAGES_TABLE  = 'cyber_chat_messages';
+	private const GAME_SESSIONS_TABLE  = 'cyber_game_sessions';
+
 	public function __construct() {
 		if ( ! is_admin() ) {
 			return;
 		}
+
 		add_action( 'admin_menu',            [ $this, 'register_menu'        ] );
 		add_action( 'admin_menu',            [ $this, 'rename_first_submenu' ], 999 );
 		add_action( 'admin_menu',            [ $this, 'sort_submenu'         ], 9999 );
@@ -26,7 +35,7 @@ class NeoWeaver_Admin {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  MENU                                                               */
+	/* MENU                                                               */
 	/* ------------------------------------------------------------------ */
 
 	public function register_menu(): void {
@@ -67,7 +76,7 @@ class NeoWeaver_Admin {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  ASSETS                                                             */
+	/* ASSETS                                                             */
 	/* ------------------------------------------------------------------ */
 
 	public function enqueue_assets( string $hook ): void {
@@ -75,24 +84,10 @@ class NeoWeaver_Admin {
 			return;
 		}
 
-		/*
-		 * Use plugin_dir_url() relative to this file instead of relying on
-		 * NEOWEAVER_PLUGIN_URL / NW_PLUGIN_URL being defined — avoids the
-		 * "Undefined constant" fatal that hits when the bootstrap file hasn't
-		 * run yet or the constant name doesn't match.
-		 *
-		 * dirname(__FILE__) = .../neoweaver-wp-core-main/admin
-		 * dirname(dirname(__FILE__)) = .../neoweaver-wp-core-main/
-		 */
 		$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 
-		/*
-		 * Version string: use the constant if available, otherwise null
-		 * (WordPress will omit the ?ver= query string).
-		 */
 		$version = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
-				 : ( defined( 'NW_VERSION' )      ? NW_VERSION
-				 : null );
+				 : ( defined( 'NW_VERSION' ) ? NW_VERSION : null );
 
 		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
 			wp_enqueue_style(
@@ -121,11 +116,12 @@ class NeoWeaver_Admin {
 		wp_localize_script( 'nw-dashboard-script', 'NWDashData', [
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'neoweaver_dashboard' ),
+			'debug'   => defined( 'WP_DEBUG' ) && WP_DEBUG ? '1' : '0',
 		] );
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  HELPERS                                                            */
+	/* HELPERS                                                            */
 	/* ------------------------------------------------------------------ */
 
 	private function get_supa_url(): string {
@@ -177,7 +173,7 @@ class NeoWeaver_Admin {
 		$res = wp_remote_get(
 			rtrim( $supa_url, '/' ) . '/rest/v1/' . ltrim( $path, '/' ),
 			[
-				'timeout' => 12,
+				'timeout' => 15,
 				'headers' => [
 					'apikey'        => $supa_key,
 					'Authorization' => 'Bearer ' . $supa_key,
@@ -199,11 +195,11 @@ class NeoWeaver_Admin {
 			'status' => $code,
 			'body'   => $data,
 			'error'  => null,
-			'raw'    => ( $code < 200 || $code >= 300 ) ? substr( $body, 0, 300 ) : null,
+			'raw'    => ( $code < 200 || $code >= 300 ) ? substr( $body, 0, 500 ) : null,
 		];
 	}
 
-	private function supa_count( string $table ): int {
+	private function supa_count( string $table, string $filters = '' ): int {
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
@@ -211,8 +207,13 @@ class NeoWeaver_Admin {
 			return 0;
 		}
 
+		$url = rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id';
+		if ( $filters ) {
+			$url .= '&' . ltrim( $filters, '&' );
+		}
+
 		$res = wp_remote_get(
-			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id',
+			$url,
 			[
 				'timeout' => 10,
 				'headers' => [
@@ -230,14 +231,14 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
 		return 0;
 	}
 
-	private function supa_recent_count( string $table, int $days = 7 ): int {
+	private function supa_recent_count( string $table, int $days = 7, string $date_col = 'created_at', string $extra_filters = '' ): int {
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
@@ -245,10 +246,15 @@ class NeoWeaver_Admin {
 			return 0;
 		}
 
-		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( $days * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( $days * DAY_IN_SECONDS ) );
+
+		$url = rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&' . $date_col . '=gte.' . rawurlencode( $since );
+		if ( $extra_filters ) {
+			$url .= '&' . ltrim( $extra_filters, '&' );
+		}
 
 		$res = wp_remote_get(
-			rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&created_at=gte.' . rawurlencode( $since ),
+			$url,
 			[
 				'timeout' => 10,
 				'headers' => [
@@ -266,27 +272,28 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
 		return 0;
 	}
 
-	private function supa_growth_series( string $table, int $days = 30 ): array {
-		$transient_key = 'nw_growth_' . md5( $table . '_' . $days . '_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 ) );
+	private function supa_growth_series( string $table, int $days = 30, string $date_col = 'created_at' ): array {
+		$days          = max( 1, min( 30, $days ) );
+		$transient_key = 'nw_growth_' . md5( $table . '_' . $date_col . '_' . $days . '_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 ) );
 		$cached        = get_transient( $transient_key );
 
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
 
 		$path = $table
-			. '?select=created_at'
-			. '&created_at=gte.' . rawurlencode( $since )
-			. '&order=created_at.asc'
+			. '?select=' . rawurlencode( $date_col )
+			. '&' . $date_col . '=gte.' . rawurlencode( $since )
+			. '&order=' . rawurlencode( $date_col . '.asc' )
 			. '&limit=5000';
 
 		$res  = $this->supa_get( $path );
@@ -299,10 +306,10 @@ class NeoWeaver_Admin {
 		}
 
 		foreach ( $rows as $row ) {
-			if ( empty( $row['created_at'] ) ) {
+			if ( empty( $row[ $date_col ] ) ) {
 				continue;
 			}
-			$key = gmdate( 'Y-m-d', strtotime( $row['created_at'] ) );
+			$key = gmdate( 'Y-m-d', strtotime( (string) $row[ $date_col ] ) );
 			if ( isset( $series[ $key ] ) ) {
 				$series[ $key ]++;
 			}
@@ -325,8 +332,6 @@ class NeoWeaver_Admin {
 
 		return $result;
 	}
-
-	private const DEBUG_LOGS_TABLE = 'cyber_logs';
 
 	private function supa_recent_logs( int $limit = 10 ): array {
 		$path = self::DEBUG_LOGS_TABLE . '?select=id,created_at,level,message,context,data&order=created_at.desc&limit=' . $limit;
@@ -357,7 +362,7 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
@@ -393,7 +398,7 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
@@ -411,67 +416,79 @@ class NeoWeaver_Admin {
 		return $count;
 	}
 
-	private function supa_deck_breakdown(): array {
-		$transient_key = 'nw_deck_breakdown_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 );
-		$cached        = get_transient( $transient_key );
+	private function supa_active_sessions_count(): int {
+		$supa_url = $this->get_supa_url();
+		$supa_key = $this->get_supa_key();
 
-		if ( false !== $cached ) {
-			return $cached;
+		if ( ! $supa_url || ! $supa_key ) {
+			return 0;
 		}
 
-		$path = 'cyber_deck?select=deck_category,rarity,is_active&limit=5000';
-		$res  = $this->supa_get( $path );
-		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : [];
-
-		$categories = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
-		$rarities   = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
-		$active_count   = 0;
-		$inactive_count = 0;
-
-		foreach ( $rows as $row ) {
-			$cat = $row['deck_category'] ?? '';
-			$rar = $row['rarity']        ?? '';
-
-			if ( isset( $categories[ $cat ] ) ) {
-				$categories[ $cat ]++;
-			}
-			if ( isset( $rarities[ $rar ] ) ) {
-				$rarities[ $rar ]++;
-			}
-			if ( ! empty( $row['is_active'] ) ) {
-				$active_count++;
-			} else {
-				$inactive_count++;
-			}
-		}
-
-		$result = [
-			'categories'     => $categories,
-			'rarities'       => $rarities,
-			'active_count'   => $active_count,
-			'inactive_count' => $inactive_count,
-			'total'          => count( $rows ),
+		$try_filters = [
+			'status=in.(active,started,in_progress)',
+			'ended_at=is.null',
 		];
 
-		set_transient( $transient_key, $result, 5 * MINUTE_IN_SECONDS );
+		foreach ( $try_filters as $filters ) {
+			$count = $this->supa_count( self::GAME_SESSIONS_TABLE, $filters );
+			if ( $count > 0 ) {
+				return $count;
+			}
+		}
 
-		return $result;
+		return 0;
+	}
+
+	private function supa_campaigns_with_active_session(): int {
+		$supa_url = $this->get_supa_url();
+		$supa_key = $this->get_supa_key();
+
+		if ( ! $supa_url || ! $supa_key ) {
+			return 0;
+		}
+
+		$paths = [
+			self::GAME_SESSIONS_TABLE . '?select=campaign_id&status=in.(active,started,in_progress)&campaign_id=not.is.null&limit=5000',
+			self::GAME_SESSIONS_TABLE . '?select=campaign_id&ended_at=is.null&campaign_id=not.is.null&limit=5000',
+		];
+
+		foreach ( $paths as $path ) {
+			$res = $this->supa_get( $path );
+			if ( ! $res['ok'] || ! is_array( $res['body'] ) ) {
+				continue;
+			}
+
+			$uniq = [];
+			foreach ( $res['body'] as $row ) {
+				if ( ! empty( $row['campaign_id'] ) ) {
+					$uniq[ (string) $row['campaign_id'] ] = true;
+				}
+			}
+
+			if ( ! empty( $uniq ) ) {
+				return count( $uniq );
+			}
+		}
+
+		return 0;
+	}
+
+	private function supa_messages_total(): int {
+		return $this->supa_count( self::CHAT_MESSAGES_TABLE );
+	}
+
+	private function supa_messages_recent( int $days ): int {
+		return $this->supa_recent_count( self::CHAT_MESSAGES_TABLE, $days, 'created_at' );
+	}
+
+	private function get_range_days(): int {
+		$range = isset( $_POST['range'] ) ? (int) $_POST['range'] : 30;
+		return in_array( $range, [ 7, 30 ], true ) ? $range : 30;
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  AJAX: DASHBOARD                                                    */
+	/* AJAX: DASHBOARD                                                    */
 	/* ------------------------------------------------------------------ */
-
-	private function supa_all_counts(): ?array {
-		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
-			return null;
-		}
-		$result = tw_supabase_rpc( 'nw_dashboard_counts', [] );
-		if ( is_array( $result ) && isset( $result['characters'] ) ) {
-			return $result;
-		}
-		return null;
-	}
 
 	public function ajax_dashboard_data(): void {
 		check_ajax_referer( 'neoweaver_dashboard', 'nonce' );
@@ -486,56 +503,41 @@ class NeoWeaver_Admin {
 			return;
 		}
 
-		$rpc = $this->supa_all_counts();
+		$range_days = $this->get_range_days();
 
-		if ( $rpc ) {
-			$counts = [
-				'characters' => (int) ( $rpc['characters'] ?? 0 ),
-				'worlds'     => (int) ( $rpc['worlds']     ?? 0 ),
-				'campaigns'  => (int) ( $rpc['campaigns']  ?? 0 ),
-				'deck_cards' => (int) ( $rpc['deck_cards'] ?? 0 ),
-			];
-			$recent = [
-				'characters_7d' => (int) ( $rpc['chars_7d']  ?? 0 ),
-				'worlds_7d'     => (int) ( $rpc['worlds_7d'] ?? 0 ),
-				'campaigns_7d'  => (int) ( $rpc['camps_7d']  ?? 0 ),
-				'deck_cards_7d' => (int) ( $rpc['deck_7d']   ?? 0 ),
-			];
-		} else {
-			$counts = [
-				'characters' => $this->supa_count( 'cyber_characters' ),
-				'worlds'     => $this->supa_count( 'cyber_worlds' ),
-				'campaigns'  => $this->supa_count( 'cyber_campaign' ),
-				'deck_cards' => $this->supa_count( 'cyber_deck' ),
-			];
-			$recent = [
-				'characters_7d' => $this->supa_recent_count( 'cyber_characters', 7 ),
-				'worlds_7d'     => $this->supa_recent_count( 'cyber_worlds', 7 ),
-				'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
-				'deck_cards_7d' => $this->supa_recent_count( 'cyber_deck', 7 ),
-			];
-		}
+		$counts = [
+			'characters'                     => $this->supa_count( 'cyber_characters' ),
+			'worlds'                         => $this->supa_count( 'cyber_worlds' ),
+			'campaigns'                      => $this->supa_count( 'cyber_campaign' ),
+			'active_sessions'                => $this->supa_active_sessions_count(),
+			'campaigns_with_active_session'  => $this->supa_campaigns_with_active_session(),
+			'messages_total'                 => $this->supa_messages_total(),
+		];
+
+		$recent = [
+			'characters_7d' => $this->supa_recent_count( 'cyber_characters', 7 ),
+			'worlds_7d'     => $this->supa_recent_count( 'cyber_worlds', 7 ),
+			'campaigns_7d'  => $this->supa_recent_count( 'cyber_campaign', 7 ),
+			'messages_7d'   => $this->supa_messages_recent( 7 ),
+			'messages_30d'  => $this->supa_messages_recent( 30 ),
+		];
 
 		$growth_raw = [
-			'characters' => $this->supa_growth_series( 'cyber_characters', 30 ),
-			'worlds'     => $this->supa_growth_series( 'cyber_worlds', 30 ),
-			'campaigns'  => $this->supa_growth_series( 'cyber_campaign', 30 ),
-			'deck_cards' => $this->supa_growth_series( 'cyber_deck', 30 ),
+			'characters' => $this->supa_growth_series( 'cyber_characters', $range_days ),
+			'worlds'     => $this->supa_growth_series( 'cyber_worlds', $range_days ),
+			'campaigns'  => $this->supa_growth_series( 'cyber_campaign', $range_days ),
 		];
 
 		$growth = [
 			'characters' => $growth_raw['characters']['series'],
 			'worlds'     => $growth_raw['worlds']['series'],
 			'campaigns'  => $growth_raw['campaigns']['series'],
-			'deck_cards' => $growth_raw['deck_cards']['series'],
 		];
 
 		$health = [
 			'worlds_without_campaigns'    => $this->supa_worlds_without_campaigns(),
 			'campaigns_without_character' => $this->supa_campaigns_without_character(),
 		];
-
-		$deck_breakdown = $this->supa_deck_breakdown();
 
 		$logs       = $this->supa_recent_logs( 10 );
 		$logs_table = self::DEBUG_LOGS_TABLE;
@@ -550,6 +552,9 @@ class NeoWeaver_Admin {
 		}
 		if ( $recent['campaigns_7d'] === 0 ) {
 			$alerts[] = [ 'level' => 'warn', 'label' => 'Campaigns', 'text' => 'No new campaigns in the last 7 days.' ];
+		}
+		if ( $counts['campaigns_with_active_session'] === 0 ) {
+			$alerts[] = [ 'level' => 'info', 'label' => 'Sessions', 'text' => 'No campaigns currently have an active session.' ];
 		}
 		if ( $health['worlds_without_campaigns'] > 0 ) {
 			$alerts[] = [
@@ -567,16 +572,15 @@ class NeoWeaver_Admin {
 		}
 
 		wp_send_json_success( [
-			'counts'         => $counts,
-			'recent'         => $recent,
-			'growth'         => $growth,
-			'health'         => $health,
-			'deck_breakdown' => $deck_breakdown,
-			'alerts'         => $alerts,
-			'logs'           => $logs,
-			'_debug'         => [
+			'range_days' => $range_days,
+			'counts'     => $counts,
+			'recent'     => $recent,
+			'growth'     => $growth,
+			'health'     => $health,
+			'alerts'     => $alerts,
+			'logs'       => $logs,
+			'_debug'     => [
 				'key_type'    => $this->get_supa_key_type(),
-				'rpc_used'    => ! is_null( $rpc ),
 				'logs_table'  => $logs_table,
 				'growth_meta' => [
 					'characters' => [
@@ -597,45 +601,44 @@ class NeoWeaver_Admin {
 						'http_status' => $growth_raw['campaigns']['http_status'],
 						'api_error'   => $growth_raw['campaigns']['api_error'],
 					],
-					'deck_cards' => [
-						'rows_found'  => $growth_raw['deck_cards']['rows_found'],
-						'query_ok'    => $growth_raw['deck_cards']['query_ok'],
-						'http_status' => $growth_raw['deck_cards']['http_status'],
-						'api_error'   => $growth_raw['deck_cards']['api_error'],
-					],
 				],
 			],
 		] );
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  RENDER                                                             */
+	/* RENDER                                                             */
 	/* ------------------------------------------------------------------ */
 
 	public function render_page(): void {
 		$supa_url = $this->get_supa_url();
 		$key_ok   = (bool) $this->get_supa_key();
 		$version  = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
-				  : ( defined( 'NW_VERSION' )      ? NW_VERSION : '—' );
-
-		$allowed_html = [
-			'span' => [ 'class' => [] ],
-		];
+				  : ( defined( 'NW_VERSION' ) ? NW_VERSION : '—' );
 		?>
 		<div class="wrap nw-dash" id="nw-dashboard">
 
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
-					<?php 					$svg = $this->logo_svg( 44, '#adff00' );
-if ( $svg ) {
-    echo wp_kses_post( $svg );
-} 	?>
+					<?php
+					$svg = $this->logo_svg( 44, '#adff00' );
+					if ( $svg ) {
+						echo wp_kses_post( $svg );
+					}
+					?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
 						<span class="nw-logo-version">v<?php echo esc_html( $version ); ?> &mdash; Game Ops Dashboard</span>
 					</div>
 				</div>
-				<button class="nw-btn nw-btn-ghost" id="nw-refresh-dashboard">&#8635; Refresh</button>
+
+				<div class="nw-dash-actions" style="display:flex;gap:12px;align-items:center;">
+					<div class="nw-range-switch" id="nw-range-switch" role="tablist" aria-label="Trend range">
+						<button type="button" class="nw-btn nw-btn-ghost nw-range-btn" data-range="7">7d</button>
+						<button type="button" class="nw-btn nw-btn-ghost nw-range-btn is-active" data-range="30">30d</button>
+					</div>
+					<button class="nw-btn nw-btn-ghost" id="nw-refresh-dashboard">&#8635; Refresh</button>
+				</div>
 			</div>
 
 			<div class="nw-grid-main">
@@ -643,7 +646,7 @@ if ( $svg ) {
 				<section class="nw-block">
 					<div class="nw-block-head">
 						<h2 class="nw-section-title">Overview</h2>
-						<span class="nw-section-kicker">product activity</span>
+						<span class="nw-section-kicker">core entities</span>
 					</div>
 					<div class="nw-stat-grid">
 						<div class="nw-stat-card">
@@ -662,17 +665,41 @@ if ( $svg ) {
 							<div class="nw-stat-sub" id="nw-recent-campaigns">Last 7d: &mdash;</div>
 						</div>
 						<div class="nw-stat-card">
-							<div class="nw-stat-label-top">Deck Cards</div>
-							<div class="nw-stat-value" id="nw-stat-deck-cards"><div class="nw-spinner"></div></div>
-							<div class="nw-stat-sub" id="nw-recent-deck-cards">Last 7d: &mdash;</div>
+							<div class="nw-stat-label-top">Active Sessions</div>
+							<div class="nw-stat-value" id="nw-stat-active-sessions"><div class="nw-spinner"></div></div>
+							<div class="nw-stat-sub" id="nw-recent-active-sessions">Campaigns live: &mdash;</div>
 						</div>
 					</div>
 				</section>
 
 				<section class="nw-block">
 					<div class="nw-block-head">
-						<h2 class="nw-section-title">Growth</h2>
-						<span class="nw-section-kicker">last 30 days</span>
+						<h2 class="nw-section-title">Messages</h2>
+						<span class="nw-section-kicker">cyber_chat_messages</span>
+					</div>
+					<div class="nw-stat-grid">
+						<div class="nw-stat-card">
+							<div class="nw-stat-label-top">Total Messages</div>
+							<div class="nw-stat-value" id="nw-stat-messages-total"><div class="nw-spinner"></div></div>
+							<div class="nw-stat-sub">All time</div>
+						</div>
+						<div class="nw-stat-card">
+							<div class="nw-stat-label-top">Messages 7d</div>
+							<div class="nw-stat-value" id="nw-stat-messages-7d"><div class="nw-spinner"></div></div>
+							<div class="nw-stat-sub">Last 7 days</div>
+						</div>
+						<div class="nw-stat-card">
+							<div class="nw-stat-label-top">Messages 30d</div>
+							<div class="nw-stat-value" id="nw-stat-messages-30d"><div class="nw-spinner"></div></div>
+							<div class="nw-stat-sub">Last 30 days</div>
+						</div>
+					</div>
+				</section>
+
+				<section class="nw-block">
+					<div class="nw-block-head">
+						<h2 class="nw-section-title">Trends</h2>
+						<span class="nw-section-kicker">characters, worlds, campaigns</span>
 					</div>
 					<div class="nw-chart-grid">
 						<div class="nw-chart-card">
@@ -687,54 +714,14 @@ if ( $svg ) {
 							<div class="nw-chart-title">Campaigns</div>
 							<div class="nw-chart" id="nw-chart-campaigns"></div>
 						</div>
-						<div class="nw-chart-card">
-							<div class="nw-chart-title">Deck Cards</div>
-							<div class="nw-chart" id="nw-chart-deck-cards"></div>
-						</div>
-					</div>
-				</section>
-
-				<section class="nw-block">
-					<div class="nw-block-head">
-						<h2 class="nw-section-title">Deck Library</h2>
-						<span class="nw-section-kicker">cyber_deck breakdown</span>
-					</div>
-					<div class="nw-deck-grid">
-						<div class="nw-deck-col">
-							<div class="nw-deck-col-title">By Category</div>
-							<div class="nw-deck-bars" id="nw-deck-categories">
-								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
-							</div>
-						</div>
-						<div class="nw-deck-col">
-							<div class="nw-deck-col-title">By Rarity</div>
-							<div class="nw-deck-bars" id="nw-deck-rarities">
-								<div class="nw-spinner" style="margin:20px auto;display:block;"></div>
-							</div>
-						</div>
-						<div class="nw-deck-col nw-deck-col-sm">
-							<div class="nw-deck-col-title">Status</div>
-							<div id="nw-deck-status">
-								<div class="nw-deck-status-row">
-									<span class="nw-deck-status-dot nw-deck-dot-active"></span>
-									<span class="nw-deck-status-label">Active</span>
-									<span class="nw-deck-status-val" id="nw-deck-active">&mdash;</span>
-								</div>
-								<div class="nw-deck-status-row">
-									<span class="nw-deck-status-dot nw-deck-dot-inactive"></span>
-									<span class="nw-deck-status-label">Inactive</span>
-									<span class="nw-deck-status-val" id="nw-deck-inactive">&mdash;</span>
-								</div>
-							</div>
-						</div>
 					</div>
 				</section>
 
 				<div class="nw-grid-2">
 					<section class="nw-block">
 						<div class="nw-block-head">
-							<h2 class="nw-section-title">Needs Attention</h2>
-							<span class="nw-section-kicker">exceptions first</span>
+							<h2 class="nw-section-title">World Health</h2>
+							<span class="nw-section-kicker">structure integrity</span>
 						</div>
 						<div id="nw-alerts" class="nw-alerts-list">
 							<div class="nw-alert-card nw-alert-card-loading">
@@ -812,7 +799,7 @@ if ( $svg ) {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/*  SVG LOGO                                                           */
+	/* SVG LOGO                                                           */
 	/* ------------------------------------------------------------------ */
 
 	private function logo_svg( int $size = 20, string $color = '#ffffff' ): string {
@@ -821,7 +808,6 @@ if ( $svg ) {
 			. '<polyline points="11,27 11,13 20,24 29,13 29,27" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
 			. '</svg>';
 	}
-
 }
 
 new NeoWeaver_Admin();
