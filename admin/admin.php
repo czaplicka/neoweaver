@@ -416,28 +416,48 @@ class NeoWeaver_Admin {
 		return $count;
 	}
 
-	private function supa_active_sessions_count(): int {
-		$supa_url = $this->get_supa_url();
-		$supa_key = $this->get_supa_key();
+private function supa_active_sessions_count(): int {
+	$supa_url = $this->get_supa_url();
+	$supa_key = $this->get_supa_key();
 
-		if ( ! $supa_url || ! $supa_key ) {
-			return 0;
-		}
-
-		$try_filters = [
-			'status=in.(active,started,in_progress)',
-			'ended_at=is.null',
-		];
-
-		foreach ( $try_filters as $filters ) {
-			$count = $this->supa_count( self::GAME_SESSIONS_TABLE, $filters );
-			if ( $count > 0 ) {
-				return $count;
-			}
-		}
-
+	if ( ! $supa_url || ! $supa_key ) {
 		return 0;
 	}
+
+	// Twoja tabela ma tylko 'active', 'ended', 'paused'
+	return $this->supa_count( self::GAME_SESSIONS_TABLE, 'status=eq.active' );
+}
+
+private function supa_campaigns_with_active_session(): int {
+	$supa_url = $this->get_supa_url();
+	$supa_key = $this->get_supa_key();
+
+	if ( ! $supa_url || ! $supa_key ) {
+		return 0;
+	}
+
+	// Pobierz wszystkie aktywne sesje z campaign_id
+	$path = self::GAME_SESSIONS_TABLE 
+		. '?select=campaign_id'
+		. '&status=eq.active'
+		. '&campaign_id=not.is.null'
+		. '&limit=5000';
+
+	$res = $this->supa_get( $path );
+	if ( ! $res['ok'] || ! is_array( $res['body'] ) ) {
+		return 0;
+	}
+
+	// Policz unikalne campaign_id
+	$uniq = [];
+	foreach ( $res['body'] as $row ) {
+		if ( ! empty( $row['campaign_id'] ) ) {
+			$uniq[ (string) $row['campaign_id'] ] = true;
+		}
+	}
+
+	return count( $uniq );
+}
 
 	private function supa_campaigns_with_active_session(): int {
 		$supa_url = $this->get_supa_url();
