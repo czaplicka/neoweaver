@@ -322,3 +322,139 @@
 		width: 100%;
 	}
 }
+/* ===== Exact fix for header controls ===== */
+
+#nw-dashboard .nw-dash-actions {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+#nw-dashboard .nw-range-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	background: #101010;
+	border: 1px solid #262626;
+	border-radius: 999px;
+}
+
+/* 7d / 30d */
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn {
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	height: 38px !important;
+	min-height: 38px !important;
+	padding: 0 14px !important;
+	margin: 0 !important;
+	border: 1px solid transparent !important;
+	border-radius: 999px !important;
+	background: transparent !important;
+	color: #a8a8a8 !important;
+	font-family: "Chakra Petch", sans-serif !important;
+	font-size: 12px !important;
+	font-weight: 700 !important;
+	line-height: 1 !important;
+	letter-spacing: .04em !important;
+	text-transform: uppercase !important;
+	text-decoration: none !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+
+/* active 7d / 30d */
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn.is-active,
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn[aria-pressed="true"] {
+	background: #adff00 !important;
+	color: #11150c !important;
+	border-color: #adff00 !important;
+	box-shadow: 0 4px 12px rgba(173,255,0,.20) !important;
+}
+
+/* hover 7d / 30d */
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn:hover {
+	background: #1a1a1a !important;
+	color: #ffffff !important;
+	border-color: #303030 !important;
+}
+
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn.is-active:hover,
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn[aria-pressed="true"]:hover {
+	background: #adff00 !important;
+	color: #11150c !important;
+	border-color: #adff00 !important;
+}
+
+/* refresh */
+#nw-dashboard .nw-dash-actions #nw-refresh-dashboard.nw-btn.nw-btn-ghost {
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	height: 38px !important;
+	min-height: 38px !important;
+	padding: 0 16px !important;
+	margin: 0 !important;
+	border: 1px solid #2a2a2a !important;
+	border-radius: 999px !important;
+	background: #141414 !important;
+	color: #e4e4e4 !important;
+	font-family: "Chakra Petch", sans-serif !important;
+	font-size: 12px !important;
+	font-weight: 700 !important;
+	line-height: 1 !important;
+	letter-spacing: .04em !important;
+	text-transform: uppercase !important;
+	text-decoration: none !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+
+#nw-dashboard .nw-dash-actions #nw-refresh-dashboard.nw-btn.nw-btn-ghost:hover {
+	background: #1b1b1b !important;
+	border-color: rgba(173,255,0,.28) !important;
+	color: #fff !important;
+}
+
+/* focus */
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn:focus,
+#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn:focus-visible,
+#nw-dashboard .nw-dash-actions #nw-refresh-dashboard.nw-btn.nw-btn-ghost:focus,
+#nw-dashboard .nw-dash-actions #nw-refresh-dashboard.nw-btn.nw-btn-ghost:focus-visible {
+	outline: none !important;
+	box-shadow: 0 0 0 2px #0d0d0d, 0 0 0 4px rgba(173,255,0,.85) !important;
+}
+
+@media (max-width: 782px) {
+	#nw-dashboard .nw-dash-actions {
+		margin-left: 0;
+		width: 100%;
+		justify-content: space-between;
+	}
+}
+
+@media (max-width: 560px) {
+	#nw-dashboard .nw-dash-actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	#nw-dashboard .nw-range-switch {
+		width: 100%;
+	}
+
+	#nw-dashboard .nw-dash-actions .nw-range-switch .nw-btn.nw-btn-ghost.nw-range-btn {
+		flex: 1 1 0;
+	}
+
+	#nw-dashboard .nw-dash-actions #nw-refresh-dashboard.nw-btn.nw-btn-ghost {
+		width: 100%;
+	}
+}
