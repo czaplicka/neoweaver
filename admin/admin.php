@@ -100,14 +100,14 @@ class NeoWeaver_Admin {
 
 		wp_enqueue_style(
 			'nw-dashboard-style',
-			$plugin_url . 'assets/css/admin-dashboard.css',
+			$plugin_url . 'assets/css/admin/dashboard.css',
 			[ 'chakra-petch' ],
 			$version
 		);
 
 		wp_enqueue_script(
 			'nw-dashboard-script',
-			$plugin_url . 'assets/js/admin-dashboard.js',
+			$plugin_url . 'assets/js/admin/dashboard.js',
 			[ 'jquery' ],
 			$version,
 			true
