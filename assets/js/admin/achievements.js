@@ -1,7 +1,9 @@
 /* global jQuery, NWAch, lucide */
 jQuery( function ( $ ) {
 
-    const { ajaxurl, nonce } = NWAch;
+    const cfg = window.NWAch || {};
+const ajaxurl = cfg.ajaxurl || '';
+const nonce = cfg.nonce || '';
     let editId = null;
     let allRows = [];
 
@@ -74,7 +76,8 @@ jQuery( function ( $ ) {
         $.each( rows, function ( _, a ) {
             total++;
             if ( a.is_active )           active++;    else inactive++;
-            if ( a.scope === 'account' )  account++;   else character++;
+            if ( a.scope === 'account' ) account++;
+if ( a.scope === 'character' ) character++;
             if ( a.hidden_until_earned )  hidden++;
 
             const catCls   = a.category ? ' nw-cat-'   + a.category : '';
@@ -172,7 +175,8 @@ jQuery( function ( $ ) {
         data.achievement.is_active           = $( '#nw-field-is_active' ).is( ':checked' ) ? '1' : '0';
         data.achievement.hidden_until_earned = $( '#nw-field-hidden_until_earned' ).is( ':checked' ) ? '1' : '0';
 
-        $( '#nw-save-btn' ).prop( 'disabled', true ).text( 'Saving…' );
+        $('#nw-save-btn').prop('disabled', true);
+$('#nw-save-label').text('Saving…');
 
         $.post( ajaxurl, data, function ( r ) {
             $( '#nw-save-btn' ).prop( 'disabled', false );
