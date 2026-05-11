@@ -618,7 +618,7 @@ private function supa_campaigns_with_active_session(): int {
 					</div>
 				</div>
 
-				<div class="nw-dash-actions" style="display:flex;gap:12px;align-items:center;">
+				<div class="nw-dash-actions">
 					<div class="nw-range-switch" id="nw-range-switch" role="tablist" aria-label="Trend range">
 						<button type="button" class="nw-btn nw-btn-ghost nw-range-btn" data-range="7">7d</button>
 						<button type="button" class="nw-btn nw-btn-ghost nw-range-btn is-active" data-range="30">30d</button>
