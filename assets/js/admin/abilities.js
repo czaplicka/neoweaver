@@ -4,7 +4,6 @@ jQuery(function ($) {
     var cfg = window.NWAbilities || {};
     var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     var nonce = cfg.nonce || '';
-
     var $notice = $('#nw-notice');
     var $tbody = $('#nw-abilities-tbody');
     var $filterType = $('#nw-filter-type');
@@ -15,7 +14,6 @@ jQuery(function ($) {
     var $saveBtn = $('#nw-save-btn');
     var $saveLabel = $('#nw-save-label');
     var $deleteBtn = $('#nw-delete-btn');
-
     var $fieldId = $('#nw-field-id');
     var $fieldName = $('#nw-field-name');
     var $fieldTitle = $('#nw-field-title');
