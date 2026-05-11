@@ -3,7 +3,6 @@ jQuery(function ($) {
   var $statWorlds = $("#nw-stat-worlds");
   var $statCampaigns = $("#nw-stat-campaigns");
   var $statActiveSessions = $("#nw-stat-active-sessions");
-
   var $recentChars = $("#nw-recent-characters");
   var $recentWorlds = $("#nw-recent-worlds");
   var $recentCamps = $("#nw-recent-campaigns");
