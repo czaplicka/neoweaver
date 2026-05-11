@@ -18,8 +18,8 @@ class NeoWeaver_Achievements_Admin {
 	private string $parent_slug = 'neoweaver';
 
 	/** Exact values from DB constraint */
-	private const SCOPES = [ 'account', 'character' ];
-	private const CATEGORIES = [ 'system', 'exploration', 'social', 'progression', 'mission', 'loot', 'secret' ];
+	private const SCOPES      = [ 'account', 'character' ];
+	private const CATEGORIES  = [ 'system', 'exploration', 'social', 'progression', 'mission', 'loot', 'secret' ];
 
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
@@ -59,16 +59,16 @@ class NeoWeaver_Achievements_Admin {
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/nw-admin-core.css',
+			NW_PLUGIN_URL . 'assets/css/nw-admin-core.css',
 			[ 'chakra-petch' ],
-			NEOWEAVER_VERSION
+			NW_VERSION
 		);
 
 		wp_enqueue_style(
 			'nw-achievements-style',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/achievements-admin.css',
+			NW_PLUGIN_URL . 'assets/css/achievements-admin.css',
 			[ 'chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
+			NW_VERSION
 		);
 
 		wp_enqueue_script(
@@ -81,9 +81,9 @@ class NeoWeaver_Achievements_Admin {
 
 		wp_enqueue_script(
 			'nw-achievements-script',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/js/achievements-admin.js',
+			NW_PLUGIN_URL . 'assets/js/achievements-admin.js',
 			[ 'jquery', 'lucide' ],
-			NEOWEAVER_VERSION,
+			NW_VERSION,
 			true
 		);
 
@@ -497,11 +497,3 @@ class NeoWeaver_Achievements_Admin {
 		</div>
 	<?php }
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NeoWeaver_Achievements_Admin();
-	},
-	20
-);
