@@ -104,7 +104,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/weaver-list.php',
 			'public/shortcodes/world-creator.php',
 			'public/shortcodes/world-news.php',
-			'public/class-neoweaver-public.php',
+			'public/class-public.php',
 			'includes/api-endpoints.php',
 			'includes/api-endpoints-character-data.php',
 		];
