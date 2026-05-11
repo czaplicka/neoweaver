@@ -459,40 +459,6 @@ private function supa_campaigns_with_active_session(): int {
 	return count( $uniq );
 }
 
-	private function supa_campaigns_with_active_session(): int {
-		$supa_url = $this->get_supa_url();
-		$supa_key = $this->get_supa_key();
-
-		if ( ! $supa_url || ! $supa_key ) {
-			return 0;
-		}
-
-		$paths = [
-			self::GAME_SESSIONS_TABLE . '?select=campaign_id&status=in.(active,started,in_progress)&campaign_id=not.is.null&limit=5000',
-			self::GAME_SESSIONS_TABLE . '?select=campaign_id&ended_at=is.null&campaign_id=not.is.null&limit=5000',
-		];
-
-		foreach ( $paths as $path ) {
-			$res = $this->supa_get( $path );
-			if ( ! $res['ok'] || ! is_array( $res['body'] ) ) {
-				continue;
-			}
-
-			$uniq = [];
-			foreach ( $res['body'] as $row ) {
-				if ( ! empty( $row['campaign_id'] ) ) {
-					$uniq[ (string) $row['campaign_id'] ] = true;
-				}
-			}
-
-			if ( ! empty( $uniq ) ) {
-				return count( $uniq );
-			}
-		}
-
-		return 0;
-	}
-
 	private function supa_messages_total(): int {
 		return $this->supa_count( self::CHAT_MESSAGES_TABLE );
 	}
