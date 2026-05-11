@@ -17,7 +17,6 @@ class NeoWeaver_Achievements_Admin {
 	private string $page_slug   = 'neoweaver-achievements';
 	private string $parent_slug = 'neoweaver';
 
-	/** Exact values from DB constraint */
 	private const SCOPES      = [ 'account', 'character' ];
 	private const CATEGORIES  = [ 'system', 'exploration', 'social', 'progression', 'mission', 'loot', 'secret' ];
 
