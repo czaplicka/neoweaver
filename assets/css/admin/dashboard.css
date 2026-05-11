@@ -105,3 +105,167 @@
 .nw-sysinfo-val { color: #aaa; font-family: monospace; font-size: 12px; word-break: break-word; }
 
 .nw-empty-state { background: #141414; border: 1px dashed #2a2a2a; border-radius: 10px; padding: 18px; color: #777; font-size: 12px; text-align: center; }
+/* =========================================================
+   NeoWeaver Admin Dashboard — patch: range switch + messages
+   ========================================================= */
+
+/* Header actions */
+.nw-dash-actions {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+/* Range switch */
+.nw-range-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	border: 1px solid rgba(173, 255, 0, 0.16);
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 999px;
+	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.nw-range-switch .nw-range-btn {
+	min-width: 56px;
+	padding: 8px 14px;
+	border-radius: 999px;
+	border: 0;
+	background: transparent;
+	color: #b8b8b8;
+	font-weight: 700;
+	font-size: 12px;
+	line-height: 1;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	transition:
+		background-color 0.18s ease,
+		color 0.18s ease,
+		box-shadow 0.18s ease,
+		transform 0.18s ease;
+}
+
+.nw-range-switch .nw-range-btn:hover {
+	color: #f5f5f5;
+	background: rgba(173, 255, 0, 0.08);
+}
+
+.nw-range-switch .nw-range-btn.is-active,
+.nw-range-switch .nw-range-btn[aria-pressed="true"] {
+	background: #adff00;
+	color: #101410;
+	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.28), 0 4px 14px rgba(173, 255, 0, 0.22);
+}
+
+.nw-range-switch .nw-range-btn:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px rgba(10, 10, 10, 0.9),
+		0 0 0 4px rgba(173, 255, 0, 0.9);
+}
+
+.nw-range-switch .nw-range-btn:active {
+	transform: translateY(1px);
+}
+
+/* Messages section */
+.nw-messages-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 16px;
+}
+
+.nw-stat-card--message .nw-stat-label-top {
+	color: #d7d7d7;
+}
+
+.nw-stat-card--message .nw-stat-value {
+	font-variant-numeric: tabular-nums;
+}
+
+.nw-stat-card--message .nw-stat-sub {
+	color: #8f8f8f;
+}
+
+/* Optional subtle visual differentiation for message cards */
+.nw-stat-card--message {
+	position: relative;
+	overflow: hidden;
+}
+
+.nw-stat-card--message::after {
+	content: "";
+	position: absolute;
+	inset: auto -20% -35% auto;
+	width: 120px;
+	height: 120px;
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(173,255,0,0.12) 0%, rgba(173,255,0,0.02) 45%, rgba(173,255,0,0) 70%);
+	pointer-events: none;
+}
+
+/* Numeric readability */
+.nw-stat-value,
+.nw-health-value,
+.nw-deck-status-val {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Small polish for chart section heading row when switch is inside it later */
+.nw-block-head--split {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+	.nw-messages-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 782px) {
+	.nw-dash-actions {
+		width: 100%;
+		justify-content: space-between;
+	}
+
+	.nw-range-switch {
+		order: 1;
+	}
+
+	#nw-refresh-dashboard {
+		order: 2;
+	}
+
+	.nw-messages-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 560px) {
+	.nw-range-switch {
+		width: 100%;
+	}
+
+	.nw-range-switch .nw-range-btn {
+		flex: 1 1 0;
+		min-width: 0;
+		justify-content: center;
+	}
+
+	.nw-dash-actions {
+		align-items: stretch;
+	}
+
+	#nw-refresh-dashboard {
+		width: 100%;
+		justify-content: center;
+	}
+}
