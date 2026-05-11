@@ -1,220 +1,422 @@
-/* NeoWeaver Admin — Deck Cards JS */
-(function($){
-'use strict';
+/* global ajaxurl, NWDeck */
+(function ($) {
+    'use strict';
 
-const nonce  = $('#nw-nonce').val();
-const ajax   = window.ajaxurl || '';
-let   cards  = [];   // all cards returned from server
-let   editId = null;
+    var cfg = window.NWDeck || {};
+    var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
+    var nonce = cfg.nonce || '';
 
-const TAG_FIELDS = ['tags','requirement_tags','denied_tags','required_item_tags','required_location_tags','denied_location_tags'];
+    var cards = [];
+    var currentId = 0;
+    var activeXhr = null;
 
-/* ---- helpers -------------------------------------------------------- */
-function notice(msg, type='success'){
-    const $n = $('#nw-notice');
-    $n.removeClass('nw-notice-success nw-notice-error')
-      .addClass('nw-notice-' + type)
-      .html(msg).show();
-    if(type==='success') setTimeout(()=>$n.fadeOut(),3000);
-}
+    function notice(msg, type) {
+        var $msg = $('#nw-deck-msg');
+        var color = (type === 'error') ? '#b42318' : '#067647';
+        $msg.stop(true, true).css('color', color).text(msg).show();
 
-function esc(str){
-    return String(str == null ? '' : str)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
-
-function formatTags(val){
-    if(!val) return '';
-    const arr = Array.isArray(val) ? val : (typeof val==='string' ? val.split(',').map(s=>s.trim()).filter(Boolean) : []);
-    return arr.map(t=>`<span class="nw-tag">${esc(t)}</span>`).join('');
-}
-
-function rarityClass(r){ return 'nw-rarity-'+(r||'common'); }
-
-function catClass(c){
-    const map={action:'nw-cat-action',magic:'nw-cat-magic',equipment:'nw-cat-equipment'};
-    return map[c]||'';
-}
-
-function tagsToString(val){
-    if(!val) return '';
-    return Array.isArray(val) ? val.join(', ') : val;
-}
-
-/* ---- load all cards from server (category/rarity/type filtered) ----- */
-function loadCards(){
-    const cat    = $('#nw-filter-category').val();
-    const rarity = $('#nw-filter-rarity').val();
-    const type   = $('#nw-filter-type').val();
-    $('#nw-deck-tbody').html('<tr class="nw-loading-row"><td colspan="9"><div class="nw-spinner"></div> Loading cards&hellip;</td></tr>');
-    $.post(ajax,{action:'nw_deck_get_all',nonce,filter_category:cat,filter_rarity:rarity,filter_type:type},function(res){
-        if(!res.success){ notice(res.data||'Load error','error'); return; }
-        cards = res.data||[];
-        renderTable();
-    });
-}
-
-/* ---- client-side search filter (runs on already-loaded cards) ------- */
-function getSearchQuery(){
-    return $('#nw-search').val().trim().toLowerCase();
-}
-
-function matchesSearch(c, q){
-    if(!q) return true;
-    const haystack = [
-        c.name, c.type, c.deck_category, c.rarity, c.mechanic,
-        c.description, c.effect,
-        Array.isArray(c.tags) ? c.tags.join(' ') : (c.tags||'')
-    ].join(' ').toLowerCase();
-    return haystack.includes(q);
-}
-
-function renderTable(){
-    const q       = getSearchQuery();
-    const visible = cards.filter(c => matchesSearch(c, q));
-
-    const active   = cards.filter(c=>c.is_active).length;
-    const inactive = cards.length - active;
-    $('#nw-total').text(cards.length);
-    $('#nw-active').text(active);
-    $('#nw-inactive').text(inactive);
-
-    // show "Showing X" pill only when search is active
-    if(q){
-        $('#nw-filtered').text(visible.length);
-        $('#nw-filtered-pill').show();
-    } else {
-        $('#nw-filtered-pill').hide();
+        if (type !== 'error') {
+            setTimeout(function () {
+                $msg.fadeOut(250);
+            }, 2500);
+        }
     }
 
-    if(!visible.length){
-        const msg = q ? 'No cards match your search.' : 'No cards found.';
-        $('#nw-deck-tbody').html(`<tr><td colspan="9" style="text-align:center;color:#555;padding:30px;">${msg}</td></tr>`);
-        return;
+    function esc(str) {
+        return $('<div>').text(str == null ? '' : String(str)).html();
     }
 
-    const rows = visible.map(c=>{
-        const img = c.img_url
-            ? `<img class="nw-card-img" src="${esc(c.img_url)}" alt="">`
-            : `<div class="nw-card-img-placeholder">&#127183;</div>`;
-        const tags = formatTags(c.tags);
-        const cost = c.cost_number ? `<span class="nw-cost-label">${esc(c.cost_label||'Cost')}:</span> ${c.cost_number}` : '&mdash;';
-        const time = c.time_cost_minutes ? `${c.time_cost_minutes}m` : '&mdash;';
-        return `<tr>
-            <td>${img}</td>
-            <td><div class="nw-item-name">${esc(c.name)}</div></td>
-            <td><span class="nw-type-badge ${catClass(c.deck_category)}">${esc(c.deck_category||'')}</span></td>
-            <td><span class="nw-type-label">${esc(c.type||'&mdash;')}</span></td>
-            <td><div class="nw-tags">${tags}</div></td>
-            <td><span class="${rarityClass(c.rarity)}">${esc(c.rarity||'common')}</span><br><span class="nw-level-badge">Lv ${c.level||1}</span></td>
-            <td><div class="nw-cost-info">${cost}</div><div class="nw-item-sub">${time}</div></td>
-            <td><div class="nw-toggle-wrap"><label class="nw-toggle">
-                <input type="checkbox" class="nw-toggle-active" data-id="${esc(c.id)}" ${c.is_active?'checked':''}>
-                <span class="nw-toggle-slider"></span></label></div></td>
-            <td><button class="nw-action-btn nw-edit-btn" data-id="${esc(c.id)}">&#9998; Edit</button></td>
-        </tr>`;
-    }).join('');
-    $('#nw-deck-tbody').html(rows);
-}
+    function tagsToString(val) {
+        if (!val) {
+            return '';
+        }
+        if (Array.isArray(val)) {
+            return val.join(', ');
+        }
+        if (typeof val === 'string') {
+            return val;
+        }
+        return '';
+    }
 
-/* ---- search: live filter on keyup ----------------------------------- */
-$(document).on('input','#nw-search', renderTable);
+    function boolVal(v) {
+        return v === true || v === 1 || v === '1' || v === 'true';
+    }
 
-/* ---- toggle active -------------------------------------------------- */
-$(document).on('change','.nw-toggle-active',function(){
-    const id      = $(this).data('id');
-    const active  = $(this).prop('checked');
-    $.post(ajax,{action:'nw_deck_toggle',nonce,card_id:id,is_active:active?1:0},function(res){
-        if(!res.success){ notice(res.data||'Error','error'); loadCards(); }
-        else { notice('Card ' + (active?'activated':'deactivated') + '.'); }
-    });
-});
+    function rarityBadge(rarity) {
+        return '<span class="nw-rarity nw-rarity-' + esc(rarity || 'common') + '">' + esc(rarity || 'common') + '</span>';
+    }
 
-/* ---- open modal ----------------------------------------------------- */
-function openModal(card){
-    editId = card ? card.id : null;
-    $('#nw-modal-title').text(card ? 'Edit Card' : 'New Card');
-    $('#nw-delete-btn').toggle(!!card);
-    $('#nw-deck-form')[0].reset();
-    $('#nw-img-preview-wrap').hide();
-    $('#nw-sound-wrap').hide();
+    function openModal() {
+        $('#nw-deck-modal').show();
+    }
 
-    if(card){
-        $.each(card,(k,v)=>{
-            const $f = $('#nw-field-'+k);
-            if(!$f.length) return;
-            if($f.is(':checkbox')) $f.prop('checked', !!v);
-            else if(TAG_FIELDS.includes(k)) $f.val(tagsToString(v));
-            else if(k==='bonus') $f.val(v && Object.keys(v).length ? JSON.stringify(v) : '');
-            else $f.val(v||'');
+    function closeModal() {
+        $('#nw-deck-modal').hide();
+        $('#nw-deck-msg').hide().text('');
+        currentId = 0;
+    }
+
+    function resetForm() {
+        currentId = 0;
+
+        $('#nw-deck-id').val('');
+        $('#nw-deck-name').val('');
+        $('#nw-deck-category').val('action');
+        $('#nw-deck-type').val('');
+        $('#nw-deck-rarity').val('common');
+        $('#nw-deck-description').val('');
+        $('#nw-deck-effect').val('');
+        $('#nw-deck-mechanic').val('');
+        $('#nw-deck-mechanic-goal').val('');
+        $('#nw-deck-cost-label').val('');
+        $('#nw-deck-cost-number').val(0);
+        $('#nw-deck-time-cost-minutes').val(0);
+        $('#nw-deck-cooldown-messages').val(0);
+        $('#nw-deck-entropy-on-fail').val(0);
+        $('#nw-deck-level').val(1);
+        $('#nw-deck-xp-current').val(0);
+        $('#nw-deck-xp-to-next').val(10);
+        $('#nw-deck-bonus').val('');
+        $('#nw-deck-tags').val('');
+        $('#nw-deck-requirement-tags').val('');
+        $('#nw-deck-denied-tags').val('');
+        $('#nw-deck-required-item-tags').val('');
+        $('#nw-deck-required-location-tags').val('');
+        $('#nw-deck-denied-location-tags').val('');
+        $('#nw-deck-requirement-description').val('');
+        $('#nw-deck-ai-instruction').val('');
+        $('#nw-deck-gm').val('');
+        $('#nw-deck-sound-effect').val('');
+        $('#nw-deck-img-url').val('');
+        $('#nw-deck-class-id').val('');
+        $('#nw-deck-is-leveling').prop('checked', true);
+        $('#nw-deck-is-disposable').prop('checked', false);
+        $('#nw-deck-is-active').prop('checked', true);
+
+        $('#nw-deck-modal-title').text('Add Card');
+        $('#nw-deck-delete-btn').hide();
+        $('#nw-deck-msg').hide().text('');
+    }
+
+    function fillForm(card) {
+        currentId = parseInt(card.id, 10) || 0;
+
+        $('#nw-deck-id').val(currentId);
+        $('#nw-deck-name').val(card.name || '');
+        $('#nw-deck-category').val(card.deck_category || 'action');
+        $('#nw-deck-type').val(card.type || '');
+        $('#nw-deck-rarity').val(card.rarity || 'common');
+        $('#nw-deck-description').val(card.description || '');
+        $('#nw-deck-effect').val(card.effect || '');
+        $('#nw-deck-mechanic').val(card.mechanic || '');
+        $('#nw-deck-mechanic-goal').val(card.mechanic_goal || '');
+        $('#nw-deck-cost-label').val(card.cost_label || '');
+        $('#nw-deck-cost-number').val(card.cost_number || 0);
+        $('#nw-deck-time-cost-minutes').val(card.time_cost_minutes || 0);
+        $('#nw-deck-cooldown-messages').val(card.cooldown_messages || 0);
+        $('#nw-deck-entropy-on-fail').val(card.entropy_on_fail || 0);
+        $('#nw-deck-level').val(card.level || 1);
+        $('#nw-deck-xp-current').val(card.xp_current || 0);
+        $('#nw-deck-xp-to-next').val(card.xp_to_next || 10);
+        $('#nw-deck-bonus').val(card.bonus && Object.keys(card.bonus).length ? JSON.stringify(card.bonus) : '');
+        $('#nw-deck-tags').val(tagsToString(card.tags));
+        $('#nw-deck-requirement-tags').val(tagsToString(card.requirement_tags));
+        $('#nw-deck-denied-tags').val(tagsToString(card.denied_tags));
+        $('#nw-deck-required-item-tags').val(tagsToString(card.required_item_tags));
+        $('#nw-deck-required-location-tags').val(tagsToString(card.required_location_tags));
+        $('#nw-deck-denied-location-tags').val(tagsToString(card.denied_location_tags));
+        $('#nw-deck-requirement-description').val(card.requirement_description || '');
+        $('#nw-deck-ai-instruction').val(card.ai_instruction || '');
+        $('#nw-deck-gm').val(card.gm || '');
+        $('#nw-deck-sound-effect').val(card.sound_effect || '');
+        $('#nw-deck-img-url').val(card.img_url || '');
+        $('#nw-deck-class-id').val(card.class_id || '');
+        $('#nw-deck-is-leveling').prop('checked', boolVal(card.is_leveling));
+        $('#nw-deck-is-disposable').prop('checked', boolVal(card.is_disposable));
+        $('#nw-deck-is-active').prop('checked', boolVal(card.is_active));
+
+        $('#nw-deck-modal-title').text('Edit Card');
+        $('#nw-deck-delete-btn').show();
+        $('#nw-deck-msg').hide().text('');
+    }
+
+    function renderTable(rows) {
+        var $tbody = $('#nw-deck-tbody');
+
+        if (!rows || !rows.length) {
+            $tbody.html('<tr><td colspan="7">No cards found.</td></tr>');
+            return;
+        }
+
+        var html = rows.map(function (card) {
+            var active = boolVal(card.is_active);
+            return ''
+                + '<tr data-id="' + esc(card.id) + '">'
+                + '<td>' + esc(card.name || '') + '</td>'
+                + '<td>' + esc(card.deck_category || '') + '</td>'
+                + '<td>' + esc(card.type || '') + '</td>'
+                + '<td>' + rarityBadge(card.rarity) + '</td>'
+                + '<td>' + esc(card.level || 1) + '</td>'
+                + '<td><input type="checkbox" class="nw-deck-toggle" data-id="' + esc(card.id) + '"' + (active ? ' checked' : '') + '></td>'
+                + '<td>'
+                + '<button type="button" class="button button-small nw-deck-edit" data-id="' + esc(card.id) + '">Edit</button> '
+                + '<button type="button" class="button button-small nw-deck-delete-row" data-id="' + esc(card.id) + '">Delete</button>'
+                + '</td>'
+                + '</tr>';
+        }).join('');
+
+        $tbody.html(html);
+    }
+
+    function loadCards() {
+        if (!ajax || !nonce) {
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
+
+        var data = {
+            action: 'nw_deck_list',
+            nonce: nonce,
+            category: $('#nw-deck-filter-category').val() || '',
+            rarity: $('#nw-deck-filter-rarity').val() || '',
+            active: $('#nw-deck-filter-active').val() || '',
+            search: $('#nw-deck-search').val().trim() || ''
+        };
+
+        if (activeXhr && activeXhr.readyState !== 4) {
+            activeXhr.abort();
+        }
+
+        $('#nw-deck-tbody').html('<tr><td colspan="7">Loading…</td></tr>');
+
+        activeXhr = $.post(ajax, data, function (res) {
+            if (!res || !res.success) {
+                $('#nw-deck-tbody').html('<tr><td colspan="7">Error loading cards.</td></tr>');
+                notice((res && res.data) || 'Load error', 'error');
+                return;
+            }
+
+            cards = Array.isArray(res.data) ? res.data : [];
+            renderTable(cards);
+        }).fail(function (xhr, status) {
+            if (status !== 'abort') {
+                $('#nw-deck-tbody').html('<tr><td colspan="7">Request failed.</td></tr>');
+                notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+            }
+        }).always(function () {
+            activeXhr = null;
         });
-        if(card.img_url){ $('#nw-img-preview').attr('src',card.img_url); $('#nw-img-preview-wrap').show(); }
-        if(card.sound_effect){ $('#nw-audio-preview').attr('src',card.sound_effect); $('#nw-sound-wrap').show(); }
     }
-    $('#nw-modal-overlay').show();
-}
 
-$(document).on('click','#nw-add-btn',    ()=>openModal(null));
-$(document).on('click','.nw-edit-btn',   function(){
-    const c = cards.find(x=>x.id===$(this).data('id'));
-    if(c) openModal(c);
-});
+    function loadSingle(id) {
+        $.post(ajax, {
+            action: 'nw_deck_get',
+            nonce: nonce,
+            id: id
+        }, function (res) {
+            if (!res || !res.success || !res.data) {
+                notice((res && res.data) || 'Cannot load card.', 'error');
+                return;
+            }
 
-/* ---- close modal ---------------------------------------------------- */
-function closeModal(){ $('#nw-modal-overlay').hide(); editId=null; }
-$(document).on('click','#nw-modal-close, #nw-cancel-btn', closeModal);
-$(document).on('click','#nw-modal-overlay',function(e){
-    if($(e.target).is('#nw-modal-overlay')) closeModal();
-});
+            fillForm(res.data);
+            openModal();
+        }).fail(function (xhr) {
+            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+        });
+    }
 
-/* ---- image/audio preview -------------------------------------------- */
-$(document).on('input','#nw-field-img_url',function(){
-    const v=$(this).val().trim();
-    if(v){ $('#nw-img-preview').attr('src',v); $('#nw-img-preview-wrap').show(); }
-    else  { $('#nw-img-preview-wrap').hide(); }
-});
-$(document).on('input','#nw-field-sound_effect',function(){
-    const v=$(this).val().trim();
-    if(v){ $('#nw-audio-preview').attr('src',v); $('#nw-sound-wrap').show(); }
-    else  { $('#nw-sound-wrap').hide(); }
-});
+    function collectPayload() {
+        return {
+            action: 'nw_deck_save',
+            nonce: nonce,
+            id: $('#nw-deck-id').val() || '',
+            name: $('#nw-deck-name').val().trim(),
+            deck_category: $('#nw-deck-category').val(),
+            type: $('#nw-deck-type').val().trim(),
+            rarity: $('#nw-deck-rarity').val(),
+            description: $('#nw-deck-description').val().trim(),
+            effect: $('#nw-deck-effect').val().trim(),
+            mechanic: $('#nw-deck-mechanic').val().trim(),
+            mechanic_goal: $('#nw-deck-mechanic-goal').val().trim(),
+            cost_label: $('#nw-deck-cost-label').val().trim(),
+            cost_number: $('#nw-deck-cost-number').val(),
+            time_cost_minutes: $('#nw-deck-time-cost-minutes').val(),
+            cooldown_messages: $('#nw-deck-cooldown-messages').val(),
+            entropy_on_fail: $('#nw-deck-entropy-on-fail').val(),
+            level: $('#nw-deck-level').val(),
+            xp_current: $('#nw-deck-xp-current').val(),
+            xp_to_next: $('#nw-deck-xp-to-next').val(),
+            bonus: $('#nw-deck-bonus').val().trim(),
+            tags: $('#nw-deck-tags').val().trim(),
+            requirement_tags: $('#nw-deck-requirement-tags').val().trim(),
+            denied_tags: $('#nw-deck-denied-tags').val().trim(),
+            required_item_tags: $('#nw-deck-required-item-tags').val().trim(),
+            required_location_tags: $('#nw-deck-required-location-tags').val().trim(),
+            denied_location_tags: $('#nw-deck-denied-location-tags').val().trim(),
+            requirement_description: $('#nw-deck-requirement-description').val().trim(),
+            ai_instruction: $('#nw-deck-ai-instruction').val().trim(),
+            gm: $('#nw-deck-gm').val().trim(),
+            sound_effect: $('#nw-deck-sound-effect').val().trim(),
+            img_url: $('#nw-deck-img-url').val().trim(),
+            class_id: $('#nw-deck-class-id').val().trim(),
+            is_leveling: $('#nw-deck-is-leveling').is(':checked') ? 1 : 0,
+            is_disposable: $('#nw-deck-is-disposable').is(':checked') ? 1 : 0,
+            is_active: $('#nw-deck-is-active').is(':checked') ? 1 : 0
+        };
+    }
 
-/* ---- save ----------------------------------------------------------- */
-$(document).on('click','#nw-save-btn',function(){
-    const $btn=$(this);
-    const data={id:editId||''};
-    $('#nw-deck-form').serializeArray().forEach(f=>{ data[f.name]=f.value; });
-    ['is_leveling','is_disposable','is_active'].forEach(n=>{
-        data[n]=$('#nw-field-'+n).prop('checked')?'1':'0';
+    $('#nw-deck-add-btn').on('click', function (e) {
+        e.preventDefault();
+        resetForm();
+        openModal();
     });
-    $btn.prop('disabled',true).text('Saving...');
-    $.post(ajax,{action:'nw_deck_save',nonce,card:data},function(res){
-        $btn.prop('disabled',false).text('Save Card');
-        if(!res.success){ notice(res.data||'Save error','error'); return; }
-        notice('Card saved!');
-        closeModal();
+
+    $('#nw-deck-filter-btn').on('click', function (e) {
+        e.preventDefault();
         loadCards();
     });
-});
 
-/* ---- delete --------------------------------------------------------- */
-$(document).on('click','#nw-delete-btn',function(){
-    if(!editId) return;
-    if(!confirm('Delete this card? This cannot be undone.')) return;
-    $.post(ajax,{action:'nw_deck_delete',nonce,card_id:editId},function(res){
-        if(!res.success){ notice(res.data||'Delete error','error'); return; }
-        notice('Card deleted.');
+    $('#nw-deck-search').on('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            loadCards();
+        }
+    });
+
+    $('#nw-deck-cancel-btn, #nw-deck-modal-close').on('click', function (e) {
+        e.preventDefault();
         closeModal();
+    });
+
+    $('#nw-deck-modal').on('click', function (e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+
+    $(document).on('click', '.nw-deck-edit', function () {
+        var id = parseInt($(this).data('id'), 10) || 0;
+        if (id) {
+            loadSingle(id);
+        }
+    });
+
+    $(document).on('change', '.nw-deck-toggle', function () {
+        var id = parseInt($(this).data('id'), 10) || 0;
+        var state = $(this).is(':checked') ? 1 : 0;
+        var $checkbox = $(this);
+
+        $.post(ajax, {
+            action: 'nw_deck_toggle',
+            nonce: nonce,
+            id: id,
+            state: state
+        }, function (res) {
+            if (!res || !res.success) {
+                $checkbox.prop('checked', !$checkbox.is(':checked'));
+                notice((res && res.data) || 'Toggle failed.', 'error');
+                return;
+            }
+
+            notice('Card updated.', 'success');
+        }).fail(function (xhr) {
+            $checkbox.prop('checked', !$checkbox.is(':checked'));
+            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+        });
+    });
+
+    $('#nw-deck-save-btn').on('click', function (e) {
+        e.preventDefault();
+
+        var payload = collectPayload();
+        var $btn = $(this);
+        var originalText = $btn.text();
+
+        if (!payload.name) {
+            notice('Name is required.', 'error');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('Saving…');
+
+        $.post(ajax, payload, function (res) {
+            $btn.prop('disabled', false).text(originalText);
+
+            if (!res || !res.success) {
+                notice((res && res.data) || 'Save failed.', 'error');
+                return;
+            }
+
+            notice('Card saved.', 'success');
+            closeModal();
+            loadCards();
+        }).fail(function (xhr) {
+            $btn.prop('disabled', false).text(originalText);
+            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+        });
+    });
+
+    $('#nw-deck-delete-btn').on('click', function (e) {
+        e.preventDefault();
+
+        var id = parseInt($('#nw-deck-id').val(), 10) || 0;
+        if (!id) {
+            return;
+        }
+
+        if (!window.confirm('Delete this card? This cannot be undone.')) {
+            return;
+        }
+
+        $.post(ajax, {
+            action: 'nw_deck_delete',
+            nonce: nonce,
+            id: id
+        }, function (res) {
+            if (!res || !res.success) {
+                notice((res && res.data) || 'Delete failed.', 'error');
+                return;
+            }
+
+            notice('Card deleted.', 'success');
+            closeModal();
+            loadCards();
+        }).fail(function (xhr) {
+            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+        });
+    });
+
+    $(document).on('click', '.nw-deck-delete-row', function () {
+        var id = parseInt($(this).data('id'), 10) || 0;
+        if (!id) {
+            return;
+        }
+
+        if (!window.confirm('Delete this card? This cannot be undone.')) {
+            return;
+        }
+
+        $.post(ajax, {
+            action: 'nw_deck_delete',
+            nonce: nonce,
+            id: id
+        }, function (res) {
+            if (!res || !res.success) {
+                notice((res && res.data) || 'Delete failed.', 'error');
+                return;
+            }
+
+            notice('Card deleted.', 'success');
+            loadCards();
+        }).fail(function (xhr) {
+            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+        });
+    });
+
+    $(function () {
         loadCards();
     });
-});
-
-/* ---- server-side filters (category/rarity/type) trigger reload ------ */
-$(document).on('change','#nw-filter-category, #nw-filter-rarity, #nw-filter-type', loadCards);
-$(document).on('click','#nw-refresh-btn', loadCards);
-
-/* ---- init ----------------------------------------------------------- */
-$(document).ready(loadCards);
 
 })(jQuery);
