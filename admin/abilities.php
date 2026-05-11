@@ -1,6 +1,13 @@
 <?php
+/**
+ * NeoWeaver Admin — Abilities (cyber_abilities)
+ *
+ * @package NeoWeaver
+ */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class NW_Abilities_Admin {
 
@@ -13,11 +20,11 @@ class NW_Abilities_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
-		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
-		add_action( 'wp_ajax_nw_save_ability',      [ $this, 'ajax_save_ability'      ] );
-		add_action( 'wp_ajax_nw_delete_ability',    [ $this, 'ajax_delete_ability'    ] );
-		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
+		add_action( 'wp_ajax_nw_abilities_get_all',  [ $this, 'ajax_get_abilities'   ] );
+		add_action( 'wp_ajax_nw_abilities_toggle',   [ $this, 'ajax_toggle_ability'  ] );
+		add_action( 'wp_ajax_nw_save_ability',       [ $this, 'ajax_save_ability'    ] );
+		add_action( 'wp_ajax_nw_delete_ability',     [ $this, 'ajax_delete_ability'  ] );
+		add_action( 'wp_ajax_nw_reorder_abilities',  [ $this, 'ajax_reorder_abilities' ] );
 	}
 
 	public function register_menu(): void {
@@ -36,41 +43,27 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'chakra-petch',
-				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-				[],
-				null
-			);
-		}
+		// Chakra Petch i Lucide są rejestrowane globalnie w NeoWeaver_Core.
+		// Tu tylko dodajemy zależności od tych handlerów.
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/nw-admin-core.css',
-			[ 'chakra-petch' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+			[ 'nw-font-chakra-petch' ],
 			NEOWEAVER_VERSION
 		);
 
 		wp_enqueue_style(
 			'nw-abilities-style',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/css/abilities-admin.css',
-			[ 'chakra-petch', 'nw-admin-core' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
+			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 			NEOWEAVER_VERSION
 		);
 
 		wp_enqueue_script(
-			'lucide',
-			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
-			[],
-			'0.468.0',
-			true
-		);
-
-		wp_enqueue_script(
 			'nw-abilities-script',
-			plugin_dir_url( dirname( __FILE__ ) ) . 'assets/js/abilities-admin.js',
-			[ 'jquery', 'lucide' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
+			[ 'jquery', 'nw-lucide' ],
 			NEOWEAVER_VERSION,
 			true
 		);
@@ -177,8 +170,7 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		// Use title as name fallback and vice-versa.
-		if ( empty( $name ) ) $name = $title;
+		if ( empty( $name ) )  $name  = $title;
 		if ( empty( $title ) ) $title = $name;
 
 		$payload = [
@@ -270,7 +262,10 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		$order = isset( $_POST['order'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['order'] ) ) : [];
+		$order = isset( $_POST['order'] )
+			? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['order'] ) )
+			: [];
+
 		if ( empty( $order ) ) {
 			wp_send_json_error( 'No order data.' );
 			return;
@@ -280,7 +275,9 @@ class NW_Abilities_Admin {
 		foreach ( $order as $position => $id ) {
 			if ( ! $id ) continue;
 			$res = $this->supa( 'PATCH', 'cyber_abilities?id=eq.' . rawurlencode( $id ), [ 'sort_order' => (int) $position ] );
-			if ( ! $res['ok'] ) $errors[] = $id;
+			if ( ! $res['ok'] ) {
+				$errors[] = $id;
+			}
 		}
 
 		if ( $errors ) {
@@ -467,11 +464,3 @@ class NW_Abilities_Admin {
 		</div>
 	<?php }
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NW_Abilities_Admin();
-	},
-	20
-);
