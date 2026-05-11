@@ -58,7 +58,7 @@ class NeoWeaver_Achievements_Admin {
 
 		wp_enqueue_style(
 			'nw-admin-core',
-			NW_PLUGIN_URL . 'assets/css/admin-core.css',
+			NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',
 			[ 'chakra-petch' ],
 			NW_VERSION
 		);
