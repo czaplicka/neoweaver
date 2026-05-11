@@ -4,46 +4,43 @@
  *
  * Loaded FIRST (explicitly, before glob) so the top-level "neoweaver"
  * menu slug exists when all submenu files run add_submenu_page().
+ *
+ * @package NeoWeaver
  */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class NeoWeaver_Admin {
 
-	private $slug = 'neoweaver';
+	private string $slug = 'neoweaver';
 
-	/**
-	 * FIX #2: Guard instantiation — only register admin hooks when in admin context.
-	 */
 	public function __construct() {
-		if ( ! is_admin() ) {
-			return;
-		}
-		add_action( 'admin_menu',            array( $this, 'register_menu'        ) );
-		add_action( 'admin_menu',            array( $this, 'rename_first_submenu' ), 999 );
-		add_action( 'admin_menu',            array( $this, 'sort_submenu'         ), 9999 );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets'       ) );
-		add_action( 'wp_ajax_nw_dashboard_data', array( $this, 'ajax_dashboard_data' ) );
+		add_action( 'admin_menu',            [ $this, 'register_menu'        ] );
+		add_action( 'admin_menu',            [ $this, 'rename_first_submenu' ], 999 );
+		add_action( 'admin_menu',            [ $this, 'sort_submenu'         ], 9999 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'       ] );
+		add_action( 'wp_ajax_nw_dashboard_data', [ $this, 'ajax_dashboard_data' ] );
 	}
 
 	/* ------------------------------------------------------------------ */
 	/*  MENU                                                               */
 	/* ------------------------------------------------------------------ */
 
-public function register_menu(): void {
-    $svg_icon = 'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg( 20, '#a0a0a0' ) );
+	public function register_menu(): void {
+		$svg_icon = 'data:image/svg+xml;base64,' . base64_encode( $this->logo_svg( 20, '#a0a0a0' ) );
 
-    add_menu_page(
-        'NeoWeaver',
-        'NeoWeaver',
-        'manage_options',
-        $this->slug,
-        array( $this, 'render_page' ),
-        $svg_icon,   // ← bezpośrednio base64 SVG
-        30
-    );
-    // Usuń osobny add_action dla admin_head z CSS — nie jest już potrzebny
-}
+		add_menu_page(
+			'NeoWeaver',
+			'NeoWeaver',
+			'manage_options',
+			$this->slug,
+			[ $this, 'render_page' ],
+			$svg_icon,
+			30
+		);
+	}
 
 	public function rename_first_submenu(): void {
 		global $submenu;
@@ -52,10 +49,6 @@ public function register_menu(): void {
 		}
 	}
 
-	/**
-	 * Sort submenu: Dashboard (index 0) stays first,
-	 * remaining items sorted alphabetically by label.
-	 */
 	public function sort_submenu(): void {
 		global $submenu;
 
@@ -63,15 +56,12 @@ public function register_menu(): void {
 			return;
 		}
 
-		// Separate Dashboard (first item) from the rest.
 		$dashboard = array_shift( $submenu[ $this->slug ] );
 
-		// Sort remaining items alphabetically by menu label (index 0).
-		usort( $submenu[ $this->slug ], function( $a, $b ) {
+		usort( $submenu[ $this->slug ], static function ( $a, $b ) {
 			return strcasecmp( $a[0], $b[0] );
 		} );
 
-		// Re-insert Dashboard at the top.
 		array_unshift( $submenu[ $this->slug ], $dashboard );
 	}
 
@@ -84,36 +74,31 @@ public function register_menu(): void {
 			return;
 		}
 
-		// FIX #8: Use NEOWEAVER_PLUGIN_URL constant instead of fragile dirname(__FILE__) path.
-		$plugin_url = NEOWEAVER_PLUGIN_URL;
+		// Chakra Petch and Lucide are registered globally by NeoWeaver_Core.
+		// We only declare them as dependencies here.
 
-		// OPT #5: Only enqueue Chakra Petch if not already registered (e.g. by the theme).
-		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'chakra-petch',
-				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-				[],
-				null
-			);
-		}
+		wp_enqueue_style(
+			'nw-admin-core',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/nw-admin-core.css',
+			[ 'nw-font-chakra-petch' ],
+			NEOWEAVER_VERSION
+		);
 
 		wp_enqueue_style(
 			'nw-dashboard-style',
-			$plugin_url . 'assets/css/admin-dashboard.css',
-			[ 'chakra-petch' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/dashboard.css',
+			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 			NEOWEAVER_VERSION
 		);
 
 		wp_enqueue_script(
 			'nw-dashboard-script',
-			$plugin_url . 'assets/js/admin-dashboard.js',
-			[ 'jquery' ],
+			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/dashboard.js',
+			[ 'jquery', 'nw-lucide' ],
 			NEOWEAVER_VERSION,
 			true
 		);
 
-		// FIX #3: Single nonce source — only localise via wp_localize_script.
-		// The hidden <input> in render_page() has been removed.
 		wp_localize_script( 'nw-dashboard-script', 'NWDashData', [
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'neoweaver_dashboard' ),
@@ -148,19 +133,12 @@ public function register_menu(): void {
 		return 'none';
 	}
 
-	/**
-	 * OPT #3: Delegate HTTP/auth to tw_supabase_get() from supabase-helpers.php
-	 * when available; fall back to a local implementation only if the helper
-	 * doesn't exist (keeps the class self-contained during early bootstrap).
-	 */
 	private function supa_get( string $path ): array {
 		if ( function_exists( 'tw_supabase_get' ) ) {
 			$result = tw_supabase_get( $path );
-			// Normalise to our internal envelope if the helper returns a different shape.
 			if ( is_array( $result ) && array_key_exists( 'ok', $result ) ) {
 				return $result;
 			}
-			// tw_supabase_get returns decoded body directly on success, null on failure.
 			return [
 				'ok'     => ! is_null( $result ),
 				'status' => is_null( $result ) ? 0 : 200,
@@ -170,8 +148,6 @@ public function register_menu(): void {
 			];
 		}
 
-		// Fallback: own implementation (kept for completeness but should not be hit
-		// in a correctly assembled plugin).
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
@@ -208,13 +184,7 @@ public function register_menu(): void {
 		];
 	}
 
-	/**
-	 * OPT #3 / FIX for supa_count: reuse tw_supabase_request() when available.
-	 * Uses Supabase count=exact header; never fetches rows.
-	 */
 	private function supa_count( string $table ): int {
-		// OPT #1: This method is kept for one-off use; the AJAX handler will
-		// batch everything via a single RPC call (see ajax_dashboard_data).
 		$supa_url = $this->get_supa_url();
 		$supa_key = $this->get_supa_key();
 
@@ -284,11 +254,6 @@ public function register_menu(): void {
 		return 0;
 	}
 
-	/**
-	 * OPT #2: Cache growth series in a transient (5-minute TTL).
-	 * FIX (supa_growth_series): Still capped at 5000 rows for simplicity;
-	 * the transient avoids repeated heavy queries.
-	 */
 	private function supa_growth_series( string $table, int $days = 30 ): array {
 		$transient_key = 'nw_growth_' . md5( $table . '_' . $days . '_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 ) );
 		$cached        = get_transient( $transient_key );
@@ -310,7 +275,7 @@ public function register_menu(): void {
 
 		$series = [];
 		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$d           = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
+			$d            = gmdate( 'Y-m-d', time() - ( $i * DAY_IN_SECONDS ) );
 			$series[ $d ] = 0;
 		}
 
@@ -342,11 +307,6 @@ public function register_menu(): void {
 		return $result;
 	}
 
-	/**
-	 * FIX #9: Use the correct table name for debug logs.
-	 * Based on project schema, the table is cyber_logs (not cyber_debug_logs).
-	 * Update this constant to match your actual Supabase table name.
-	 */
 	private const DEBUG_LOGS_TABLE = 'cyber_logs';
 
 	private function supa_recent_logs( int $limit = 10 ): array {
@@ -354,23 +314,13 @@ public function register_menu(): void {
 		$res  = $this->supa_get( $path );
 
 		if ( ! $res['ok'] ) {
-			// Surface the silent data gap to _debug instead of hiding it.
 			return [];
 		}
 
 		return is_array( $res['body'] ) ? $res['body'] : [];
 	}
 
-	/**
-	 * FIX #5: Count orphan campaigns using Supabase count=exact + server-side filter
-	 * instead of fetching up to 5000 rows and counting in PHP.
-	 *
-	 * Requires a Postgres view or function; falls back to PHP-side count if unavailable.
-	 * OPT #4: Ideally this becomes part of an RPC call (see ajax_dashboard_data).
-	 */
 	private function supa_campaigns_without_character(): int {
-		// Use a Supabase view `cyber_campaign_no_character` if it exists (preferred).
-		// Fallback: fetch all and count in PHP (original behaviour, limited to 5000).
 		$path = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&cyber_campaigncharacters.character_id=is.null&limit=1';
 		$res  = wp_remote_get(
 			rtrim( $this->get_supa_url(), '/' ) . '/rest/v1/' . $path,
@@ -393,7 +343,6 @@ public function register_menu(): void {
 			}
 		}
 
-		// Fallback (original): PHP-side count, capped at 5000.
 		$path_full = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&limit=5000';
 		$r         = $this->supa_get( $path_full );
 		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
@@ -407,9 +356,6 @@ public function register_menu(): void {
 		return $count;
 	}
 
-	/**
-	 * FIX #5: Same pattern — server-side count with !inner filter.
-	 */
 	private function supa_worlds_without_campaigns(): int {
 		$path = 'cyber_worlds?select=id,cyber_campaign!left(id)&cyber_campaign.id=is.null&limit=1';
 		$res  = wp_remote_get(
@@ -433,7 +379,6 @@ public function register_menu(): void {
 			}
 		}
 
-		// Fallback.
 		$path_full = 'cyber_worlds?select=id,cyber_campaign!left(id)&limit=5000';
 		$r         = $this->supa_get( $path_full );
 		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
@@ -447,10 +392,6 @@ public function register_menu(): void {
 		return $count;
 	}
 
-	/**
-	 * OPT #4: Deck breakdown — still PHP-side aggregation, but cached.
-	 * Recommend creating a Supabase RPC/view for production.
-	 */
 	private function supa_deck_breakdown(): array {
 		$transient_key = 'nw_deck_breakdown_' . gmdate( 'YmdHi', (int) ( time() / 300 ) * 300 );
 		$cached        = get_transient( $transient_key );
@@ -463,8 +404,8 @@ public function register_menu(): void {
 		$res  = $this->supa_get( $path );
 		$rows = ( $res['ok'] && is_array( $res['body'] ) ) ? $res['body'] : [];
 
-		$categories = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
-		$rarities   = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
+		$categories     = [ 'action' => 0, 'magic' => 0, 'equipment' => 0 ];
+		$rarities       = [ 'common' => 0, 'uncommon' => 0, 'rare' => 0, 'epic' => 0, 'legendary' => 0 ];
 		$active_count   = 0;
 		$inactive_count = 0;
 
@@ -503,10 +444,10 @@ public function register_menu(): void {
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * OPT #1 + FIX #10: Attempt a single RPC call to get all counts at once.
+	 * Attempt a single RPC call to get all counts at once.
 	 * Falls back to individual calls if the RPC is not available.
 	 *
-	 * Expected RPC signature (create in Supabase):
+	 * Expected Supabase RPC:
 	 *
 	 *   CREATE OR REPLACE FUNCTION nw_dashboard_counts()
 	 *   RETURNS json LANGUAGE sql STABLE AS $$
@@ -517,8 +458,8 @@ public function register_menu(): void {
 	 *       'deck_cards',  (SELECT count(*) FROM cyber_deck),
 	 *       'chars_7d',    (SELECT count(*) FROM cyber_characters  WHERE created_at >= now() - interval '7 days'),
 	 *       'worlds_7d',   (SELECT count(*) FROM cyber_worlds      WHERE created_at >= now() - interval '7 days'),
-	 *       'camps_7d',    (SELECT count(*) FROM cyber_campaign     WHERE created_at >= now() - interval '7 days'),
-	 *       'deck_7d',     (SELECT count(*) FROM cyber_deck         WHERE created_at >= now() - interval '7 days')
+	 *       'camps_7d',    (SELECT count(*) FROM cyber_campaign    WHERE created_at >= now() - interval '7 days'),
+	 *       'deck_7d',     (SELECT count(*) FROM cyber_deck        WHERE created_at >= now() - interval '7 days')
 	 *     );
 	 *   $$;
 	 */
@@ -538,15 +479,14 @@ public function register_menu(): void {
 
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
-			return; // FIX #4: Explicit return after wp_send_json_error for clarity.
+			return;
 		}
 
 		if ( ! $this->get_supa_url() || ! $this->get_supa_key() ) {
 			wp_send_json_error( 'Supabase not configured.' );
-			return; // FIX #4: Explicit return.
+			return;
 		}
 
-		// OPT #1: Try a single RPC call for all counts; fall back to individual requests.
 		$rpc = $this->supa_all_counts();
 
 		if ( $rpc ) {
@@ -597,10 +537,7 @@ public function register_menu(): void {
 		];
 
 		$deck_breakdown = $this->supa_deck_breakdown();
-
-		$logs         = $this->supa_recent_logs( 10 );
-		$logs_ok      = ! empty( $logs ) || true; // always include; empty is valid.
-		$logs_table   = self::DEBUG_LOGS_TABLE;
+		$logs           = $this->supa_recent_logs( 10 );
 
 		$alerts = [];
 
@@ -639,7 +576,7 @@ public function register_menu(): void {
 			'_debug'         => [
 				'key_type'    => $this->get_supa_key_type(),
 				'rpc_used'    => ! is_null( $rpc ),
-				'logs_table'  => $logs_table,
+				'logs_table'  => self::DEBUG_LOGS_TABLE,
 				'growth_meta' => [
 					'characters' => [
 						'rows_found'  => $growth_raw['characters']['rows_found'],
@@ -682,10 +619,7 @@ public function register_menu(): void {
 
 			<div class="nw-dash-header">
 				<div class="nw-dash-logo">
-					<?php
-					// FIX #7: Escape SVG output through wp_kses_post to prevent XSS.
-					echo wp_kses_post( $this->logo_svg( 44, '#adff00' ) );
-					?>
+					<?php echo wp_kses_post( $this->logo_svg( 44, '#adff00' ) ); ?>
 					<div>
 						<span class="nw-logo-name"><span class="nw-accent">Neo</span>Weaver</span>
 						<span class="nw-logo-version">v<?php echo esc_html( NEOWEAVER_VERSION ); ?> &mdash; Game Ops Dashboard</span>
@@ -859,10 +793,6 @@ public function register_menu(): void {
 				</section>
 
 			</div>
-			<?php
-			// FIX #3: Nonce is already injected via NWDashData.nonce (wp_localize_script).
-			// The redundant hidden <input> has been intentionally removed.
-			?>
 		</div>
 		<?php
 	}
@@ -877,7 +807,4 @@ public function register_menu(): void {
 			. '<polyline points="11,27 11,13 20,24 29,13 29,27" stroke="' . esc_attr( $color ) . '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>'
 			. '</svg>';
 	}
-
-} // FIX #1: Closing brace for class NeoWeaver_Admin — was missing in original.
-
-new NeoWeaver_Admin();
+}
