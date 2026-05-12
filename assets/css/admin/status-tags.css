@@ -1,0 +1,54 @@
+/* assets/css/admin/status-tags.css */
+.nw-status-tags-admin .nw-subtitle {
+	margin: 6px 0 18px;
+	color: #666;
+}
+
+.nw-status-tags-admin .nw-toolbar {
+	margin: 0 0 16px;
+}
+
+.nw-status-tags-admin .nw-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 12px;
+	padding: 20px;
+	margin: 16px 0 24px;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+.nw-status-tags-admin h1,
+.nw-status-tags-admin h2,
+.nw-status-tags-admin,
+.nw-status-tags-admin input,
+.nw-status-tags-admin textarea,
+.nw-status-tags-admin select,
+.nw-status-tags-admin button {
+	font-family: "Chakra Petch", sans-serif;
+}
+
+.nw-status-tags-admin .form-table th {
+	width: 180px;
+}
+
+.nw-status-tags-admin input[type="color"] {
+	width: 64px;
+	height: 40px;
+	padding: 2px;
+	border: 1px solid #c3c4c7;
+	border-radius: 8px;
+	background: #fff;
+}
+
+.nw-status-tags-admin .wp-list-table td,
+.nw-status-tags-admin .wp-list-table th {
+	vertical-align: middle;
+}
+
+.nw-status-tags-admin .button-link-delete {
+	color: #b32d2e;
+}
+
+.nw-status-tags-admin #nw-notice {
+	border-radius: 10px;
+}
