@@ -168,9 +168,16 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 								</tr>
 
 								<tr>
-									<th><label for="nw-field-img_url">Image URL</label></th>
+									<th><label for="nw-field-img_url">Image file or URL</label></th>
 									<td>
-										<input type="url" id="nw-field-img_url" name="img_url" class="large-text">
+										<input
+											type="text"
+											id="nw-field-img_url"
+											name="img_url"
+											class="large-text"
+											placeholder="arcana.svg or full https://..."
+										>
+										<p class="description">You can enter only filename, e.g. <code>arcana.svg</code>.</p>
 										<div id="nw-img-preview-wrap" style="display:none;margin-top:10px;">
 											<img id="nw-img-preview" src="" alt="" style="display:block;max-width:160px;max-height:160px;border-radius:10px;border:1px solid #2b2b2b;background:#111;padding:6px;">
 										</div>
@@ -241,10 +248,51 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 			);
 		}
 
+		private function resolve_image_url( string $value ): ?string {
+			$value = trim( $value );
+
+			if ( '' === $value ) {
+				return null;
+			}
+
+			if ( filter_var( $value, FILTER_VALIDATE_URL ) ) {
+				return esc_url_raw( $value );
+			}
+
+			$uploads = wp_get_upload_dir();
+			$baseurl = isset( $uploads['baseurl'] ) ? trailingslashit( $uploads['baseurl'] ) : '';
+
+			if ( '' === $baseurl ) {
+				return null;
+			}
+
+			$value = ltrim( $value, '/' );
+
+			return esc_url_raw( $baseurl . $value );
+		}
+
+		private function image_input_from_url( $url ): string {
+			$url = trim( (string) $url );
+
+			if ( '' === $url ) {
+				return '';
+			}
+
+			$uploads = wp_get_upload_dir();
+			$baseurl = isset( $uploads['baseurl'] ) ? trailingslashit( $uploads['baseurl'] ) : '';
+
+			if ( $baseurl && 0 === strpos( $url, $baseurl ) ) {
+				return ltrim( substr( $url, strlen( $baseurl ) ), '/' );
+			}
+
+			return $url;
+		}
+
 		private function normalize_row( array $row ): array {
 			$row['tags'] = isset( $row['tags'] ) && is_array( $row['tags'] ) ? $row['tags'] : [];
 			$row['linked_attributes'] = isset( $row['linked_attributes'] ) && is_array( $row['linked_attributes'] ) ? $row['linked_attributes'] : [];
 			$row['is_active'] = ! empty( $row['is_active'] );
+			$row['img_input'] = $this->image_input_from_url( (string) ( $row['img_url'] ?? '' ) );
 			return $row;
 		}
 
@@ -331,7 +379,7 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 			$category          = sanitize_text_field( wp_unslash( $_POST['category'] ?? '' ) );
 			$application       = sanitize_text_field( wp_unslash( $_POST['application'] ?? '' ) );
 			$card_effect       = sanitize_textarea_field( wp_unslash( $_POST['card_effect'] ?? '' ) );
-			$img_url           = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
+			$img_url           = $this->resolve_image_url( (string) wp_unslash( $_POST['img_url'] ?? '' ) );
 			$tags              = $this->parse_csv_array( wp_unslash( $_POST['tags'] ?? '' ) );
 			$linked_attributes = $this->parse_csv_array( wp_unslash( $_POST['linked_attributes'] ?? '' ) );
 			$is_active         = ! empty( $_POST['is_active'] );
@@ -352,7 +400,7 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 				'category'          => $category ?: null,
 				'application'       => $application ?: null,
 				'card_effect'       => $card_effect ?: null,
-				'img_url'           => $img_url ?: null,
+				'img_url'           => $img_url,
 				'tags'              => $tags,
 				'linked_attributes' => $linked_attributes,
 				'is_active'         => $is_active,
