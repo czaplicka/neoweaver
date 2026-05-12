@@ -106,7 +106,7 @@
 	border:1px solid #2e2e2e;
 	background:#1a1a1a;
 	padding:3px;
-	filter:invert(1) sepia(1) saturate(5) hue-rotate(50deg);
+	/* filter:invert(1) sepia(1) saturate(5) hue-rotate(50deg); */
 }
 .nw-race-img-placeholder{
 	width:36px;height:36px;
