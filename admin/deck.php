@@ -54,14 +54,14 @@ class NW_Deck_Admin {
 
 		wp_enqueue_style(
 			'nw-deck-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/decks.css',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/deck.css',
 			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 			NEOWEAVER_VERSION
 		);
 
 		wp_enqueue_script(
 			'nw-deck-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/decks.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/deck.js',
 			[ 'jquery', 'nw-lucide' ],
 			NEOWEAVER_VERSION,
 			true
