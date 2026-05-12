@@ -91,7 +91,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 				[
 					'ajaxurl'     => admin_url( 'admin-ajax.php' ),
 					'nonce'       => wp_create_nonce( $this->nonce_action ),
-					'uploadsBase' => self::UPLOADS_BASE,
+					'uploadsBase' => trailingslashit( wp_upload_dir()['baseurl'] ),
 				]
 			);
 		}
