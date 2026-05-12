@@ -8,7 +8,6 @@
 	var cfg   = window.NWItems || {};
 	var ajax  = cfg.ajaxurl || '';
 	var nonce = cfg.nonce || '';
-
 	var allItems  = [];
 	var editingId = null;
 	var filterType = '';
