@@ -77,17 +77,6 @@ class NW_Deck_Admin {
 		);
 	}
 
-	/**
-	 * Normalized Supabase wrapper.
-	 *
-	 * Returns:
-	 * [
-	 *   'ok'    => bool,
-	 *   'code'  => int,
-	 *   'data'  => mixed,
-	 *   'error' => string|null,
-	 * ]
-	 */
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
@@ -252,7 +241,86 @@ class NW_Deck_Admin {
 
 	public function render_page(): void {
 		?>
-		<div class="wrap">
+		<div class="wrap nw-deck-admin">
+			<style>
+				.nw-deck-admin .nw-deck-modal-overlay {
+					position: fixed;
+					inset: 0;
+					background: rgba(0, 0, 0, 0.78);
+					z-index: 9999;
+					overflow-y: auto;
+					padding: 32px 16px;
+				}
+				.nw-deck-admin .nw-deck-modal-panel {
+					background: #050505;
+					color: #f2f2f2;
+					margin: 24px auto;
+					padding: 24px;
+					max-width: 980px;
+					border-radius: 14px;
+					position: relative;
+					border: 1px solid #2b2b2b;
+					box-shadow: 0 24px 80px rgba(0,0,0,.45);
+				}
+				.nw-deck-admin .nw-deck-modal-panel h2,
+				.nw-deck-admin .nw-deck-modal-panel th,
+				.nw-deck-admin .nw-deck-modal-panel label {
+					color: #f5f5f5;
+				}
+				.nw-deck-admin .nw-deck-modal-panel td,
+				.nw-deck-admin .nw-deck-modal-panel p,
+				.nw-deck-admin .nw-deck-modal-panel span {
+					color: #d6d6d6;
+				}
+				.nw-deck-admin .nw-deck-modal-panel input[type="text"],
+				.nw-deck-admin .nw-deck-modal-panel input[type="url"],
+				.nw-deck-admin .nw-deck-modal-panel input[type="number"],
+				.nw-deck-admin .nw-deck-modal-panel textarea,
+				.nw-deck-admin .nw-deck-modal-panel select {
+					background: #101010;
+					color: #f4f4f4;
+					border: 1px solid #313131;
+					border-radius: 8px;
+				}
+				.nw-deck-admin .nw-deck-modal-panel input:focus,
+				.nw-deck-admin .nw-deck-modal-panel textarea:focus,
+				.nw-deck-admin .nw-deck-modal-panel select:focus {
+					border-color: #adff00;
+					box-shadow: 0 0 0 1px #adff00;
+					outline: none;
+				}
+				.nw-deck-admin #nw-deck-modal-close {
+					color: #f5f5f5;
+					background: transparent;
+					border: 0;
+					cursor: pointer;
+				}
+				.nw-deck-admin .nw-deck-thumb {
+					width: 44px;
+					height: 44px;
+					object-fit: cover;
+					border-radius: 8px;
+					background: #111;
+					border: 1px solid #2a2a2a;
+					display: block;
+				}
+				.nw-deck-admin .nw-deck-thumb-placeholder {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					color: #666;
+				}
+				.nw-deck-admin #nw-deck-image-preview {
+					display: block;
+					max-width: 220px;
+					max-height: 220px;
+					border-radius: 10px;
+					border: 1px solid #2f2f2f;
+					background: #111;
+					padding: 6px;
+				}
+			</style>
+
 			<h1><?php esc_html_e( 'NeoWeaver — Deck', 'neoweaver' ); ?></h1>
 
 			<div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
@@ -284,11 +352,11 @@ class NW_Deck_Admin {
 			<table class="wp-list-table widefat fixed striped" id="nw-deck-table">
 				<thead>
 					<tr>
+						<th><?php esc_html_e( 'Image', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Name', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Category', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Type', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Level', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Active', 'neoweaver' ); ?></th>
 						<th><?php esc_html_e( 'Actions', 'neoweaver' ); ?></th>
 					</tr>
@@ -298,9 +366,9 @@ class NW_Deck_Admin {
 				</tbody>
 			</table>
 
-			<div id="nw-deck-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:9999; overflow-y:auto;">
-				<div style="background:#fff; margin:40px auto; padding:24px; max-width:900px; border-radius:6px; position:relative;">
-					<button id="nw-deck-modal-close" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+			<div id="nw-deck-modal" class="nw-deck-modal-overlay" style="display:none;">
+				<div class="nw-deck-modal-panel">
+					<button id="nw-deck-modal-close" style="position:absolute; top:12px; right:12px; font-size:20px;">✕</button>
 					<h2 id="nw-deck-modal-title"><?php esc_html_e( 'Card', 'neoweaver' ); ?></h2>
 
 					<input type="hidden" id="nw-deck-id">
@@ -371,18 +439,6 @@ class NW_Deck_Admin {
 							<td><input type="number" id="nw-deck-entropy-on-fail" min="0" value="0" style="width:80px;"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-level"><?php esc_html_e( 'Level', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-level" min="1" max="10" value="1" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-xp-current"><?php esc_html_e( 'XP Current', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-xp-current" min="0" value="0" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-xp-to-next"><?php esc_html_e( 'XP to Next', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-xp-to-next" min="0" value="10" style="width:80px;"></td>
-						</tr>
-						<tr>
 							<th><label for="nw-deck-bonus"><?php esc_html_e( 'Bonus JSON', 'neoweaver' ); ?></label></th>
 							<td><textarea id="nw-deck-bonus" rows="3" class="large-text" placeholder='{"damage":2}'></textarea></td>
 						</tr>
@@ -431,6 +487,14 @@ class NW_Deck_Admin {
 							<td><input type="url" id="nw-deck-img-url" class="large-text"></td>
 						</tr>
 						<tr>
+							<th><?php esc_html_e( 'Preview', 'neoweaver' ); ?></th>
+							<td>
+								<div id="nw-deck-image-preview-wrap" style="display:none;">
+									<img id="nw-deck-image-preview" src="" alt="">
+								</div>
+							</td>
+						</tr>
+						<tr>
 							<th><label for="nw-deck-class-id"><?php esc_html_e( 'Class ID', 'neoweaver' ); ?></label></th>
 							<td><input type="text" id="nw-deck-class-id" class="regular-text"></td>
 						</tr>
@@ -469,7 +533,7 @@ class NW_Deck_Admin {
 		$search   = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
 		$active   = sanitize_text_field( wp_unslash( $_POST['active'] ?? '' ) );
 
-		$endpoint = 'cyber_deck?select=*&order=name.asc';
+		$endpoint = 'cyber_deck?select=id,name,deck_category,type,rarity,img_url,is_active&order=name.asc';
 
 		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
 			$endpoint .= '&deck_category=eq.' . rawurlencode( $category );
@@ -584,7 +648,7 @@ class NW_Deck_Admin {
 			'cooldown_messages'       => max( 0, intval( $_POST['cooldown_messages'] ?? 0 ) ),
 			'entropy_on_fail'         => max( 0, intval( $_POST['entropy_on_fail'] ?? 0 ) ),
 			'rarity'                  => $rarity,
-			'level'                   => min( 10, max( 1, intval( $_POST['level'] ?? 1 ) ) ),
+			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
 			'xp_current'              => max( 0, intval( $_POST['xp_current'] ?? 0 ) ),
 			'xp_to_next'              => max( 0, intval( $_POST['xp_to_next'] ?? 10 ) ),
 			'is_leveling'             => filter_var( $_POST['is_leveling'] ?? false, FILTER_VALIDATE_BOOLEAN ),
