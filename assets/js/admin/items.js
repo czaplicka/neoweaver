@@ -5,7 +5,6 @@
 /* global NWItems, jQuery */
 (function ($) {
 	'use strict';
-
 	var cfg   = window.NWItems || {};
 	var ajax  = cfg.ajaxurl || '';
 	var nonce = cfg.nonce || '';
