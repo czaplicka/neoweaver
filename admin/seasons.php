@@ -71,12 +71,6 @@ if ( ! class_exists( 'NeoWeaver_Seasons_Admin' ) ) {
 				return;
 			}
 
-			if ( defined( 'NEOWEAVER_PLUGIN_URL' ) ) {
-				$base = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'admin/';
-			} else {
-				$base = plugin_dir_url( dirname( __FILE__ ) ) . 'admin/';
-			}
-
 			$ver = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
 
 			wp_enqueue_style(
@@ -85,17 +79,23 @@ if ( ! class_exists( 'NeoWeaver_Seasons_Admin' ) ) {
 				[],
 				null
 			);
+			wp_enqueue_style(
+			'nw-admin-core',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+			[ 'nw-font-chakra-petch' ],
+			NEOWEAVER_VERSION
+		);
 
 			wp_enqueue_style(
 				'nw-seasons-admin',
-				$base . 'css/seasons-admin.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
 				[ 'chakra-petch' ],
 				$ver
 			);
 
 			wp_enqueue_script(
 				'nw-seasons-admin',
-				$base . 'js/seasons-admin.js',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
 				[ 'jquery' ],
 				$ver,
 				true
