@@ -22,7 +22,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 		private const UPLOADS_BASE = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
 
 		/**
-		 * Preferred scales are 0–10, base HP/MP > 0 (see DB constraints).
+		 * Preferred scales are 0–5, base HP/MP > 0.
 		 */
 		private const SLIDER_DEFAULTS = [
 			'race_base_hp'      => 8,
@@ -98,32 +98,29 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 
 		/* ---------- img helpers ---------- */
 
-		/**
-		 * Given a raw DB value (filename or full URL), return a full URL for display.
-		 */
 		private function img_url( string $filename ): string {
 			if ( empty( $filename ) ) {
 				return '';
 			}
+
 			if ( str_starts_with( $filename, 'http://' ) || str_starts_with( $filename, 'https://' ) ) {
 				return esc_url_raw( $filename );
 			}
+
 			return esc_url_raw( self::UPLOADS_BASE . ltrim( $filename, '/' ) );
 		}
 
-		/**
-		 * Strip the uploads base URL so we store only the filename in the DB.
-		 */
 		private function img_filename( string $url ): string {
 			$url = trim( $url );
+
 			if ( empty( $url ) ) {
 				return '';
 			}
-			// Strip our known uploads prefix
-			$stripped = str_replace( self::UPLOADS_BASE, '', $url );
-			// Also handle wp_upload_dir() base in case domain ever changes
+
+			$stripped   = str_replace( self::UPLOADS_BASE, '', $url );
 			$upload_dir = wp_upload_dir();
 			$stripped   = str_replace( trailingslashit( $upload_dir['baseurl'] ), '', $stripped );
+
 			return sanitize_text_field( ltrim( $stripped, '/' ) );
 		}
 
@@ -164,7 +161,6 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 					</tbody>
 				</table>
 
-				<!-- MODAL -->
 				<div id="nw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.74);z-index:9999;overflow-y:auto;padding:24px;">
 					<div style="max-width:980px;margin:24px auto;background:#050505;color:#f2f2f2;border-radius:14px;border:1px solid #2b2b2b;padding:32px 28px;position:relative;">
 						<button id="nw-modal-close" style="position:absolute;right:14px;top:14px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer;line-height:1;">✕</button>
@@ -174,8 +170,6 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 							<input type="hidden" id="nw-field-id" name="id">
 
 							<table class="form-table" role="presentation">
-
-								<!-- Basic info -->
 								<tr>
 									<th><label for="nw-field-name">Name *</label></th>
 									<td><input type="text" id="nw-field-name" name="name" class="regular-text"></td>
@@ -192,8 +186,6 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 									<th><label for="nw-field-gm_instructions">GM Instructions</label></th>
 									<td><textarea id="nw-field-gm_instructions" name="gm_instructions" class="large-text" rows="3"></textarea></td>
 								</tr>
-
-								<!-- Image — filename only stored in DB -->
 								<tr>
 									<th><label for="nw-field-img_url">Image filename</label></th>
 									<td>
@@ -204,14 +196,10 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 										</div>
 									</td>
 								</tr>
-
-								<!-- Tags -->
 								<tr>
 									<th><label for="nw-field-tags">Tags</label></th>
 									<td><input type="text" id="nw-field-tags" name="tags" class="large-text" placeholder="comma,separated,tags"></td>
 								</tr>
-
-								<!-- Conflict -->
 								<tr>
 									<th><label for="nw-field-conflict_axis">Conflict axis</label></th>
 									<td><input type="text" id="nw-field-conflict_axis" name="conflict_axis" class="regular-text" placeholder="e.g. tech-vs-magic"></td>
@@ -220,14 +208,10 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 									<th><label for="nw-field-conflict_side">Conflict side</label></th>
 									<td><input type="text" id="nw-field-conflict_side" name="conflict_side" class="regular-text" placeholder="e.g. pro-tech"></td>
 								</tr>
-
-								<!-- Bonus JSON -->
 								<tr>
 									<th><label for="nw-field-bonus">Bonus (JSON)</label></th>
 									<td><textarea id="nw-field-bonus" name="bonus" class="large-text" rows="3" placeholder='{"hp":2,"tech":1}'></textarea></td>
 								</tr>
-
-								<!-- Base HP / MP -->
 								<tr>
 									<th>Base HP / MP</th>
 									<td>
@@ -240,36 +224,32 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 										</label>
 									</td>
 								</tr>
-
-								<!-- Preferences -->
 								<tr>
-									<th>Preferences (0–10)</th>
+									<th>Preferences (0–5)</th>
 									<td>
 										<div class="nw-pref-grid">
-											<?php foreach ( self::SLIDER_DEFAULTS as $key => $def ) :
-												if ( str_starts_with( $key, 'preferred_' ) ) : ?>
-												<div class="nw-pref-row">
-													<label for="nw-field-<?php echo esc_attr( $key ); ?>">
-														<?php echo esc_html( ucwords( str_replace( [ 'preferred_', '_' ], [ '', ' ' ], $key ) ) ); ?>
-													</label>
-													<input
-														type="range"
-														class="nw-range"
-														id="nw-field-<?php echo esc_attr( $key ); ?>"
-														name="<?php echo esc_attr( $key ); ?>"
-														min="0" max="10"
-														value="<?php echo esc_attr( $def ); ?>"
-													>
-													<span id="nw-val-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $def ); ?></span>
-												</div>
-											<?php
-												endif;
-											endforeach; ?>
+											<?php foreach ( self::SLIDER_DEFAULTS as $key => $def ) : ?>
+												<?php if ( str_starts_with( $key, 'preferred_' ) ) : ?>
+													<div class="nw-pref-row">
+														<label for="nw-field-<?php echo esc_attr( $key ); ?>">
+															<?php echo esc_html( ucwords( str_replace( [ 'preferred_', '_' ], [ '', ' ' ], $key ) ) ); ?>
+														</label>
+														<input
+															type="range"
+															class="nw-range"
+															id="nw-field-<?php echo esc_attr( $key ); ?>"
+															name="<?php echo esc_attr( $key ); ?>"
+															min="0"
+															max="5"
+															value="<?php echo esc_attr( $def ); ?>"
+														>
+														<span id="nw-val-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $def ); ?></span>
+													</div>
+												<?php endif; ?>
+											<?php endforeach; ?>
 										</div>
 									</td>
 								</tr>
-
-								<!-- Active -->
 								<tr>
 									<th>Active</th>
 									<td>
@@ -279,7 +259,6 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 										</label>
 									</td>
 								</tr>
-
 							</table>
 						</form>
 
@@ -293,7 +272,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 
 						<div id="nw-form-notice" role="alert" aria-live="polite"></div>
 					</div>
-				</div><!-- /modal -->
+				</div>
 			</div>
 			<?php
 		}
@@ -305,34 +284,44 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 				$items = $value;
 			} else {
 				$value = trim( (string) $value );
+
 				if ( '' === $value ) {
 					return [];
 				}
+
 				$decoded = json_decode( $value, true );
+
 				if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
 					$items = $decoded;
 				} else {
 					$items = array_map( 'trim', explode( ',', $value ) );
 				}
 			}
+
 			$items = array_map( 'sanitize_text_field', $items );
-			return array_values( array_filter( array_unique( $items ), static fn( $v ) => '' !== $v ) );
+
+			return array_values(
+				array_filter(
+					array_unique( $items ),
+					static fn( $v ) => '' !== $v
+				)
+			);
 		}
 
 		private function bust_cache_for_table(): void {
 			$this->bust_cache( $this->table );
 		}
 
-		/**
-		 * Apply img_url() to every row returned from Supabase.
-		 */
 		private function hydrate_rows( array $rows ): array {
-			return array_map( function ( $row ) {
-				if ( isset( $row['img_url'] ) ) {
-					$row['img_url'] = $this->img_url( (string) $row['img_url'] );
-				}
-				return $row;
-			}, $rows );
+			return array_map(
+				function ( $row ) {
+					if ( isset( $row['img_url'] ) ) {
+						$row['img_url'] = $this->img_url( (string) $row['img_url'] );
+					}
+					return $row;
+				},
+				$rows
+			);
 		}
 
 		/* ---------- AJAX ---------- */
@@ -356,46 +345,47 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 		}
 
 		public function ajax_get_one(): void {
-	check_ajax_referer( $this->nonce_action, 'nonce' );
+			check_ajax_referer( $this->nonce_action, 'nonce' );
 
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( 'Forbidden', 403 );
-		return;
-	}
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
 
-	$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-	if ( ! $id ) {
-		wp_send_json_error( 'Missing ID' );
-		return;
-	}
+			$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 
-	$rows = $this->cached_get_all( $this->table, 'name' );
+			if ( ! $id ) {
+				wp_send_json_error( 'Missing ID' );
+				return;
+			}
 
-	if ( isset( $rows['error'] ) ) {
-		wp_send_json_error( $rows['error'] );
-		return;
-	}
+			$rows = $this->cached_get_all( $this->table, 'name' );
 
-	$item = null;
+			if ( isset( $rows['error'] ) ) {
+				wp_send_json_error( $rows['error'] );
+				return;
+			}
 
-	foreach ( $rows as $row ) {
-		if ( isset( $row['id'] ) && (string) $row['id'] === (string) $id ) {
-			$item = $row;
-			break;
+			$item = null;
+
+			foreach ( $rows as $row ) {
+				if ( isset( $row['id'] ) && (string) $row['id'] === (string) $id ) {
+					$item = $row;
+					break;
+				}
+			}
+
+			if ( ! $item ) {
+				wp_send_json_error( 'Race not found' );
+				return;
+			}
+
+			if ( isset( $item['img_url'] ) ) {
+				$item['img_url'] = $this->img_filename( (string) $item['img_url'] );
+			}
+
+			wp_send_json_success( $item );
 		}
-	}
-
-	if ( ! $item ) {
-		wp_send_json_error( 'Race not found' );
-		return;
-	}
-
-	if ( isset( $item['img_url'] ) ) {
-		$item['img_url'] = $this->img_filename( (string) $item['img_url'] );
-	}
-
-	wp_send_json_success( $item );
-}
 
 		public function ajax_save(): void {
 			check_ajax_referer( $this->nonce_action, 'nonce' );
@@ -407,6 +397,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 
 			$id   = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 			$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+
 			if ( ! $name ) {
 				wp_send_json_error( 'Name is required' );
 				return;
@@ -421,28 +412,29 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 			$bonus_raw       = wp_unslash( $_POST['bonus'] ?? '' );
 			$is_active       = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
 
-			// Store only the filename — strip full URL if someone pasted it
-			$img_raw         = sanitize_text_field( wp_unslash( $_POST['img_url'] ?? '' ) );
-			$img_filename    = $this->img_filename( $img_raw ) ?: null;
+			$img_raw      = sanitize_text_field( wp_unslash( $_POST['img_url'] ?? '' ) );
+			$img_filename = $this->img_filename( $img_raw ) ?: null;
 
-			$race_base_hp    = max( 1, intval( $_POST['race_base_hp'] ?? self::SLIDER_DEFAULTS['race_base_hp'] ) );
-			$race_base_mp    = max( 0, intval( $_POST['race_base_mp'] ?? self::SLIDER_DEFAULTS['race_base_mp'] ) );
+			$race_base_hp = max( 1, intval( $_POST['race_base_hp'] ?? self::SLIDER_DEFAULTS['race_base_hp'] ) );
+			$race_base_mp = max( 0, intval( $_POST['race_base_mp'] ?? self::SLIDER_DEFAULTS['race_base_mp'] ) );
 
-			$preferred_tech   = max( 0, min( 10, intval( $_POST['preferred_tech']   ?? self::SLIDER_DEFAULTS['preferred_tech'] ) ) );
-			$preferred_magic  = max( 0, min( 10, intval( $_POST['preferred_magic']  ?? self::SLIDER_DEFAULTS['preferred_magic'] ) ) );
-			$preferred_gods   = max( 0, min( 10, intval( $_POST['preferred_gods']   ?? self::SLIDER_DEFAULTS['preferred_gods'] ) ) );
-			$preferred_wealth = max( 0, min( 10, intval( $_POST['preferred_wealth'] ?? self::SLIDER_DEFAULTS['preferred_wealth'] ) ) );
-			$preferred_threat = max( 0, min( 10, intval( $_POST['preferred_threat'] ?? self::SLIDER_DEFAULTS['preferred_threat'] ) ) );
-			$preferred_moral  = max( 0, min( 10, intval( $_POST['preferred_moral']  ?? self::SLIDER_DEFAULTS['preferred_moral'] ) ) );
-			$preferred_social = max( 0, min( 10, intval( $_POST['preferred_social'] ?? self::SLIDER_DEFAULTS['preferred_social'] ) ) );
+			$preferred_tech   = max( 0, min( 5, intval( $_POST['preferred_tech']   ?? self::SLIDER_DEFAULTS['preferred_tech'] ) ) );
+			$preferred_magic  = max( 0, min( 5, intval( $_POST['preferred_magic']  ?? self::SLIDER_DEFAULTS['preferred_magic'] ) ) );
+			$preferred_gods   = max( 0, min( 5, intval( $_POST['preferred_gods']   ?? self::SLIDER_DEFAULTS['preferred_gods'] ) ) );
+			$preferred_wealth = max( 0, min( 5, intval( $_POST['preferred_wealth'] ?? self::SLIDER_DEFAULTS['preferred_wealth'] ) ) );
+			$preferred_threat = max( 0, min( 5, intval( $_POST['preferred_threat'] ?? self::SLIDER_DEFAULTS['preferred_threat'] ) ) );
+			$preferred_moral  = max( 0, min( 5, intval( $_POST['preferred_moral']  ?? self::SLIDER_DEFAULTS['preferred_moral'] ) ) );
+			$preferred_social = max( 0, min( 5, intval( $_POST['preferred_social'] ?? self::SLIDER_DEFAULTS['preferred_social'] ) ) );
 
 			$bonus = null;
 			if ( '' !== trim( $bonus_raw ) ) {
 				$decoded = json_decode( $bonus_raw, true );
+
 				if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
 					wp_send_json_error( 'Bonus must be valid JSON object.' );
 					return;
 				}
+
 				$bonus = $decoded;
 			}
 
@@ -511,7 +503,12 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 			}
 
 			$this->bust_cache_for_table();
-			wp_send_json_success( [ 'id' => $id, 'is_active' => $is_active ] );
+			wp_send_json_success(
+				[
+					'id'        => $id,
+					'is_active' => $is_active,
+				]
+			);
 		}
 
 		public function ajax_delete(): void {
@@ -523,6 +520,7 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 			}
 
 			$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+
 			if ( ! $id ) {
 				wp_send_json_error( 'Missing ID' );
 				return;
