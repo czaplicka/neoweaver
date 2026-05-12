@@ -1,208 +1,458 @@
 /**
  * NeoWeaver Admin — Races (cyber_races)
- * Handles list rendering, modal CRUD, toggle active.
- * Depends on: jQuery, ajaxurl (WP global)
- * Nonce: read from #nw-nonce hidden field.
+ * Works with the updated races.php backend.
  */
-/* global ajaxurl, jQuery */
+/* global NWRaces, jQuery */
 (function ($) {
 	'use strict';
 
-	// ── state ────────────────────────────────────────────────────────────
-	var nonce = $('#nw-nonce').val();
-	var all   = [];
+	var cfg   = window.NWRaces || {};
+	var ajax  = cfg.ajaxurl || '';
+	var nonce = cfg.nonce || '';
 
-	var SLIDER_KEYS = [
-		'race_base_hp', 'race_base_mp',
-		'preferred_tech', 'preferred_magic', 'preferred_gods',
-		'preferred_wealth', 'preferred_threat', 'preferred_moral', 'preferred_social',
+	var all = [];
+
+	var PREF_KEYS = [
+		'preferred_tech',
+		'preferred_magic',
+		'preferred_gods',
+		'preferred_wealth',
+		'preferred_threat',
+		'preferred_moral',
+		'preferred_social'
 	];
-	var SLIDER_DEFS = {
-		race_base_hp: 8, race_base_mp: 8,
-		preferred_tech: 3, preferred_magic: 3, preferred_gods: 3,
-		preferred_wealth: 3, preferred_threat: 2, preferred_moral: 3, preferred_social: 2,
+
+	var DEFAULTS = {
+		race_base_hp: 8,
+		race_base_mp: 8,
+		preferred_tech: 3,
+		preferred_magic: 3,
+		preferred_gods: 3,
+		preferred_wealth: 3,
+		preferred_threat: 3,
+		preferred_moral: 2,
+		preferred_social: 3
 	};
 
-	// ── helpers ──────────────────────────────────────────────────────────
 	function esc(s) {
-		return $('<span>').text(s || '').html();
+		return $('<span>').text(s == null ? '' : String(s)).html();
+	}
+
+	function boolVal(v) {
+		return v === true || v === 1 || v === '1' || v === 'true';
 	}
 
 	function notice(msg, type) {
-		var el = $('#nw-notice');
-		el.attr('class', 'nw-notice nw-notice-' + type).text(msg).show();
-		setTimeout(function () { el.fadeOut(300); }, 3500);
+		var $el = $('#nw-notice');
+		var isError = type === 'error';
+
+		$el.stop(true, true)
+			.attr('class', '')
+			.css({
+				display: 'block',
+				background: isError ? '#5c0000' : '#1a3300',
+				color: isError ? '#ff8080' : '#adff00'
+			})
+			.text(msg || '');
+
+		setTimeout(function () {
+			$el.fadeOut(250);
+		}, 3200);
 	}
 
-	function tagsStr(t) {
-		if (!t) return '';
-		if (Array.isArray(t)) return t.join(', ');
-		try {
-			var a = JSON.parse(t);
-			return Array.isArray(a) ? a.join(', ') : t;
-		} catch (e) { return t; }
+	function tagsToString(tags) {
+		if (!tags) return '';
+		if (Array.isArray(tags)) return tags.join(', ');
+		if (typeof tags === 'string') return tags;
+		return '';
+	}
+
+	function renderTags(tags) {
+		var arr = Array.isArray(tags) ? tags : [];
+		if (!arr.length) {
+			return '—';
+		}
+
+		var html = arr.slice(0, 4).map(function (tag) {
+			return '<span class="nw-tag">' + esc(tag) + '</span>';
+		}).join('');
+
+		if (arr.length > 4) {
+			html += '<span class="nw-tag">+' + (arr.length - 4) + '</span>';
+		}
+
+		return '<div class="nw-tags">' + html + '</div>';
+	}
+
+	function renderImage(url) {
+		if (!url) {
+			return '<div class="nw-race-img-placeholder" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#111;border:1px solid #2b2b2b;color:#666;">🧬</div>';
+		}
+
+		return '<img src="' + esc(url) + '" class="nw-race-img" loading="lazy" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:#111;border:1px solid #2b2b2b;">';
 	}
 
 	function updateStats(data) {
-		var active = data.filter(function (r) { return r.is_active !== false; }).length;
-		$('#nw-total').text(data.length);
+		var active = (data || []).filter(function (row) {
+			return boolVal(row.is_active);
+		}).length;
+
+		$('#nw-total').text((data || []).length);
 		$('#nw-active').text(active);
-		$('#nw-inactive').text(data.length - active);
+		$('#nw-inactive').text((data || []).length - active);
 	}
 
-	// ── render table ─────────────────────────────────────────────────────
-	function renderTable(data) {
-		var tbody = $('#nw-races-tbody');
+	function getFilteredRows() {
+		var term = ($('#nw-search').val() || '').toLowerCase().trim();
+
+		if (!term) {
+			return all;
+		}
+
+		return all.filter(function (row) {
+			var haystack = [
+				row.name || '',
+				row.parent_race || '',
+				row.description || '',
+				row.conflict_axis || '',
+				row.conflict_side || '',
+				tagsToString(row.tags)
+			].join(' ').toLowerCase();
+
+			return haystack.indexOf(term) !== -1;
+		});
+	}
+
+	function renderTable(rows) {
+		var data = rows || [];
+		var $tbody = $('#nw-races-tbody');
+
 		if (!data.length) {
-			tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#555;">No races found.</td></tr>');
+			$tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">No races found.</td></tr>');
 			return;
 		}
-		tbody.html(data.map(function (r) {
-			var tags   = Array.isArray(r.tags) ? r.tags : [];
-			var tagsH  = tags.slice(0, 4).map(function (t) {
-				return '<span class="nw-tag">' + esc(t) + '</span>';
-			}).join('') + (tags.length > 4 ? '<span class="nw-tag">+' + (tags.length - 4) + '</span>' : '');
-			var active = r.is_active !== false;
-			var imgH   = r.img_url
-				? '<img src="' + esc(r.img_url) + '" class="nw-race-img" loading="lazy" onerror="this.style.display=\'none\'">'
-				: '<div class="nw-race-img-placeholder">🧬</div>';
-			return '<tr data-id="' + r.id + '" class="' + (active ? '' : 'nw-row-inactive') + '">'
-				+ '<td>' + imgH + '</td>'
-				+ '<td><div class="nw-race-name">' + esc(r.name) + '</div><div class="nw-race-sub">' + esc(r.parent_race || '') + '</div></td>'
-				+ '<td>' + esc(r.conflict_axis || '—') + '</td>'
-				+ '<td><div class="nw-tags">' + tagsH + '</div></td>'
-				+ '<td class="nw-hp-mp"><span class="nw-hp">HP ' + (r.race_base_hp || '?') + '</span> / <span class="nw-mp">MP ' + (r.race_base_mp || '?') + '</span></td>'
-				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="' + r.id + '" ' + (active ? 'checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
-				+ '<td><div class="nw-row-actions"><button class="nw-action-btn nw-edit-btn" data-id="' + r.id + '">Edit</button></div></td>'
+
+		var html = data.map(function (row) {
+			var active = boolVal(row.is_active);
+
+			return ''
+				+ '<tr data-id="' + esc(row.id) + '"' + (active ? '' : ' class="nw-row-inactive"') + '>'
+				+ '<td>' + renderImage(row.img_url) + '</td>'
+				+ '<td>'
+				+ '<div class="nw-race-name"><strong>' + esc(row.name) + '</strong></div>'
+				+ '<div class="nw-race-sub" style="color:#888;">' + esc(row.parent_race || '') + '</div>'
+				+ '</td>'
+				+ '<td>' + esc(row.conflict_axis || '—') + (row.conflict_side ? '<br><small style="color:#888;">' + esc(row.conflict_side) + '</small>' : '') + '</td>'
+				+ '<td>' + renderTags(row.tags) + '</td>'
+				+ '<td><span class="nw-hp">HP ' + esc(row.race_base_hp || '?') + '</span> / <span class="nw-mp">MP ' + esc(row.race_base_mp || '?') + '</span></td>'
+				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="' + esc(row.id) + '"' + (active ? ' checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
+				+ '<td><button type="button" class="button button-small nw-edit-btn" data-id="' + esc(row.id) + '">Edit</button></td>'
 				+ '</tr>';
-		}).join(''));
+		}).join('');
+
+		$tbody.html(html);
 	}
 
-	// ── load all ─────────────────────────────────────────────────────────
-	function loadAll() {
-		$('#nw-races-tbody').html('<tr class="nw-loading-row"><td colspan="7"><div class="nw-spinner"></div> Loading…</td></tr>');
-		$.post(ajaxurl, { action: 'nw_races_get_all', nonce: nonce }, function (res) {
-			if (!res.success) { notice('Error: ' + res.data, 'error'); return; }
-			all = res.data || [];
-			renderTable(all);
-			updateStats(all);
-		}).fail(function () { notice('Request failed.', 'error'); });
+	function updateImagePreview() {
+		var url = ($('#nw-field-img_url').val() || '').trim();
+		var $wrap = $('#nw-race-image-preview-wrap');
+		var $img = $('#nw-race-image-preview');
+
+		if (!url) {
+			$img.attr('src', '');
+			$wrap.hide();
+			return;
+		}
+
+		$img.attr('src', url);
+		$wrap.show();
 	}
 
-	// ── modal ────────────────────────────────────────────────────────────
-	function openModal(id) {
+	function resetForm() {
 		$('#nw-race-form')[0].reset();
 		$('#nw-field-id').val('');
-		SLIDER_KEYS.forEach(function (k) {
-			var d = SLIDER_DEFS[k];
-			$('#nw-field-' + k).val(d);
-			$('#nw-val-' + k).text(d);
+		$('#nw-field-name').val('');
+		$('#nw-field-parent_race').val('');
+		$('#nw-field-description').val('');
+		$('#nw-field-gm_instructions').val('');
+		$('#nw-field-img_url').val('');
+		$('#nw-field-tags').val('');
+		$('#nw-field-conflict_axis').val('');
+		$('#nw-field-conflict_side').val('');
+		$('#nw-field-bonus').val('');
+		$('#nw-field-race_base_hp').val(DEFAULTS.race_base_hp);
+		$('#nw-field-race_base_mp').val(DEFAULTS.race_base_mp);
+		$('#nw-field-is_active').prop('checked', true);
+
+		PREF_KEYS.forEach(function (key) {
+			$('#nw-field-' + key).val(DEFAULTS[key]);
+			$('#nw-val-' + key).text(DEFAULTS[key]);
 		});
 
-		if (id) {
-			var r = all.find(function (x) { return x.id === id; });
-			if (r) {
-				$('#nw-field-id').val(r.id);
-				$('#nw-field-name').val(r.name || '');
-				$('#nw-field-parent_race').val(r.parent_race || '');
-				$('#nw-field-description').val(r.description || '');
-				$('#nw-field-gm_instructions').val(r.gm_instructions || '');
-				$('#nw-field-img_url').val(r.img_url || '');
-				$('#nw-field-bonus').val(r.bonus || '');
-				$('#nw-field-conflict_axis').val(r.conflict_axis || '');
-				$('#nw-field-conflict_side').val(r.conflict_side || '');
-				$('#nw-field-tags').val(tagsStr(r.tags));
-				$('#nw-field-is_active').prop('checked', r.is_active !== false);
-				SLIDER_KEYS.forEach(function (k) {
-					var v = r[k] !== undefined ? r[k] : SLIDER_DEFS[k];
-					$('#nw-field-' + k).val(v);
-					$('#nw-val-' + k).text(v);
-				});
+		$('#nw-race-image-preview').attr('src', '');
+		$('#nw-race-image-preview-wrap').hide();
+
+		$('#nw-delete-btn').hide();
+		$('#nw-save-label').text('Save Race');
+		$('#nw-modal-title').text('New Race');
+	}
+
+	function fillForm(row) {
+		resetForm();
+
+		if (!row) return;
+
+		$('#nw-field-id').val(row.id || '');
+		$('#nw-field-name').val(row.name || '');
+		$('#nw-field-parent_race').val(row.parent_race || '');
+		$('#nw-field-description').val(row.description || '');
+		$('#nw-field-gm_instructions').val(row.gm_instructions || '');
+		$('#nw-field-img_url').val(row.img_url || '');
+		$('#nw-field-tags').val(tagsToString(row.tags));
+		$('#nw-field-conflict_axis').val(row.conflict_axis || '');
+		$('#nw-field-conflict_side').val(row.conflict_side || '');
+
+		if (row.bonus) {
+			try {
+				$('#nw-field-bonus').val(JSON.stringify(row.bonus, null, 2));
+			} catch (e) {
+				$('#nw-field-bonus').val('');
 			}
-			$('#nw-modal-title').text('Edit Race');
-			$('#nw-save-label').text('Save Changes');
-		} else {
-			$('#nw-modal-title').text('New Race');
-			$('#nw-save-label').text('Create Race');
 		}
-		$('#nw-modal-overlay').fadeIn(150);
+
+		$('#nw-field-race_base_hp').val(row.race_base_hp || DEFAULTS.race_base_hp);
+		$('#nw-field-race_base_mp').val(row.race_base_mp || DEFAULTS.race_base_mp);
+		$('#nw-field-is_active').prop('checked', boolVal(row.is_active));
+
+		PREF_KEYS.forEach(function (key) {
+			var val = (typeof row[key] !== 'undefined' && row[key] !== null) ? row[key] : DEFAULTS[key];
+			$('#nw-field-' + key).val(val);
+			$('#nw-val-' + key).text(val);
+		});
+
+		$('#nw-delete-btn').show();
+		$('#nw-save-label').text('Save Changes');
+		$('#nw-modal-title').text('Edit Race');
+
+		updateImagePreview();
+	}
+
+	function openModal(id) {
+		resetForm();
+
+		if (!id) {
+			$('#nw-modal-overlay').fadeIn(150);
+			$('#nw-field-name').trigger('focus');
+			return;
+		}
+
+		$.post(ajax, {
+			action: 'nw_races_get_one',
+			nonce: nonce,
+			id: id
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Could not load race.'), 'error');
+				return;
+			}
+
+			fillForm(res.data || {});
+			$('#nw-modal-overlay').fadeIn(150);
+			$('#nw-field-name').trigger('focus');
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
 	}
 
 	function closeModal() {
 		$('#nw-modal-overlay').fadeOut(150);
 	}
 
-	// ── events ───────────────────────────────────────────────────────────
-	$(document).on('input', '.nw-range', function () {
-		$('#nw-val-' + $(this).attr('id').replace('nw-field-', '')).text($(this).val());
+	function collectPayload() {
+		return {
+			action: 'nw_races_save',
+			nonce: nonce,
+			id: ($('#nw-field-id').val() || '').trim(),
+			name: ($('#nw-field-name').val() || '').trim(),
+			parent_race: ($('#nw-field-parent_race').val() || '').trim(),
+			description: ($('#nw-field-description').val() || '').trim(),
+			gm_instructions: ($('#nw-field-gm_instructions').val() || '').trim(),
+			img_url: ($('#nw-field-img_url').val() || '').trim(),
+			tags: ($('#nw-field-tags').val() || '').trim(),
+			conflict_axis: ($('#nw-field-conflict_axis').val() || '').trim(),
+			conflict_side: ($('#nw-field-conflict_side').val() || '').trim(),
+			bonus: ($('#nw-field-bonus').val() || '').trim(),
+			race_base_hp: $('#nw-field-race_base_hp').val(),
+			race_base_mp: $('#nw-field-race_base_mp').val(),
+			preferred_tech: $('#nw-field-preferred_tech').val(),
+			preferred_magic: $('#nw-field-preferred_magic').val(),
+			preferred_gods: $('#nw-field-preferred_gods').val(),
+			preferred_wealth: $('#nw-field-preferred_wealth').val(),
+			preferred_threat: $('#nw-field-preferred_threat').val(),
+			preferred_moral: $('#nw-field-preferred_moral').val(),
+			preferred_social: $('#nw-field-preferred_social').val(),
+			is_active: $('#nw-field-is_active').is(':checked') ? '1' : '0'
+		};
+	}
+
+	function loadAll() {
+		$('#nw-races-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">Loading…</td></tr>');
+
+		$.post(ajax, {
+			action: 'nw_races_get_all',
+			nonce: nonce
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Load failed.'), 'error');
+				return;
+			}
+
+			all = Array.isArray(res.data) ? res.data : [];
+			var filtered = getFilteredRows();
+			renderTable(filtered);
+			updateStats(filtered);
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
+	}
+
+	$(document).on('input', '#nw-search', function () {
+		var filtered = getFilteredRows();
+		renderTable(filtered);
+		updateStats(filtered);
 	});
 
-	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', closeModal);
+	$(document).on('input', '.nw-range', function () {
+		var id = $(this).attr('id').replace('nw-field-', '');
+		$('#nw-val-' + id).text($(this).val());
+	});
 
-	$(document).on('click', '#nw-modal-overlay', function (e) {
-		if ($(e.target).is('#nw-modal-overlay')) closeModal();
+	$(document).on('input change blur', '#nw-field-img_url', function () {
+		updateImagePreview();
+	});
+
+	$(document).on('click', '#nw-add-btn', function () {
+		openModal(null);
+	});
+
+	$(document).on('click', '#nw-refresh-btn', function () {
+		loadAll();
 	});
 
 	$(document).on('click', '.nw-edit-btn', function () {
 		openModal($(this).data('id'));
 	});
 
-	$(document).on('click', '#nw-add-btn',     function () { openModal(null); });
-	$(document).on('click', '#nw-refresh-btn', loadAll);
-
-	// toggle active
-	$(document).on('change', '.nw-active-toggle', function () {
-		var $cb  = $(this);
-		var id   = $cb.data('id');
-		var val  = $cb.is(':checked');
-		var row  = $cb.closest('tr');
-		$.post(ajaxurl, {
-			action:    'nw_races_toggle',
-			nonce:     nonce,
-			race_id:   id,
-			is_active: val ? 1 : 0,
-		}, function (res) {
-			if (res.success) {
-				row.toggleClass('nw-row-inactive', !val);
-				all = all.map(function (r) { if (r.id === id) r.is_active = val; return r; });
-				updateStats(all);
-				notice((val ? 'Activated' : 'Deactivated') + '.', 'success');
-			} else {
-				notice('Toggle failed: ' + res.data, 'error');
-				$cb.prop('checked', !val);
-			}
-		});
+	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', function () {
+		closeModal();
 	});
 
-	// save
-	$(document).on('click', '#nw-save-btn', function () {
-		if (!$('#nw-field-name').val().trim()) { notice('Name is required.', 'error'); return; }
-		var btn = $(this);
-		btn.prop('disabled', true);
-		$('#nw-save-label').text('Saving…');
-		var fd = { action: 'nw_races_save', nonce: nonce, race: {} };
-		$('#nw-race-form').serializeArray().forEach(function (f) {
-			if (f.name !== 'is_active') fd.race[f.name] = f.value;
-		});
-		fd.race.is_active = $('#nw-field-is_active').is(':checked') ? 1 : 0;
-		$.post(ajaxurl, fd, function (res) {
-			btn.prop('disabled', false);
-			$('#nw-save-label').text('Save Changes');
-			if (res.success) {
-				notice('Race saved!', 'success');
-				closeModal();
-				loadAll();
-			} else {
-				notice('Error: ' + (res.data || 'Unknown'), 'error');
+	$(document).on('click', '#nw-modal-overlay', function (e) {
+		if ($(e.target).is('#nw-modal-overlay')) {
+			closeModal();
+		}
+	});
+
+	$(document).on('change', '.nw-active-toggle', function () {
+		var $cb = $(this);
+		var id = $cb.data('id');
+		var val = $cb.is(':checked');
+		var $row = $cb.closest('tr');
+
+		$.post(ajax, {
+			action: 'nw_races_toggle',
+			nonce: nonce,
+			id: id,
+			is_active: val ? '1' : '0'
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Toggle failed: ' + ((res && res.data) || 'Unknown error'), 'error');
+				$cb.prop('checked', !val);
+				return;
 			}
+
+			all = all.map(function (race) {
+				if (String(race.id) === String(id)) {
+					race.is_active = val;
+				}
+				return race;
+			});
+
+			$row.toggleClass('nw-row-inactive', !val);
+			updateStats(getFilteredRows());
+			notice(val ? 'Activated.' : 'Deactivated.', 'success');
 		}).fail(function () {
-			btn.prop('disabled', false);
-			$('#nw-save-label').text('Save Changes');
+			$cb.prop('checked', !val);
 			notice('Request failed.', 'error');
 		});
 	});
 
-	// ── init ─────────────────────────────────────────────────────────────
-	$(function () { loadAll(); });
+	$(document).on('click', '#nw-save-btn', function () {
+		var payload = collectPayload();
+		var $btn = $(this);
 
-}(jQuery));
+		if (!payload.name) {
+			notice('Name is required.', 'error');
+			return;
+		}
+
+		$btn.prop('disabled', true);
+		$('#nw-save-label').text('Saving…');
+
+		$.post(ajax, payload, function (res) {
+			$btn.prop('disabled', false);
+			$('#nw-save-label').text(payload.id ? 'Save Changes' : 'Save Race');
+
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
+				return;
+			}
+
+			notice('Race saved!', 'success');
+			closeModal();
+			loadAll();
+		}).fail(function () {
+			$btn.prop('disabled', false);
+			$('#nw-save-label').text(payload.id ? 'Save Changes' : 'Save Race');
+			notice('Request failed.', 'error');
+		});
+	});
+
+	$(document).on('click', '#nw-delete-btn', function () {
+		var id = ($('#nw-field-id').val() || '').trim();
+
+		if (!id) {
+			return;
+		}
+
+		if (!window.confirm('Delete this race? This cannot be undone.')) {
+			return;
+		}
+
+		$.post(ajax, {
+			action: 'nw_races_delete',
+			nonce: nonce,
+			id: id
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Delete failed: ' + ((res && res.data) || 'Unknown error'), 'error');
+				return;
+			}
+
+			notice('Deleted.', 'success');
+			closeModal();
+			loadAll();
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
+	});
+
+	$(function () {
+		if (!ajax || !nonce) {
+			notice('Missing AJAX config.', 'error');
+			return;
+		}
+		loadAll();
+	});
+
+})(jQuery);
