@@ -356,34 +356,47 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 		}
 
 		public function ajax_get_one(): void {
-			check_ajax_referer( $this->nonce_action, 'nonce' );
+	check_ajax_referer( $this->nonce_action, 'nonce' );
 
-			if ( ! current_user_can( 'manage_options' ) ) {
-				wp_send_json_error( 'Forbidden', 403 );
-				return;
-			}
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Forbidden', 403 );
+		return;
+	}
 
-			$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-			if ( ! $id ) {
-				wp_send_json_error( 'Missing ID' );
-				return;
-			}
+	$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+	if ( ! $id ) {
+		wp_send_json_error( 'Missing ID' );
+		return;
+	}
 
-			$res = NW_Supabase::get_one( $this->table, $id );
-			if ( isset( $res['error'] ) ) {
-				wp_send_json_error( $res['error'] );
-				return;
-			}
+	$res = NW_Supabase::get_one( $this->table, $id );
 
-			$item = $res['data'][0] ?? null;
-			if ( $item && isset( $item['img_url'] ) ) {
-				// Return filename only so the form field shows "abomination.svg"
-				// JS will build the preview URL using uploadsBase from NWRaces config
-				$item['img_url'] = $this->img_filename( (string) $item['img_url'] );
-			}
+	if ( isset( $res['error'] ) ) {
+		wp_send_json_error( $res['error'] );
+		return;
+	}
 
-			wp_send_json_success( $item );
-		}
+	$data = $res['data'] ?? null;
+
+	if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
+		$item = $data[0];
+	} elseif ( is_array( $data ) ) {
+		$item = $data;
+	} else {
+		$item = null;
+	}
+
+	if ( ! $item ) {
+		wp_send_json_error( 'Race not found' );
+		return;
+	}
+
+	if ( isset( $item['img_url'] ) ) {
+		$item['img_url'] = $this->img_filename( (string) $item['img_url'] );
+	}
+
+	wp_send_json_success( $item );
+}
 
 		public function ajax_save(): void {
 			check_ajax_referer( $this->nonce_action, 'nonce' );
