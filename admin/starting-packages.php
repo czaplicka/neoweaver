@@ -49,51 +49,51 @@ if ( ! class_exists( 'NeoWeaver_Starting_Packages_Admin' ) ) {
 		}
 
 		public function enqueue_assets( string $hook ): void {
-			if ( ! str_contains( $hook, $this->page_slug ) ) {
-				return;
-			}
+	if ( ! str_contains( $hook, $this->page_slug ) ) {
+		return;
+	}
 
-			$ver = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
+	$ver = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
+	$base = trailingslashit( NEOWEAVER_PLUGIN_URL );
 
-			wp_enqueue_style(
-				'chakra-petch',
-				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-				[],
-				null
-			);
+	wp_enqueue_style(
+		'nw-font-chakra-petch',
+		'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+		[],
+		null
+	);
 
-wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
-		);
+	wp_enqueue_style(
+		'nw-admin-core',
+		$base . 'assets/css/admin/admin-core.css',
+		[ 'nw-font-chakra-petch' ],
+		$ver
+	);
 
-		wp_enqueue_style(
-			'nw-starting-packages-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/starting-packages.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
-		);
+	wp_enqueue_style(
+		'nw-starting-packages-style',
+		$base . 'assets/css/admin/starting-packages.css',
+		[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+		$ver
+	);
 
-		wp_enqueue_script(
-			'nw-starting-packages-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/starting-packages.js',
-			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
-			true
-		);
+	wp_enqueue_script(
+		'nw-starting-packages-script',
+		$base . 'assets/js/admin/starting-packages.js',
+		[ 'jquery', 'nw-lucide' ],
+		$ver,
+		true
+	);
 
-			wp_localize_script(
-				'nw-starting-packages-admin',
-				'NW_SP',
-				[
-					'ajax_url' => admin_url( 'admin-ajax.php' ),
-					'nonce'    => wp_create_nonce( $this->nonce_action ),
-				]
-			);
-		}
-
+	wp_localize_script(
+		'nw-starting-packages-script',
+		'NW_SP',
+		[
+			'ajax_url' => admin_url( 'admin-ajax.php' ),
+			'nonce'    => wp_create_nonce( $this->nonce_action ),
+		]
+	);
+}
 		public function render_page(): void { ?>
 			<div class="wrap nw-panel" id="nw-sp-panel">
 				<div class="nw-panel-header">
