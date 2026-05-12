@@ -48,6 +48,7 @@ final class NeoWeaver_Core {
 		$files = [
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
+			'includes/classes/class-nw-supabase.php',
 			'includes/game-data.php',
 			'includes/ajax/public-profile.php',
 			'includes/head-injection.php',
