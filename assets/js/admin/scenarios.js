@@ -1,236 +1,475 @@
 /**
  * NeoWeaver Admin — Scenarios (cyber_scenarios)
- * Handles list rendering, modal CRUD, tabs, toggle, delete.
- * Depends on: jQuery
- * Config injected via wp_localize_script as NWScenarios { ajaxurl, nonce }
+ * Works with the rewritten scenarios PHP backend.
  */
 /* global NWScenarios, jQuery */
 (function ($) {
 	'use strict';
 
-	var ajaxurl = NWScenarios.ajaxurl;
-	var nonce   = NWScenarios.nonce;
-	var all     = [];
+	var cfg = window.NWScenarios || {};
+	var ajaxurl = cfg.ajaxurl || '';
+	var nonce = cfg.nonce || '';
+	var all = [];
 
-	// ── helpers ──────────────────────────────────────────────────────────
+	var TYPES = ['main', 'personal', 'social', 'world'];
+	var CATEGORIES = ['combat', 'social', 'magic', 'investigation', 'worlds', 'sidequest', 'family'];
+
 	function esc(s) {
-		return $('<span>').text(s || '').html();
+		return $('<span>').text(s == null ? '' : String(s)).html();
+	}
+
+	function boolVal(v) {
+		return v === true || v === 1 || v === '1' || v === 'true';
+	}
+
+	function clampInt(v, min, max, fallback) {
+		var n = parseInt(v, 10);
+		if (isNaN(n)) return fallback;
+		return Math.max(min, Math.min(max, n));
+	}
+
+	function nullableInt(v, min, max) {
+		if (v === null || typeof v === 'undefined') return '';
+		var s = String(v).trim();
+		if (!s) return '';
+		var n = parseInt(s, 10);
+		if (isNaN(n)) return '';
+		return Math.max(min, Math.min(max, n));
 	}
 
 	function notice(msg, type) {
-		var el = $('#nw-notice');
-		el.attr('class', 'nw-notice nw-notice-' + type).html(esc(msg)).show();
-		setTimeout(function () { el.fadeOut(300); }, 3500);
+		var $el = $('#nw-notice');
+		var isError = type === 'error';
+
+		$el.stop(true, true)
+			.attr('class', '')
+			.css({
+				display: 'block',
+				background: isError ? '#5c0000' : '#1a3300',
+				color: isError ? '#ff8080' : '#adff00'
+			})
+			.text(msg || '');
+
+		setTimeout(function () {
+			$el.fadeOut(250);
+		}, 3200);
 	}
 
-	var DIFF_COLOR = {
-		trivial: '#6daa45', easy: '#4f98a3', medium: '#d19900',
-		hard: '#bb653b', deadly: '#a12c7b',
-	};
-
-	function diffBadge(d) {
-		var c = DIFF_COLOR[d] || '#555';
-		return '<span style="font-size:10px;padding:2px 8px;border-radius:3px;background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40;text-transform:uppercase;letter-spacing:.5px">' + esc(d || '—') + '</span>';
-	}
-
-	function tagsHtml(tags) {
-		if (!tags || !tags.length) return '<span style="color:#555">—</span>';
-		var arr = Array.isArray(tags) ? tags : (tags + '').split(',').map(function (t) { return t.trim(); });
-		return arr.slice(0, 4).map(function (t) {
-			return '<span style="font-size:10px;padding:2px 7px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:3px;color:#888">' + esc(t) + '</span>';
-		}).join(' ') + (arr.length > 4 ? ' <span style="font-size:10px;color:#555">+' + (arr.length - 4) + '</span>' : '');
-	}
-
-	function jsonPretty(v) {
-		if (!v || (Array.isArray(v) && !v.length)) return '';
-		if (typeof v === 'string') return v;
-		return JSON.stringify(v, null, 2);
-	}
-
-	function objToLines(v) {
+	function arrayToCommaString(v) {
 		if (!v) return '';
-		if (Array.isArray(v)) return v.join('\n');
+		if (Array.isArray(v)) return v.join(', ');
 		if (typeof v === 'string') return v;
-		return JSON.stringify(v, null, 2);
+		return '';
 	}
 
-	// ── render table ───────────────────────────────────────────────────
-	function renderTable(data) {
-		var tbody = $('#nw-scenarios-tbody');
-		var search = $('#nw-search').val().toLowerCase().trim();
-		var diff   = $('#nw-filter-difficulty').val();
+	function jsonOrLinesToTextarea(v) {
+		if (!v) return '';
+		if (Array.isArray(v)) return JSON.stringify(v, null, 2);
+		if (typeof v === 'object') return JSON.stringify(v, null, 2);
+		if (typeof v === 'string') return v;
+		return '';
+	}
 
-		var rows = data.filter(function (r) {
-			if (diff   && r.difficulty !== diff) return false;
-			if (search && (r.title || '').toLowerCase().indexOf(search) < 0) return false;
-			return true;
+	function rewardText(row) {
+		var credits = row.reward_credits != null && row.reward_credits !== '' ? row.reward_credits : '—';
+		var items = Array.isArray(row.reward_items) ? row.reward_items.length : 0;
+		return '₵ ' + esc(credits) + (items ? ' + ' + esc(items) + ' item(s)' : '');
+	}
+
+	function updateStats(rows) {
+		var data = rows || [];
+		var active = data.filter(function (row) {
+			return boolVal(row.is_active);
+		}).length;
+
+		$('#nw-total').text(data.length);
+		$('#nw-active-count').text(active);
+	}
+
+	function getFilteredRows() {
+		var term = ($('#nw-search').val() || '').toLowerCase().trim();
+		var type = ($('#nw-filter-type').val() || '').trim();
+		var category = ($('#nw-filter-category').val() || '').trim();
+		var difficulty = ($('#nw-filter-difficulty').val() || '').trim();
+
+		return all.filter(function (row) {
+			if (type && row.type !== type) return false;
+			if (category && row.category !== category) return false;
+			if (difficulty && String(row.difficulty) !== String(difficulty)) return false;
+
+			if (!term) return true;
+
+			var haystack = [
+				row.name || '',
+				row.type || '',
+				row.category || '',
+				row.goal || '',
+				row.gm_instruction || '',
+				row.victory_condition || '',
+				row.fail_conditions || '',
+				arrayToCommaString(row.tags),
+				arrayToCommaString(row.required_tags),
+				arrayToCommaString(row.success_tags),
+				arrayToCommaString(row.failure_tags),
+				row.area_id || ''
+			].join(' ').toLowerCase();
+
+			return haystack.indexOf(term) !== -1;
 		});
+	}
 
-		if (!rows.length) {
-			tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#555">No scenarios found.</td></tr>');
+	function renderTable(rows) {
+		var data = rows || [];
+		var $tbody = $('#nw-scenarios-tbody');
+
+		if (!data.length) {
+			$tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">No scenarios found.</td></tr>');
 			return;
 		}
 
-		tbody.html(rows.map(function (r) {
-			var active = r.is_active !== false;
-			var dur    = r.estimated_duration_minutes ? r.estimated_duration_minutes + ' min' : '—';
-			return '<tr data-id="' + r.id + '"' + (active ? '' : ' style="opacity:.45"') + '>'
-				+ '<td><strong style="color:#fff">' + esc(r.title) + '</strong><div style="font-size:11px;color:#555">' + esc(r.setting || '') + '</div></td>'
-				+ '<td>' + diffBadge(r.difficulty) + '</td>'
-				+ '<td style="font-size:12px;color:#aaa">' + esc(r.setting || '—') + '</td>'
-				+ '<td style="font-size:12px;color:#aaa;white-space:nowrap">' + esc(dur) + '</td>'
-				+ '<td><div style="display:flex;flex-wrap:wrap;gap:4px">' + tagsHtml(r.tags) + '</div></td>'
-				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="' + r.id + '" ' + (active ? 'checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
-				+ '<td><div style="display:flex;gap:6px">'
-				+ '<button class="nw-action-btn nw-action-btn--small nw-edit-btn" data-id="' + r.id + '">Edit</button>'
-				+ '</div></td>'
+		var html = data.map(function (row) {
+			var active = boolVal(row.is_active);
+
+			return ''
+				+ '<tr data-id="' + esc(row.id) + '"' + (active ? '' : ' class="nw-row-inactive"') + '>'
+				+ '<td>'
+				+ '<div><strong>' + esc(row.name) + '</strong></div>'
+				+ '<div style="color:#888;font-size:12px;">ID: ' + esc(row.id) + '</div>'
+				+ '</td>'
+				+ '<td>' + esc(row.type || '—') + '</td>'
+				+ '<td>' + esc(row.category || '—') + '</td>'
+				+ '<td>' + esc(row.difficulty || '—') + '</td>'
+				+ '<td>' + rewardText(row) + '</td>'
+				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="' + esc(row.id) + '"' + (active ? ' checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
+				+ '<td><button type="button" class="button button-small nw-edit-btn" data-id="' + esc(row.id) + '">Edit</button></td>'
 				+ '</tr>';
-		}).join(''));
+		}).join('');
+
+		$tbody.html(html);
 	}
 
-	// ── load all ────────────────────────────────────────────────────────
-	function loadAll() {
-		$('#nw-scenarios-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#555"><span class="nw-spinner"></span> Loading…</td></tr>');
-		$.post(ajaxurl, {
-			action:            'nw_scenarios_get_all',
-			nonce:             nonce,
-			filter_difficulty: $('#nw-filter-difficulty').val(),
-		}, function (res) {
-			if (!res.success) { notice('Error: ' + res.data, 'error'); return; }
-			all = res.data || [];
-			renderTable(all);
-		}).fail(function () { notice('Request failed.', 'error'); });
-	}
-
-	// ── tabs ─────────────────────────────────────────────────────────────
-	$(document).on('click', '.nw-tab', function () {
-		var tab = $(this).data('tab');
-		$('.nw-tab').removeClass('active');
-		$(this).addClass('active');
-		$('.nw-tab-panel').hide();
-		$('#nw-tab-' + tab).show();
-	});
-
-	// ── modal open ─────────────────────────────────────────────────────
-	function resetModal() {
+	function resetForm() {
 		$('#nw-scenario-form')[0].reset();
+
 		$('#nw-field-id').val('');
-		$('#nw-field-active').prop('checked', true);
-		$('#nw-field-duration').val(60);
-		$('#nw-field-sort').val(0);
-		$('#nw-field-difficulty').val('medium');
-		$('.nw-tab').first().trigger('click');
+		$('#nw-field-name').val('');
+		$('#nw-field-type').val('main');
+		$('#nw-field-category').val('combat');
+		$('#nw-field-difficulty').val(3);
+		$('#nw-field-goal').val('');
+		$('#nw-field-gm_instruction').val('');
+		$('#nw-field-victory_condition').val('');
+		$('#nw-field-fail_conditions').val('');
+		$('#nw-field-tags').val('');
+		$('#nw-field-required_tags').val('');
+		$('#nw-field-success_tags').val('');
+		$('#nw-field-failure_tags').val('');
+		$('#nw-field-reward_credits').val(100);
+		$('#nw-field-reward_items').val('');
+		$('#nw-field-min_entropy').val('');
+		$('#nw-field-max_entropy').val('');
+		$('#nw-field-kingdom_tech').val('');
+		$('#nw-field-kingdom_magic').val('');
+		$('#nw-field-kingdom_wealth').val('');
+		$('#nw-field-area_id').val('');
+		$('#nw-field-required_archetype_id').val('');
+		$('#nw-field-giver_npc_tag').val('');
+		$('#nw-field-img_url').val('');
+
+		$('#nw-field-is_boss').prop('checked', false);
+		$('#nw-field-is_key_arc').prop('checked', false);
+		$('#nw-field-is_repeatable').prop('checked', false);
+		$('#nw-field-is_active').prop('checked', true);
+
+		$('#nw-delete-btn').hide();
+		$('#nw-modal-title').text('New Scenario');
+		$('#nw-save-btn').text('Save Scenario').prop('disabled', false);
 	}
 
-	function populateModal(r) {
-		$('#nw-field-id').val(r.id);
-		$('#nw-field-title').val(r.title || '');
-		$('#nw-field-setting').val(r.setting || '');
-		$('#nw-field-desc').val(r.description || '');
-		$('#nw-field-difficulty').val(r.difficulty || 'medium');
-		$('#nw-field-duration').val(r.estimated_duration_minutes || 60);
-		$('#nw-field-sort').val(r.sort_order || 0);
-		$('#nw-field-image').val(r.image_url || '');
-		$('#nw-field-active').prop('checked', r.is_active !== false);
+	function populateForm(row) {
+		resetForm();
 
-		var tagsVal = Array.isArray(r.tags) ? r.tags.join(', ') : (r.tags || '');
-		$('#nw-field-tags').val(tagsVal);
-		$('#nw-field-objectives').val(objToLines(r.objectives));
-		$('#nw-field-rewards').val(jsonPretty(r.rewards));
-		$('#nw-field-prerequisites').val(jsonPretty(r.prerequisites));
+		if (!row) return;
+
+		$('#nw-field-id').val(row.id || '');
+		$('#nw-field-name').val(row.name || '');
+		$('#nw-field-type').val(TYPES.indexOf(row.type) >= 0 ? row.type : 'main');
+		$('#nw-field-category').val(CATEGORIES.indexOf(row.category) >= 0 ? row.category : 'combat');
+		$('#nw-field-difficulty').val(clampInt(row.difficulty, 1, 5, 3));
+		$('#nw-field-goal').val(row.goal || '');
+		$('#nw-field-gm_instruction').val(row.gm_instruction || '');
+		$('#nw-field-victory_condition').val(row.victory_condition || '');
+		$('#nw-field-fail_conditions').val(row.fail_conditions || '');
+		$('#nw-field-tags').val(arrayToCommaString(row.tags));
+		$('#nw-field-required_tags').val(jsonOrLinesToTextarea(row.required_tags));
+		$('#nw-field-success_tags').val(jsonOrLinesToTextarea(row.success_tags));
+		$('#nw-field-failure_tags').val(jsonOrLinesToTextarea(row.failure_tags));
+		$('#nw-field-reward_credits').val(row.reward_credits != null ? row.reward_credits : 100);
+		$('#nw-field-reward_items').val(jsonOrLinesToTextarea(row.reward_items));
+		$('#nw-field-min_entropy').val(row.min_entropy != null ? row.min_entropy : '');
+		$('#nw-field-max_entropy').val(row.max_entropy != null ? row.max_entropy : '');
+		$('#nw-field-kingdom_tech').val(row.kingdom_tech != null ? row.kingdom_tech : '');
+		$('#nw-field-kingdom_magic').val(row.kingdom_magic != null ? row.kingdom_magic : '');
+		$('#nw-field-kingdom_wealth').val(row.kingdom_wealth != null ? row.kingdom_wealth : '');
+		$('#nw-field-area_id').val(row.area_id || '');
+		$('#nw-field-required_archetype_id').val(row.required_archetype_id != null ? row.required_archetype_id : '');
+		$('#nw-field-giver_npc_tag').val(jsonOrLinesToTextarea(row.giver_npc_tag));
+		$('#nw-field-img_url').val(row.img_url || '');
+
+		$('#nw-field-is_boss').prop('checked', boolVal(row.is_boss));
+		$('#nw-field-is_key_arc').prop('checked', boolVal(row.is_key_arc));
+		$('#nw-field-is_repeatable').prop('checked', boolVal(row.is_repeatable));
+		$('#nw-field-is_active').prop('checked', boolVal(row.is_active));
+
+		$('#nw-delete-btn').show();
+		$('#nw-modal-title').text('Edit Scenario');
+		$('#nw-save-btn').text('Save Changes').prop('disabled', false);
 	}
 
 	function openModal(id) {
-		resetModal();
-		if (id) {
-			$('#nw-modal-title').text('Edit Scenario');
-			$('#nw-delete-btn').show();
-			$.post(ajaxurl, { action: 'nw_scenarios_get_one', nonce: nonce, scenario_id: id }, function (res) {
-				if (!res.success) { notice('Load error: ' + res.data, 'error'); return; }
-				populateModal(res.data);
-			});
-		} else {
-			$('#nw-modal-title').text('New Scenario');
-			$('#nw-delete-btn').hide();
+		resetForm();
+
+		if (!id) {
+			$('#nw-modal-overlay').fadeIn(150);
+			$('#nw-field-name').trigger('focus');
+			return;
 		}
-		$('#nw-modal-overlay').fadeIn(150);
+
+		$.post(ajaxurl, {
+			action: 'nw_scenarios_get_one',
+			nonce: nonce,
+			id: id
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Could not load scenario.'), 'error');
+				return;
+			}
+
+			populateForm(res.data || {});
+			$('#nw-modal-overlay').fadeIn(150);
+			$('#nw-field-name').trigger('focus');
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
 	}
 
-	function closeModal() { $('#nw-modal-overlay').fadeOut(150); }
+	function closeModal() {
+		$('#nw-modal-overlay').fadeOut(150);
+	}
 
-	// ── events ───────────────────────────────────────────────────────────
-	$(document).on('click', '#nw-add-btn',     function () { openModal(null); });
-	$(document).on('click', '#nw-refresh-btn', loadAll);
-	$(document).on('click', '.nw-edit-btn',    function () { openModal($(this).data('id')); });
-	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', closeModal);
-	$(document).on('click', '#nw-modal-overlay', function (e) {
-		if ($(e.target).is('#nw-modal-overlay')) closeModal();
-	});
+	function collectPayload() {
+		var fd = $('#nw-scenario-form').serializeArray();
+		var data = {
+			action: 'nw_scenarios_save',
+			nonce: nonce
+		};
 
-	// filter + search
-	$(document).on('change', '#nw-filter-difficulty', function () { renderTable(all); });
-	$(document).on('input',  '#nw-search',            function () { renderTable(all); });
-
-	// toggle active
-	$(document).on('change', '.nw-active-toggle', function () {
-		var $cb = $(this), id = $cb.data('id'), val = $cb.is(':checked');
-		$.post(ajaxurl, {
-			action:      'nw_scenarios_toggle',
-			nonce:       nonce,
-			scenario_id: id,
-			is_active:   val ? 1 : 0,
-		}, function (res) {
-			if (res.success) {
-				all = all.map(function (r) { if (r.id === id) r.is_active = val; return r; });
-				renderTable(all);
-				notice((val ? 'Activated' : 'Deactivated') + '.', 'success');
-			} else {
-				notice('Toggle failed: ' + res.data, 'error');
-				$cb.prop('checked', !val);
-			}
+		fd.forEach(function (f) {
+			data[f.name] = f.value;
 		});
+
+		data.id = ($('#nw-field-id').val() || '').trim();
+		data.name = ($('#nw-field-name').val() || '').trim();
+		data.type = ($('#nw-field-type').val() || 'main').trim();
+		data.category = ($('#nw-field-category').val() || 'combat').trim();
+		data.difficulty = clampInt($('#nw-field-difficulty').val(), 1, 5, 3);
+		data.goal = ($('#nw-field-goal').val() || '').trim();
+		data.gm_instruction = ($('#nw-field-gm_instruction').val() || '').trim();
+		data.victory_condition = ($('#nw-field-victory_condition').val() || '').trim();
+		data.fail_conditions = ($('#nw-field-fail_conditions').val() || '').trim();
+		data.tags = ($('#nw-field-tags').val() || '').trim();
+		data.required_tags = ($('#nw-field-required_tags').val() || '').trim();
+		data.success_tags = ($('#nw-field-success_tags').val() || '').trim();
+		data.failure_tags = ($('#nw-field-failure_tags').val() || '').trim();
+		data.reward_credits = Math.max(0, parseInt($('#nw-field-reward_credits').val(), 10) || 0);
+		data.reward_items = ($('#nw-field-reward_items').val() || '').trim();
+		data.min_entropy = nullableInt($('#nw-field-min_entropy').val(), 0, 999);
+		data.max_entropy = nullableInt($('#nw-field-max_entropy').val(), 0, 999);
+		data.kingdom_tech = nullableInt($('#nw-field-kingdom_tech').val(), 0, 5);
+		data.kingdom_magic = nullableInt($('#nw-field-kingdom_magic').val(), 0, 5);
+		data.kingdom_wealth = nullableInt($('#nw-field-kingdom_wealth').val(), 0, 5);
+		data.area_id = ($('#nw-field-area_id').val() || '').trim();
+		data.required_archetype_id = ($('#nw-field-required_archetype_id').val() || '').trim();
+		data.giver_npc_tag = ($('#nw-field-giver_npc_tag').val() || '').trim();
+		data.img_url = ($('#nw-field-img_url').val() || '').trim();
+
+		data.is_boss = $('#nw-field-is_boss').is(':checked') ? '1' : '';
+		data.is_key_arc = $('#nw-field-is_key_arc').is(':checked') ? '1' : '';
+		data.is_repeatable = $('#nw-field-is_repeatable').is(':checked') ? '1' : '';
+		data.is_active = $('#nw-field-is_active').is(':checked') ? '1' : '';
+
+		return data;
+	}
+
+	function loadAll() {
+		$('#nw-scenarios-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">Loading…</td></tr>');
+
+		$.post(ajaxurl, {
+			action: 'nw_scenarios_get_all',
+			nonce: nonce,
+			filter_type: ($('#nw-filter-type').val() || '').trim(),
+			filter_category: ($('#nw-filter-category').val() || '').trim(),
+			filter_difficulty: ($('#nw-filter-difficulty').val() || '').trim()
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Load failed.'), 'error');
+				return;
+			}
+
+			all = Array.isArray(res.data) ? res.data : [];
+			var filtered = getFilteredRows();
+			renderTable(filtered);
+			updateStats(filtered);
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
+	}
+
+	$(document).on('input', '#nw-search', function () {
+		var filtered = getFilteredRows();
+		renderTable(filtered);
+		updateStats(filtered);
 	});
 
-	// save
-	$(document).on('click', '#nw-save-btn', function () {
-		if (!$('#nw-field-title').val().trim()) { notice('Title is required.', 'error'); return; }
-		var btn = $(this).prop('disabled', true).text('Saving…');
-		var fd  = $('#nw-scenario-form').serializeArray();
-		var data = { action: 'nw_scenarios_save', nonce: nonce };
-		fd.forEach(function (f) { data[f.name] = f.value; });
-		// checkbox is_active — serializeArray skips unchecked
-		data.is_active = $('#nw-field-active').is(':checked') ? 1 : 0;
-		$.post(ajaxurl, data, function (res) {
-			btn.prop('disabled', false).text('Save');
-			if (res.success) {
-				notice('Scenario saved!', 'success');
-				closeModal();
-				loadAll();
-			} else {
-				notice('Error: ' + (res.data || 'Unknown'), 'error');
+	$(document).on('change', '#nw-filter-type, #nw-filter-category, #nw-filter-difficulty', function () {
+		loadAll();
+	});
+
+	$(document).on('click', '#nw-add-btn', function () {
+		openModal(null);
+	});
+
+	$(document).on('click', '#nw-refresh-btn', function () {
+		loadAll();
+	});
+
+	$(document).on('click', '.nw-edit-btn', function () {
+		openModal($(this).data('id'));
+	});
+
+	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', function () {
+		closeModal();
+	});
+
+	$(document).on('click', '#nw-modal-overlay', function (e) {
+		if ($(e.target).is('#nw-modal-overlay')) {
+			closeModal();
+		}
+	});
+
+	$(document).on('change', '.nw-active-toggle', function () {
+		var $cb = $(this);
+		var id = $cb.data('id');
+		var val = $cb.is(':checked');
+		var $row = $cb.closest('tr');
+
+		$.post(ajaxurl, {
+			action: 'nw_scenarios_toggle',
+			nonce: nonce,
+			id: id,
+			is_active: val ? '1' : '0'
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Toggle failed: ' + ((res && res.data) || 'Unknown error'), 'error');
+				$cb.prop('checked', !val);
+				return;
 			}
+
+			all = all.map(function (scenario) {
+				if (String(scenario.id) === String(id)) {
+					scenario.is_active = val;
+				}
+				return scenario;
+			});
+
+			$row.toggleClass('nw-row-inactive', !val);
+			updateStats(getFilteredRows());
+			notice(val ? 'Activated.' : 'Deactivated.', 'success');
 		}).fail(function () {
-			btn.prop('disabled', false).text('Save');
+			$cb.prop('checked', !val);
 			notice('Request failed.', 'error');
 		});
 	});
 
-	// delete
-	$(document).on('click', '#nw-delete-btn', function () {
-		var id = $('#nw-field-id').val();
-		if (!id || !window.confirm('Delete this scenario? This cannot be undone.')) return;
-		$.post(ajaxurl, { action: 'nw_scenarios_delete', nonce: nonce, scenario_id: id }, function (res) {
-			if (res.success) {
-				notice('Scenario deleted.', 'success');
-				closeModal();
-				loadAll();
-			} else {
-				notice('Delete failed: ' + res.data, 'error');
+	$(document).on('click', '#nw-save-btn', function () {
+		var payload = collectPayload();
+		var $btn = $(this);
+
+		if (!payload.name) {
+			notice('Name is required.', 'error');
+			return;
+		}
+
+		if (TYPES.indexOf(payload.type) < 0) {
+			notice('Invalid type.', 'error');
+			return;
+		}
+
+		if (CATEGORIES.indexOf(payload.category) < 0) {
+			notice('Invalid category.', 'error');
+			return;
+		}
+
+		if (payload.min_entropy !== '' && payload.max_entropy !== '' && parseInt(payload.min_entropy, 10) > parseInt(payload.max_entropy, 10)) {
+			notice('Min entropy cannot be greater than max entropy.', 'error');
+			return;
+		}
+
+		$btn.prop('disabled', true).text('Saving…');
+
+		$.post(ajaxurl, payload, function (res) {
+			$btn.prop('disabled', false).text(payload.id ? 'Save Changes' : 'Save Scenario');
+
+			if (!res || !res.success) {
+				notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
+				return;
 			}
+
+			notice('Scenario saved!', 'success');
+			closeModal();
+			loadAll();
+		}).fail(function () {
+			$btn.prop('disabled', false).text(payload.id ? 'Save Changes' : 'Save Scenario');
+			notice('Request failed.', 'error');
 		});
 	});
 
-	// ── init ─────────────────────────────────────────────────────────────
-	$(function () { loadAll(); });
+	$(document).on('click', '#nw-delete-btn', function () {
+		var id = ($('#nw-field-id').val() || '').trim();
 
-}(jQuery));
+		if (!id) return;
+
+		if (!window.confirm('Delete this scenario? This cannot be undone.')) {
+			return;
+		}
+
+		$.post(ajaxurl, {
+			action: 'nw_scenarios_delete',
+			nonce: nonce,
+			id: id
+		}, function (res) {
+			if (!res || !res.success) {
+				notice('Delete failed: ' + ((res && res.data) || 'Unknown error'), 'error');
+				return;
+			}
+
+			notice('Deleted.', 'success');
+			closeModal();
+			loadAll();
+		}).fail(function () {
+			notice('Request failed.', 'error');
+		});
+	});
+
+	$(function () {
+		if (!ajaxurl || !nonce) {
+			notice('Missing AJAX config.', 'error');
+			return;
+		}
+
+		$('#nw-field-difficulty').attr({ min: 1, max: 5 });
+
+		loadAll();
+	});
+
+})(jQuery);
