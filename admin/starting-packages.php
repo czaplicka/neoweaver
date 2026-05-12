@@ -53,10 +53,6 @@ if ( ! class_exists( 'NeoWeaver_Starting_Packages_Admin' ) ) {
 				return;
 			}
 
-			$base = defined( 'NEOWEAVER_PLUGIN_URL' )
-				? trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'admin/'
-				: plugin_dir_url( dirname( __FILE__ ) ) . 'admin/';
-
 			$ver = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
 
 			wp_enqueue_style(
@@ -66,20 +62,27 @@ if ( ! class_exists( 'NeoWeaver_Starting_Packages_Admin' ) ) {
 				null
 			);
 
-			wp_enqueue_style(
-				'nw-starting-packages-admin',
-				$base . 'css/starting-packages-admin.css',
-				[ 'chakra-petch' ],
-				$ver
-			);
+wp_enqueue_style(
+			'nw-admin-core',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+			[ 'nw-font-chakra-petch' ],
+			NEOWEAVER_VERSION
+		);
 
-			wp_enqueue_script(
-				'nw-starting-packages-admin',
-				$base . 'js/starting-packages-admin.js',
-				[ 'jquery' ],
-				$ver,
-				true
-			);
+		wp_enqueue_style(
+			'nw-starting-packages-style',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/starting-packages.css',
+			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+			NEOWEAVER_VERSION
+		);
+
+		wp_enqueue_script(
+			'nw-starting-packages-script',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/starting-packages.js',
+			[ 'jquery', 'nw-lucide' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
 			wp_localize_script(
 				'nw-starting-packages-admin',
