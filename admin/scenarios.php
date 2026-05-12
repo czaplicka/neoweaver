@@ -2,503 +2,671 @@
 /**
  * NeoWeaver Admin Panel — Scenarios (cyber_scenarios)
  *
- * Fields: id, title, description, difficulty, setting, objectives[],
- *         rewards{}, prerequisites{}, tags[], is_active, sort_order,
- *         image_url, estimated_duration_minutes.
+ * Real schema fields:
+ * id, name, type, category, goal, gm_instruction, tags, required_tags,
+ * success_tags, failure_tags, victory_condition, fail_conditions, difficulty,
+ * min_entropy, max_entropy, is_boss, is_key_arc, is_active, area_id, img_url,
+ * reward_credits, reward_items, kingdom_tech, kingdom_magic, kingdom_wealth,
+ * required_archetype_id, giver_npc_tag, is_repeatable, created_at
+ *
+ * @package NeoWeaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class NeoWeaver_Scenarios_Admin {
+if ( ! class_exists( 'NeoWeaver_Scenarios_Admin' ) ) {
 
-	private string $table       = 'cyber_scenarios';
-	private string $supabase_url;
-	private string $supabase_key;
+	class NeoWeaver_Scenarios_Admin {
 
-	public function __construct() {
-		// Use existing helpers to fetch Supabase config if available.
-		if ( function_exists( 'tw_supabase_url' ) ) {
-			$this->supabase_url = rtrim( tw_supabase_url(), '/' );
-		} else {
-			$this->supabase_url = '';
+		private string $table        = 'cyber_scenarios';
+		private string $page_slug    = 'nw-scenarios';
+		private string $nonce_action = 'nw_scenarios_nonce';
+		private string $supabase_url = '';
+		private string $supabase_key = '';
+
+		private const TYPES = [ 'main', 'personal', 'social', 'world' ];
+		private const CATEGORIES = [ 'combat', 'social', 'magic', 'investigation', 'worlds', 'sidequest', 'family' ];
+
+		public function __construct() {
+			if ( function_exists( 'tw_supabase_url' ) ) {
+				$this->supabase_url = rtrim( (string) tw_supabase_url(), '/' );
+			}
+
+			if ( function_exists( 'tw_supabase_anon_key' ) ) {
+				$this->supabase_key = (string) tw_supabase_anon_key();
+			}
+
+			add_action( 'admin_menu', [ $this, 'register_menu' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+			add_action( 'wp_ajax_nw_scenarios_get_all', [ $this, 'ajax_get_all' ] );
+			add_action( 'wp_ajax_nw_scenarios_get_one', [ $this, 'ajax_get_one' ] );
+			add_action( 'wp_ajax_nw_scenarios_save', [ $this, 'ajax_save' ] );
+			add_action( 'wp_ajax_nw_scenarios_toggle', [ $this, 'ajax_toggle' ] );
+			add_action( 'wp_ajax_nw_scenarios_delete', [ $this, 'ajax_delete' ] );
 		}
 
-		if ( function_exists( 'tw_supabase_anon_key' ) ) {
-			$this->supabase_key = tw_supabase_anon_key();
-		} else {
-			$this->supabase_key = '';
+		public function register_menu(): void {
+			add_submenu_page(
+				'neoweaver',
+				'Scenarios',
+				'📋 Scenarios',
+				'manage_options',
+				$this->page_slug,
+				[ $this, 'render_page' ]
+			);
 		}
 
-		add_action( 'admin_menu',            [ $this, 'register_menu'   ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'  ] );
+		public function enqueue_assets( string $hook ): void {
+			if ( ! str_contains( $hook, $this->page_slug ) ) {
+				return;
+			}
 
-		add_action( 'wp_ajax_nw_scenarios_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_scenarios_get_one', [ $this, 'ajax_get_one' ] );
-		add_action( 'wp_ajax_nw_scenarios_save',    [ $this, 'ajax_save'    ] );
-		add_action( 'wp_ajax_nw_scenarios_toggle',  [ $this, 'ajax_toggle'  ] );
-		add_action( 'wp_ajax_nw_scenarios_delete',  [ $this, 'ajax_delete'  ] );
-	}
+			wp_enqueue_style(
+				'nw-admin-core',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+				[ 'nw-font-chakra-petch' ],
+				NEOWEAVER_VERSION
+			);
 
-	// ── menu ──────────────────────────────────────────────────────────────
+			wp_enqueue_style(
+				'nw-scenarios-style',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/scenarios.css',
+				[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+				NEOWEAVER_VERSION
+			);
 
-	public function register_menu(): void {
-		add_submenu_page(
-			'neoweaver',
-			'Scenarios',
-			'📋Scenarios',
-			'manage_options',
-			'nw-scenarios',
-			[ $this, 'render_page' ]
-		);
-	}
+			wp_enqueue_script(
+				'nw-scenarios-script',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/admin/scenarios.js',
+				[ 'jquery', 'nw-lucide' ],
+				NEOWEAVER_VERSION,
+				true
+			);
 
-	// ── assets ────────────────────────────────────────────────────────────
-
-	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, 'nw-scenarios' ) ) {
-			return;
+			wp_localize_script(
+				'nw-scenarios-script',
+				'NWScenarios',
+				[
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( $this->nonce_action ),
+				]
+			);
 		}
 
-		wp_enqueue_style(
-			'chakra-petch',
-			'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-			[],
-			null
-		);
+		public function render_page(): void {
+			?>
+			<div class="wrap nw-admin-wrap nw-scenarios-admin">
+				<h1>Scenarios</h1>
 
-		wp_enqueue_style(
-			'nw-scenarios-css',
-			plugin_dir_url( __FILE__ ) . '../assets/css/scenarios-admin.css',
-			[ 'chakra-petch' ],
-			'1.0.0'
-		);
+				<div id="nw-notice" style="display:none;margin:12px 0;padding:10px 12px;border-radius:8px;"></div>
 
-		wp_enqueue_script(
-			'nw-scenarios-js',
-			plugin_dir_url( __FILE__ ) . '../assets/js/scenarios-admin.js',
-			[ 'jquery' ],
-			'1.0.0',
-			true
-		);
+				<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 18px;">
+					<input type="text" id="nw-search" class="regular-text" placeholder="Search scenarios…">
 
-		wp_localize_script(
-			'nw-scenarios-js',
-			'NWScenarios',
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'nw_scenarios_nonce' ),
-			]
-		);
-	}
+					<select id="nw-filter-type">
+						<option value="">All types</option>
+						<?php foreach ( self::TYPES as $type ) : ?>
+							<option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
 
-	// ── page HTML ─────────────────────────────────────────────────────────
+					<select id="nw-filter-category">
+						<option value="">All categories</option>
+						<?php foreach ( self::CATEGORIES as $category ) : ?>
+							<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( ucfirst( $category ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
 
-	public function render_page(): void {
-		?>
-		<div class="wrap nw-admin-wrap">
-			<h1 class="nw-admin-heading">🎭 Scenarios</h1>
+					<select id="nw-filter-difficulty">
+						<option value="">All difficulties</option>
+						<option value="1">1</option>
+						<option value="2">2</option>
+						<option value="3">3</option>
+						<option value="4">4</option>
+						<option value="5">5</option>
+					</select>
 
-			<div id="nw-notice" class="nw-notice" style="display:none"></div>
+					<button id="nw-refresh-btn" class="button">Refresh</button>
+					<button id="nw-add-btn" class="button button-primary">+ Add Scenario</button>
+				</div>
 
-			<div class="nw-toolbar">
-				<button id="nw-add-btn" class="nw-action-btn">+ Add Scenario</button>
-				<button id="nw-refresh-btn" class="nw-action-btn nw-action-btn--secondary">↺ Refresh</button>
-				<select id="nw-filter-difficulty">
-					<option value="">All Difficulties</option>
-					<option value="trivial">Trivial</option>
-					<option value="easy">Easy</option>
-					<option value="medium">Medium</option>
-					<option value="hard">Hard</option>
-					<option value="deadly">Deadly</option>
-				</select>
-				<input type="text" id="nw-search" placeholder="Search scenarios…" />
-			</div>
+				<div style="display:flex;gap:16px;margin-bottom:16px;">
+					<div><strong>Total:</strong> <span id="nw-total">0</span></div>
+					<div><strong>Active:</strong> <span id="nw-active-count">0</span></div>
+				</div>
 
-			<table class="nw-table" id="nw-scenarios-table">
-				<thead>
-					<tr>
-						<th>Title</th>
-						<th>Difficulty</th>
-						<th>Setting</th>
-						<th>Duration</th>
-						<th>Tags</th>
-						<th>Active</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody id="nw-scenarios-tbody"></tbody>
-			</table>
+				<table class="wp-list-table widefat striped" id="nw-scenarios-table">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Type</th>
+							<th>Category</th>
+							<th>Difficulty</th>
+							<th>Rewards</th>
+							<th>Active</th>
+							<th>Actions</th>
+						</tr>
+					</thead>
+					<tbody id="nw-scenarios-tbody">
+						<tr><td colspan="7" style="text-align:center;padding:32px;">Loading…</td></tr>
+					</tbody>
+				</table>
 
-			<!-- ─── Modal ─── -->
-			<div id="nw-modal-overlay" class="nw-modal-overlay" style="display:none">
-				<div class="nw-modal nw-modal--wide">
-					<div class="nw-modal-header">
-						<h2 id="nw-modal-title">Scenario</h2>
-						<button id="nw-modal-close" class="nw-modal-close">✕</button>
-					</div>
-					<form id="nw-scenario-form">
-						<input type="hidden" name="scenario_id" id="nw-field-id" />
+				<div id="nw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.74);z-index:9999;overflow-y:auto;padding:24px;">
+					<div style="max-width:1040px;margin:24px auto;background:#050505;color:#f2f2f2;border-radius:14px;border:1px solid #2b2b2b;padding:32px 28px;position:relative;">
+						<button id="nw-modal-close" style="position:absolute;right:14px;top:14px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer;line-height:1;">✕</button>
+						<h2 id="nw-modal-title" style="margin-top:0;margin-bottom:20px;">New Scenario</h2>
 
-						<!-- Tab nav -->
-						<div class="nw-tabs">
-							<button type="button" class="nw-tab active" data-tab="basic">Basic</button>
-							<button type="button" class="nw-tab" data-tab="objectives">Objectives</button>
-							<button type="button" class="nw-tab" data-tab="rewards">Rewards</button>
-							<button type="button" class="nw-tab" data-tab="prerequisites">Prerequisites</button>
-						</div>
+						<form id="nw-scenario-form">
+							<input type="hidden" id="nw-field-id" name="id">
 
-						<!-- Tab: Basic -->
-						<div class="nw-tab-panel active" id="nw-tab-basic">
-							<div class="nw-form-grid">
-								abel>Title *<input type="text" name="title" id="nw-field-title" required /></label>
-								abel>Setting<input type="text" name="setting" id="nw-field-setting" /></label>
-								abel class="nw-span-2">Description<textarea name="description" id="nw-field-desc" rows="4"></textarea></label>
-								abel>Difficulty
-									<select name="difficulty" id="nw-field-difficulty">
-										<option value="trivial">Trivial</option>
-										<option value="easy">Easy</option>
-										<option value="medium" selected>Medium</option>
-										<option value="hard">Hard</option>
-										<option value="deadly">Deadly</option>
-									</select>
-								</label>
-								abel>Duration (min)<input type="number" name="estimated_duration_minutes" id="nw-field-duration" value="60" min="0" /></label>
-								abel>Sort Order<input type="number" name="sort_order" id="nw-field-sort" value="0" /></label>
-								abel>Image URL<input type="url" name="image_url" id="nw-field-image" /></label>
-								abel>Tags (comma-separated)<input type="text" name="tags" id="nw-field-tags" /></label>
-								abel class="nw-checkbox-label"><input type="checkbox" name="is_active" id="nw-field-active" value="1" checked /> Active</label>
-							</div>
-						</div><!-- /tab-basic -->
+							<table class="form-table" role="presentation">
+								<tr>
+									<th><label for="nw-field-name">Name *</label></th>
+									<td><input type="text" id="nw-field-name" name="name" class="regular-text" required></td>
+								</tr>
 
-						<!-- Tab: Objectives -->
-						<div class="nw-tab-panel" id="nw-tab-objectives" style="display:none">
-							<p class="nw-help-text">Add objectives (one per line or JSON array).</p>
-							<textarea name="objectives" id="nw-field-objectives" rows="8" style="width:100%"></textarea>
-						</div>
+								<tr>
+									<th><label for="nw-field-type">Type</label></th>
+									<td>
+										<select id="nw-field-type" name="type">
+											<?php foreach ( self::TYPES as $type ) : ?>
+												<option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</td>
+								</tr>
 
-						<!-- Tab: Rewards -->
-						<div class="nw-tab-panel" id="nw-tab-rewards" style="display:none">
-							<p class="nw-help-text">Rewards as JSON object, e.g. {"xp":100,"credits":50}.</p>
-							<textarea name="rewards" id="nw-field-rewards" rows="6" style="width:100%"></textarea>
-						</div>
+								<tr>
+									<th><label for="nw-field-category">Category</label></th>
+									<td>
+										<select id="nw-field-category" name="category">
+											<?php foreach ( self::CATEGORIES as $category ) : ?>
+												<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( ucfirst( $category ) ); ?></option>
+											<?php endforeach; ?>
+										</select>
+									</td>
+								</tr>
 
-						<!-- Tab: Prerequisites -->
-						<div class="nw-tab-panel" id="nw-tab-prerequisites" style="display:none">
-							<p class="nw-help-text">Prerequisites as JSON object.</p>
-							<textarea name="prerequisites" id="nw-field-prerequisites" rows="6" style="width:100%"></textarea>
-						</div>
+								<tr>
+									<th><label for="nw-field-difficulty">Difficulty (1–5)</label></th>
+									<td><input type="number" id="nw-field-difficulty" name="difficulty" class="small-text" min="1" max="5" value="3"></td>
+								</tr>
 
-					</form><!-- /form -->
+								<tr>
+									<th><label for="nw-field-goal">Goal</label></th>
+									<td><textarea id="nw-field-goal" name="goal" class="large-text" rows="3"></textarea></td>
+								</tr>
 
-					<div class="nw-modal-footer">
-						<button id="nw-save-btn" class="nw-action-btn">Save</button>
-						<button id="nw-cancel-btn" class="nw-action-btn nw-action-btn--secondary">Cancel</button>
-						<button id="nw-delete-btn" class="nw-action-btn nw-action-btn--danger" style="display:none">Delete</button>
+								<tr>
+									<th><label for="nw-field-gm_instruction">GM Instruction</label></th>
+									<td><textarea id="nw-field-gm_instruction" name="gm_instruction" class="large-text" rows="3"></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-victory_condition">Victory Condition</label></th>
+									<td><textarea id="nw-field-victory_condition" name="victory_condition" class="large-text" rows="2"></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-fail_conditions">Fail Conditions</label></th>
+									<td><textarea id="nw-field-fail_conditions" name="fail_conditions" class="large-text" rows="2"></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-tags">Tags</label></th>
+									<td><input type="text" id="nw-field-tags" name="tags" class="large-text" placeholder="comma,separated,tags"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-required_tags">Required Tags</label></th>
+									<td><textarea id="nw-field-required_tags" name="required_tags" class="large-text" rows="2" placeholder='["city","night"] or one per line'></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-success_tags">Success Tags</label></th>
+									<td><textarea id="nw-field-success_tags" name="success_tags" class="large-text" rows="2" placeholder='["saved","allied"] or one per line'></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-failure_tags">Failure Tags</label></th>
+									<td><textarea id="nw-field-failure_tags" name="failure_tags" class="large-text" rows="2" placeholder='["burned","enemy_alerted"] or one per line'></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-reward_credits">Reward Credits</label></th>
+									<td><input type="number" id="nw-field-reward_credits" name="reward_credits" class="small-text" min="0" value="100"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-reward_items">Reward Items</label></th>
+									<td><textarea id="nw-field-reward_items" name="reward_items" class="large-text" rows="3" placeholder='["item_slug"] or JSON array'></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-min_entropy">Min Entropy</label></th>
+									<td><input type="number" id="nw-field-min_entropy" name="min_entropy" class="small-text" min="0"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-max_entropy">Max Entropy</label></th>
+									<td><input type="number" id="nw-field-max_entropy" name="max_entropy" class="small-text" min="0"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-kingdom_tech">Kingdom Tech</label></th>
+									<td><input type="number" id="nw-field-kingdom_tech" name="kingdom_tech" class="small-text" min="0" max="5"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-kingdom_magic">Kingdom Magic</label></th>
+									<td><input type="number" id="nw-field-kingdom_magic" name="kingdom_magic" class="small-text" min="0" max="5"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-kingdom_wealth">Kingdom Wealth</label></th>
+									<td><input type="number" id="nw-field-kingdom_wealth" name="kingdom_wealth" class="small-text" min="0" max="5"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-area_id">Area ID</label></th>
+									<td><input type="text" id="nw-field-area_id" name="area_id" class="regular-text"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-required_archetype_id">Required Archetype ID</label></th>
+									<td><input type="number" id="nw-field-required_archetype_id" name="required_archetype_id" class="small-text" min="1"></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-giver_npc_tag">Giver NPC Tag</label></th>
+									<td><textarea id="nw-field-giver_npc_tag" name="giver_npc_tag" class="large-text" rows="2" placeholder='["merchant"] or JSON'></textarea></td>
+								</tr>
+
+								<tr>
+									<th><label for="nw-field-img_url">Image URL</label></th>
+									<td><input type="url" id="nw-field-img_url" name="img_url" class="large-text"></td>
+								</tr>
+
+								<tr>
+									<th>Flags</th>
+									<td>
+										<label><input type="checkbox" id="nw-field-is_boss" name="is_boss"> Is boss</label><br>
+										<label><input type="checkbox" id="nw-field-is_key_arc" name="is_key_arc"> Is key arc</label><br>
+										<label><input type="checkbox" id="nw-field-is_repeatable" name="is_repeatable"> Is repeatable</label><br>
+										<label><input type="checkbox" id="nw-field-is_active" name="is_active" checked> Is active</label>
+									</td>
+								</tr>
+							</table>
+						</form>
+
+						<p style="margin-top:20px;">
+							<button id="nw-save-btn" class="button button-primary">Save Scenario</button>
+							<button id="nw-cancel-btn" class="button" style="margin-left:8px;">Cancel</button>
+							<button id="nw-delete-btn" class="button button-link-delete" style="display:none;margin-left:16px;">Delete</button>
+						</p>
+
+						<div id="nw-form-notice" role="alert" aria-live="polite"></div>
 					</div>
 				</div>
-			</div><!-- /modal-overlay -->
-		</div><!-- /wrap -->
-		<?php
-	}
+			</div>
+			<?php
+		}
 
-	// ── helpers ───────────────────────────────────────────────────────────
+		private function supa( string $method, string $path, array $body = [], array $extra_headers = [] ): array {
+			if ( empty( $this->supabase_url ) || empty( $this->supabase_key ) ) {
+				return [
+					'ok'    => false,
+					'code'  => 0,
+					'data'  => null,
+					'error' => 'Supabase configuration not available.',
+				];
+			}
 
-	/**
-	 * Low-level Supabase request helper using WP HTTP API.
-	 *
-	 * @param string $method  HTTP method.
-	 * @param string $path    PostgREST path (table + query string).
-	 * @param array  $body    Request body.
-	 * @param array  $extra   Extra headers.
-	 *
-	 * @return array{ok:bool,code:int,data:mixed,error:?string}
-	 */
-	private function supa( string $method, string $path, array $body = [], array $extra = [] ): array {
-		if ( empty( $this->supabase_url ) || empty( $this->supabase_key ) ) {
-			return [
-				'ok'    => false,
-				'code'  => 0,
-				'data'  => null,
-				'error' => 'Supabase configuration not available.',
+			$headers = array_merge(
+				[
+					'apikey'        => $this->supabase_key,
+					'Authorization' => 'Bearer ' . $this->supabase_key,
+					'Content-Type'  => 'application/json',
+				],
+				$extra_headers
+			);
+
+			$args = [
+				'method'  => strtoupper( $method ),
+				'timeout' => 20,
+				'headers' => $headers,
 			];
-		}
 
-		$method = strtoupper( $method );
+			if ( ! empty( $body ) ) {
+				$args['body'] = wp_json_encode( $body );
+			}
 
-		$headers = array_merge(
-			[
-				'apikey'        => $this->supabase_key,
-				'Authorization' => 'Bearer ' . $this->supabase_key,
-				'Content-Type'  => 'application/json',
-			],
-			$extra
-		);
+			$url      = $this->supabase_url . '/rest/v1/' . ltrim( $path, '/' );
+			$response = wp_remote_request( $url, $args );
 
-		$args = [
-			'method'  => $method,
-			'timeout' => 15,
-			'headers' => $headers,
-		];
+			if ( is_wp_error( $response ) ) {
+				return [
+					'ok'    => false,
+					'code'  => 0,
+					'data'  => null,
+					'error' => $response->get_error_message(),
+				];
+			}
 
-		if ( ! empty( $body ) ) {
-			$args['body'] = wp_json_encode( $body );
-		}
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			$raw  = wp_remote_retrieve_body( $response );
+			$data = json_decode( $raw, true );
 
-		$url = rtrim( $this->supabase_url, '/' ) . '/rest/v1/' . ltrim( $path, '/' );
+			if ( $code >= 400 ) {
+				$msg = is_array( $data ) && isset( $data['message'] )
+					? $data['message']
+					: 'Supabase error ' . $code;
 
-		$response = wp_remote_request( $url, $args );
-
-		if ( is_wp_error( $response ) ) {
-			return [
-				'ok'    => false,
-				'code'  => 0,
-				'data'  => null,
-				'error' => $response->get_error_message(),
-			];
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( $code >= 400 ) {
-			$msg = is_array( $data ) && isset( $data['message'] )
-				? $data['message']
-				: 'Supabase error ' . $code;
+				return [
+					'ok'    => false,
+					'code'  => $code,
+					'data'  => $data,
+					'error' => $msg,
+				];
+			}
 
 			return [
-				'ok'    => false,
+				'ok'    => true,
 				'code'  => $code,
 				'data'  => $data,
-				'error' => $msg,
+				'error' => null,
 			];
 		}
 
-		return [
-			'ok'    => true,
-			'code'  => $code,
-			'data'  => $data,
-			'error' => null,
-		];
-	}
+		private function parse_csv_tags( $value ): array {
+			$value = trim( (string) $value );
 
-	/**
-	 * Decode textarea input that may be either:
-	 * - plain text (one item per line)  → convert to array
-	 * - JSON array                      → array
-	 * - JSON object                     → assoc array
-	 *
-	 * @param string $raw
-	 * @return mixed
-	 */
-	private function decode_textarea_field( string $raw ) {
-		$raw = trim( $raw );
-		if ( $raw === '' ) {
-			return [];
+			if ( '' === $value ) {
+				return [];
+			}
+
+			$items = array_map( 'trim', explode( ',', $value ) );
+			$items = array_map( 'sanitize_text_field', $items );
+
+			return array_values( array_filter( array_unique( $items ), static fn( $v ) => '' !== $v ) );
 		}
 
-		$decoded = json_decode( $raw, true );
-		if ( json_last_error() === JSON_ERROR_NONE ) {
-			return $decoded;
-		}
+		private function parse_json_or_lines( $raw ): array {
+			$raw = trim( (string) $raw );
 
-		// Plain text → array of non-empty lines.
-		return array_values(
-			array_filter(
-				array_map(
-					'trim',
-					preg_split( '/\r\n|\r|\n/', $raw )
+			if ( '' === $raw ) {
+				return [];
+			}
+
+			$decoded = json_decode( $raw, true );
+			if ( JSON_ERROR_NONE === json_last_error() ) {
+				if ( is_array( $decoded ) ) {
+					return $decoded;
+				}
+				return [];
+			}
+
+			return array_values(
+				array_filter(
+					array_map(
+						'trim',
+						preg_split( '/\r\n|\r|\n/', $raw )
+					)
 				)
-			)
-		);
-	}
-
-	// ── AJAX: get all ─────────────────────────────────────────────────────
-
-	public function ajax_get_all(): void {
-		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
+			);
 		}
 
-		$difficulty = sanitize_text_field( $_POST['filter_difficulty'] ?? '' );
-		$qs         = $this->table . '?order=sort_order.asc,title.asc&select=*';
+		private function clamp_nullable_int( $value, int $min, int $max ): ?int {
+			if ( '' === (string) $value || null === $value ) {
+				return null;
+			}
 
-		if ( $difficulty ) {
-			$qs .= '&difficulty=eq.' . rawurlencode( $difficulty );
+			$n = (int) $value;
+			return max( $min, min( $max, $n ) );
 		}
 
-		$res = $this->supa( 'GET', $qs );
+		public function ajax_get_all(): void {
+			check_ajax_referer( $this->nonce_action, 'nonce' );
 
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to load scenarios.' );
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
+
+			$type       = sanitize_text_field( wp_unslash( $_POST['filter_type'] ?? '' ) );
+			$category   = sanitize_text_field( wp_unslash( $_POST['filter_category'] ?? '' ) );
+			$difficulty = sanitize_text_field( wp_unslash( $_POST['filter_difficulty'] ?? '' ) );
+
+			$qs = $this->table . '?select=*&order=id.desc';
+
+			if ( $type && in_array( $type, self::TYPES, true ) ) {
+				$qs .= '&type=eq.' . rawurlencode( $type );
+			}
+
+			if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
+				$qs .= '&category=eq.' . rawurlencode( $category );
+			}
+
+			if ( '' !== $difficulty ) {
+				$qs .= '&difficulty=eq.' . rawurlencode( (string) max( 1, min( 5, (int) $difficulty ) ) );
+			}
+
+			$res = $this->supa( 'GET', $qs );
+
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Failed to load scenarios.' );
+				return;
+			}
+
+			wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
 		}
 
-		wp_send_json_success( $res['data'] ?? [] );
-	}
+		public function ajax_get_one(): void {
+			check_ajax_referer( $this->nonce_action, 'nonce' );
 
-	// ── AJAX: get one (full record for editing) ───────────────────────────
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
 
-	public function ajax_get_one(): void {
-		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+			$id = (int) ( $_POST['id'] ?? 0 );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
+			if ( $id <= 0 ) {
+				wp_send_json_error( 'Missing ID' );
+				return;
+			}
+
+			$res = $this->supa(
+				'GET',
+				$this->table . '?id=eq.' . rawurlencode( (string) $id ) . '&select=*'
+			);
+
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Failed to fetch scenario.' );
+				return;
+			}
+
+			$data = is_array( $res['data'] ) ? $res['data'] : [];
+			$item = $data[0] ?? null;
+
+			if ( ! $item ) {
+				wp_send_json_error( 'Scenario not found' );
+				return;
+			}
+
+			wp_send_json_success( $item );
 		}
 
-		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+		public function ajax_save(): void {
+			check_ajax_referer( $this->nonce_action, 'nonce' );
 
-		if ( ! $id ) {
-			wp_send_json_error( 'Missing ID' );
-		}
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
 
-		$res = $this->supa(
-			'GET',
-			$this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*'
-		);
+			$id       = (int) ( $_POST['id'] ?? 0 );
+			$name     = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+			$type     = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'main' ) );
+			$category = sanitize_text_field( wp_unslash( $_POST['category'] ?? 'combat' ) );
 
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to fetch scenario.' );
-		}
+			if ( '' === $name ) {
+				wp_send_json_error( 'Name is required' );
+				return;
+			}
 
-		$data = $res['data'] ?? [];
+			if ( ! in_array( $type, self::TYPES, true ) ) {
+				wp_send_json_error( 'Invalid type' );
+				return;
+			}
 
-		if ( empty( $data ) ) {
-			wp_send_json_error( 'Not found' );
-		}
+			if ( ! in_array( $category, self::CATEGORIES, true ) ) {
+				wp_send_json_error( 'Invalid category' );
+				return;
+			}
 
-		wp_send_json_success( $data[0] );
-	}
+			$difficulty = max( 1, min( 5, (int) ( $_POST['difficulty'] ?? 3 ) ) );
 
-	// ── AJAX: save ────────────────────────────────────────────────────────
+			$min_entropy = $this->clamp_nullable_int( $_POST['min_entropy'] ?? null, 0, 999 );
+			$max_entropy = $this->clamp_nullable_int( $_POST['max_entropy'] ?? null, 0, 999 );
 
-	public function ajax_save(): void {
-		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
+			if ( null !== $min_entropy && null !== $max_entropy && $min_entropy > $max_entropy ) {
+				wp_send_json_error( 'Min entropy cannot be greater than max entropy' );
+				return;
+			}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
+			$payload = [
+				'name'                  => $name,
+				'type'                  => $type,
+				'category'              => $category,
+				'goal'                  => sanitize_textarea_field( wp_unslash( $_POST['goal'] ?? '' ) ) ?: null,
+				'gm_instruction'        => sanitize_textarea_field( wp_unslash( $_POST['gm_instruction'] ?? '' ) ) ?: null,
+				'tags'                  => $this->parse_csv_tags( wp_unslash( $_POST['tags'] ?? '' ) ),
+				'required_tags'         => $this->parse_json_or_lines( wp_unslash( $_POST['required_tags'] ?? '' ) ),
+				'success_tags'          => $this->parse_json_or_lines( wp_unslash( $_POST['success_tags'] ?? '' ) ),
+				'failure_tags'          => $this->parse_json_or_lines( wp_unslash( $_POST['failure_tags'] ?? '' ) ),
+				'victory_condition'     => sanitize_textarea_field( wp_unslash( $_POST['victory_condition'] ?? '' ) ) ?: null,
+				'fail_conditions'       => sanitize_textarea_field( wp_unslash( $_POST['fail_conditions'] ?? '' ) ) ?: null,
+				'difficulty'            => $difficulty,
+				'min_entropy'           => $min_entropy,
+				'max_entropy'           => $max_entropy,
+				'is_boss'               => ! empty( $_POST['is_boss'] ),
+				'is_key_arc'            => ! empty( $_POST['is_key_arc'] ),
+				'is_active'             => ! empty( $_POST['is_active'] ),
+				'area_id'               => sanitize_text_field( wp_unslash( $_POST['area_id'] ?? '' ) ) ?: null,
+				'img_url'               => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
+				'reward_credits'        => max( 0, (int) ( $_POST['reward_credits'] ?? 100 ) ),
+				'reward_items'          => $this->parse_json_or_lines( wp_unslash( $_POST['reward_items'] ?? '' ) ),
+				'kingdom_tech'          => $this->clamp_nullable_int( $_POST['kingdom_tech'] ?? null, 0, 5 ),
+				'kingdom_magic'         => $this->clamp_nullable_int( $_POST['kingdom_magic'] ?? null, 0, 5 ),
+				'kingdom_wealth'        => $this->clamp_nullable_int( $_POST['kingdom_wealth'] ?? null, 0, 5 ),
+				'required_archetype_id' => ( '' !== (string) ( $_POST['required_archetype_id'] ?? '' ) ) ? max( 1, (int) $_POST['required_archetype_id'] ) : null,
+				'giver_npc_tag'         => $this->parse_json_or_lines( wp_unslash( $_POST['giver_npc_tag'] ?? '' ) ),
+				'is_repeatable'         => ! empty( $_POST['is_repeatable'] ),
+			];
 
-		$title = sanitize_text_field( $_POST['title'] ?? '' );
-		if ( ! $title ) {
-			wp_send_json_error( 'Title is required' );
-		}
-
-		$tags = array_values(
-			array_filter(
-				array_map(
-					'trim',
-					explode( ',', sanitize_text_field( $_POST['tags'] ?? '' ) )
+			$res = $id > 0
+				? $this->supa(
+					'PATCH',
+					$this->table . '?id=eq.' . rawurlencode( (string) $id ),
+					$payload,
+					[ 'Prefer' => 'return=representation' ]
 				)
-			)
-		);
+				: $this->supa(
+					'POST',
+					$this->table,
+					$payload,
+					[ 'Prefer' => 'return=representation' ]
+				);
 
-		$objectives    = $this->decode_textarea_field( wp_unslash( $_POST['objectives']    ?? '' ) );
-		$rewards       = $this->decode_textarea_field( wp_unslash( $_POST['rewards']       ?? '' ) );
-		$prerequisites = $this->decode_textarea_field( wp_unslash( $_POST['prerequisites'] ?? '' ) );
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Save failed.' );
+				return;
+			}
 
-		$payload = [
-			'title'                      => $title,
-			'description'                => sanitize_textarea_field( $_POST['description'] ?? '' ),
-			'difficulty'                 => sanitize_text_field( $_POST['difficulty'] ?? 'medium' ),
-			'setting'                    => sanitize_text_field( $_POST['setting'] ?? '' ),
-			'objectives'                 => $objectives,
-			'rewards'                    => $rewards,
-			'prerequisites'              => $prerequisites,
-			'tags'                       => $tags,
-			'is_active'                  => ! empty( $_POST['is_active'] ),
-			'sort_order'                 => (int) ( $_POST['sort_order'] ?? 0 ),
-			'image_url'                  => esc_url_raw( $_POST['image_url'] ?? '' ),
-			'estimated_duration_minutes' => (int) ( $_POST['estimated_duration_minutes'] ?? 60 ),
-		];
+			$data = $res['data'];
+			$item = is_array( $data ) && isset( $data[0] ) ? $data[0] : $data;
 
-		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
+			wp_send_json_success( $item );
+		}
 
-		if ( $id ) {
+		public function ajax_toggle(): void {
+			check_ajax_referer( $this->nonce_action, 'nonce' );
+
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
+
+			$id        = (int) ( $_POST['id'] ?? 0 );
+			$is_active = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
+
+			if ( $id <= 0 ) {
+				wp_send_json_error( 'Missing ID' );
+				return;
+			}
+
 			$res = $this->supa(
 				'PATCH',
-				$this->table . '?id=eq.' . rawurlencode( $id ),
-				$payload,
-				[ 'Prefer' => 'return=representation' ]
+				$this->table . '?id=eq.' . rawurlencode( (string) $id ),
+				[ 'is_active' => $is_active ]
 			);
-		} else {
+
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Toggle failed.' );
+				return;
+			}
+
+			wp_send_json_success(
+				[
+					'id'        => $id,
+					'is_active' => $is_active,
+				]
+			);
+		}
+
+		public function ajax_delete(): void {
+			check_ajax_referer( $this->nonce_action, 'nonce' );
+
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Forbidden', 403 );
+				return;
+			}
+
+			$id = (int) ( $_POST['id'] ?? 0 );
+
+			if ( $id <= 0 ) {
+				wp_send_json_error( 'Missing ID' );
+				return;
+			}
+
 			$res = $this->supa(
-				'POST',
-				$this->table,
-				$payload,
-				[ 'Prefer' => 'return=representation' ]
+				'DELETE',
+				$this->table . '?id=eq.' . rawurlencode( (string) $id ),
+				[],
+				[ 'Prefer' => '' ]
 			);
+
+			if ( ! $res['ok'] ) {
+				wp_send_json_error( $res['error'] ?? 'Delete failed.' );
+				return;
+			}
+
+			wp_send_json_success( 'deleted' );
 		}
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Save failed.' );
-		}
-
-		$data = $res['data'] ?? [];
-		$item = is_array( $data ) && isset( $data[0] ) ? $data[0] : $data;
-
-		wp_send_json_success( $item );
-	}
-
-	// ── AJAX: toggle active ───────────────────────────────────────────────
-
-	public function ajax_toggle(): void {
-		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
-
-		$id    = sanitize_text_field( $_POST['scenario_id'] ?? '' );
-		$state = filter_var( $_POST['is_active'] ?? false, FILTER_VALIDATE_BOOLEAN );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Missing ID' );
-		}
-
-		$res = $this->supa(
-			'PATCH',
-			$this->table . '?id=eq.' . rawurlencode( $id ),
-			[ 'is_active' => $state ]
-		);
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Toggle failed.' );
-		}
-
-		wp_send_json_success( [ 'is_active' => $state ] );
-	}
-
-	// ── AJAX: delete ──────────────────────────────────────────────────────
-
-	public function ajax_delete(): void {
-		check_ajax_referer( 'nw_scenarios_nonce', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
-
-		$id = sanitize_text_field( $_POST['scenario_id'] ?? '' );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Missing ID' );
-		}
-
-		$res = $this->supa(
-			'DELETE',
-			$this->table . '?id=eq.' . rawurlencode( $id ),
-			[],
-			[ 'Prefer' => '' ]
-		);
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Delete failed.' );
-		}
-
-		wp_send_json_success( 'deleted' );
 	}
 }
 
-new NeoWeaver_Scenarios_Admin();
+add_action(
+	'plugins_loaded',
+	static function () {
+		if ( class_exists( 'NeoWeaver_Scenarios_Admin' ) ) {
+			new NeoWeaver_Scenarios_Admin();
+		}
+	},
+	20
+);
