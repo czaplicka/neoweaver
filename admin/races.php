@@ -369,21 +369,20 @@ if ( ! class_exists( 'NeoWeaver_Races_Admin' ) ) {
 		return;
 	}
 
-	$res = NW_Supabase::get_one( $this->table, $id );
+	$rows = $this->cached_get_all( $this->table, 'name' );
 
-	if ( isset( $res['error'] ) ) {
-		wp_send_json_error( $res['error'] );
+	if ( isset( $rows['error'] ) ) {
+		wp_send_json_error( $rows['error'] );
 		return;
 	}
 
-	$data = $res['data'] ?? null;
+	$item = null;
 
-	if ( is_array( $data ) && isset( $data[0] ) && is_array( $data[0] ) ) {
-		$item = $data[0];
-	} elseif ( is_array( $data ) ) {
-		$item = $data;
-	} else {
-		$item = null;
+	foreach ( $rows as $row ) {
+		if ( isset( $row['id'] ) && (string) $row['id'] === (string) $id ) {
+			$item = $row;
+			break;
+		}
 	}
 
 	if ( ! $item ) {
