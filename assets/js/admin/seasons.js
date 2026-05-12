@@ -1,212 +1,418 @@
 /**
  * NeoWeaver Admin — Seasons Config
- * Extracted from class-nw-seasons-admin.php
+ * Works with the updated Seasons PHP backend.
  *
- * Expects globals injected via wp_localize_script('nw-seasons-admin'):
- *   nwSeasonsData.nonce, nwSeasonsData.ajax, nwSeasonsData.weights
+ * Expects:
+ *   nwSeasonsData.nonce
+ *   nwSeasonsData.ajax
+ *   nwSeasonsData.weights
  */
-(function($){
-	const NONCE   = nwSeasonsData.nonce;
-	const AJAX    = nwSeasonsData.ajax;
-	const WEIGHTS = nwSeasonsData.weights; // { weight_sun:"Sun", … }
-	const W_KEYS  = Object.keys(WEIGHTS);
+/* global nwSeasonsData, jQuery */
+(function ($) {
+	'use strict';
 
-	/* colour map for mini table bar */
-	const W_COLORS = {
-		weight_sun:'#ffd700', weight_cloudy:'#9e9e9e',
-		weight_rain:'#4fc3f7', weight_fog:'#b0bec5',
-		weight_storm:'#7e57c2', weight_snow:'#e0f7fa'
+	var cfg = window.nwSeasonsData || {};
+	var NONCE = cfg.nonce || '';
+	var AJAX = cfg.ajax || '';
+	var WEIGHTS = cfg.weights || {};
+	var W_KEYS = Object.keys(WEIGHTS);
+
+	var W_COLORS = {
+		weight_sun: '#ffd700',
+		weight_cloudy: '#9e9e9e',
+		weight_rain: '#4fc3f7',
+		weight_fog: '#b0bec5',
+		weight_storm: '#7e57c2',
+		weight_snow: '#e0f7fa'
 	};
 
-	function post(action, data){
-		return $.post(AJAX, Object.assign({action, nonce:NONCE}, data));
+	function esc(s) {
+		return $('<span>').text(s == null ? '' : String(s)).html();
 	}
-	const esc = s => $('<span>').text(s).html();
 
-	/* ── load list ─────────────────────────────────── */
-	function loadList(){
-		$('#nw-season-table-wrap').html('<div class="nw-spinner" style="margin:40px auto;display:block;"></div>');
-		post('nw_season_list').done(function(res){
-			if(!res.success){ $('#nw-season-table-wrap').html('<p style="color:#ff6b6b;">'+esc(res.data)+'</p>'); return; }
-			renderTable(res.data);
-		}).fail(function(){
-			$('#nw-season-table-wrap').html('<p style="color:#ff6b6b;">Request failed.</p>');
+	function normalizeError(res, fallback) {
+		if (res && typeof res.data === 'string' && res.data.trim()) {
+			return res.data.trim();
+		}
+		if (res && res.data && typeof res.data.message === 'string' && res.data.message.trim()) {
+			return res.data.message.trim();
+		}
+		return fallback || 'Request failed.';
+	}
+
+	function post(action, data) {
+		return $.post(AJAX, $.extend({}, { action: action, nonce: NONCE }, data || {}));
+	}
+
+	function setInlineError(msg) {
+		$('#nw-season-save-error').text(msg || '');
+	}
+
+	function setSaveButtonState(isBusy) {
+		$('#nw-season-save-btn')
+			.prop('disabled', !!isBusy)
+			.text(isBusy ? 'Saving…' : 'Save Season');
+	}
+
+	function setSeasonNameLocked(locked) {
+		$('#nw-season-name').prop('readonly', !!locked);
+	}
+
+	function getWeightValue(key) {
+		var n = parseInt($('#nw-' + key).val(), 10);
+		if (isNaN(n)) n = 0;
+		return Math.max(0, Math.min(100, n));
+	}
+
+	function getWeightsSum() {
+		var sum = 0;
+		W_KEYS.forEach(function (k) {
+			sum += getWeightValue(k);
 		});
+		return sum;
 	}
 
-	function renderTable(rows){
-		if(!rows.length){
+	function loadList() {
+		$('#nw-season-table-wrap').html('<div class="nw-spinner" style="margin:40px auto;display:block;"></div>');
+
+		post('nw_season_list')
+			.done(function (res) {
+				if (!res || !res.success) {
+					$('#nw-season-table-wrap').html('<p style="color:#ff6b6b;">' + esc(normalizeError(res, 'Could not load seasons.')) + '</p>');
+					return;
+				}
+				renderTable(Array.isArray(res.data) ? res.data : []);
+			})
+			.fail(function (xhr) {
+				var msg = 'Request failed.';
+				if (xhr && xhr.responseJSON) {
+					msg = normalizeError(xhr.responseJSON, msg);
+				}
+				$('#nw-season-table-wrap').html('<p style="color:#ff6b6b;">' + esc(msg) + '</p>');
+			});
+	}
+
+	function renderTable(rows) {
+		if (!rows.length) {
 			$('#nw-season-table-wrap').html('<div class="nw-empty"><p>No seasons configured yet.</p><p style="font-size:.8rem">Add one with the button above.</p></div>');
 			return;
 		}
-		let html = '<table class="nw-season-table"><thead><tr>'
-			+'<th>Name</th><th>Icon</th><th>Color</th><th>Temp ×</th><th>Sort</th><th>Weather Distribution</th><th>Actions</th>'
-			+'</tr></thead><tbody>';
-		rows.forEach(r => {
-			const dot = r.color ? `<span class="nw-color-dot" style="background:${esc(r.color)};"></span>` : '';
-			const icon = r.icon ? `<span style="font-size:1.2rem">${esc(r.icon)}</span>` : '—';
 
-			/* mini bar */
-			let miniBar = '<div class="nw-mini-bar">';
-			W_KEYS.forEach(k => {
-				const w = r[k] || 0;
-				if(w > 0) miniBar += `<div class="nw-mini-seg" style="width:${w}%;background:${W_COLORS[k]};" title="${WEIGHTS[k]}: ${w}%"></div>`;
+		var html = ''
+			+ '<table class="nw-season-table">'
+			+ '<thead><tr>'
+			+ '<th>Name</th><th>Icon</th><th>Color</th><th>Temp ×</th><th>Sort</th><th>Weather Distribution</th><th>Actions</th>'
+			+ '</tr></thead><tbody>';
+
+		rows.forEach(function (r) {
+			var seasonName = r && r.season_name ? String(r.season_name) : '';
+			var icon = r && r.icon ? '<span style="font-size:1.2rem">' + esc(r.icon) + '</span>' : '—';
+			var colorText = r && r.color ? esc(r.color) : '<span style="color:var(--nw-muted)">—</span>';
+			var dot = r && r.color ? '<span class="nw-color-dot" style="background:' + esc(r.color) + ';"></span>' : '';
+			var sortOrder = (r && r.sort_order != null) ? r.sort_order : 0;
+
+			var miniBar = '<div class="nw-mini-bar">';
+			W_KEYS.forEach(function (k) {
+				var w = parseInt(r[k], 10) || 0;
+				if (w > 0) {
+					miniBar += '<div class="nw-mini-seg" style="width:' + w + '%;background:' + W_COLORS[k] + ';" title="' + esc(WEIGHTS[k] + ': ' + w + '%') + '"></div>';
+				}
 			});
 			miniBar += '</div>';
-			const sumLabel = W_KEYS.reduce((s,k)=>s+(r[k]||0),0);
-			miniBar += `<span style="font-size:.7rem;color:var(--nw-muted);margin-left:6px;">${sumLabel}%</span>`;
 
-			html += `<tr>
-				<td><strong>${esc(r.season_name)}</strong></td>
-				<td>${icon}</td>
-				<td>${dot}${r.color ? esc(r.color) : '<span style="color:var(--nw-muted)">—</span>'}</td>
-				<td>${r.temp_modifier}</td>
-				<td style="color:var(--nw-muted)">${r.sort_order ?? 0}</td>
-				<td><div style="display:flex;align-items:center;">${miniBar}</div></td>
-				<td><div class="nw-tbl-actions">
-					<button class="nw-btn nw-btn-ghost nw-btn-xs nw-edit-btn" data-name="${esc(r.season_name)}">Edit</button>
-					<button class="nw-btn nw-btn-danger nw-btn-xs nw-delete-btn" data-name="${esc(r.season_name)}">Delete</button>
-				</div></td>
-			</tr>`;
+			var sumLabel = W_KEYS.reduce(function (s, k) {
+				return s + (parseInt(r[k], 10) || 0);
+			}, 0);
+
+			html += ''
+				+ '<tr>'
+				+ '<td><strong>' + esc(seasonName) + '</strong></td>'
+				+ '<td>' + icon + '</td>'
+				+ '<td>' + dot + colorText + '</td>'
+				+ '<td>' + esc(r.temp_modifier) + '</td>'
+				+ '<td style="color:var(--nw-muted)">' + esc(sortOrder) + '</td>'
+				+ '<td><div style="display:flex;align-items:center;">' + miniBar + '<span style="font-size:.7rem;color:var(--nw-muted);margin-left:6px;">' + esc(sumLabel) + '%</span></div></td>'
+				+ '<td><div class="nw-tbl-actions">'
+				+ '<button type="button" class="nw-btn nw-btn-ghost nw-btn-xs nw-edit-btn" data-name="' + esc(seasonName) + '">Edit</button>'
+				+ '<button type="button" class="nw-btn nw-btn-danger nw-btn-xs nw-delete-btn" data-name="' + esc(seasonName) + '">Delete</button>'
+				+ '</div></td>'
+				+ '</tr>';
 		});
+
 		html += '</tbody></table>';
 		$('#nw-season-table-wrap').html(html);
 	}
 
-	/* ── weight live update ─────────────────────────── */
-	function updateWeightUI(){
-		let sum = 0;
-		W_KEYS.forEach(k => {
-			const val = parseInt($('#nw-'+k).val(),10)||0;
+	function updateWeightUI() {
+		var sum = 0;
+
+		W_KEYS.forEach(function (k) {
+			var val = getWeightValue(k);
 			sum += val;
-			$('#nw-'+k+'-pct').text(val+'%');
-			$('#nw-'+k+'-range').val(val);
-			$('#nw-bar-'+k.replace('weight_','')).css('width', val+'%');
+			$('#nw-' + k).val(val);
+			$('#nw-' + k + '-pct').text(val + '%');
+			$('#nw-' + k + '-range').val(val);
+			$('#nw-bar-' + k.replace('weight_', '')).css('width', val + '%');
 		});
+
 		$('#nw-weights-sum').text(sum);
-		const badge = $('#nw-weights-sum-badge');
-		badge.toggleClass('ok', sum===100).toggleClass('bad', sum!==100);
-		$('#nw-season-save-btn').prop('disabled', sum!==100);
+
+		var $badge = $('#nw-weights-sum-badge');
+		$badge.toggleClass('ok', sum === 100).toggleClass('bad', sum !== 100);
+
+		var tempVal = parseFloat($('#nw-season-temp').val());
+		var tempOk = !isNaN(tempVal) && tempVal > 0;
+
+		$('#nw-season-save-btn').prop('disabled', !(sum === 100 && tempOk));
 	}
 
-	/* sync range → number */
-	$(document).on('input','.nw-weight-range',function(){
-		const target = $(this).data('target');
-		$('#'+target).val($(this).val());
-		updateWeightUI();
-	});
-	$(document).on('input','.nw-weight-num',function(){
-		const id = $(this).attr('id');
-		$('#'+id+'-range').val($(this).val());
-		updateWeightUI();
-	});
+	function resetForm() {
+		var form = $('#nw-season-form')[0];
+		if (form) {
+			form.reset();
+		}
 
-	/* color picker sync */
-	$(document).on('input','#nw-season-color-picker',function(){
-		$('#nw-season-color').val($(this).val());
-	});
-	$(document).on('input','#nw-season-color',function(){
-		const v = $(this).val();
-		if(/^#[0-9a-fA-F]{6}$/.test(v)) $('#nw-season-color-picker').val(v);
-	});
-
-	/* ── modal helpers ──────────────────────────────── */
-	function openModal(title){
-		$('#nw-season-modal-title').text(title);
-		$('#nw-season-save-error').text('');
-		$('#nw-season-modal').show();
-		$('#nw-season-name').focus();
-		updateWeightUI();
-	}
-	function closeModal(){
-		$('#nw-season-modal').hide();
-		$('#nw-season-form')[0].reset();
 		$('#nw-season-is-edit').val('0');
 		$('#nw-season-orig-name').val('');
+		$('#nw-season-name').val('');
+		$('#nw-season-desc').val('');
+		$('#nw-season-temp').val('1.00');
+		$('#nw-season-color').val('');
+		$('#nw-season-color-picker').val('#adff00');
+		$('#nw-season-icon').val('');
+		$('#nw-season-sort').val('0');
+
+		$('#nw-weight_sun').val(25);
+		$('#nw-weight_cloudy').val(25);
+		$('#nw-weight_rain').val(25);
+		$('#nw-weight_fog').val(25);
+		$('#nw-weight_storm').val(0);
+		$('#nw-weight_snow').val(0);
+
+		$('#nw-weight_sun-range').val(25);
+		$('#nw-weight_cloudy-range').val(25);
+		$('#nw-weight_rain-range').val(25);
+		$('#nw-weight_fog-range').val(25);
+		$('#nw-weight_storm-range').val(0);
+		$('#nw-weight_snow-range').val(0);
+
+		setSeasonNameLocked(false);
+		setInlineError('');
+		setSaveButtonState(false);
 		updateWeightUI();
 	}
 
-	function populateForm(r){
-		$('#nw-season-name').val(r.season_name);
-		$('#nw-season-orig-name').val(r.season_name);
+	function populateForm(r) {
+		$('#nw-season-name').val(r.season_name || '');
+		$('#nw-season-orig-name').val(r.season_name || '');
 		$('#nw-season-is-edit').val('1');
-		$('#nw-season-desc').val(r.description||'');
-		$('#nw-season-temp').val(r.temp_modifier);
-		$('#nw-season-color').val(r.color||'');
-		if(r.color && /^#[0-9a-fA-F]{6}$/.test(r.color)) $('#nw-season-color-picker').val(r.color);
-		$('#nw-season-icon').val(r.icon||'');
-		$('#nw-season-sort').val(r.sort_order??0);
-		W_KEYS.forEach(k => {
-			$('#nw-'+k).val(r[k]??0);
-			$('#nw-'+k+'-range').val(r[k]??0);
+		$('#nw-season-desc').val(r.description || '');
+		$('#nw-season-temp').val(r.temp_modifier != null ? r.temp_modifier : '1.00');
+		$('#nw-season-color').val(r.color || '');
+		if (r.color && /^#[0-9a-fA-F]{6}$/.test(r.color)) {
+			$('#nw-season-color-picker').val(r.color);
+		} else {
+			$('#nw-season-color-picker').val('#adff00');
+		}
+		$('#nw-season-icon').val(r.icon || '');
+		$('#nw-season-sort').val(r.sort_order != null ? r.sort_order : 0);
+
+		W_KEYS.forEach(function (k) {
+			var val = parseInt(r[k], 10);
+			if (isNaN(val)) val = 0;
+			val = Math.max(0, Math.min(100, val));
+			$('#nw-' + k).val(val);
+			$('#nw-' + k + '-range').val(val);
 		});
+
+		setSeasonNameLocked(true);
 		updateWeightUI();
 	}
 
-	function formToData(){
-		const data = {
-			season_name:      $('#nw-season-name').val(),
-			orig_season_name: $('#nw-season-orig-name').val(),
-			is_edit:          $('#nw-season-is-edit').val(),
-			description:      $('#nw-season-desc').val(),
-			temp_modifier:    $('#nw-season-temp').val(),
-			color:            $('#nw-season-color').val(),
-			icon:             $('#nw-season-icon').val(),
-			sort_order:       $('#nw-season-sort').val(),
+	function openModal(title) {
+		$('#nw-season-modal-title').text(title || 'Season');
+		setInlineError('');
+		$('#nw-season-modal').show();
+		updateWeightUI();
+		$('#nw-season-name').trigger('focus');
+	}
+
+	function closeModal() {
+		$('#nw-season-modal').hide();
+		resetForm();
+	}
+
+	function formToData() {
+		var data = {
+			season_name: ($('#nw-season-name').val() || '').trim(),
+			orig_season_name: ($('#nw-season-orig-name').val() || '').trim(),
+			is_edit: ($('#nw-season-is-edit').val() || '0'),
+			description: ($('#nw-season-desc').val() || '').trim(),
+			temp_modifier: ($('#nw-season-temp').val() || '').trim(),
+			color: ($('#nw-season-color').val() || '').trim(),
+			icon: ($('#nw-season-icon').val() || '').trim(),
+			sort_order: ($('#nw-season-sort').val() || '').trim()
 		};
-		W_KEYS.forEach(k => { data[k] = $('#nw-'+k).val(); });
+
+		W_KEYS.forEach(function (k) {
+			data[k] = getWeightValue(k);
+		});
+
 		return data;
 	}
 
-	/* ── events ─────────────────────────────────────── */
+	$(document).on('input', '.nw-weight-range', function () {
+		var target = $(this).data('target');
+		var val = parseInt($(this).val(), 10);
+		if (isNaN(val)) val = 0;
+		val = Math.max(0, Math.min(100, val));
+		$('#' + target).val(val);
+		updateWeightUI();
+	});
+
+	$(document).on('input', '.nw-weight-num', function () {
+		var id = $(this).attr('id');
+		var val = parseInt($(this).val(), 10);
+		if (isNaN(val)) val = 0;
+		val = Math.max(0, Math.min(100, val));
+		$(this).val(val);
+		$('#' + id + '-range').val(val);
+		updateWeightUI();
+	});
+
+	$(document).on('input', '#nw-season-temp', function () {
+		updateWeightUI();
+	});
+
+	$(document).on('input', '#nw-season-color-picker', function () {
+		$('#nw-season-color').val($(this).val());
+	});
+
+	$(document).on('input', '#nw-season-color', function () {
+		var v = ($(this).val() || '').trim();
+		if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+			$('#nw-season-color-picker').val(v);
+		}
+	});
+
 	$(document)
-		.on('click','#nw-season-add-btn',function(){
-			closeModal();
+		.on('click', '#nw-season-add-btn', function () {
+			resetForm();
 			openModal('Add Season');
 		})
-		.on('click','#nw-season-modal-close, #nw-season-cancel-btn', closeModal)
-		.on('click','#nw-season-modal',function(e){ if($(e.target).is('#nw-season-modal')) closeModal(); })
-		.on('keydown',function(e){ if(e.key==='Escape') closeModal(); })
-
-		.on('click','.nw-edit-btn',function(){
-			const name = $(this).data('name');
-			post('nw_season_get',{season_name:name}).done(function(res){
-				if(!res.success){ alert('Could not load season.'); return; }
-				populateForm(res.data);
-				openModal('Edit Season');
-			});
+		.on('click', '#nw-season-modal-close, #nw-season-cancel-btn', function () {
+			closeModal();
 		})
-
-		.on('click','.nw-delete-btn',function(){
-			const name = $(this).data('name');
-			if(!confirm('Delete season "'+name+'"? This cannot be undone.')) return;
-			post('nw_season_delete',{season_name:name}).done(function(res){
-				if(!res.success){ alert('Delete failed.'); return; }
-				loadList();
-			});
+		.on('click', '#nw-season-modal', function (e) {
+			if ($(e.target).is('#nw-season-modal')) {
+				closeModal();
+			}
 		})
+		.on('keydown', function (e) {
+			if (e.key === 'Escape' && $('#nw-season-modal').is(':visible')) {
+				closeModal();
+			}
+		})
+		.on('click', '.nw-edit-btn', function () {
+			var name = $(this).data('name');
 
-		.on('submit','#nw-season-form',function(e){
+			post('nw_season_get', { season_name: name })
+				.done(function (res) {
+					if (!res || !res.success) {
+						window.alert(normalizeError(res, 'Could not load season.'));
+						return;
+					}
+					resetForm();
+					populateForm(res.data || {});
+					openModal('Edit Season');
+				})
+				.fail(function (xhr) {
+					var msg = 'Could not load season.';
+					if (xhr && xhr.responseJSON) {
+						msg = normalizeError(xhr.responseJSON, msg);
+					}
+					window.alert(msg);
+				});
+		})
+		.on('click', '.nw-delete-btn', function () {
+			var name = $(this).data('name');
+
+			if (!window.confirm('Delete season "' + name + '"? This cannot be undone.')) {
+				return;
+			}
+
+			post('nw_season_delete', { season_name: name })
+				.done(function (res) {
+					if (!res || !res.success) {
+						window.alert(normalizeError(res, 'Delete failed.'));
+						return;
+					}
+					loadList();
+				})
+				.fail(function (xhr) {
+					var msg = 'Delete failed.';
+					if (xhr && xhr.responseJSON) {
+						msg = normalizeError(xhr.responseJSON, msg);
+					}
+					window.alert(msg);
+				});
+		})
+		.on('submit', '#nw-season-form', function (e) {
 			e.preventDefault();
-			$('#nw-season-save-btn').prop('disabled',true).text('Saving…');
-			$('#nw-season-save-error').text('');
-			post('nw_season_save', formToData())
-				.done(function(res){
-					if(!res.success){
-						$('#nw-season-save-error').text(res.data||'Save failed.');
-						$('#nw-season-save-btn').prop('disabled',false).text('Save Season');
+
+			var data = formToData();
+			var sum = getWeightsSum();
+			var tempVal = parseFloat(data.temp_modifier);
+
+			setInlineError('');
+
+			if (!data.season_name) {
+				setInlineError('Season name is required.');
+				return;
+			}
+
+			if (sum !== 100) {
+				setInlineError('Weather weights must sum to exactly 100.');
+				updateWeightUI();
+				return;
+			}
+
+			if (isNaN(tempVal) || tempVal <= 0) {
+				setInlineError('Temp modifier must be greater than 0.');
+				updateWeightUI();
+				return;
+			}
+
+			setSaveButtonState(true);
+
+			post('nw_season_save', data)
+				.done(function (res) {
+					if (!res || !res.success) {
+						setInlineError(normalizeError(res, 'Save failed.'));
+						setSaveButtonState(false);
 						return;
 					}
 					closeModal();
 					loadList();
 				})
-				.fail(function(){
-					$('#nw-season-save-error').text('Request failed.');
-					$('#nw-season-save-btn').prop('disabled',false).text('Save Season');
+				.fail(function (xhr) {
+					var msg = 'Request failed.';
+					if (xhr && xhr.responseJSON) {
+						msg = normalizeError(xhr.responseJSON, msg);
+					}
+					setInlineError(msg);
+					setSaveButtonState(false);
 				});
 		});
 
-	/* init */
-	$(document).ready(function(){ loadList(); });
+	$(document).ready(function () {
+		if (!AJAX || !NONCE) {
+			$('#nw-season-table-wrap').html('<p style="color:#ff6b6b;">Missing AJAX configuration.</p>');
+			return;
+		}
+
+		resetForm();
+		loadList();
+	});
 
 })(jQuery);
