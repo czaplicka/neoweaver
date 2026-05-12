@@ -88,14 +88,14 @@ if ( ! class_exists( 'NeoWeaver_Seasons_Admin' ) ) {
 
 			wp_enqueue_style(
 				'nw-seasons-admin',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/seasons.css',
 				[ 'chakra-petch' ],
 				$ver
 			);
 
 			wp_enqueue_script(
 				'nw-seasons-admin',
-				NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/admin/seasons.js',
 				[ 'jquery' ],
 				$ver,
 				true
