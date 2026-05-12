@@ -49,27 +49,23 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 				return;
 			}
 
-			$base = defined( 'NEOWEAVER_PLUGIN_URL' )
-				? trailingslashit( NEOWEAVER_PLUGIN_URL )
-				: plugin_dir_url( dirname( __FILE__ ) );
-
 			wp_enqueue_style(
 				'nw-admin-core',
-				$base . 'assets/css/admin/admin-core.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
 				[ 'nw-font-chakra-petch' ],
 				NEOWEAVER_VERSION
 			);
 
 			wp_enqueue_style(
 				'nw-skills-style',
-				$base . 'assets/css/admin/skills-admin.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/admin/skills.css',
 				[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 				NEOWEAVER_VERSION
 			);
 
 			wp_enqueue_script(
 				'nw-skills',
-				$base . 'assets/js/admin/skills-admin.js',
+				$base . 'assets/js/admin/skills.js',
 				[ 'jquery' ],
 				NEOWEAVER_VERSION,
 				true
