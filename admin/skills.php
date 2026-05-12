@@ -65,7 +65,7 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 
 			wp_enqueue_script(
 				'nw-skills',
-				$base . 'assets/js/admin/skills.js',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/admin/skills.js',
 				[ 'jquery' ],
 				NEOWEAVER_VERSION,
 				true
