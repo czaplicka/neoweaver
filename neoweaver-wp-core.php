@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Primary constants (NEOWEAVER_* namespace)
-define( 'NEOWEAVER_VERSION',     '0.7.1' );
+define( 'NEOWEAVER_VERSION',     '0.7.2' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 define( 'NEOWEAVER_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'NEOWEAVER_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
