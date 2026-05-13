@@ -1,4 +1,6 @@
 jQuery(function ($) {
+  "use strict";
+
   var $statChars = $("#nw-stat-characters");
   var $statWorlds = $("#nw-stat-worlds");
   var $statCampaigns = $("#nw-stat-campaigns");
@@ -23,8 +25,11 @@ jQuery(function ($) {
   var $chartCamps = $("#nw-chart-campaigns");
 
   var $rangeBtns = $(".nw-range-btn");
+  var $refreshBtn = $("#nw-refresh-dashboard");
+
   var currentRange = 30;
   var activeXhr = null;
+  var isRefreshing = false;
 
   var escapeMap = {
     "&": "&amp;",
@@ -46,9 +51,29 @@ jQuery(function ($) {
     return safeCssColorRe.test(String(color || "")) ? color : fallback;
   }
 
+  function hasDashData() {
+    return !!(
+      window.NWDashData &&
+      typeof window.NWDashData === "object" &&
+      window.NWDashData.ajaxurl &&
+      window.NWDashData.nonce
+    );
+  }
+
   function setRangeButtons(range) {
-    $rangeBtns.removeClass("is-active").attr("aria-pressed", "false");
-    $rangeBtns.filter('[data-range="' + range + '"]').addClass("is-active").attr("aria-pressed", "true");
+    $rangeBtns
+      .removeClass("is-active")
+      .attr("aria-pressed", "false");
+
+    $rangeBtns
+      .filter('[data-range="' + range + '"]')
+      .addClass("is-active")
+      .attr("aria-pressed", "true");
+  }
+
+  function setRefreshState(isBusy) {
+    isRefreshing = !!isBusy;
+    $refreshBtn.prop("disabled", isRefreshing).attr("aria-busy", isRefreshing ? "true" : "false");
   }
 
   function drawSparkline(el, series, color) {
@@ -205,6 +230,11 @@ jQuery(function ($) {
   }
 
   function loadDashboard(range) {
+    if (!hasDashData()) {
+      setErrorState("Dashboard configuration is missing.");
+      return;
+    }
+
     if (activeXhr) {
       activeXhr.abort();
       activeXhr = null;
@@ -213,16 +243,18 @@ jQuery(function ($) {
     currentRange = (range === 7 || range === 30) ? range : 30;
     setRangeButtons(currentRange);
     setLoadingState();
+    setRefreshState(true);
 
     activeXhr = $.post(
-      NWDashData.ajaxurl,
+      window.NWDashData.ajaxurl,
       {
         action: "nw_dashboard_data",
-        nonce: NWDashData.nonce,
+        nonce: window.NWDashData.nonce,
         range: currentRange
       },
       function (res) {
         activeXhr = null;
+        setRefreshState(false);
 
         if (!res || !res.success) {
           setErrorState((res && res.data) ? res.data : "Could not load dashboard data.");
@@ -240,7 +272,7 @@ jQuery(function ($) {
           setRangeButtons(currentRange);
         }
 
-        if (d._debug && NWDashData.debug === "1") {
+        if (d._debug && window.NWDashData.debug === "1" && window.console) {
           console.group("[NeoWeaver] Dashboard debug");
           console.log("Key type:", d._debug.key_type);
           console.table(d._debug.growth_meta);
@@ -273,6 +305,8 @@ jQuery(function ($) {
       }
     ).fail(function (xhr, status) {
       activeXhr = null;
+      setRefreshState(false);
+
       if (status === "abort") {
         return;
       }
@@ -281,27 +315,37 @@ jQuery(function ($) {
     });
   }
 
+  if (!hasDashData()) {
+    setErrorState("Dashboard configuration is missing.");
+    return;
+  }
+
   loadDashboard(currentRange);
 
-  var refreshTimeout = null;
-  $("#nw-refresh-dashboard").on("click", function () {
-    if (refreshTimeout) {
+  $refreshBtn.on("click", function () {
+    if (isRefreshing || activeXhr) {
       return;
     }
+
     loadDashboard(currentRange);
-    refreshTimeout = setTimeout(function () {
-      refreshTimeout = null;
-    }, 2000);
   });
 
   $rangeBtns.on("click", function () {
-    var nextRange = parseInt($(this).data("range"), 10);
+    var rawRange = $(this).attr("data-range");
+    var nextRange = parseInt(rawRange, 10);
+
+    if (Number.isNaN(nextRange)) {
+      return;
+    }
+
     if (nextRange !== 7 && nextRange !== 30) {
       return;
     }
+
     if (nextRange === currentRange) {
       return;
     }
+
     loadDashboard(nextRange);
   });
 });
