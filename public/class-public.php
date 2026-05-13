@@ -73,7 +73,7 @@ class Neoweaver_Public {
 		$url = NEOWEAVER_PLUGIN_URL;
 		$ver = NEOWEAVER_VERSION;
 		// ── Agents list ──────────────────────────────────────────────────────
-Neoweaver_Agents_List::enqueue_assets();
+		Neoweaver_Agents_List::enqueue_assets();
 
 		// ── Character creator ──────────────────────────────────────────────
 		wp_localize_script(
