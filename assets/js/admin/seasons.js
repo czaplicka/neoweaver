@@ -15,7 +15,28 @@
 	var NONCE = cfg.nonce || '';
 	var AJAX = cfg.ajax || '';
 	var WEIGHTS = cfg.weights || {};
-	var W_KEYS = Object.keys(WEIGHTS);
+
+	var WEIGHT_ORDER = [
+		'weight_sun',
+		'weight_cloudy',
+		'weight_rain',
+		'weight_fog',
+		'weight_storm',
+		'weight_snow'
+	];
+
+	var W_KEYS = WEIGHT_ORDER.filter(function (key) {
+		return Object.prototype.hasOwnProperty.call(WEIGHTS, key) || $('#nw-' + key).length;
+	});
+
+	var DEFAULT_WEIGHT_VALUES = {
+		weight_sun: 25,
+		weight_cloudy: 25,
+		weight_rain: 25,
+		weight_fog: 25,
+		weight_storm: 0,
+		weight_snow: 0
+	};
 
 	var W_COLORS = {
 		weight_sun: '#ffd700',
@@ -44,13 +65,37 @@
 		return $.post(AJAX, $.extend({}, { action: action, nonce: NONCE }, data || {}));
 	}
 
+	function setNotice(msg, type) {
+		var $el = $('#nw-notice');
+		var isError = type === 'error';
+
+		if (!$el.length) {
+			return;
+		}
+
+		$el.stop(true, true)
+			.attr('class', '')
+			.css({
+				display: 'block',
+				background: isError ? '#5c0000' : '#1a3300',
+				color: isError ? '#ff8080' : '#adff00'
+			})
+			.text(msg || '');
+
+		setTimeout(function () {
+			$el.fadeOut(250);
+		}, 3200);
+	}
+
 	function setInlineError(msg) {
 		$('#nw-season-save-error').text(msg || '');
 	}
 
-	function setSaveButtonState(isBusy) {
+	function setSaveButtonState(isBusy, disabledBecauseInvalid) {
+		var disabled = !!isBusy || !!disabledBecauseInvalid;
+
 		$('#nw-season-save-btn')
-			.prop('disabled', !!isBusy)
+			.prop('disabled', disabled)
 			.text(isBusy ? 'Saving…' : 'Save Season');
 	}
 
@@ -70,6 +115,45 @@
 			sum += getWeightValue(k);
 		});
 		return sum;
+	}
+
+	function getDefaultWeightValue(key) {
+		if (cfg.defaultWeightValues && Object.prototype.hasOwnProperty.call(cfg.defaultWeightValues, key)) {
+			var serverVal = parseInt(cfg.defaultWeightValues[key], 10);
+			if (!isNaN(serverVal)) {
+				return Math.max(0, Math.min(100, serverVal));
+			}
+		}
+
+		if (Object.prototype.hasOwnProperty.call(DEFAULT_WEIGHT_VALUES, key)) {
+			return DEFAULT_WEIGHT_VALUES[key];
+		}
+
+		return 0;
+	}
+
+	function validateFormState(showMessage) {
+		var sum = getWeightsSum();
+		var tempRaw = ($('#nw-season-temp').val() || '').trim();
+		var tempVal = parseFloat(tempRaw);
+		var error = '';
+
+		if (!($('#nw-season-name').val() || '').trim()) {
+			error = 'Season name is required.';
+		} else if (sum !== 100) {
+			error = 'Weather weights must sum to exactly 100.';
+		} else if (!tempRaw || isNaN(tempVal) || tempVal <= 0) {
+			error = 'Temp modifier must be greater than 0.';
+		}
+
+		if (showMessage) {
+			setInlineError(error);
+		} else if (!error) {
+			setInlineError('');
+		}
+
+		setSaveButtonState(false, !!error);
+		return !error;
 	}
 
 	function loadList() {
@@ -115,7 +199,7 @@
 			W_KEYS.forEach(function (k) {
 				var w = parseInt(r[k], 10) || 0;
 				if (w > 0) {
-					miniBar += '<div class="nw-mini-seg" style="width:' + w + '%;background:' + W_COLORS[k] + ';" title="' + esc(WEIGHTS[k] + ': ' + w + '%') + '"></div>';
+					miniBar += '<div class="nw-mini-seg" style="width:' + w + '%;background:' + W_COLORS[k] + ';" title="' + esc((WEIGHTS[k] || k) + ': ' + w + '%') + '"></div>';
 				}
 			});
 			miniBar += '</div>';
@@ -143,7 +227,7 @@
 		$('#nw-season-table-wrap').html(html);
 	}
 
-	function updateWeightUI() {
+	function updateWeightUI(showValidation) {
 		var sum = 0;
 
 		W_KEYS.forEach(function (k) {
@@ -160,10 +244,7 @@
 		var $badge = $('#nw-weights-sum-badge');
 		$badge.toggleClass('ok', sum === 100).toggleClass('bad', sum !== 100);
 
-		var tempVal = parseFloat($('#nw-season-temp').val());
-		var tempOk = !isNaN(tempVal) && tempVal > 0;
-
-		$('#nw-season-save-btn').prop('disabled', !(sum === 100 && tempOk));
+		validateFormState(!!showValidation);
 	}
 
 	function resetForm() {
@@ -182,24 +263,16 @@
 		$('#nw-season-icon').val('');
 		$('#nw-season-sort').val('0');
 
-		$('#nw-weight_sun').val(25);
-		$('#nw-weight_cloudy').val(25);
-		$('#nw-weight_rain').val(25);
-		$('#nw-weight_fog').val(25);
-		$('#nw-weight_storm').val(0);
-		$('#nw-weight_snow').val(0);
-
-		$('#nw-weight_sun-range').val(25);
-		$('#nw-weight_cloudy-range').val(25);
-		$('#nw-weight_rain-range').val(25);
-		$('#nw-weight_fog-range').val(25);
-		$('#nw-weight_storm-range').val(0);
-		$('#nw-weight_snow-range').val(0);
+		W_KEYS.forEach(function (k) {
+			var def = getDefaultWeightValue(k);
+			$('#nw-' + k).val(def);
+			$('#nw-' + k + '-range').val(def);
+		});
 
 		setSeasonNameLocked(false);
 		setInlineError('');
-		setSaveButtonState(false);
-		updateWeightUI();
+		setSaveButtonState(false, false);
+		updateWeightUI(false);
 	}
 
 	function populateForm(r) {
@@ -218,6 +291,10 @@
 		$('#nw-season-sort').val(r.sort_order != null ? r.sort_order : 0);
 
 		W_KEYS.forEach(function (k) {
+			if (!Object.prototype.hasOwnProperty.call(r, k)) {
+				setInlineError('Warning: season data is missing expected weight key "' + k + '".');
+			}
+
 			var val = parseInt(r[k], 10);
 			if (isNaN(val)) val = 0;
 			val = Math.max(0, Math.min(100, val));
@@ -226,14 +303,14 @@
 		});
 
 		setSeasonNameLocked(true);
-		updateWeightUI();
+		updateWeightUI(true);
 	}
 
 	function openModal(title) {
 		$('#nw-season-modal-title').text(title || 'Season');
 		setInlineError('');
 		$('#nw-season-modal').show();
-		updateWeightUI();
+		updateWeightUI(false);
 		$('#nw-season-name').trigger('focus');
 	}
 
@@ -267,7 +344,7 @@
 		if (isNaN(val)) val = 0;
 		val = Math.max(0, Math.min(100, val));
 		$('#' + target).val(val);
-		updateWeightUI();
+		updateWeightUI(true);
 	});
 
 	$(document).on('input', '.nw-weight-num', function () {
@@ -277,11 +354,11 @@
 		val = Math.max(0, Math.min(100, val));
 		$(this).val(val);
 		$('#' + id + '-range').val(val);
-		updateWeightUI();
+		updateWeightUI(true);
 	});
 
-	$(document).on('input', '#nw-season-temp', function () {
-		updateWeightUI();
+	$(document).on('input', '#nw-season-temp, #nw-season-name', function () {
+		updateWeightUI(true);
 	});
 
 	$(document).on('input', '#nw-season-color-picker', function () {
@@ -319,7 +396,7 @@
 			post('nw_season_get', { season_name: name })
 				.done(function (res) {
 					if (!res || !res.success) {
-						window.alert(normalizeError(res, 'Could not load season.'));
+						setNotice(normalizeError(res, 'Could not load season.'), 'error');
 						return;
 					}
 					resetForm();
@@ -331,7 +408,7 @@
 					if (xhr && xhr.responseJSON) {
 						msg = normalizeError(xhr.responseJSON, msg);
 					}
-					window.alert(msg);
+					setNotice(msg, 'error');
 				});
 		})
 		.on('click', '.nw-delete-btn', function () {
@@ -344,9 +421,10 @@
 			post('nw_season_delete', { season_name: name })
 				.done(function (res) {
 					if (!res || !res.success) {
-						window.alert(normalizeError(res, 'Delete failed.'));
+						setNotice(normalizeError(res, 'Delete failed.'), 'error');
 						return;
 					}
+					setNotice('Season deleted.', 'success');
 					loadList();
 				})
 				.fail(function (xhr) {
@@ -354,7 +432,7 @@
 					if (xhr && xhr.responseJSON) {
 						msg = normalizeError(xhr.responseJSON, msg);
 					}
-					window.alert(msg);
+					setNotice(msg, 'error');
 				});
 		})
 		.on('submit', '#nw-season-form', function (e) {
@@ -368,31 +446,34 @@
 
 			if (!data.season_name) {
 				setInlineError('Season name is required.');
+				updateWeightUI(true);
 				return;
 			}
 
 			if (sum !== 100) {
 				setInlineError('Weather weights must sum to exactly 100.');
-				updateWeightUI();
+				updateWeightUI(true);
 				return;
 			}
 
 			if (isNaN(tempVal) || tempVal <= 0) {
 				setInlineError('Temp modifier must be greater than 0.');
-				updateWeightUI();
+				updateWeightUI(true);
 				return;
 			}
 
-			setSaveButtonState(true);
+			setSaveButtonState(true, false);
 
 			post('nw_season_save', data)
 				.done(function (res) {
 					if (!res || !res.success) {
 						setInlineError(normalizeError(res, 'Save failed.'));
-						setSaveButtonState(false);
+						setSaveButtonState(false, false);
+						validateFormState(true);
 						return;
 					}
 					closeModal();
+					setNotice('Season saved.', 'success');
 					loadList();
 				})
 				.fail(function (xhr) {
@@ -401,7 +482,8 @@
 						msg = normalizeError(xhr.responseJSON, msg);
 					}
 					setInlineError(msg);
-					setSaveButtonState(false);
+					setSaveButtonState(false, false);
+					validateFormState(true);
 				});
 		});
 
