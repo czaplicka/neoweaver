@@ -189,42 +189,92 @@
 	}
 
 	function buildRow(t) {
-		const color = t.color || '#888888';
-		const sourceMap = {
-			system: 'nw-badge-system',
-			custom: 'nw-badge-custom',
-			imported: 'nw-badge-imported'
-		};
-		const badgeCls = sourceMap[t.source] || '';
-		const dimCls = t.is_active ? '' : ' nw-inactive';
+	const color = t.color || '#888888';
+	const sourceMap = {
+		system: 'nw-badge-system',
+		custom: 'nw-badge-custom',
+		imported: 'nw-badge-imported'
+	};
+	const badgeCls = sourceMap[t.source] || '';
+	const dimCls = t.is_active ? '' : ' nw-inactive';
 
-		return $('<tr>')
-			attr('data-id', t.id)
-			.html(
-				'<td class="' + dimCls + '"><code>' + esc(t.code) + '</code></td>' +
-				'<td class="' + dimCls + '">' + esc(t.label) + '</td>' +
-				'<td>' +
-					'<div class="nw-icon-cell">' +
-						'<span class="nw-color-dot" style="background:' + esc(color) + ';"></span>' +
-						(t.icon ? esc(t.icon) : '<span style="color:var(--nw-text-muted)">—</span>') +
-					'</div>' +
-				'</td>' +
-				'<td class="' + dimCls + '">' + (t.category ? esc(t.category) : '—') + '</td>' +
-				'<td><span class="nw-badge ' + badgeCls + '">' + esc(t.source || '—') + '</span></td>' +
-				'<td class="' + dimCls + '">' + (t.impact != null ? esc(t.impact) : '—') + '</td>' +
-				'<td class="' + dimCls + '">' + (t.sort_order != null ? esc(t.sort_order) : '—') + '</td>' +
-				'<td>' +
-					'<button type="button" class="nw-row-toggle nw-toggle-active-btn" data-id="' + esc(t.id) + '" data-active="' + (t.is_active ? 1 : 0) + '" title="Toggle active">' +
-						(t.is_active ? '✅' : '⭕') +
-					'</button>' +
-				'</td>' +
-				'<td>' +
-					'<div class="nw-row-actions">' +
-						'<button type="button" class="nw-row-btn nw-edit-btn" data-id="' + esc(t.id) + '">Edit</button>' +
-					'</div>' +
-				'</td>'
-			);
+	const $tr = $('<tr>').attr('data-id', t.id);
+
+	$tr.append(
+		$('<td>').addClass(dimCls.trim()).append(
+			$('<code>').text(t.code || '')
+		)
+	);
+
+	$tr.append(
+		$('<td>').addClass(dimCls.trim()).text(t.label || '')
+	);
+
+	const $iconCell = $('<div>').addClass('nw-icon-cell');
+	$iconCell.append(
+		$('<span>')
+			.addClass('nw-color-dot')
+			.attr('style', 'background:' + color + ';')
+	);
+
+	if (t.icon) {
+		$iconCell.append(document.createTextNode(t.icon));
+	} else {
+		$iconCell.append(
+			$('<span>').css('color', 'var(--nw-text-muted)').text('—')
+		);
 	}
+
+	$tr.append($('<td>').append($iconCell));
+
+	$tr.append(
+		$('<td>').addClass(dimCls.trim()).html(t.category ? $('<div>').text(t.category).html() : '—')
+	);
+
+	$tr.append(
+		$('<td>').append(
+			$('<span>')
+				.addClass('nw-badge ' + badgeCls)
+				.text(t.source || '—')
+		)
+	);
+
+	$tr.append(
+		$('<td>').addClass(dimCls.trim()).text(t.impact != null ? t.impact : '—')
+	);
+
+	$tr.append(
+		$('<td>').addClass(dimCls.trim()).text(t.sort_order != null ? t.sort_order : '—')
+	);
+
+	$tr.append(
+		$('<td>').append(
+			$('<button>', {
+				type: 'button',
+				class: 'nw-row-toggle nw-toggle-active-btn',
+				'data-id': t.id,
+				'data-active': t.is_active ? 1 : 0,
+				title: 'Toggle active',
+				text: t.is_active ? '✅' : '⭕'
+			})
+		)
+	);
+
+	$tr.append(
+		$('<td>').append(
+			$('<div>').addClass('nw-row-actions').append(
+				$('<button>', {
+					type: 'button',
+					class: 'nw-row-btn nw-edit-btn',
+					'data-id': t.id,
+					text: 'Edit'
+				})
+			)
+		)
+	);
+
+	return $tr;
+}
 
 	function openModal(tag) {
 		editingId = tag ? tag.id : null;
