@@ -2,16 +2,18 @@
  * NeoWeaver Admin — Items (cyber_items)
  * Works with the updated items.php backend.
  */
-/* global NWItems, jQuery */
+/* global NWItems, jQuery, ajaxurl */
 (function ($) {
 	'use strict';
-	var cfg   = window.NWItems || {};
-	var ajax  = cfg.ajaxurl || '';
+
+	var cfg = window.NWItems || {};
+	var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
 	var nonce = cfg.nonce || '';
-	var allItems  = [];
+	var allItems = [];
 	var editingId = null;
 	var filterType = '';
 	var filterRarity = '';
+	var noticeTimer = null;
 
 	function esc(str) {
 		return $('<div>').text(str == null ? '' : String(str)).html();
@@ -21,7 +23,31 @@
 		return v === true || v === 1 || v === '1' || v === 'true';
 	}
 
-	function notice(msg, isError) {
+	function debounce(fn, delay) {
+		var timer = null;
+		return function () {
+			var ctx = this;
+			var args = arguments;
+			clearTimeout(timer);
+			timer = setTimeout(function () {
+				fn.apply(ctx, args);
+			}, delay || 150);
+		};
+	}
+
+	function clearNoticeTimer() {
+		if (noticeTimer) {
+			clearTimeout(noticeTimer);
+			noticeTimer = null;
+		}
+	}
+
+	function notice(msg, type) {
+		var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
+		var isError = safeType === 'error';
+
+		clearNoticeTimer();
+
 		$('#nw-notice')
 			.stop(true, true)
 			.text(msg || '')
@@ -29,8 +55,9 @@
 			.css('color', isError ? '#ff8080' : '#adff00')
 			.show();
 
-		setTimeout(function () {
+		noticeTimer = setTimeout(function () {
 			$('#nw-notice').fadeOut(200);
+			noticeTimer = null;
 		}, 3000);
 	}
 
@@ -49,6 +76,11 @@
 			return '<img class="nw-item-thumb" src="' + esc(url) + '" alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:#111;border:1px solid #2b2b2b;" />';
 		}
 		return '<div class="nw-item-thumb--empty" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#111;border:1px solid #2b2b2b;color:#666;">⚙</div>';
+	}
+
+	function syncFilterStateFromUi() {
+		filterType = $('#nw-filter-type').val() || '';
+		filterRarity = $('#nw-filter-rarity').val() || '';
 	}
 
 	function updateTypeFilterOptions(items) {
@@ -70,10 +102,19 @@
 			html += '<option value="' + esc(type) + '">' + esc(type) + '</option>';
 		});
 
-		$('#nw-filter-type').html(html).val(filterType);
+		$('#nw-filter-type').html(html);
+
+		if (filterType && types.indexOf(filterType) === -1) {
+			filterType = '';
+		}
+
+		$('#nw-filter-type').val(filterType);
+		$('#nw-filter-rarity').val(filterRarity);
 	}
 
 	function renderTable(items) {
+		syncFilterStateFromUi();
+
 		var search = ($('#nw-search').val() || '').toLowerCase().trim();
 
 		var filtered = (items || []).filter(function (item) {
@@ -121,8 +162,8 @@
 				+ '<td>' + esc(item.slot || 'none') + '</td>'
 				+ '<td>' + esc(item.size || 'medium') + '</td>'
 				+ '<td>' + esc(item.price || 0) + '</td>'
-				+ '<td><button class="nw-toggle nw-toggle--' + (active ? 'on' : 'off') + '" data-id="' + esc(item.id) + '" data-active="' + (active ? '1' : '0') + '">' + (active ? '✔' : '✖') + '</button></td>'
-				+ '<td><button class="button button-small nw-edit-btn" data-id="' + esc(item.id) + '">Edit</button></td>'
+				+ '<td><button type="button" class="nw-toggle nw-toggle--' + (active ? 'on' : 'off') + '" data-id="' + esc(item.id) + '" data-active="' + (active ? '1' : '0') + '">' + (active ? '✔' : '✖') + '</button></td>'
+				+ '<td><button type="button" class="button button-small nw-edit-btn" data-id="' + esc(item.id) + '">Edit</button></td>'
 				+ '</tr>';
 		}).join('');
 
@@ -219,9 +260,11 @@
 
 	function loadItems() {
 		if (!ajax || !nonce) {
-			notice('Missing AJAX config.', true);
+			notice('Missing AJAX config.', 'error');
 			return;
 		}
+
+		syncFilterStateFromUi();
 
 		$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Loading…</td></tr>');
 
@@ -230,7 +273,7 @@
 			nonce: nonce
 		}, function (res) {
 			if (!res || !res.success) {
-				notice((res && res.data) || 'Load failed', true);
+				notice((res && res.data) || 'Load failed', 'error');
 				$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Load failed.</td></tr>');
 				return;
 			}
@@ -239,25 +282,30 @@
 			updateTypeFilterOptions(allItems);
 			renderTable(allItems);
 		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', true);
+			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
 			$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Request failed.</td></tr>');
 		});
 	}
 
 	function loadSingle(id) {
+		if (!id) {
+			notice('Missing item ID.', 'error');
+			return;
+		}
+
 		$.post(ajax, {
 			action: 'nw_items_get',
 			nonce: nonce,
-			id: id
+			id: String(id)
 		}, function (res) {
 			if (!res || !res.success || !res.data) {
-				notice((res && res.data) || 'Item not found.', true);
+				notice((res && res.data) || 'Item not found.', 'error');
 				return;
 			}
 
 			openModal('Edit Item', res.data);
 		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', true);
+			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
 		});
 	}
 
@@ -288,6 +336,10 @@
 		};
 	}
 
+	var debouncedRender = debounce(function () {
+		renderTable(allItems);
+	}, 150);
+
 	$(document).on('click', '#nw-add-btn', function () {
 		openModal('Add Item', null);
 	});
@@ -306,9 +358,7 @@
 		}
 	});
 
-	$(document).on('input', '#nw-search', function () {
-		renderTable(allItems);
-	});
+	$(document).on('input', '#nw-search', debouncedRender);
 
 	$(document).on('change', '#nw-filter-type', function () {
 		filterType = $(this).val() || '';
@@ -339,24 +389,27 @@
 		$.post(ajax, {
 			action: 'nw_items_toggle',
 			nonce: nonce,
-			id: id,
+			id: String(id),
 			is_active: next ? '1' : '0'
 		}, function (res) {
 			if (!res || !res.success) {
-				notice((res && res.data) || 'Toggle failed.', true);
+				notice((res && res.data) || 'Toggle failed.', 'error');
 				return;
 			}
 
-			allItems.forEach(function (item) {
+			allItems = allItems.map(function (item) {
 				if (String(item.id) === String(id)) {
-					item.is_active = next;
+					return $.extend({}, item, {
+						is_active: next
+					});
 				}
+				return item;
 			});
 
 			renderTable(allItems);
-			notice('Item updated.', false);
+			notice('Item updated.', 'success');
 		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', true);
+			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
 		});
 	});
 
@@ -365,8 +418,13 @@
 		var $btn = $(this);
 		var originalText = $btn.text();
 
+		if (!ajax || !nonce) {
+			notice('Missing AJAX config.', 'error');
+			return;
+		}
+
 		if (!payload.name) {
-			notice('Name is required.', true);
+			notice('Name is required.', 'error');
 			return;
 		}
 
@@ -376,16 +434,16 @@
 			$btn.prop('disabled', false).text(originalText);
 
 			if (!res || !res.success) {
-				notice((res && res.data) || 'Save failed.', true);
+				notice((res && res.data) || 'Save failed.', 'error');
 				return;
 			}
 
-			notice('Saved.', false);
+			notice('Saved.', 'success');
 			closeModal();
 			loadItems();
 		}).fail(function (xhr) {
 			$btn.prop('disabled', false).text(originalText);
-			notice('Request failed (' + (xhr.status || 'network') + ').', true);
+			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
 		});
 	});
 
@@ -406,20 +464,18 @@
 			id: id
 		}, function (res) {
 			if (!res || !res.success) {
-				notice((res && res.data) || 'Delete failed.', true);
+				notice((res && res.data) || 'Delete failed.', 'error');
 				return;
 			}
 
-			notice('Deleted.', false);
+			notice('Deleted.', 'success');
 			closeModal();
 			loadItems();
 		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', true);
+			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
 		});
 	});
 
-	$(function () {
-		loadItems();
-	});
+	loadItems();
 
 })(jQuery);
