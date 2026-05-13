@@ -36,6 +36,7 @@ jQuery(function ($) {
     var all = [];
     var filtered = [];
     var activeXhr = null;
+    var noticeTimer = null;
 
     var ABILITY_TYPES = ['active', 'passive', 'reaction', 'aura'];
 
@@ -47,11 +48,21 @@ jQuery(function ($) {
     };
 
     function esc(value) {
-        return $('<div>').text(value == null ? '' : String(value)).html();
+        return $('<span>').text(value == null ? '' : String(value)).html();
+    }
+
+    function clearNoticeTimer() {
+        if (noticeTimer) {
+            clearTimeout(noticeTimer);
+            noticeTimer = null;
+        }
     }
 
     function notice(message, type) {
         var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
+
+        clearNoticeTimer();
+
         $notice
             .stop(true, true)
             .removeClass()
@@ -59,8 +70,9 @@ jQuery(function ($) {
             .text(message || '')
             .fadeIn(120);
 
-        setTimeout(function () {
+        noticeTimer = setTimeout(function () {
             $notice.fadeOut(220);
+            noticeTimer = null;
         }, 3500);
     }
 
@@ -257,6 +269,8 @@ jQuery(function ($) {
 
         renderTable(filtered);
     }
+
+    var debouncedApplyFilters = debounce(applyFilters, 150);
 
     function loadAll() {
         if (!ajaxEndpoint) {
@@ -510,9 +524,9 @@ jQuery(function ($) {
         loadAll();
     });
 
-    $filterType.on('change', applyFilters);
-    $filterActive.on('change', applyFilters);
-    $search.on('input', debounce(applyFilters, 150));
+    $filterType.on('change', debouncedApplyFilters);
+    $filterActive.on('change', debouncedApplyFilters);
+    $search.on('input', debouncedApplyFilters);
 
     $(document).on('input change', '#nw-field-img_url', function () {
         updateImgPreview($(this).val());
