@@ -2,16 +2,16 @@
  * NeoWeaver Admin — Races (cyber_races)
  * Works with the updated races.php backend.
  */
-/* global NWRaces, jQuery */
+/* global NWRaces, jQuery, ajaxurl */
 (function ($) {
 	'use strict';
 
-	var cfg         = window.NWRaces || {};
-	var ajax        = cfg.ajaxurl || '';
-	var nonce       = cfg.nonce || '';
+	var cfg = window.NWRaces || {};
+	var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
+	var nonce = cfg.nonce || '';
 	var uploadsBase = (cfg.uploadsBase || '').replace(/\/?$/, '/');
-
 	var all = [];
+	var noticeTimer = null;
 
 	var PREF_KEYS = [
 		'preferred_tech',
@@ -49,6 +49,10 @@
 		return Math.max(0, Math.min(5, n));
 	}
 
+	function prefString(v) {
+		return String(clampPref(v));
+	}
+
 	function toImgUrl(filename) {
 		if (!filename) return '';
 		filename = String(filename).trim();
@@ -60,9 +64,18 @@
 		return uploadsBase + filename.replace(/^\//, '');
 	}
 
+	function clearNoticeTimer() {
+		if (noticeTimer) {
+			clearTimeout(noticeTimer);
+			noticeTimer = null;
+		}
+	}
+
 	function notice(msg, type) {
 		var $el = $('#nw-notice');
 		var isError = type === 'error';
+
+		clearNoticeTimer();
 
 		$el.stop(true, true)
 			.attr('class', '')
@@ -73,8 +86,9 @@
 			})
 			.text(msg || '');
 
-		setTimeout(function () {
+		noticeTimer = setTimeout(function () {
 			$el.fadeOut(250);
+			noticeTimer = null;
 		}, 3200);
 	}
 
@@ -143,6 +157,12 @@
 		});
 	}
 
+	function rerenderCurrentView() {
+		var filtered = getFilteredRows();
+		renderTable(filtered);
+		updateStats(filtered);
+	}
+
 	function renderTable(rows) {
 		var data = rows || [];
 		var $tbody = $('#nw-races-tbody');
@@ -189,7 +209,10 @@
 	}
 
 	function resetForm() {
-		$('#nw-race-form')[0].reset();
+		if ($('#nw-race-form').length && $('#nw-race-form')[0]) {
+			$('#nw-race-form')[0].reset();
+		}
+
 		$('#nw-field-id').val('');
 		$('#nw-field-name').val('');
 		$('#nw-field-parent_race').val('');
@@ -304,15 +327,15 @@
 			conflict_axis: ($('#nw-field-conflict_axis').val() || '').trim(),
 			conflict_side: ($('#nw-field-conflict_side').val() || '').trim(),
 			bonus: ($('#nw-field-bonus').val() || '').trim(),
-			race_base_hp: $('#nw-field-race_base_hp').val(),
-			race_base_mp: $('#nw-field-race_base_mp').val(),
-			preferred_tech: clampPref($('#nw-field-preferred_tech').val()),
-			preferred_magic: clampPref($('#nw-field-preferred_magic').val()),
-			preferred_gods: clampPref($('#nw-field-preferred_gods').val()),
-			preferred_wealth: clampPref($('#nw-field-preferred_wealth').val()),
-			preferred_threat: clampPref($('#nw-field-preferred_threat').val()),
-			preferred_moral: clampPref($('#nw-field-preferred_moral').val()),
-			preferred_social: clampPref($('#nw-field-preferred_social').val()),
+			race_base_hp: String($('#nw-field-race_base_hp').val() || DEFAULTS.race_base_hp),
+			race_base_mp: String($('#nw-field-race_base_mp').val() || DEFAULTS.race_base_mp),
+			preferred_tech: prefString($('#nw-field-preferred_tech').val()),
+			preferred_magic: prefString($('#nw-field-preferred_magic').val()),
+			preferred_gods: prefString($('#nw-field-preferred_gods').val()),
+			preferred_wealth: prefString($('#nw-field-preferred_wealth').val()),
+			preferred_threat: prefString($('#nw-field-preferred_threat').val()),
+			preferred_moral: prefString($('#nw-field-preferred_moral').val()),
+			preferred_social: prefString($('#nw-field-preferred_social').val()),
 			is_active: $('#nw-field-is_active').is(':checked') ? '1' : '0'
 		};
 	}
@@ -330,18 +353,14 @@
 			}
 
 			all = Array.isArray(res.data) ? res.data : [];
-			var filtered = getFilteredRows();
-			renderTable(filtered);
-			updateStats(filtered);
+			rerenderCurrentView();
 		}).fail(function () {
 			notice('Request failed.', 'error');
 		});
 	}
 
 	$(document).on('input', '#nw-search', function () {
-		var filtered = getFilteredRows();
-		renderTable(filtered);
-		updateStats(filtered);
+		rerenderCurrentView();
 	});
 
 	$(document).on('input', '.nw-range', function () {
@@ -381,7 +400,6 @@
 		var $cb = $(this);
 		var id = $cb.data('id');
 		var val = $cb.is(':checked');
-		var $row = $cb.closest('tr');
 
 		$.post(ajax, {
 			action: 'nw_races_toggle',
@@ -397,13 +415,14 @@
 
 			all = all.map(function (race) {
 				if (String(race.id) === String(id)) {
-					race.is_active = val;
+					return $.extend({}, race, {
+						is_active: val
+					});
 				}
 				return race;
 			});
 
-			$row.toggleClass('nw-row-inactive', !val);
-			updateStats(getFilteredRows());
+			rerenderCurrentView();
 			notice(val ? 'Activated.' : 'Deactivated.', 'success');
 		}).fail(function () {
 			$cb.prop('checked', !val);
@@ -471,20 +490,18 @@
 		});
 	});
 
-	$(function () {
-		if (!ajax || !nonce) {
-			notice('Missing AJAX config.', 'error');
-			return;
-		}
+	if (!ajax || !nonce) {
+		notice('Missing AJAX config.', 'error');
+		return;
+	}
 
-		PREF_KEYS.forEach(function (key) {
-			$('#nw-field-' + key).attr({
-				min: 0,
-				max: 5
-			});
+	PREF_KEYS.forEach(function (key) {
+		$('#nw-field-' + key).attr({
+			min: 0,
+			max: 5
 		});
-
-		loadAll();
 	});
+
+	loadAll();
 
 })(jQuery);
