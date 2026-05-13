@@ -23,7 +23,7 @@ class NeoWeaver_Admin {
 
 	private string $slug = 'neoweaver';
 
-	private const DEBUG_LOGS_TABLE    = 'cyber_logs';
+	private const DEBUG_LOGS_TABLE    = 'debug_log';
 	private const CHAT_MESSAGES_TABLE = 'cyber_chat_messages';
 	private const GAME_SESSIONS_TABLE = 'cyber_game_sessions';
 
@@ -289,7 +289,7 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\\/(\\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
@@ -304,7 +304,7 @@ class NeoWeaver_Admin {
 			return 0;
 		}
 
-		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( $days * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( $days * DAY_IN_SECONDS ) );
 
 		$url = rtrim( $supa_url, '/' ) . '/rest/v1/' . $table . '?select=id&' . $date_col . '=gte.' . rawurlencode( $since );
 		if ( $extra_filters ) {
@@ -330,7 +330,7 @@ class NeoWeaver_Admin {
 		}
 
 		$cr = wp_remote_retrieve_header( $res, 'content-range' );
-		if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+		if ( $cr && preg_match( '/\\/(\\d+)$/', $cr, $m ) ) {
 			return (int) $m[1];
 		}
 
@@ -346,7 +346,7 @@ class NeoWeaver_Admin {
 			return $cached;
 		}
 
-		$since = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
+		$since = gmdate( 'Y-m-d\\TH:i:s\\Z', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
 
 		$path = $table
 			. '?select=' . rawurlencode( $date_col )
@@ -395,6 +395,7 @@ class NeoWeaver_Admin {
 	}
 
 	private function supa_recent_logs( int $limit = 10 ): array {
+		// Table: debug_log (columns: id, created_at, level, message, context, data).
 		$path = self::DEBUG_LOGS_TABLE . '?select=id,created_at,level,message,context,data&order=created_at.desc&limit=' . $limit;
 		$res  = $this->supa_get( $path );
 
@@ -406,7 +407,8 @@ class NeoWeaver_Admin {
 	}
 
 	private function supa_campaigns_without_character(): int {
-		$path = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&cyber_campaigncharacters.character_id=is.null&limit=1';
+		// Fixed: correct junction table name is cyber_campaign_characters (not cyber_campaigncharacters).
+		$path = 'cyber_campaign?select=id,cyber_campaign_characters!left(character_id)&cyber_campaign_characters.character_id=is.null&limit=1';
 		$res  = wp_remote_get(
 			rtrim( $this->get_supa_url(), '/' ) . '/rest/v1/' . $path,
 			[
@@ -423,18 +425,18 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\\/(\\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
 
-		$path_full = 'cyber_campaign?select=id,cyber_campaigncharacters!left(character_id)&limit=5000';
+		$path_full = 'cyber_campaign?select=id,cyber_campaign_characters!left(character_id)&limit=5000';
 		$r         = $this->supa_get( $path_full );
 		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
 
 		$count = 0;
 		foreach ( $rows as $row ) {
-			if ( empty( $row['cyber_campaigncharacters'] ) ) {
+			if ( empty( $row['cyber_campaign_characters'] ) ) {
 				$count++;
 			}
 		}
@@ -442,7 +444,8 @@ class NeoWeaver_Admin {
 	}
 
 	private function supa_worlds_without_campaigns(): int {
-		$path = 'cyber_worlds?select=id,cyber_campaign!left(id)&cyber_campaign.id=is.null&limit=1';
+		// Fixed: disambiguate FK with explicit hint cyber_campaign!cyber_campaign_world_id_fkey.
+		$path = 'cyber_worlds?select=id,cyber_campaign!cyber_campaign_world_id_fkey(id)&cyber_campaign.id=is.null&limit=1';
 		$res  = wp_remote_get(
 			rtrim( $this->get_supa_url(), '/' ) . '/rest/v1/' . $path,
 			[
@@ -459,12 +462,12 @@ class NeoWeaver_Admin {
 
 		if ( ! is_wp_error( $res ) ) {
 			$cr = wp_remote_retrieve_header( $res, 'content-range' );
-			if ( $cr && preg_match( '/\/(\d+)$/', $cr, $m ) ) {
+			if ( $cr && preg_match( '/\\/(\\d+)$/', $cr, $m ) ) {
 				return (int) $m[1];
 			}
 		}
 
-		$path_full = 'cyber_worlds?select=id,cyber_campaign!left(id)&limit=5000';
+		$path_full = 'cyber_worlds?select=id,cyber_campaign!cyber_campaign_world_id_fkey(id)&limit=5000';
 		$r         = $this->supa_get( $path_full );
 		$rows      = ( $r['ok'] && is_array( $r['body'] ) ) ? $r['body'] : [];
 
