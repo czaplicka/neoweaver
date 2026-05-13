@@ -46,11 +46,11 @@ wp_localize_script(
 
 		// Spinner CSS — loaded here (not in enqueue_assets) because it is only
 		// needed when the world creator shortcode is actually on the page.
-		$spinner_css  = NEOWEAVER_PLUGIN_DIR . 'assets/css/tw-node-spinner.css';
+		$spinner_css  = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/node-spinner.css';
 		if ( file_exists( $spinner_css ) ) {
 			wp_enqueue_style(
 				'neoweaver-node-spinner',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/tw-node-spinner.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/public/node-spinner.css',
 				[],
 				(string) filemtime( $spinner_css )
 			);
