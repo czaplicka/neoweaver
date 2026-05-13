@@ -6,28 +6,125 @@
 (function ($) {
 	'use strict';
 
-	let allTags = [];
-	let editingId = null;
+	var allTags = [];
+	var editingId = null;
 
-	const $tbody = $('#nw-sd-tbody');
-	const $notice = $('#nw-notice');
-	const $overlay = $('#nw-modal-overlay');
-	const $modalTitle = $('#nw-modal-title');
-	const $form = $('#nw-sd-form');
-	const $deleteBtn = $('#nw-delete-btn');
-	const $saveLabel = $('#nw-save-label');
+	var $tbody;
+	var $notice;
+	var $overlay;
+	var $modalTitle;
+	var $form;
+	var $deleteBtn;
+	var $saveLabel;
 
-	const $fCat = $('#nw-filter-category');
-	const $fActive = $('#nw-filter-active');
-	const $fSearch = $('#nw-filter-search');
+	var $fCat;
+	var $fActive;
+	var $fSearch;
 
-	const $total = $('#nw-total');
-	const $active = $('#nw-active');
-	const $inactive = $('#nw-inactive');
+	var $total;
+	var $active;
+	var $inactive;
 
-	if (!window.NW_SD || !NW_SD.ajax_url || !NW_SD.nonce) {
-		console.error('NeoWeaver Style Dictionary: missing AJAX config.');
-		return;
+	function init() {
+		if (!window.NW_SD || !NW_SD.ajax_url || !NW_SD.nonce) {
+			console.error('NeoWeaver Style Dictionary: missing AJAX config.');
+			return;
+		}
+
+		$tbody = $('#nw-sd-tbody');
+		$notice = $('#nw-notice');
+		$overlay = $('#nw-modal-overlay');
+		$modalTitle = $('#nw-modal-title');
+		$form = $('#nw-sd-form');
+		$deleteBtn = $('#nw-delete-btn');
+		$saveLabel = $('#nw-save-label');
+
+		$fCat = $('#nw-filter-category');
+		$fActive = $('#nw-filter-active');
+		$fSearch = $('#nw-filter-search');
+
+		$total = $('#nw-total');
+		$active = $('#nw-active');
+		$inactive = $('#nw-inactive');
+
+		if (
+			!$tbody.length ||
+			!$notice.length ||
+			!$overlay.length ||
+			!$modalTitle.length ||
+			!$form.length ||
+			!$deleteBtn.length ||
+			!$saveLabel.length
+		) {
+			console.error('NeoWeaver Style Dictionary: required DOM elements are missing.');
+			return;
+		}
+
+		bindEvents();
+		loadTags();
+	}
+
+	function bindEvents() {
+		$fCat.on('change', applyFilters);
+		$fActive.on('change', applyFilters);
+		$fSearch.on('input', applyFilters);
+
+		$('#nw-refresh-btn').on('click', function () {
+			loadTags();
+		});
+
+		$('#nw-add-btn').on('click', function () {
+			openModal(null);
+		});
+
+		$('#nw-cancel-btn, #nw-modal-close').on('click', function () {
+			closeModal();
+		});
+
+		$overlay.on('click', function (e) {
+			if ($(e.target).is($overlay)) {
+				closeModal();
+			}
+		});
+
+		$('#nw-save-btn').on('click', function (e) {
+			e.preventDefault();
+			saveTag();
+		});
+
+		$form.on('submit', function (e) {
+			e.preventDefault();
+			saveTag();
+		});
+
+		$('#nw-delete-btn').on('click', function () {
+			if (editingId) {
+				deleteTag(editingId);
+			}
+		});
+
+		$(document).on('click', '.nw-edit-btn', function () {
+			var id = $(this).attr('data-id');
+			var tag = allTags.find(function (t) {
+				return String(t.id) === String(id);
+			});
+
+			if (tag) {
+				openModal(tag);
+			} else {
+				showNotice('Tag not found.', true);
+			}
+		});
+
+		$(document).on('change', '.nw-quick-toggle', function () {
+			toggleTag($(this).attr('data-id'), this.checked);
+		});
+
+		$(document).on('keydown', function (e) {
+			if (e.key === 'Escape' && $overlay.is(':visible')) {
+				closeModal();
+			}
+		});
 	}
 
 	function request(data, onSuccess, fallbackError) {
@@ -42,7 +139,10 @@
 				onSuccess(res);
 			}
 		})
-		.fail(function (xhr) {
+		.fail(function (xhr, status) {
+			if (status === 'abort') {
+				return;
+			}
 			showNotice(extractError(xhr, fallbackError || 'Request failed.'), true);
 		});
 	}
@@ -63,7 +163,7 @@
 
 		if (xhr && typeof xhr.responseText === 'string' && xhr.responseText.trim()) {
 			try {
-				const parsed = JSON.parse(xhr.responseText);
+				var parsed = JSON.parse(xhr.responseText);
 				if (parsed && typeof parsed.data === 'string' && parsed.data) {
 					return parsed.data;
 				}
@@ -87,19 +187,19 @@
 	}
 
 	function updateStats(tags) {
-		const activeCount = tags.filter(function (t) {
+		var activeCount = tags.filter(function (t) {
 			return !!t.is_active;
 		}).length;
 
-		const inactiveCount = tags.length - activeCount;
+		var inactiveCount = tags.length - activeCount;
 
 		$total.text(tags.length);
 		$active.text(activeCount);
 		$inactive.text(inactiveCount);
 
 		$('.nw-cat-count').each(function () {
-			const cat = $(this).data('cat');
-			const count = tags.filter(function (t) {
+			var cat = $(this).data('cat');
+			var count = tags.filter(function (t) {
 				return String(t.category || '') === String(cat);
 			}).length;
 			$(this).text(count);
@@ -115,8 +215,8 @@
 		}
 
 		tags.forEach(function (tag) {
-			const activeChecked = tag.is_active ? 'checked' : '';
-			const rowClass = tag.is_active ? '' : 'nw-row-inactive';
+			var activeChecked = tag.is_active ? 'checked' : '';
+			var rowClass = tag.is_active ? '' : 'nw-row-inactive';
 
 			$tbody.append(
 				'<tr class="' + rowClass + '" data-id="' + escHtml(tag.id) + '">' +
@@ -138,13 +238,13 @@
 	}
 
 	function applyFilters() {
-		const cat = $fCat.val();
-		const active = $fActive.val();
-		const search = String($fSearch.val() || '').toLowerCase().trim();
+		var cat = $fCat.val();
+		var active = $fActive.val();
+		var search = String($fSearch.val() || '').toLowerCase().trim();
 
-		const filtered = allTags.filter(function (t) {
-			const tagName = String(t.tag_name || '').toLowerCase();
-			const interpretation = String(t.interpretation_en || '').toLowerCase();
+		var filtered = allTags.filter(function (t) {
+			var tagName = String(t.tag_name || '').toLowerCase();
+			var interpretation = String(t.interpretation_en || '').toLowerCase();
 
 			if (cat && t.category !== cat) {
 				return false;
@@ -155,7 +255,7 @@
 			if (active === '0' && t.is_active) {
 				return false;
 			}
-			if (search && !tagName.includes(search) && !interpretation.includes(search)) {
+			if (search && tagName.indexOf(search) === -1 && interpretation.indexOf(search) === -1) {
 				return false;
 			}
 			return true;
@@ -190,7 +290,9 @@
 	function openModal(tag) {
 		editingId = tag ? tag.id : null;
 
-		$form[0].reset();
+		if ($form.length && $form[0]) {
+			$form[0].reset();
+		}
 
 		$modalTitle.text(tag ? 'Edit Style Tag' : 'New Style Tag');
 		$saveLabel.text(tag ? 'Save Tag' : 'Create Tag');
@@ -208,14 +310,19 @@
 	function closeModal() {
 		$overlay.hide();
 		editingId = null;
-		$form[0].reset();
+
+		if ($form.length && $form[0]) {
+			$form[0].reset();
+		}
+
 		$('#nw-field-id').val('');
 		$deleteBtn.hide();
 		$saveLabel.text('Save Tag');
+		$('#nw-save-btn').prop('disabled', false);
 	}
 
 	function saveTag() {
-		const payload = {
+		var payload = {
 			action: 'nw_sd_save',
 			nonce: NW_SD.nonce,
 			tag: {
@@ -274,7 +381,7 @@
 					return;
 				}
 
-				const tag = allTags.find(function (t) {
+				var tag = allTags.find(function (t) {
 					return String(t.id) === String(id);
 				});
 
@@ -284,7 +391,8 @@
 
 				updateStats(allTags);
 
-				const $row = $tbody.find('tr[data-id="' + id + '"]');
+				var safeId = escHtml(id);
+				var $row = $tbody.find('tr[data-id="' + safeId + '"]');
 				$row.toggleClass('nw-row-inactive', !isActive);
 			},
 			'Network error while updating tag.'
@@ -320,72 +428,13 @@
 		return String(str == null ? '' : str)
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
-			replace(/>/g, '&gt;')
+			.replace(/>/g, '&gt;')
 			.replace(/"/g, '&quot;')
 			.replace(/'/g, '&#039;');
 	}
 
-	$fCat.on('change', applyFilters);
-	$fActive.on('change', applyFilters);
-	$fSearch.on('input', applyFilters);
-
-	$('#nw-refresh-btn').on('click', function () {
-		loadTags();
+	$(document).ready(function () {
+		init();
 	});
-
-	$('#nw-add-btn').on('click', function () {
-		openModal(null);
-	});
-
-	$('#nw-cancel-btn, #nw-modal-close').on('click', function () {
-		closeModal();
-	});
-
-	$overlay.on('click', function (e) {
-		if ($(e.target).is($overlay)) {
-			closeModal();
-		}
-	});
-
-	$('#nw-save-btn').on('click', function (e) {
-		e.preventDefault();
-		saveTag();
-	});
-
-	$form.on('submit', function (e) {
-		e.preventDefault();
-		saveTag();
-	});
-
-	$('#nw-delete-btn').on('click', function () {
-		if (editingId) {
-			deleteTag(editingId);
-		}
-	});
-
-	$tbody.on('click', '.nw-edit-btn', function () {
-		const id = $(this).data('id');
-		const tag = allTags.find(function (t) {
-			return String(t.id) === String(id);
-		});
-
-		if (tag) {
-			openModal(tag);
-		} else {
-			showNotice('Tag not found.', true);
-		}
-	});
-
-	$tbody.on('change', '.nw-quick-toggle', function () {
-		toggleTag($(this).data('id'), this.checked);
-	});
-
-	$(document).on('keydown', function (e) {
-		if (e.key === 'Escape' && $overlay.is(':visible')) {
-			closeModal();
-		}
-	});
-
-	loadTags();
 
 }(jQuery));
