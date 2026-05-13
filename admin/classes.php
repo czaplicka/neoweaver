@@ -5,11 +5,18 @@
  * Handles the WP Admin page, AJAX load/save/delete, and Supabase sync
  * for character class definitions.
  *
+ * Instantiated exclusively by NW_Admin_Bootstrap — do NOT add
+ * `new NW_Classes_Admin()` or `add_action('plugins_loaded', ...)` here.
+ *
  * @package NeoWeaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+if ( class_exists( 'NW_Classes_Admin', false ) ) {
+	return;
 }
 
 class NW_Classes_Admin {
@@ -244,6 +251,21 @@ class NW_Classes_Admin {
 	}
 
 	/* ---------------------------------------------------------------- */
+	/*  VALIDATE                                                         */
+	/* ---------------------------------------------------------------- */
+
+	/**
+	 * Validates that a string is a well-formed UUID v1–v5.
+	 * Identical to the pattern used in abilities.php.
+	 */
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match(
+			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
+			$value
+		);
+	}
+
+	/* ---------------------------------------------------------------- */
 	/*  NORMALIZE                                                        */
 	/* ---------------------------------------------------------------- */
 
@@ -323,24 +345,29 @@ class NW_Classes_Admin {
 			return;
 		}
 
-		$id                     = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name                   = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$description            = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
-		$icon_slug              = sanitize_text_field( wp_unslash( $_POST['icon_slug'] ?? '' ) );
-		$vulnerability          = sanitize_text_field( wp_unslash( $_POST['vulnerability'] ?? '' ) );
-		$mechanics              = sanitize_textarea_field( wp_unslash( $_POST['mechanics'] ?? '' ) );
-		$gm_instructions        = sanitize_textarea_field( wp_unslash( $_POST['gm_instructions'] ?? '' ) );
+		$id                      = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$name                    = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$description             = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$icon_slug               = sanitize_text_field( wp_unslash( $_POST['icon_slug'] ?? '' ) );
+		$vulnerability           = sanitize_text_field( wp_unslash( $_POST['vulnerability'] ?? '' ) );
+		$mechanics               = sanitize_textarea_field( wp_unslash( $_POST['mechanics'] ?? '' ) );
+		$gm_instructions         = sanitize_textarea_field( wp_unslash( $_POST['gm_instructions'] ?? '' ) );
 		$ai_personality_modifier = sanitize_textarea_field( wp_unslash( $_POST['ai_personality_modifier'] ?? '' ) );
-		$img_url                = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
-		$starting_gold          = max( 0, intval( wp_unslash( $_POST['starting_gold'] ?? 100 ) ) );
-		$skill_limit            = max( 0, intval( wp_unslash( $_POST['skill_limit'] ?? 3 ) ) );
-		$is_active              = $this->bool_from_post( 'is_active', true );
-
-		$tags_raw               = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
-		$attribute_bonuses_raw  = wp_unslash( $_POST['attribute_bonuses'] ?? '' );
+		$img_url                 = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
+		$starting_gold           = max( 0, intval( wp_unslash( $_POST['starting_gold'] ?? 100 ) ) );
+		$skill_limit             = max( 0, intval( wp_unslash( $_POST['skill_limit'] ?? 3 ) ) );
+		$is_active               = $this->bool_from_post( 'is_active', true );
+		$tags_raw                = sanitize_text_field( wp_unslash( $_POST['tags'] ?? '' ) );
+		$attribute_bonuses_raw   = wp_unslash( $_POST['attribute_bonuses'] ?? '' );
 
 		if ( ! $name ) {
 			wp_send_json_error( 'Name is required.' );
+			return;
+		}
+
+		// Validate UUID when updating an existing record.
+		if ( $id && ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid class ID.' );
 			return;
 		}
 
@@ -397,6 +424,11 @@ class NW_Classes_Admin {
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Missing ID.' );
+			return;
+		}
+
+		if ( ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid class ID.' );
 			return;
 		}
 
@@ -564,11 +596,3 @@ class NW_Classes_Admin {
 		<?php
 	}
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NW_Classes_Admin();
-	},
-	20
-);
