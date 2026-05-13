@@ -196,29 +196,29 @@
 		imported: 'nw-badge-imported'
 	};
 	const badgeCls = sourceMap[t.source] || '';
-	const dimCls = t.is_active ? '' : ' nw-inactive';
+	const inactiveClass = t.is_active ? '' : 'nw-inactive';
 
 	const $tr = $('<tr>').attr('data-id', t.id);
 
 	$tr.append(
-		$('<td>').addClass(dimCls.trim()).append(
+		$('<td>').addClass(inactiveClass).append(
 			$('<code>').text(t.code || '')
 		)
 	);
 
 	$tr.append(
-		$('<td>').addClass(dimCls.trim()).text(t.label || '')
+		$('<td>').addClass(inactiveClass).text(t.label || '')
 	);
 
 	const $iconCell = $('<div>').addClass('nw-icon-cell');
 	$iconCell.append(
 		$('<span>')
 			.addClass('nw-color-dot')
-			.attr('style', 'background:' + color + ';')
+			.css('background', color)
 	);
 
 	if (t.icon) {
-		$iconCell.append(document.createTextNode(t.icon));
+		$iconCell.append(document.createTextNode(' ' + t.icon));
 	} else {
 		$iconCell.append(
 			$('<span>').css('color', 'var(--nw-text-muted)').text('—')
@@ -228,23 +228,24 @@
 	$tr.append($('<td>').append($iconCell));
 
 	$tr.append(
-		$('<td>').addClass(dimCls.trim()).html(t.category ? $('<div>').text(t.category).html() : '—')
+		$('<td>').addClass(inactiveClass).text(t.category || '—')
 	);
 
 	$tr.append(
 		$('<td>').append(
 			$('<span>')
-				.addClass('nw-badge ' + badgeCls)
+				.addClass('nw-badge')
+				.addClass(badgeCls)
 				.text(t.source || '—')
 		)
 	);
 
 	$tr.append(
-		$('<td>').addClass(dimCls.trim()).text(t.impact != null ? t.impact : '—')
+		$('<td>').addClass(inactiveClass).text(t.impact != null ? t.impact : '—')
 	);
 
 	$tr.append(
-		$('<td>').addClass(dimCls.trim()).text(t.sort_order != null ? t.sort_order : '—')
+		$('<td>').addClass(inactiveClass).text(t.sort_order != null ? t.sort_order : '—')
 	);
 
 	$tr.append(
