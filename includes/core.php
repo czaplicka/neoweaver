@@ -26,3 +26,5 @@ public function register_shortcodes(): void {
     add_shortcode( 'tw_campaign_creator', 'neoweaver_shortcode_campaign_creator' );
 }
 }
+$neoweaver_core = new Neoweaver_Core();
+$neoweaver_core->run();
