@@ -3,9 +3,11 @@ jQuery(function ($) {
 	'use strict';
 
 	var ajaxUrl = (window.NW_SP && window.NW_SP.ajax_url) ? window.NW_SP.ajax_url : '';
-	var nonce   = (window.NW_SP && window.NW_SP.nonce) ? window.NW_SP.nonce : ($('#nw-nonce').val() || '');
-	var editId  = null;
+	var nonce = (window.NW_SP && window.NW_SP.nonce) ? window.NW_SP.nonce : ($('#nw-nonce').val() || '');
+	var editId = null;
 	var allItems = [];
+	var itemsCacheLoaded = false;
+	var itemsCacheXhr = null;
 
 	if (!ajaxUrl || !nonce) {
 		console.error('NeoWeaver Starting Packages: missing AJAX config.');
@@ -24,7 +26,10 @@ jQuery(function ($) {
 				onSuccess(res);
 			}
 		})
-		.fail(function (xhr) {
+		.fail(function (xhr, status) {
+			if (status === 'abort') {
+				return;
+			}
 			showNotice('error', extractError(xhr, fallbackError || 'Request failed.'));
 		});
 	}
@@ -55,23 +60,43 @@ jQuery(function ($) {
 		return fallback || 'Request failed.';
 	}
 
-	function loadItemsCache(cb) {
-		if (allItems.length) {
+	function invalidateItemsCache() {
+		allItems = [];
+		itemsCacheLoaded = false;
+		if (itemsCacheXhr && itemsCacheXhr.readyState !== 4) {
+			itemsCacheXhr.abort();
+		}
+		itemsCacheXhr = null;
+	}
+
+	function loadItemsCache(cb, forceRefresh) {
+		if (itemsCacheLoaded && !forceRefresh) {
 			if (typeof cb === 'function') {
 				cb();
 			}
 			return;
 		}
 
-		request(
+		if (itemsCacheXhr && itemsCacheXhr.readyState !== 4) {
+			itemsCacheXhr.abort();
+		}
+
+		itemsCacheXhr = request(
 			{
 				action: 'nw_sp_get_items',
 				nonce: nonce
 			},
 			function (r) {
+				itemsCacheXhr = null;
+
 				if (r && r.success) {
 					allItems = Array.isArray(r.data) ? r.data : [];
+					itemsCacheLoaded = true;
+				} else {
+					allItems = [];
+					itemsCacheLoaded = false;
 				}
+
 				if (typeof cb === 'function') {
 					cb();
 				}
@@ -243,14 +268,18 @@ jQuery(function ($) {
 
 		loadItemsCache(function () {
 			populateItemSelects(pkg);
-		});
+		}, true);
 
 		$('#nw-modal-overlay').show();
 	}
 
 	function closeModal() {
 		$('#nw-modal-overlay').hide();
-		$('#nw-sp-form')[0].reset();
+
+		if ($('#nw-sp-form').length && $('#nw-sp-form')[0]) {
+			$('#nw-sp-form')[0].reset();
+		}
+
 		$('#nw-field-id').val('');
 		editId = null;
 		$('#nw-delete-btn').hide();
@@ -269,18 +298,24 @@ jQuery(function ($) {
 		var data = {
 			action: 'nw_sp_save',
 			nonce: nonce,
-			pkg: {}
+			pkg: {
+				id: ($('#nw-field-id').val() || '').trim(),
+				package_name: packageName,
+				description: ($('#nw-field-description').val() || '').trim(),
+				base_armor: ($('#nw-field-base_armor').val() || '0').trim(),
+				items_list: ($('#nw-field-items_list').val() || '').trim(),
+				attack_cards_pool: ($('#nw-field-attack_cards_pool').val() || '').trim(),
+				defense_cards_pool: ($('#nw-field-defense_cards_pool').val() || '').trim(),
+				compatibility_tags: ($('#nw-field-compatibility_tags').val() || '').trim(),
+				compatible_class_ids: ($('#nw-field-compatible_class_ids').val() || '').trim(),
+				is_player_selectable: $('#nw-field-is_player_selectable').is(':checked') ? '1' : '0',
+				head_item_id: $('#nw-field-head_item_id').val() || '',
+				torso_item_id: $('#nw-field-torso_item_id').val() || '',
+				hand_r_item_id: $('#nw-field-hand_r_item_id').val() || '',
+				hand_l_item_id: $('#nw-field-hand_l_item_id').val() || '',
+				belt_item_id: $('#nw-field-belt_item_id').val() || ''
+			}
 		};
-
-		$('#nw-sp-form').serializeArray().forEach(function (f) {
-			data.pkg[f.name] = f.value;
-		});
-
-		data.pkg.is_player_selectable = $('#nw-field-is_player_selectable').is(':checked') ? '1' : '0';
-
-		['head_item_id', 'torso_item_id', 'hand_r_item_id', 'hand_l_item_id', 'belt_item_id'].forEach(function (f) {
-			data.pkg[f] = $('#nw-field-' + f).val() || '';
-		});
 
 		$('#nw-save-btn').prop('disabled', true);
 		$('#nw-save-label').text(editId ? 'Saving…' : 'Creating…');
@@ -301,6 +336,25 @@ jQuery(function ($) {
 				loadPackages();
 			},
 			'Failed to save package.'
+		);
+	}
+
+	function loadPackageById(id) {
+		request(
+			{
+				action: 'nw_sp_get_one',
+				nonce: nonce,
+				pkg_id: id
+			},
+			function (r) {
+				if (!r || !r.success || !r.data) {
+					showNotice('error', r && r.data ? r.data : 'Could not load package details.');
+					return;
+				}
+
+				openModal(r.data);
+			},
+			'Failed to load package details.'
 		);
 	}
 
@@ -353,10 +407,12 @@ jQuery(function ($) {
 	});
 
 	$('#nw-add-btn').on('click', function () {
+		invalidateItemsCache();
 		openModal(null);
 	});
 
 	$('#nw-refresh-btn').on('click', function () {
+		invalidateItemsCache();
 		loadPackages();
 	});
 
@@ -377,34 +433,7 @@ jQuery(function ($) {
 
 	$(document).on('click', '.nw-edit-btn', function () {
 		var id = $(this).data('id');
-
-		request(
-			{
-				action: 'nw_sp_get_all',
-				nonce: nonce
-			},
-			function (r) {
-				if (!r || !r.success || !Array.isArray(r.data)) {
-					showNotice('error', 'Could not load package details.');
-					return;
-				}
-
-				var pkg = null;
-				$.each(r.data, function (_, p) {
-					if (String(p.id) === String(id)) {
-						pkg = p;
-						return false;
-					}
-				});
-
-				if (pkg) {
-					openModal(pkg);
-				} else {
-					showNotice('error', 'Package not found.');
-				}
-			},
-			'Failed to load package details.'
-		);
+		loadPackageById(id);
 	});
 
 	function showNotice(type, msg) {
