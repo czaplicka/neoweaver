@@ -2,14 +2,15 @@
  * NeoWeaver Admin — Scenarios (cyber_scenarios)
  * Works with the rewritten scenarios PHP backend.
  */
-/* global NWScenarios, jQuery */
+/* global NWScenarios, jQuery, ajaxurl */
 (function ($) {
 	'use strict';
 
 	var cfg = window.NWScenarios || {};
-	var ajaxurl = cfg.ajaxurl || '';
+	var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
 	var nonce = cfg.nonce || '';
 	var all = [];
+	var noticeTimer = null;
 
 	var TYPES = ['main', 'personal', 'social', 'world'];
 	var CATEGORIES = ['combat', 'social', 'magic', 'investigation', 'worlds', 'sidequest', 'family'];
@@ -20,6 +21,18 @@
 
 	function boolVal(v) {
 		return v === true || v === 1 || v === '1' || v === 'true';
+	}
+
+	function debounce(fn, delay) {
+		var timer = null;
+		return function () {
+			var ctx = this;
+			var args = arguments;
+			clearTimeout(timer);
+			timer = setTimeout(function () {
+				fn.apply(ctx, args);
+			}, delay || 150);
+		};
 	}
 
 	function clampInt(v, min, max, fallback) {
@@ -37,9 +50,18 @@
 		return Math.max(min, Math.min(max, n));
 	}
 
+	function clearNoticeTimer() {
+		if (noticeTimer) {
+			clearTimeout(noticeTimer);
+			noticeTimer = null;
+		}
+	}
+
 	function notice(msg, type) {
 		var $el = $('#nw-notice');
 		var isError = type === 'error';
+
+		clearNoticeTimer();
 
 		$el.stop(true, true)
 			.attr('class', '')
@@ -50,8 +72,9 @@
 			})
 			.text(msg || '');
 
-		setTimeout(function () {
+		noticeTimer = setTimeout(function () {
 			$el.fadeOut(250);
+			noticeTimer = null;
 		}, 3200);
 	}
 
@@ -118,6 +141,12 @@
 		});
 	}
 
+	function rerenderCurrentView() {
+		var filtered = getFilteredRows();
+		renderTable(filtered);
+		updateStats(filtered);
+	}
+
 	function renderTable(rows) {
 		var data = rows || [];
 		var $tbody = $('#nw-scenarios-tbody');
@@ -149,7 +178,9 @@
 	}
 
 	function resetForm() {
-		$('#nw-scenario-form')[0].reset();
+		if ($('#nw-scenario-form').length && $('#nw-scenario-form')[0]) {
+			$('#nw-scenario-form')[0].reset();
+		}
 
 		$('#nw-field-id').val('');
 		$('#nw-field-name').val('');
@@ -235,7 +266,7 @@
 			return;
 		}
 
-		$.post(ajaxurl, {
+		$.post(ajaxEndpoint, {
 			action: 'nw_scenarios_get_one',
 			nonce: nonce,
 			id: id
@@ -258,21 +289,16 @@
 	}
 
 	function collectPayload() {
-		var fd = $('#nw-scenario-form').serializeArray();
 		var data = {
 			action: 'nw_scenarios_save',
 			nonce: nonce
 		};
 
-		fd.forEach(function (f) {
-			data[f.name] = f.value;
-		});
-
 		data.id = ($('#nw-field-id').val() || '').trim();
 		data.name = ($('#nw-field-name').val() || '').trim();
 		data.type = ($('#nw-field-type').val() || 'main').trim();
 		data.category = ($('#nw-field-category').val() || 'combat').trim();
-		data.difficulty = clampInt($('#nw-field-difficulty').val(), 1, 5, 3);
+		data.difficulty = String(clampInt($('#nw-field-difficulty').val(), 1, 5, 3));
 		data.goal = ($('#nw-field-goal').val() || '').trim();
 		data.gm_instruction = ($('#nw-field-gm_instruction').val() || '').trim();
 		data.victory_condition = ($('#nw-field-victory_condition').val() || '').trim();
@@ -281,7 +307,7 @@
 		data.required_tags = ($('#nw-field-required_tags').val() || '').trim();
 		data.success_tags = ($('#nw-field-success_tags').val() || '').trim();
 		data.failure_tags = ($('#nw-field-failure_tags').val() || '').trim();
-		data.reward_credits = Math.max(0, parseInt($('#nw-field-reward_credits').val(), 10) || 0);
+		data.reward_credits = String(Math.max(0, parseInt($('#nw-field-reward_credits').val(), 10) || 0));
 		data.reward_items = ($('#nw-field-reward_items').val() || '').trim();
 		data.min_entropy = nullableInt($('#nw-field-min_entropy').val(), 0, 999);
 		data.max_entropy = nullableInt($('#nw-field-max_entropy').val(), 0, 999);
@@ -293,10 +319,10 @@
 		data.giver_npc_tag = ($('#nw-field-giver_npc_tag').val() || '').trim();
 		data.img_url = ($('#nw-field-img_url').val() || '').trim();
 
-		data.is_boss = $('#nw-field-is_boss').is(':checked') ? '1' : '';
-		data.is_key_arc = $('#nw-field-is_key_arc').is(':checked') ? '1' : '';
-		data.is_repeatable = $('#nw-field-is_repeatable').is(':checked') ? '1' : '';
-		data.is_active = $('#nw-field-is_active').is(':checked') ? '1' : '';
+		data.is_boss = $('#nw-field-is_boss').is(':checked') ? '1' : '0';
+		data.is_key_arc = $('#nw-field-is_key_arc').is(':checked') ? '1' : '0';
+		data.is_repeatable = $('#nw-field-is_repeatable').is(':checked') ? '1' : '0';
+		data.is_active = $('#nw-field-is_active').is(':checked') ? '1' : '0';
 
 		return data;
 	}
@@ -304,7 +330,7 @@
 	function loadAll() {
 		$('#nw-scenarios-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">Loading…</td></tr>');
 
-		$.post(ajaxurl, {
+		$.post(ajaxEndpoint, {
 			action: 'nw_scenarios_get_all',
 			nonce: nonce,
 			filter_type: ($('#nw-filter-type').val() || '').trim(),
@@ -317,19 +343,17 @@
 			}
 
 			all = Array.isArray(res.data) ? res.data : [];
-			var filtered = getFilteredRows();
-			renderTable(filtered);
-			updateStats(filtered);
+			rerenderCurrentView();
 		}).fail(function () {
 			notice('Request failed.', 'error');
 		});
 	}
 
-	$(document).on('input', '#nw-search', function () {
-		var filtered = getFilteredRows();
-		renderTable(filtered);
-		updateStats(filtered);
-	});
+	var debouncedSearchRender = debounce(function () {
+		rerenderCurrentView();
+	}, 150);
+
+	$(document).on('input', '#nw-search', debouncedSearchRender);
 
 	$(document).on('change', '#nw-filter-type, #nw-filter-category, #nw-filter-difficulty', function () {
 		loadAll();
@@ -361,9 +385,8 @@
 		var $cb = $(this);
 		var id = $cb.data('id');
 		var val = $cb.is(':checked');
-		var $row = $cb.closest('tr');
 
-		$.post(ajaxurl, {
+		$.post(ajaxEndpoint, {
 			action: 'nw_scenarios_toggle',
 			nonce: nonce,
 			id: id,
@@ -377,13 +400,14 @@
 
 			all = all.map(function (scenario) {
 				if (String(scenario.id) === String(id)) {
-					scenario.is_active = val;
+					return $.extend({}, scenario, {
+						is_active: val
+					});
 				}
 				return scenario;
 			});
 
-			$row.toggleClass('nw-row-inactive', !val);
-			updateStats(getFilteredRows());
+			rerenderCurrentView();
 			notice(val ? 'Activated.' : 'Deactivated.', 'success');
 		}).fail(function () {
 			$cb.prop('checked', !val);
@@ -410,14 +434,18 @@
 			return;
 		}
 
-		if (payload.min_entropy !== '' && payload.max_entropy !== '' && parseInt(payload.min_entropy, 10) > parseInt(payload.max_entropy, 10)) {
+		if (
+			payload.min_entropy !== '' &&
+			payload.max_entropy !== '' &&
+			parseInt(payload.min_entropy, 10) > parseInt(payload.max_entropy, 10)
+		) {
 			notice('Min entropy cannot be greater than max entropy.', 'error');
 			return;
 		}
 
 		$btn.prop('disabled', true).text('Saving…');
 
-		$.post(ajaxurl, payload, function (res) {
+		$.post(ajaxEndpoint, payload, function (res) {
 			$btn.prop('disabled', false).text(payload.id ? 'Save Changes' : 'Save Scenario');
 
 			if (!res || !res.success) {
@@ -443,7 +471,7 @@
 			return;
 		}
 
-		$.post(ajaxurl, {
+		$.post(ajaxEndpoint, {
 			action: 'nw_scenarios_delete',
 			nonce: nonce,
 			id: id
@@ -461,15 +489,13 @@
 		});
 	});
 
-	$(function () {
-		if (!ajaxurl || !nonce) {
-			notice('Missing AJAX config.', 'error');
-			return;
-		}
+	if (!ajaxEndpoint || !nonce) {
+		notice('Missing AJAX config.', 'error');
+		return;
+	}
 
-		$('#nw-field-difficulty').attr({ min: 1, max: 5 });
+	$('#nw-field-difficulty').attr({ min: 1, max: 5 });
 
-		loadAll();
-	});
+	loadAll();
 
 })(jQuery);
