@@ -22,14 +22,14 @@ class Neoweaver_Agents_List {
             'tw-agents-list',
             $base . 'assets/css/agents-list.css',
             [],
-            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/css/agents-list.css' )
+            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/css/public/agents-list.css' )
         );
 
         wp_enqueue_script(
             'tw-agents-list',
             $base . 'assets/js/agents-list.js',
             [],
-            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/agents-list.js' ),
+            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/public/agents-list.js' ),
             true  // load in footer
         );
     }
