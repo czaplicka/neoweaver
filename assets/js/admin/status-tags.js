@@ -3,8 +3,9 @@
 	'use strict';
 
 	const NWStatusTags = {
-		currentId: 0,
+		currentId: '',
 		rows: [],
+		noticeTimer: null,
 
 		init() {
 			if (!window.NW_ST || !window.NW_ST.ajax_url || !window.NW_ST.nonce) {
@@ -36,8 +37,15 @@
 			});
 		},
 
+		normalizeId(value) {
+			if (value === null || typeof value === 'undefined') {
+				return '';
+			}
+			return String(value).trim();
+		},
+
 		request(data, onSuccess, fallbackMessage = 'Request failed.') {
-			$.ajax({
+			return $.ajax({
 				url: window.NW_ST.ajax_url,
 				method: 'POST',
 				dataType: 'json',
@@ -66,7 +74,7 @@
 					return xhr.responseJSON.data.message.trim();
 				}
 			}
-			return fallback;
+			return fallback || 'Request failed.';
 		},
 
 		load() {
@@ -99,36 +107,41 @@
 			html += '</tr></thead><tbody>';
 
 			rows.forEach((tag) => {
-				const flags = [
-					tag.is_stackable ? 'Stackable' : null,
-					tag.is_debuff ? 'Debuff' : 'Buff'
-				].filter(Boolean).join(' · ');
+				try {
+					const tagId = this.normalizeId(tag && tag.id);
+					const flags = [
+						tag && tag.is_stackable ? 'Stackable' : null,
+						tag && tag.is_debuff ? 'Debuff' : 'Buff'
+					].filter(Boolean).join(' · ');
 
-				html += `<tr data-id="${this.esc(tag.id)}">
-					<td>
-						<strong>${this.esc(tag.label)}</strong>
-						${tag.effect_description ? `<div style="color:#666;margin-top:4px;">${this.esc(this.truncate(tag.effect_description, 80))}</div>` : ''}
-					</td>
-					<td>${this.esc(tag.category || '—')}</td>
-					<td>${this.esc(tag.duration || 'scene')}</td>
-					<td>${this.esc(flags || '—')}</td>
-					<td>
-						<span style="display:inline-flex;align-items:center;gap:8px;">
-							<span style="width:14px;height:14px;border-radius:999px;background:${this.esc(tag.color_hex || '#ff0000')};border:1px solid #ccc;display:inline-block;"></span>
-							${this.esc(tag.color_hex || '#ff0000')}
-						</span>
-					</td>
-					<td>
-						<label>
-							<input type="checkbox" class="nw-toggle-tag" data-id="${this.esc(tag.id)}" ${tag.is_active ? 'checked' : ''}>
-							${tag.is_active ? 'Active' : 'Inactive'}
-						</label>
-					</td>
-					<td>
-						<button type="button" class="button button-small nw-edit-tag" data-id="${this.esc(tag.id)}">Edit</button>
-						<button type="button" class="button button-small button-link-delete nw-delete-tag" data-id="${this.esc(tag.id)}">Delete</button>
-					</td>
-				</tr>`;
+					html += `<tr data-id="${this.esc(tagId)}">
+						<td>
+							<strong>${this.esc(tag && tag.label ? tag.label : '')}</strong>
+							${tag && tag.effect_description ? `<div style="color:#666;margin-top:4px;">${this.esc(this.truncate(tag.effect_description, 80))}</div>` : ''}
+						</td>
+						<td>${this.esc((tag && tag.category) || '—')}</td>
+						<td>${this.esc((tag && tag.duration) || 'scene')}</td>
+						<td>${this.esc(flags || '—')}</td>
+						<td>
+							<span style="display:inline-flex;align-items:center;gap:8px;">
+								<span style="width:14px;height:14px;border-radius:999px;background:${this.esc((tag && tag.color_hex) || '#ff0000')};border:1px solid #ccc;display:inline-block;"></span>
+								${this.esc((tag && tag.color_hex) || '#ff0000')}
+							</span>
+						</td>
+						<td>
+							<label>
+								<input type="checkbox" class="nw-toggle-tag" data-id="${this.esc(tagId)}" ${tag && tag.is_active ? 'checked' : ''}>
+								${tag && tag.is_active ? 'Active' : 'Inactive'}
+							</label>
+						</td>
+						<td>
+							<button type="button" class="button button-small nw-edit-tag" data-id="${this.esc(tagId)}">Edit</button>
+							<button type="button" class="button button-small button-link-delete nw-delete-tag" data-id="${this.esc(tagId)}">Delete</button>
+						</td>
+					</tr>`;
+				} catch (err) {
+					html += '<tr><td colspan="7" style="color:#d63638;">Could not render one status tag row.</td></tr>';
+				}
 			});
 
 			html += '</tbody></table>';
@@ -136,7 +149,7 @@
 		},
 
 		showForm(tag = null) {
-			this.currentId = tag ? parseInt(tag.id, 10) : 0;
+			this.currentId = tag ? this.normalizeId(tag.id) : '';
 
 			$('#nw-form-title').text(tag ? 'Edit Status Tag' : 'Add Status Tag');
 			$('#nw-save-tag-btn').text(tag ? 'Save Tag' : 'Create Tag');
@@ -158,25 +171,29 @@
 		},
 
 		hideForm() {
-			this.currentId = 0;
-			$('#nw-status-tag-form-wrap').slideUp(180);
-			$('#nw-field-label').val('');
-			$('#nw-field-category').val('');
-			$('#nw-field-effect_description').val('');
-			$('#nw-field-mechanic_modifier').val('');
+			const $form = $('#nw-status-tag-form');
+
+			this.currentId = '';
+
+			if ($form.length && $form[0]) {
+				$form[0].reset();
+			}
+
 			$('#nw-field-duration').val('scene');
-			$('#nw-field-source').val('');
 			$('#nw-field-color_hex').val('#ff0000');
 			$('#nw-field-is_stackable').prop('checked', false);
 			$('#nw-field-is_debuff').prop('checked', true);
 			$('#nw-field-is_active').prop('checked', true);
+
+			$('#nw-save-tag-btn').prop('disabled', false).text('Create Tag');
 			$('#nw-delete-tag-btn').hide();
 			this.clearFormNotice();
+			$('#nw-status-tag-form-wrap').slideUp(180);
 		},
 
 		edit(e) {
-			const id = parseInt($(e.currentTarget).data('id'), 10);
-			const tag = this.rows.find((row) => parseInt(row.id, 10) === id);
+			const id = this.normalizeId($(e.currentTarget).attr('data-id'));
+			const tag = this.rows.find((row) => this.normalizeId(row && row.id) === id);
 
 			if (!tag) {
 				this.showGlobalNotice('Status tag not found.', 'error');
@@ -229,8 +246,14 @@
 
 		toggle(e) {
 			const $el = $(e.currentTarget);
-			const id = parseInt($el.data('id'), 10);
+			const id = this.normalizeId($el.attr('data-id'));
 			const value = $el.is(':checked');
+
+			if (!id) {
+				$el.prop('checked', !value);
+				this.showGlobalNotice('Invalid status tag ID.', 'error');
+				return;
+			}
 
 			this.request(
 				{
@@ -252,7 +275,7 @@
 		},
 
 		delete(e) {
-			const id = parseInt($(e.currentTarget).data('id'), 10);
+			const id = this.normalizeId($(e.currentTarget).attr('data-id'));
 			this.deleteById(id);
 		},
 
@@ -264,6 +287,13 @@
 		},
 
 		deleteById(id) {
+			id = this.normalizeId(id);
+
+			if (!id) {
+				this.showGlobalNotice('Invalid status tag ID.', 'error');
+				return;
+			}
+
 			if (!window.confirm('Delete this status tag? This cannot be undone.')) {
 				return;
 			}
@@ -279,7 +309,11 @@
 						return;
 					}
 					this.showGlobalNotice('Status tag deleted.', 'success');
-					this.hideForm();
+
+					if (this.currentId && this.normalizeId(this.currentId) === id) {
+						this.hideForm();
+					}
+
 					this.load();
 				},
 				'Failed to delete status tag.'
@@ -325,7 +359,12 @@
 			if (str === null || typeof str === 'undefined') {
 				return '';
 			}
-			return $('<div>').text(String(str)).html();
+
+			try {
+				return $('<div>').text(String(str)).html();
+			} catch (e) {
+				return '';
+			}
 		}
 	};
 
