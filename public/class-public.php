@@ -36,6 +36,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! class_exists( 'Neoweaver_Public', false ) ) :
+
 class Neoweaver_Public {
 
 	/** @var Neoweaver_Agents_List */
@@ -167,6 +169,9 @@ class Neoweaver_Public {
 	// =========================================================================
 
 	public function shortcode_character_creator(): string {
+		if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
+			return $this->screen( '<!-- Neoweaver: shortcode-character-creator.php not loaded -->' );
+		}
 		return neoweaver_shortcode_character_creator();
 	}
 
@@ -175,6 +180,9 @@ class Neoweaver_Public {
 	// =========================================================================
 
 	public function shortcode_campaign_creator(): string {
+		if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
+			return $this->screen( '<!-- Neoweaver: shortcode-campaign-creator.php not loaded -->' );
+		}
 		return neoweaver_shortcode_campaign_creator();
 	}
 
@@ -183,6 +191,9 @@ class Neoweaver_Public {
 	// =========================================================================
 
 	public function shortcode_world_creator(): string {
+		if ( ! function_exists( 'neoweaver_shortcode_world_creator' ) ) {
+			return $this->screen( '<!-- Neoweaver: shortcode-world-creator.php not loaded -->' );
+		}
 		return neoweaver_shortcode_world_creator();
 	}
 
@@ -209,15 +220,15 @@ class Neoweaver_Public {
 		<script>
 		(function () {
 			function updateQuickActionsFromHand(cards) {
-				const tags = (cards || []).flatMap((c) =>
-					(c.tags || '')
+				var tags = (cards || []).flatMap(function (c) {
+					return (c.tags || '')
 						.split(',')
-						.map((t) => t.trim())
-						.filter(Boolean)
-				);
-				if (window.twUpdatePlayerTags) {
+						.map(function (t) { return t.trim(); })
+						.filter(Boolean);
+				});
+				if (typeof window.twUpdatePlayerTags === 'function') {
 					window.twUpdatePlayerTags(tags);
-				} else {
+				} else if (typeof console !== 'undefined') {
 					console.warn('twUpdatePlayerTags is not defined – quick actions bridge has nothing to call.');
 				}
 			}
@@ -239,26 +250,33 @@ class Neoweaver_Public {
 		}
 		?>
 		<script>
-		function showTagUpdate(tagName, isSuccess = true) {
-			const popup = document.createElement('div');
-			popup.className = `tag-update-popup ${isSuccess ? '' : 'failure'}`;
-			popup.innerHTML = `
-				<span class="tag-label">// DATA SYNC: NEW ECHO TAG ACQUIRED</span>
-				<span class="tag-name"></span>
-			`;
-			popup.querySelector('.tag-name').textContent = tagName;
+		function showTagUpdate(tagName, isSuccess) {
+			isSuccess = (isSuccess !== false);
+			var popup = document.createElement('div');
+			popup.className = 'tag-update-popup' + (isSuccess ? '' : ' failure');
+
+			var labelSpan = document.createElement('span');
+			labelSpan.className = 'tag-label';
+			labelSpan.textContent = '// DATA SYNC: NEW ECHO TAG ACQUIRED';
+
+			var nameSpan = document.createElement('span');
+			nameSpan.className = 'tag-name';
+			nameSpan.textContent = tagName;
+
+			popup.appendChild(labelSpan);
+			popup.appendChild(nameSpan);
 			document.body.appendChild(popup);
 
 			if (window.jQuery) {
-				jQuery(popup).fadeIn(300).delay(3000).fadeOut(500, function() {
+				jQuery(popup).fadeIn(300).delay(3000).fadeOut(500, function () {
 					this.remove();
 				});
 			} else {
 				popup.style.opacity = '1';
-				setTimeout(() => {
+				setTimeout(function () {
 					popup.style.transition = 'opacity 0.5s';
 					popup.style.opacity = '0';
-					setTimeout(() => popup.remove(), 500);
+					setTimeout(function () { popup.remove(); }, 500);
 				}, 3000);
 			}
 		}
@@ -266,3 +284,5 @@ class Neoweaver_Public {
 		<?php
 	}
 }
+
+endif; // class_exists( 'Neoweaver_Public' )
