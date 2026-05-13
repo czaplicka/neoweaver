@@ -80,14 +80,14 @@ final class NeoWeaver_Core {
 			'includes/ajax/update-vehicle-module.php',
 
 			// includes/classes
-			'includes/classes/class-agents-list.php',
-			'includes/classes/class-agents-repository.php',
-			'includes/classes/class-checkout-block.php',
-			'includes/classes/class-core.php',
-			'includes/classes/class-deployments-creator.php',
-			'includes/classes/class-loader.php',
-			'includes/classes/class-nodes-creator.php',
-			'includes/classes/class-nw-supabase.php',
+		'includes/classes/class-nw-supabase.php',
+		'includes/classes/class-core.php',
+		'includes/classes/class-loader.php',
+		'includes/classes/class-agents-repository.php',
+		'includes/classes/class-agents-list.php',
+		'includes/classes/class-deployments-creator.php',
+		'includes/classes/class-nodes-creator.php',
+		'includes/classes/class-checkout-block.php',
 
 			// public
 			'public/class-public.php',
@@ -294,7 +294,7 @@ final class NeoWeaver_Core {
 		wp_enqueue_style(
 			'neoweaver-char-panel',
 			$css_url . 'char-panel.css',
-			[ 'neoweaver-core' ],
+			[ 'neoweaver-tw-core' ],  // <-- było 'neoweaver-core'
 			file_exists( $char_panel_file ) ? (string) filemtime( $char_panel_file ) : NEOWEAVER_VERSION
 		);
 
