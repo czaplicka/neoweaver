@@ -1,5 +1,6 @@
 <?php
-function tw_deployment_enqueue_assets() {
+if ( ! function_exists( 'tw_connect_campaign_world_enqueue_assets' ) ) {
+	function tw_connect_campaign_world_enqueue_assets() {
 
     wp_register_style(
         'tw-deployment',
@@ -16,7 +17,8 @@ function tw_deployment_enqueue_assets() {
         true
     );
 }
-add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
+}
+add_action( 'wp_enqueue_scripts', 'tw_connect_campaign_world_enqueue_assets' );
 
 /**
  * SHORTCODE: [tw_connect_campaign_world]
