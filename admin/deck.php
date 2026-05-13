@@ -3,12 +3,17 @@
  * NeoWeaver — Deck Admin
  *
  * Manages cyber_deck table.
+ * Instantiated exclusively by NW_Admin_Bootstrap.
  *
  * @package NeoWeaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+if ( class_exists( 'NW_Deck_Admin', false ) ) {
+	return;
 }
 
 class NW_Deck_Admin {
@@ -175,6 +180,23 @@ class NW_Deck_Admin {
 		];
 	}
 
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match(
+			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
+			$value
+		);
+	}
+
+	private function get_uuid_from_post( string $key = 'id' ): string {
+		$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ?? '' ) );
+
+		if ( ! $value || ! $this->is_uuid( $value ) ) {
+			return '';
+		}
+
+		return $value;
+	}
+
 	private function parse_json_array_field( $value ): array {
 		if ( is_array( $value ) ) {
 			$items = $value;
@@ -233,10 +255,7 @@ class NW_Deck_Admin {
 			return null;
 		}
 
-		return preg_match(
-			'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
-			$value
-		) ? $value : null;
+		return $this->is_uuid( $value ) ? $value : null;
 	}
 
 	public function render_page(): void {
@@ -574,7 +593,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id = absint( $_POST['id'] ?? 0 );
+		$id = $this->get_uuid_from_post( 'id' );
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -583,7 +602,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'GET',
-			'cyber_deck?id=eq.' . $id . '&select=*'
+			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=*'
 		);
 
 		if ( ! $result['ok'] ) {
@@ -603,11 +622,16 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id   = absint( $_POST['id'] ?? 0 );
+		$id   = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 
 		if ( ! $name ) {
 			wp_send_json_error( 'Name is required.' );
+			return;
+		}
+
+		if ( $id && ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid ID.' );
 			return;
 		}
 
@@ -628,11 +652,11 @@ class NW_Deck_Admin {
 			'name'                    => $name,
 			'description'             => $this->maybe_null_textarea( wp_unslash( $_POST['description'] ?? '' ) ),
 			'deck_category'           => $category,
-			'type'                    => $this->maybe_null_text( wp_unslash( $_POST['type'] ?? '' ) ) ?: 'Action',
+			'type'                    => $this->maybe_null_text( wp_unslash( $_POST['type'] ?? '' ) ) ?: 'action',
 			'mechanic'                => $this->maybe_null_text( wp_unslash( $_POST['mechanic'] ?? '' ) ),
 			'mechanic_goal'           => $this->maybe_null_text( wp_unslash( $_POST['mechanic_goal'] ?? '' ) ),
 			'cost_label'              => $this->maybe_null_text( wp_unslash( $_POST['cost_label'] ?? '' ) ),
-			'cost_number'             => max( 0, intval( $_POST['cost_number'] ?? 0 ) ),
+			'cost_number'             => max( 0, intval( wp_unslash( $_POST['cost_number'] ?? 0 ) ) ),
 			'effect'                  => $this->maybe_null_textarea( wp_unslash( $_POST['effect'] ?? '' ) ),
 			'bonus'                   => $this->parse_json_object_field( wp_unslash( $_POST['bonus'] ?? '' ) ),
 			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
@@ -644,16 +668,15 @@ class NW_Deck_Admin {
 			'required_location_tags'  => $this->parse_json_array_field( wp_unslash( $_POST['required_location_tags'] ?? '' ) ),
 			'denied_location_tags'    => $this->parse_json_array_field( wp_unslash( $_POST['denied_location_tags'] ?? '' ) ),
 			'requirement_description' => $this->maybe_null_textarea( wp_unslash( $_POST['requirement_description'] ?? '' ) ),
-			'time_cost_minutes'       => max( 0, intval( $_POST['time_cost_minutes'] ?? 0 ) ),
-			'cooldown_messages'       => max( 0, intval( $_POST['cooldown_messages'] ?? 0 ) ),
-			'entropy_on_fail'         => max( 0, intval( $_POST['entropy_on_fail'] ?? 0 ) ),
+			'time_cost_minutes'       => max( 0, intval( wp_unslash( $_POST['time_cost_minutes'] ?? 0 ) ) ),
+			'cooldown_messages'       => max( 0, intval( wp_unslash( $_POST['cooldown_messages'] ?? 0 ) ) ),
+			'entropy_on_fail'         => max( 0, intval( wp_unslash( $_POST['entropy_on_fail'] ?? 0 ) ) ),
 			'rarity'                  => $rarity,
-			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
-			'xp_current'              => max( 0, intval( $_POST['xp_current'] ?? 0 ) ),
-			'xp_to_next'              => max( 0, intval( $_POST['xp_to_next'] ?? 10 ) ),
-			'is_leveling'             => filter_var( $_POST['is_leveling'] ?? false, FILTER_VALIDATE_BOOLEAN ),
-			'is_disposable'           => filter_var( $_POST['is_disposable'] ?? false, FILTER_VALIDATE_BOOLEAN ),
-			'is_active'               => filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
+			'xp_current'              => max( 0, intval( wp_unslash( $_POST['xp_current'] ?? 0 ) ) ),
+			'xp_to_next'              => max( 0, intval( wp_unslash( $_POST['xp_to_next'] ?? 10 ) ) ),
+			'is_leveling'             => filter_var( wp_unslash( $_POST['is_leveling'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
+			'is_disposable'           => filter_var( wp_unslash( $_POST['is_disposable'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
+			'is_active'               => filter_var( wp_unslash( $_POST['is_active'] ?? true ), FILTER_VALIDATE_BOOLEAN ),
 			'sound_effect'            => esc_url_raw( wp_unslash( $_POST['sound_effect'] ?? '' ) ) ?: null,
 			'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
 			'class_id'                => $this->maybe_uuid( wp_unslash( $_POST['class_id'] ?? '' ) ),
@@ -662,7 +685,7 @@ class NW_Deck_Admin {
 		if ( $id ) {
 			$result = $this->supa(
 				'PATCH',
-				'cyber_deck?id=eq.' . $id,
+				'cyber_deck?id=eq.' . rawurlencode( $id ),
 				$payload
 			);
 		} else {
@@ -690,8 +713,8 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id    = absint( $_POST['id'] ?? 0 );
-		$state = filter_var( $_POST['state'] ?? false, FILTER_VALIDATE_BOOLEAN );
+		$id    = $this->get_uuid_from_post( 'id' );
+		$state = filter_var( wp_unslash( $_POST['state'] ?? false ), FILTER_VALIDATE_BOOLEAN );
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -700,7 +723,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'PATCH',
-			'cyber_deck?id=eq.' . $id,
+			'cyber_deck?id=eq.' . rawurlencode( $id ),
 			[ 'is_active' => $state ]
 		);
 
@@ -720,7 +743,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id = absint( $_POST['id'] ?? 0 );
+		$id = $this->get_uuid_from_post( 'id' );
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -729,7 +752,7 @@ class NW_Deck_Admin {
 
 		$result = $this->supa(
 			'DELETE',
-			'cyber_deck?id=eq.' . $id
+			'cyber_deck?id=eq.' . rawurlencode( $id )
 		);
 
 		if ( ! $result['ok'] ) {
@@ -740,11 +763,3 @@ class NW_Deck_Admin {
 		wp_send_json_success( [ 'deleted' => true ] );
 	}
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NW_Deck_Admin();
-	},
-	20
-);
