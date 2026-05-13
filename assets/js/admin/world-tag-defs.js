@@ -6,32 +6,46 @@
 (function ($) {
 	'use strict';
 
-	let allTags = [];
-	let editingId = null;
+	var allTags = [];
+	var editingId = null;
+	var noticeTimer = null;
 
-	const $notice = $('#nw-notice');
-	const $tbody = $('#nw-wtd-tbody');
-	const $overlay = $('#nw-modal-overlay');
-	const $modalTitle = $('#nw-modal-title');
-	const $deleteBtn = $('#nw-delete-btn');
-	const $saveLabel = $('#nw-save-label');
-	const $saveBtn = $('#nw-save-btn');
-	const $colorPicker = $('#nw-field-color-picker');
-	const $colorText = $('#nw-field-color');
+	var $notice = $('#nw-notice');
+	var $tbody = $('#nw-wtd-tbody');
+	var $overlay = $('#nw-modal-overlay');
+	var $modalTitle = $('#nw-modal-title');
+	var $deleteBtn = $('#nw-delete-btn');
+	var $saveLabel = $('#nw-save-label');
+	var $saveBtn = $('#nw-save-btn');
+	var $colorPicker = $('#nw-field-color-picker');
+	var $colorText = $('#nw-field-color');
 
-	const $filterCat = $('#nw-filter-category');
-	const $filterSource = $('#nw-filter-source');
-	const $filterActive = $('#nw-filter-active');
-	const $filterSearch = $('#nw-filter-search');
+	var $filterCat = $('#nw-filter-category');
+	var $filterSource = $('#nw-filter-source');
+	var $filterActive = $('#nw-filter-active');
+	var $filterSearch = $('#nw-filter-search');
 
-	const $total = $('#nw-total');
-	const $activeCount = $('#nw-active');
-	const $inactiveCount = $('#nw-inactive');
-	const $countSystem = $('#nw-count-system');
-	const $countCustom = $('#nw-count-custom');
+	var $total = $('#nw-total');
+	var $activeCount = $('#nw-active');
+	var $inactiveCount = $('#nw-inactive');
+	var $countSystem = $('#nw-count-system');
+	var $countCustom = $('#nw-count-custom');
 
 	if (!window.NW_WTD || !NW_WTD.ajax_url || !NW_WTD.nonce) {
 		console.error('NeoWeaver World Tag Defs: missing AJAX config.');
+		return;
+	}
+
+	if (
+		!$notice.length ||
+		!$tbody.length ||
+		!$overlay.length ||
+		!$modalTitle.length ||
+		!$deleteBtn.length ||
+		!$saveLabel.length ||
+		!$saveBtn.length
+	) {
+		console.error('NeoWeaver World Tag Defs: required DOM elements are missing.');
 		return;
 	}
 
@@ -47,7 +61,10 @@
 				onSuccess(res);
 			}
 		})
-		.fail(function (xhr) {
+		.fail(function (xhr, status) {
+			if (status === 'abort') {
+				return;
+			}
 			showNotice(extractError(xhr, fallbackError || 'Request failed.'), 'error');
 		});
 	}
@@ -68,7 +85,7 @@
 
 		if (xhr && typeof xhr.responseText === 'string' && xhr.responseText.trim()) {
 			try {
-				const parsed = JSON.parse(xhr.responseText);
+				var parsed = JSON.parse(xhr.responseText);
 				if (parsed && typeof parsed.data === 'string' && parsed.data) {
 					return parsed.data;
 				}
@@ -85,8 +102,8 @@
 			.text(msg || '')
 			.fadeIn(200);
 
-		clearTimeout(showNotice._timer);
-		showNotice._timer = setTimeout(function () {
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(function () {
 			$notice.fadeOut(400);
 		}, 4000);
 	}
@@ -116,8 +133,8 @@
 	}
 
 	function updateStats() {
-		const active = allTags.filter(function (t) { return !!t.is_active; }).length;
-		const inactive = allTags.length - active;
+		var active = allTags.filter(function (t) { return !!t.is_active; }).length;
+		var inactive = allTags.length - active;
 
 		$total.text(allTags.length);
 		$activeCount.text(active);
@@ -127,12 +144,25 @@
 	}
 
 	function populateCategoryFilter() {
-		const current = $filterCat.val();
-		const cats = [...new Set(
-			allTags
-				.map(function (t) { return t.category || ''; })
-				.filter(Boolean)
-		)].sort();
+		var current;
+		var seen = {};
+		var cats = [];
+
+		if (!$filterCat.length) {
+			return;
+		}
+
+		current = $filterCat.val();
+
+		allTags.forEach(function (t) {
+			var cat = t && t.category ? String(t.category) : '';
+			if (cat && !seen[cat]) {
+				seen[cat] = true;
+				cats.push(cat);
+			}
+		});
+
+		cats.sort();
 
 		$filterCat.find('option:not(:first)').remove();
 
@@ -140,36 +170,46 @@
 			$filterCat.append($('<option>').val(c).text(c));
 		});
 
-		if (current) {
+		if (current && seen[current]) {
 			$filterCat.val(current);
+		} else {
+			$filterCat.val('');
 		}
 	}
 
-	function renderTable() {
-		const cat = $filterCat.val();
-		const src = $filterSource.val();
-		const active = $filterActive.val();
-		const search = String($filterSearch.val() || '').toLowerCase().trim();
+	function getFilterValue($el, fallback) {
+		if (!$el || !$el.length) {
+			return fallback;
+		}
+		var val = $el.val();
+		return typeof val === 'undefined' || val === null ? fallback : val;
+	}
 
-		const filtered = allTags.filter(function (t) {
+	function renderTable() {
+		var cat = getFilterValue($filterCat, '');
+		var src = getFilterValue($filterSource, '');
+		var active = getFilterValue($filterActive, '');
+		var search = String(getFilterValue($filterSearch, '') || '').toLowerCase().trim();
+
+		var filtered = allTags.filter(function (t) {
 			if (cat && t.category !== cat) {
 				return false;
 			}
 			if (src && t.source !== src) {
 				return false;
 			}
-			if (active !== '' && String(t.is_active ? 1 : 0) !== active) {
+			if (active !== '' && String(t.is_active ? 1 : 0) !== String(active)) {
 				return false;
 			}
 
 			if (search) {
-				const haystack = [
+				var haystack = [
 					t.code || '',
 					t.label || '',
 					t.description || ''
 				].join(' ').toLowerCase();
 
-				if (!haystack.includes(search)) {
+				if (haystack.indexOf(search) === -1) {
 					return false;
 				}
 			}
@@ -189,102 +229,105 @@
 	}
 
 	function buildRow(t) {
-	const color = t.color || '#888888';
-	const sourceMap = {
-		system: 'nw-badge-system',
-		custom: 'nw-badge-custom',
-		imported: 'nw-badge-imported'
-	};
-	const badgeCls = sourceMap[t.source] || '';
-	const inactiveClass = t.is_active ? '' : 'nw-inactive';
+		var color = t.color || '#888888';
+		var sourceMap = {
+			system: 'nw-badge-system',
+			custom: 'nw-badge-custom',
+			imported: 'nw-badge-imported'
+		};
+		var badgeCls = sourceMap[t.source] || '';
+		var inactiveClass = t.is_active ? '' : 'nw-inactive';
+		var id = String(t && t.id != null ? t.id : '');
 
-	const $tr = $('<tr>').attr('data-id', t.id);
+		var $tr = $('<tr>').attr('data-id', id);
 
-	$tr.append(
-		$('<td>').addClass(inactiveClass).append(
-			$('<code>').text(t.code || '')
-		)
-	);
-
-	$tr.append(
-		$('<td>').addClass(inactiveClass).text(t.label || '')
-	);
-
-	const $iconCell = $('<div>').addClass('nw-icon-cell');
-	$iconCell.append(
-		$('<span>')
-			.addClass('nw-color-dot')
-			.css('background', color)
-	);
-
-	if (t.icon) {
-		$iconCell.append(document.createTextNode(' ' + t.icon));
-	} else {
-		$iconCell.append(
-			$('<span>').css('color', 'var(--nw-text-muted)').text('—')
+		$tr.append(
+			$('<td>').addClass(inactiveClass).append(
+				$('<code>').text(t.code || '')
+			)
 		);
-	}
 
-	$tr.append($('<td>').append($iconCell));
+		$tr.append(
+			$('<td>').addClass(inactiveClass).text(t.label || '')
+		);
 
-	$tr.append(
-		$('<td>').addClass(inactiveClass).text(t.category || '—')
-	);
-
-	$tr.append(
-		$('<td>').append(
+		var $iconCell = $('<div>').addClass('nw-icon-cell');
+		$iconCell.append(
 			$('<span>')
-				.addClass('nw-badge')
-				.addClass(badgeCls)
-				.text(t.source || '—')
-		)
-	);
+				.addClass('nw-color-dot')
+				.css('background', color)
+		);
 
-	$tr.append(
-		$('<td>').addClass(inactiveClass).text(t.impact != null ? t.impact : '—')
-	);
+		if (t.icon) {
+			$iconCell.append(document.createTextNode(' ' + t.icon));
+		} else {
+			$iconCell.append(
+				$('<span>').css('color', 'var(--nw-text-muted)').text('—')
+			);
+		}
 
-	$tr.append(
-		$('<td>').addClass(inactiveClass).text(t.sort_order != null ? t.sort_order : '—')
-	);
+		$tr.append($('<td>').append($iconCell));
 
-	$tr.append(
-		$('<td>').append(
-			$('<button>', {
-				type: 'button',
-				class: 'nw-row-toggle nw-toggle-active-btn',
-				'data-id': t.id,
-				'data-active': t.is_active ? 1 : 0,
-				title: 'Toggle active',
-				text: t.is_active ? '✅' : '⭕'
-			})
-		)
-	);
+		$tr.append(
+			$('<td>').addClass(inactiveClass).text(t.category || '—')
+		);
 
-	$tr.append(
-		$('<td>').append(
-			$('<div>').addClass('nw-row-actions').append(
+		$tr.append(
+			$('<td>').append(
+				$('<span>')
+					.addClass('nw-badge')
+					.addClass(badgeCls)
+					.text(t.source || '—')
+			)
+		);
+
+		$tr.append(
+			$('<td>').addClass(inactiveClass).text(t.impact != null ? t.impact : '—')
+		);
+
+		$tr.append(
+			$('<td>').addClass(inactiveClass).text(t.sort_order != null ? t.sort_order : '—')
+		);
+
+		$tr.append(
+			$('<td>').append(
 				$('<button>', {
 					type: 'button',
-					class: 'nw-row-btn nw-edit-btn',
-					'data-id': t.id,
-					text: 'Edit'
+					class: 'nw-row-toggle nw-toggle-active-btn',
+					'data-id': id,
+					'data-active': t.is_active ? 1 : 0,
+					title: 'Toggle active',
+					text: t.is_active ? '✅' : '⭕'
 				})
 			)
-		)
-	);
+		);
 
-	return $tr;
-}
+		$tr.append(
+			$('<td>').append(
+				$('<div>').addClass('nw-row-actions').append(
+					$('<button>', {
+						type: 'button',
+						class: 'nw-row-btn nw-edit-btn',
+						'data-id': id,
+						text: 'Edit'
+					})
+				)
+			)
+		);
+
+		return $tr;
+	}
 
 	function openModal(tag) {
-		editingId = tag ? tag.id : null;
+		editingId = tag ? String(tag.id) : null;
+
+		$('#nw-wtd-form')[0].reset();
 
 		$modalTitle.text(tag ? 'Edit World Tag Def' : 'New World Tag Def');
 		$saveLabel.text(tag ? 'Save Tag Def' : 'Create Tag Def');
 		$deleteBtn.toggle(!!tag);
 
-		$('#nw-field-id').val(tag ? tag.id : '');
+		$('#nw-field-id').val(tag ? String(tag.id) : '');
 		$('#nw-field-code').val(tag ? (tag.code || '') : '');
 		$('#nw-field-label').val(tag ? (tag.label || '') : '');
 		$('#nw-field-description').val(tag ? (tag.description || '') : '');
@@ -295,7 +338,7 @@
 		$('#nw-field-impact').val(tag ? (tag.impact != null ? tag.impact : '') : '');
 		$('#nw-field-is_active').prop('checked', tag ? !!tag.is_active : true);
 
-		const colorVal = (tag && tag.color) ? tag.color : '#adff00';
+		var colorVal = (tag && tag.color) ? tag.color : '#adff00';
 		$colorText.val(colorVal);
 		$colorPicker.val(colorVal);
 
@@ -306,7 +349,11 @@
 	function closeModal() {
 		$overlay.fadeOut(160);
 		editingId = null;
-		$('#nw-wtd-form')[0].reset();
+
+		if ($('#nw-wtd-form').length && $('#nw-wtd-form')[0]) {
+			$('#nw-wtd-form')[0].reset();
+		}
+
 		$('#nw-field-id').val('');
 		$deleteBtn.hide();
 		$saveLabel.text('Save Tag Def');
@@ -316,7 +363,7 @@
 	}
 
 	function saveTag() {
-		const payload = {
+		var payload = {
 			id: $('#nw-field-id').val().trim(),
 			code: $('#nw-field-code').val().trim(),
 			label: $('#nw-field-label').val().trim(),
@@ -367,7 +414,7 @@
 	}
 
 	function toggleActive(id, currentActive) {
-		const newState = currentActive ? 0 : 1;
+		var newState = currentActive ? 0 : 1;
 
 		request(
 			{
@@ -382,7 +429,7 @@
 					return;
 				}
 
-				const tag = allTags.find(function (t) {
+				var tag = allTags.find(function (t) {
 					return String(t.id) === String(id);
 				});
 
@@ -426,10 +473,6 @@
 		);
 	}
 
-	function esc(str) {
-		return $('<span>').text(str || '').html();
-	}
-
 	$('#nw-add-btn').on('click', function () {
 		openModal(null);
 	});
@@ -461,7 +504,7 @@
 	});
 
 	$colorText.on('input', function () {
-		const v = $(this).val().trim();
+		var v = $(this).val().trim();
 		if (/^#[0-9a-fA-F]{6}$/.test(v)) {
 			$colorPicker.val(v);
 		}
@@ -475,9 +518,9 @@
 		renderTable();
 	});
 
-	$tbody.on('click', '.nw-edit-btn', function () {
-		const id = $(this).data('id');
-		const tag = allTags.find(function (t) {
+	$(document).on('click', '.nw-edit-btn', function () {
+		var id = $(this).attr('data-id');
+		var tag = allTags.find(function (t) {
 			return String(t.id) === String(id);
 		});
 
@@ -486,9 +529,9 @@
 		}
 	});
 
-	$tbody.on('click', '.nw-toggle-active-btn', function () {
-		const id = $(this).data('id');
-		const active = parseInt($(this).data('active'), 10);
+	$(document).on('click', '.nw-toggle-active-btn', function () {
+		var id = $(this).attr('data-id');
+		var active = parseInt($(this).attr('data-active'), 10) || 0;
 		toggleActive(id, active);
 	});
 
