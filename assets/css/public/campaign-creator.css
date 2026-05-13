@@ -663,3 +663,42 @@
 		max-height           : 320px;
 	}
 }
+.tw-optional-badge {
+	font-size: .6rem;
+	font-weight: 700;
+	letter-spacing: 1px;
+	color: #000;
+	background: #adff00;
+	padding: 2px 6px;
+	vertical-align: middle;
+	margin-left: 8px;
+	clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+}
+
+.tw-option-grid--2.tw-option-grid--centered {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 16px;
+	max-width: 480px;
+	margin: 0 auto;
+}
+
+.tw-option-grid--5 {
+	grid-template-columns: repeat(5, 1fr);
+}
+
+.tw-option-grid--3 {
+	grid-template-columns: repeat(3, 1fr);
+}
+
+.tw-binding-section {
+	border-left: 2px solid #adff00;
+	padding-left: 20px;
+}
+
+.tw-binding-label {
+	font-size: .85rem;
+	letter-spacing: 2px;
+	margin-bottom: 16px;
+	color: #adff00;
+}
