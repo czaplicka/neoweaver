@@ -1,0 +1,358 @@
+/* =============================================================
+   NeoWeaver Admin — Platform Settings
+   Matches the dashboard.css dark theme (#101010 / #adff00).
+   All rules are scoped to .nw-settings-wrap to avoid
+   leaking into other WP admin pages.
+   ============================================================= */
+
+/* ---- Wrap & header ---- */
+.nw-settings-wrap {
+	max-width: 900px;
+	margin: 0 auto;
+	padding-bottom: 40px;
+	font-family: "Chakra Petch", sans-serif;
+}
+
+.nw-settings-header {
+	padding: 24px 0 20px;
+	border-bottom: 1px solid #1f1f1f;
+	margin-bottom: 24px;
+}
+
+.nw-settings-header h1 {
+	font-size: 22px;
+	font-weight: 700;
+	color: #fff;
+	margin: 0 0 6px;
+	line-height: 1.2;
+}
+
+.nw-settings-header h1 .nw-accent {
+	color: #adff00;
+}
+
+.nw-settings-subtitle {
+	font-size: 12px;
+	color: #555;
+	margin: 0;
+	letter-spacing: 0.3px;
+	max-width: 600px;
+}
+
+/* ---- Status banners ---- */
+.nw-settings-notice {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 14px;
+	padding: 12px 16px;
+	border-radius: 10px;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.3px;
+}
+
+.nw-notice-danger {
+	background: #1f1010;
+	border: 1px solid #5b1f1f;
+	color: #ff5c5c;
+}
+
+.nw-notice-warning {
+	background: #211800;
+	border: 1px solid #5c4300;
+	color: #ffb703;
+}
+
+/* ---- WP Settings API overrides ---- */
+.nw-settings-form .form-table {
+	border: none;
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+	margin: 0;
+	padding: 0;
+}
+
+.nw-settings-form .form-table th,
+.nw-settings-form .form-table td {
+	background: transparent;
+	border: none;
+	padding: 0;
+}
+
+/* ---- Section titles ---- */
+.nw-settings-form h2.title,
+.nw-settings-form .settings-title,
+.nw-settings-form > h2 {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	color: #adff00;
+	font-weight: 700;
+	margin: 28px 0 0;
+	padding: 0;
+}
+
+/* Section description text */
+.nw-settings-form .nw-settings-desc {
+	font-size: 11px;
+	color: #555;
+	margin: 4px 0 14px;
+	max-width: 600px;
+	letter-spacing: 0.3px;
+}
+
+/* ---- Form table rows ---- */
+.nw-settings-form .form-table tbody tr {
+	display: grid;
+	grid-template-columns: 220px 1fr;
+	gap: 0;
+	background: #141414;
+	border-bottom: 1px solid #1d1d1d;
+	align-items: start;
+}
+
+.nw-settings-form .form-table tbody tr:first-child {
+	border-radius: 12px 12px 0 0;
+}
+
+.nw-settings-form .form-table tbody tr:last-child {
+	border-bottom: none;
+	border-radius: 0 0 12px 12px;
+}
+
+.nw-settings-form .form-table th {
+	padding: 14px 16px;
+	vertical-align: top;
+	font-size: 12px;
+	font-weight: 600;
+	color: #aaa;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+}
+
+.nw-settings-form .form-table td {
+	padding: 14px 16px;
+	vertical-align: top;
+}
+
+/* ---- Number input ---- */
+.nw-settings-form input[type="number"].small-text {
+	width: 100px;
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 8px;
+	color: #e0e0e0;
+	padding: 7px 10px;
+	font-size: 13px;
+	font-family: "Chakra Petch", monospace;
+	transition: border-color .18s;
+	-moz-appearance: textfield;
+}
+
+.nw-settings-form input[type="number"].small-text::-webkit-inner-spin-button,
+.nw-settings-form input[type="number"].small-text::-webkit-outer-spin-button {
+	opacity: 0.4;
+}
+
+.nw-settings-form input[type="number"].small-text:focus {
+	border-color: #adff00;
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(173, 255, 0, 0.15);
+}
+
+/* ---- Textarea ---- */
+.nw-settings-form textarea.large-text {
+	width: 100%;
+	max-width: 480px;
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 8px;
+	color: #e0e0e0;
+	padding: 8px 10px;
+	font-size: 12px;
+	font-family: "Chakra Petch", monospace;
+	resize: vertical;
+	transition: border-color .18s;
+}
+
+.nw-settings-form textarea.large-text:focus {
+	border-color: #adff00;
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(173, 255, 0, 0.15);
+}
+
+/* ---- Select ---- */
+.nw-settings-form select {
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 8px;
+	color: #e0e0e0;
+	padding: 7px 32px 7px 10px;
+	font-size: 13px;
+	font-family: "Chakra Petch", sans-serif;
+	cursor: pointer;
+	transition: border-color .18s;
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+}
+
+.nw-settings-form select:focus {
+	border-color: #adff00;
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(173, 255, 0, 0.15);
+}
+
+/* ---- Checkboxes ---- */
+.nw-settings-form input[type="checkbox"] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 18px;
+	height: 18px;
+	border: 1px solid #2a2a2a;
+	border-radius: 5px;
+	background: #0d0d0d;
+	cursor: pointer;
+	vertical-align: -4px;
+	margin-right: 8px;
+	flex-shrink: 0;
+	transition: background .15s, border-color .15s;
+}
+
+.nw-settings-form input[type="checkbox"]:checked {
+	background: #adff00;
+	border-color: #adff00;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10'%3E%3Cpath d='M1.5 5l3 3 6-7' stroke='%2311150c' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: center;
+}
+
+.nw-settings-form input[type="checkbox"]:focus {
+	outline: none;
+	box-shadow: 0 0 0 2px #0d0d0d, 0 0 0 4px rgba(173, 255, 0, 0.65);
+}
+
+.nw-settings-form label {
+	display: flex;
+	align-items: flex-start;
+	font-size: 12px;
+	color: #ccc;
+	cursor: pointer;
+	line-height: 1.5;
+}
+
+/* ---- Field description ---- */
+.nw-settings-form .description,
+.nw-settings-form p.description {
+	color: #555;
+	font-size: 11px;
+	margin-top: 6px;
+	max-width: 440px;
+	line-height: 1.5;
+}
+
+/* ---- Submit button ---- */
+.nw-settings-form .nw-btn-save,
+.nw-settings-form p.submit .button-primary {
+	appearance: none;
+	-webkit-appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 42px;
+	padding: 0 28px;
+	border-radius: 999px;
+	border: none;
+	background: #adff00;
+	color: #11150c;
+	font-family: "Chakra Petch", sans-serif;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+	box-shadow: 0 4px 18px rgba(173, 255, 0, 0.22);
+	transition: background .18s, transform .14s, box-shadow .18s;
+}
+
+.nw-settings-form .nw-btn-save:hover,
+.nw-settings-form p.submit .button-primary:hover {
+	background: #c6ff4d;
+	box-shadow: 0 6px 24px rgba(173, 255, 0, 0.34);
+	transform: translateY(-1px);
+}
+
+.nw-settings-form .nw-btn-save:active,
+.nw-settings-form p.submit .button-primary:active {
+	transform: translateY(1px);
+	box-shadow: 0 2px 8px rgba(173, 255, 0, 0.18);
+}
+
+.nw-settings-form .nw-btn-save:focus,
+.nw-settings-form p.submit .button-primary:focus {
+	outline: none;
+	box-shadow: 0 0 0 2px #0d0d0d, 0 0 0 4px rgba(173, 255, 0, 0.85);
+}
+
+.nw-settings-form p.submit {
+	padding-top: 20px;
+	margin-top: 8px;
+	border-top: 1px solid #1f1f1f;
+}
+
+/* ---- WP "Settings saved" notice ---- */
+.nw-settings-wrap .notice,
+.nw-settings-wrap .updated,
+.nw-settings-wrap .error {
+	border-radius: 10px;
+	border-left-width: 3px;
+	font-family: "Chakra Petch", sans-serif;
+	font-size: 12px;
+	margin: 0 0 16px;
+	padding: 12px 16px;
+}
+
+.nw-settings-wrap .updated,
+.nw-settings-wrap .notice-success {
+	background: #0d1a00;
+	border-color: #adff00;
+	color: #adff00;
+}
+
+.nw-settings-wrap .error,
+.nw-settings-wrap .notice-error {
+	background: #1f1010;
+	border-color: #ff5c5c;
+	color: #ff5c5c;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+	.nw-settings-wrap {
+		max-width: 100%;
+		padding-inline: 4px;
+	}
+}
+
+@media (max-width: 700px) {
+	.nw-settings-form .form-table tbody tr {
+		grid-template-columns: 1fr;
+	}
+
+	.nw-settings-form .form-table th {
+		padding-bottom: 4px;
+		border-bottom: none;
+	}
+
+	.nw-settings-form .form-table td {
+		padding-top: 4px;
+	}
+
+	.nw-settings-form textarea.large-text {
+		max-width: 100%;
+	}
+}
