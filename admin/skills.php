@@ -71,16 +71,22 @@ if ( ! class_exists( 'NW_Skills_Admin' ) ) {
 				true
 			);
 
-			wp_localize_script(
-				'nw-skills',
-				'NW_SK',
-				[
-					'ajax_url'   => admin_url( 'admin-ajax.php' ),
-					'nonce'      => wp_create_nonce( $this->nonce_action ),
-					'categories' => self::CATEGORIES,
-				]
-			);
-		}
+$uploads = wp_get_upload_dir();
+	$uploads_base = ! empty( $uploads['baseurl'] )
+		? trailingslashit( $uploads['baseurl'] )
+		: '';
+
+	wp_localize_script(
+		'nw-skills',
+		'NW_SK',
+		[
+			'ajax_url'    => admin_url( 'admin-ajax.php' ),
+			'nonce'       => wp_create_nonce( $this->nonce_action ),
+			'categories'  => self::CATEGORIES,
+			'uploadsBase' => $uploads_base,
+		]
+	);
+}
 
 		public function render_page(): void {
 			?>
