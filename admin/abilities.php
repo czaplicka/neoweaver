@@ -9,6 +9,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( class_exists( 'NW_Abilities_Admin', false ) ) {
+	return;
+}
+
 class NW_Abilities_Admin {
 
 	private string $page_slug = 'nw-abilities';
@@ -18,7 +22,7 @@ class NW_Abilities_Admin {
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
 
 	public function __construct() {
-		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
+		add_action( 'admin_menu', [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
 		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
@@ -65,10 +69,14 @@ class NW_Abilities_Admin {
 			true
 		);
 
-		wp_localize_script( 'nw-abilities-script', 'NWAbilities', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
-		] );
+		wp_localize_script(
+			'nw-abilities-script',
+			'NWAbilities',
+			[
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+			]
+		);
 	}
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
@@ -142,7 +150,7 @@ class NW_Abilities_Admin {
 
 	private function is_uuid( string $value ): bool {
 		return (bool) preg_match(
-			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
+			'/^[0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[1-5][0-9a-fA-F]{3}\\-[89abAB][0-9a-fA-F]{3}\\-[0-9a-fA-F]{12}$/',
 			$value
 		);
 	}
@@ -179,12 +187,12 @@ class NW_Abilities_Admin {
 		$description    = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
 		$ability_type   = sanitize_text_field( wp_unslash( $_POST['ability_type'] ?? 'active' ) );
 		$cost_type      = sanitize_text_field( wp_unslash( $_POST['cost_type'] ?? 'none' ) );
-		$cost_value     = intval( $_POST['cost_value'] ?? 0 );
+		$cost_value     = intval( wp_unslash( $_POST['cost_value'] ?? 0 ) );
 		$target_type    = sanitize_text_field( wp_unslash( $_POST['target_type'] ?? 'self' ) );
-		$range_tiles    = intval( $_POST['range_tiles'] ?? 1 );
-		$duration_turns = intval( $_POST['duration_turns'] ?? 0 );
-		$is_passive     = (bool) intval( $_POST['is_passive'] ?? 0 );
-		$is_active      = (bool) intval( $_POST['is_active'] ?? 1 );
+		$range_tiles    = intval( wp_unslash( $_POST['range_tiles'] ?? 1 ) );
+		$duration_turns = intval( wp_unslash( $_POST['duration_turns'] ?? 0 ) );
+		$is_passive     = (bool) intval( wp_unslash( $_POST['is_passive'] ?? 0 ) );
+		$is_active      = (bool) intval( wp_unslash( $_POST['is_active'] ?? 1 ) );
 		$tags           = $this->normalize_tags( $_POST['tags'] ?? '' );
 		$img_url        = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
 		$source         = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
@@ -246,10 +254,12 @@ class NW_Abilities_Admin {
 				return;
 			}
 
-			wp_send_json_success( [
-				'action' => 'updated',
-				'id'     => $record_id,
-			] );
+			wp_send_json_success(
+				[
+					'action' => 'updated',
+					'id'     => $record_id,
+				]
+			);
 			return;
 		}
 
@@ -262,10 +272,12 @@ class NW_Abilities_Admin {
 
 		$created = $res['data'][0] ?? $res['data'] ?? [];
 
-		wp_send_json_success( [
-			'action' => 'created',
-			'id'     => $created['id'] ?? null,
-		] );
+		wp_send_json_success(
+			[
+				'action' => 'created',
+				'id'     => $created['id'] ?? null,
+			]
+		);
 	}
 
 	public function ajax_toggle_ability(): void {
@@ -277,7 +289,7 @@ class NW_Abilities_Admin {
 		}
 
 		$id        = sanitize_text_field( wp_unslash( $_POST['ability_id'] ?? '' ) );
-		$is_active = (bool) intval( $_POST['is_active'] ?? 0 );
+		$is_active = (bool) intval( wp_unslash( $_POST['is_active'] ?? 0 ) );
 
 		if ( ! $id || ! $this->is_uuid( $id ) ) {
 			wp_send_json_error( 'Invalid ID.' );
@@ -295,10 +307,12 @@ class NW_Abilities_Admin {
 			return;
 		}
 
-		wp_send_json_success( [
-			'id'        => $id,
-			'is_active' => $is_active,
-		] );
+		wp_send_json_success(
+			[
+				'id'        => $id,
+				'is_active' => $is_active,
+			]
+		);
 	}
 
 	public function ajax_delete_ability(): void {
