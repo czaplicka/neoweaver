@@ -15,7 +15,7 @@ class NeoWeaver_Checkout_Block_Integration implements IntegrationInterface {
     private function register_scripts() {
         wp_register_script(
             'neoweaver-checkout-block',
-            plugin_dir_url( __FILE__ ) . '../assets/checkout-block.js',
+            plugin_dir_url( __FILE__ ) . '../assets/public/checkout-block.js',
             [ 'wc-blocks-checkout', 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-components', 'wp-i18n' ],
             '1.0.0',
             true
