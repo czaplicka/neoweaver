@@ -1,37 +1,38 @@
 jQuery(function ($) {
     'use strict';
 
-    var cfg          = window.NWClasses || {};
+    var cfg = window.NWClasses || {};
     var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-    var nonce        = cfg.nonce || '';
-    var uploadsUrl   = (cfg.uploads_url || '').replace(/\/+$/, '');
+    var nonce = cfg.nonce || '';
+    var uploadsUrl = (cfg.uploads_url || '').replace(/\/+$/, '');
+    var noticeTimer = null;
 
     /* ── DOM refs ─────────────────────────────────────────── */
-    var $notice       = $('#nw-notice');
-    var $tbody        = $('#nw-classes-tbody');
-    var $search       = $('#nw-search');
+    var $notice = $('#nw-notice');
+    var $tbody = $('#nw-classes-tbody');
+    var $search = $('#nw-search');
     var $modalOverlay = $('#nw-modal-overlay');
-    var $form         = $('#nw-class-form');
-    var $saveBtn      = $('#nw-save-btn');
-    var $saveLabel    = $('#nw-save-label');
-    var $deleteBtn    = $('#nw-delete-btn');
-    var $fieldId      = $('#nw-field-id');
+    var $form = $('#nw-class-form');
+    var $saveBtn = $('#nw-save-btn');
+    var $saveLabel = $('#nw-save-label');
+    var $deleteBtn = $('#nw-delete-btn');
+    var $fieldId = $('#nw-field-id');
 
-    var $fieldName                  = $('#nw-field-name');
-    var $fieldDescription           = $('#nw-field-description');
-    var $fieldIconSlug              = $('#nw-field-icon_slug');
-    var $fieldStartingGold          = $('#nw-field-starting_gold');
-    var $fieldSkillLimit            = $('#nw-field-skill_limit');
-    var $fieldVulnerability         = $('#nw-field-vulnerability');
-    var $fieldTags                  = $('#nw-field-tags');
-    var $fieldIsActive              = $('#nw-field-is_active');
-    var $fieldMechanics             = $('#nw-field-mechanics');
-    var $fieldGmInstructions        = $('#nw-field-gm_instructions');
+    var $fieldName = $('#nw-field-name');
+    var $fieldDescription = $('#nw-field-description');
+    var $fieldIconSlug = $('#nw-field-icon_slug');
+    var $fieldStartingGold = $('#nw-field-starting_gold');
+    var $fieldSkillLimit = $('#nw-field-skill_limit');
+    var $fieldVulnerability = $('#nw-field-vulnerability');
+    var $fieldTags = $('#nw-field-tags');
+    var $fieldIsActive = $('#nw-field-is_active');
+    var $fieldMechanics = $('#nw-field-mechanics');
+    var $fieldGmInstructions = $('#nw-field-gm_instructions');
     var $fieldAiPersonalityModifier = $('#nw-field-ai_personality_modifier');
-    var $fieldAttributeBonuses      = $('#nw-field-attribute_bonuses');
-    var $fieldImgUrl                = $('#nw-field-img_url');
+    var $fieldAttributeBonuses = $('#nw-field-attribute_bonuses');
+    var $fieldImgUrl = $('#nw-field-img_url');
 
-    var $imgPreview     = $('#nw-img-preview');
+    var $imgPreview = $('#nw-img-preview');
     var $imgPreviewWrap = $('#nw-img-preview-wrap');
 
     /* ── state ────────────────────────────────────────────── */
@@ -43,16 +44,27 @@ jQuery(function ($) {
         return $('<span>').text(s || '').html();
     }
 
+    function clearNoticeTimer() {
+        if (noticeTimer) {
+            clearTimeout(noticeTimer);
+            noticeTimer = null;
+        }
+    }
+
     function notice(msg, type) {
         var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
+
+        clearNoticeTimer();
+
         $notice
             .attr('class', 'nw-notice nw-notice-' + safeType)
             .text(msg)
             .stop(true, true)
             .show();
 
-        setTimeout(function () {
+        noticeTimer = setTimeout(function () {
             $notice.fadeOut(300);
+            noticeTimer = null;
         }, 3500);
     }
 
@@ -78,6 +90,7 @@ jQuery(function ($) {
     function parseMaybeJson(value, fallback) {
         if (value == null || value === '') return fallback;
         if (typeof value === 'object') return value;
+
         try {
             return JSON.parse(value);
         } catch (e) {
@@ -85,7 +98,38 @@ jQuery(function ($) {
         }
     }
 
-    function cloneClasses(data) {
+    function getIsActiveFieldMode() {
+        if (!$fieldIsActive.length) return 'missing';
+
+        var tag = ($fieldIsActive.prop('tagName') || '').toLowerCase();
+        var type = String($fieldIsActive.attr('type') || '').toLowerCase();
+
+        if (tag === 'input' && type === 'checkbox') return 'checkbox';
+        return 'value';
+    }
+
+    function setIsActiveField(value) {
+        var normalized = !!value;
+        var mode = getIsActiveFieldMode();
+
+        if (mode === 'checkbox') {
+            $fieldIsActive.prop('checked', normalized);
+        } else if (mode === 'value') {
+            $fieldIsActive.val(normalized ? '1' : '0');
+        }
+    }
+
+    function getIsActiveFieldValue() {
+        var mode = getIsActiveFieldMode();
+
+        if (mode === 'checkbox') {
+            return $fieldIsActive.is(':checked') ? '1' : '0';
+        }
+
+        return $fieldIsActive.val() === '0' ? '0' : '1';
+    }
+
+    function normalizeClasses(data) {
         var list = data;
 
         if (typeof list === 'string') {
@@ -102,6 +146,7 @@ jQuery(function ($) {
 
         return list.map(function (item) {
             var tags = item.tags;
+
             if (typeof tags === 'string') {
                 try {
                     tags = JSON.parse(tags);
@@ -132,16 +177,31 @@ jQuery(function ($) {
     }
 
     function resolveImgUrl(raw) {
+        var value;
+
         if (!raw) return '';
-        raw = String(raw).trim();
-        if (!raw) return '';
-        if (/^https?:\/\//i.test(raw)) return raw;
-        if (!uploadsUrl) return raw;
-        return uploadsUrl + '/' + raw.replace(/^\/+/, '');
+        value = String(raw).trim();
+        if (!value) return '';
+
+        if (/^https?:\/\//i.test(value) || /^\/\//.test(value)) {
+            return value;
+        }
+
+        if (value.charAt(0) === '/') {
+            return value;
+        }
+
+        if (!uploadsUrl) {
+            notice('Image preview may be unavailable because uploads_url is missing.', 'error');
+            return '';
+        }
+
+        return uploadsUrl + '/' + value.replace(/^\/+/, '');
     }
 
     function updateImgPreview(raw) {
         var fullUrl = resolveImgUrl(raw);
+
         if (fullUrl) {
             $imgPreview.attr('src', fullUrl);
             $imgPreviewWrap.show();
@@ -153,6 +213,7 @@ jQuery(function ($) {
 
     function updateStats(data) {
         var active = 0;
+
         (data || []).forEach(function (c) {
             if (c.is_active) active++;
         });
@@ -262,7 +323,7 @@ jQuery(function ($) {
                 ? res.data
                 : (res.data && typeof res.data === 'object' ? Object.values(res.data) : []);
 
-            all = cloneClasses(rows);
+            all = normalizeClasses(rows);
             updateStats(all);
             applySearch();
         }).fail(function (xhr, status) {
@@ -288,13 +349,16 @@ jQuery(function ($) {
         );
 
         $('body').append(overlay);
+
         overlay.find('.nw-confirm-yes').on('click', function () {
             overlay.remove();
             onConfirm();
         });
+
         overlay.find('.nw-confirm-no').on('click', function () {
             overlay.remove();
         });
+
         overlay.on('click', function (e) {
             if ($(e.target).is(overlay)) overlay.remove();
         });
@@ -308,6 +372,7 @@ jQuery(function ($) {
 
         $fieldId.val('');
         updateImgPreview('');
+        setIsActiveField(true);
 
         if (id) {
             var c = all.find(function (x) {
@@ -327,7 +392,7 @@ jQuery(function ($) {
             $fieldSkillLimit.val(c.skill_limit !== '' ? c.skill_limit : 3);
             $fieldVulnerability.val(c.vulnerability || '');
             $fieldTags.val(tagsStr(c.tags));
-            $fieldIsActive.val(c.is_active ? '1' : '0');
+            setIsActiveField(!!c.is_active);
             $fieldMechanics.val(c.mechanics || '');
             $fieldGmInstructions.val(c.gm_instructions || '');
             $fieldAiPersonalityModifier.val(c.ai_personality_modifier || '');
@@ -345,7 +410,7 @@ jQuery(function ($) {
         } else {
             $fieldStartingGold.val(100);
             $fieldSkillLimit.val(3);
-            $fieldIsActive.val('1');
+            setIsActiveField(true);
 
             $('#nw-modal-title').text('New Class');
             $saveLabel.text('Create Class');
@@ -395,14 +460,9 @@ jQuery(function ($) {
 
         var attrRaw = $fieldAttributeBonuses.val().trim();
         if (attrRaw) {
-            try {
-                var parsed = parseMaybeJson(attrRaw, null);
-                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                    notice('Attribute Bonuses must be a valid JSON object.', 'error');
-                    return;
-                }
-            } catch (e) {
-                notice('Attribute Bonuses must be valid JSON.', 'error');
+            var parsed = parseMaybeJson(attrRaw, null);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                notice('Attribute Bonuses must be a valid JSON object.', 'error');
                 return;
             }
         }
@@ -424,7 +484,7 @@ jQuery(function ($) {
             skill_limit: $fieldSkillLimit.val(),
             vulnerability: $fieldVulnerability.val().trim(),
             tags: $fieldTags.val().trim(),
-            is_active: $fieldIsActive.val() === '0' ? '0' : '1',
+            is_active: getIsActiveFieldValue(),
             mechanics: $fieldMechanics.val().trim(),
             gm_instructions: $fieldGmInstructions.val().trim(),
             ai_personality_modifier: $fieldAiPersonalityModifier.val().trim(),
