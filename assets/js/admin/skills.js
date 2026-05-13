@@ -4,7 +4,7 @@
 	const NW_Skills = {
 		currentId: null,
 		allRows: [],
-		uploadsBase: 'https://neoweaver.nieodparady.pl/wp-content/uploads/',
+		uploadsBase: (window.NW_SK && window.NW_SK.uploadsBase) ? window.NW_SK.uploadsBase : '',
 
 		init() {
 			if (!window.NW_SK || !window.NW_SK.ajax_url || !window.NW_SK.nonce) {
