@@ -246,30 +246,62 @@
 	box-shadow: 0 0 0 1px var(--nw-accent);
 }
 
-/* ---- Table ---- */
+/* ---- Table: critical fixes ---- */
 #nw-wtd-panel .nw-table-wrap {
-	overflow-x: auto;
+	display: block !important;
+	position: relative !important;
+	width: 100% !important;
+	height: auto !important;
+	min-height: 120px !important;
+	max-height: none !important;
+	overflow-x: auto !important;
+	overflow-y: visible !important;
 	border-radius: var(--nw-radius);
 	border: 1px solid var(--nw-border);
 	background: var(--nw-surface);
 }
 
 #nw-wtd-panel .nw-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 0.85rem;
-	background: var(--nw-surface);
-	color: var(--nw-text);
-	table-layout: auto;
+	display: table !important;
+	width: 100% !important;
+	height: auto !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	border-collapse: collapse !important;
+	table-layout: auto !important;
+	background: var(--nw-surface) !important;
+	color: var(--nw-text) !important;
+	visibility: visible !important;
 }
 
-#nw-wtd-panel .nw-table thead,
-#nw-wtd-panel .nw-table tbody,
-#nw-wtd-panel .nw-table tr,
-#nw-wtd-panel .nw-table th,
-#nw-wtd-panel .nw-table td {
-	visibility: visible;
-	opacity: 1;
+#nw-wtd-panel .nw-table thead {
+	display: table-header-group !important;
+}
+
+#nw-wtd-panel .nw-table tbody {
+	display: table-row-group !important;
+	height: auto !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: visible !important;
+	background: var(--nw-bg) !important;
+	visibility: visible !important;
+}
+
+#nw-wtd-panel .nw-table tr {
+	display: table-row !important;
+	height: auto !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+}
+
+#nw-wtd-panel .nw-table td,
+#nw-wtd-panel .nw-table th {
+	display: table-cell !important;
+	visibility: visible !important;
+	opacity: 1 !important;
 }
 
 #nw-wtd-panel .nw-table thead tr {
@@ -287,12 +319,7 @@
 	background: var(--nw-surface);
 }
 
-#nw-wtd-panel .nw-table tbody {
-	background: var(--nw-bg);
-}
-
 #nw-wtd-panel .nw-table tbody tr {
-	display: table-row;
 	background: var(--nw-bg);
 	border-bottom: 1px solid var(--nw-border-soft);
 	transition: background var(--nw-transition);
@@ -311,7 +338,6 @@
 }
 
 #nw-wtd-panel .nw-table td {
-	display: table-cell;
 	padding: 10px 14px;
 	vertical-align: middle;
 	color: var(--nw-text);
@@ -453,10 +479,15 @@
 	inset: 0;
 	background: rgba(0, 0, 0, 0.75);
 	z-index: 99999;
-	display: flex;
+	display: none;
 	align-items: center;
 	justify-content: center;
 	padding: 20px;
+}
+
+#nw-wtd-panel .nw-modal-overlay[style*="display: block"],
+#nw-wtd-panel .nw-modal-overlay[style*="display:block"] {
+	display: flex !important;
 }
 
 #nw-wtd-panel .nw-modal {
