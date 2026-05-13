@@ -16,7 +16,7 @@ if ( class_exists( 'NeoWeaver_Style_Dictionary_Admin', false ) ) {
 
 class NeoWeaver_Style_Dictionary_Admin {
 
-	private string $page_slug    = 'neoweaver-style-dictionary';
+	private string $page_slug    = 'nw-style-dictionary';
 	private string $parent_slug  = 'neoweaver';
 	private string $nonce_action = 'neoweaver_sd';
 
