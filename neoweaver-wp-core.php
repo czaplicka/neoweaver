@@ -66,7 +66,6 @@ final class NeoWeaver_Core {
 			'includes/supabase-helpers.php',
 
 			// includes/ajax
-			'includes/ajax/ajax.php',
 			'includes/ajax/buffer.php',
 			'includes/ajax/deck-scenarios.php',
 			'includes/ajax/ensure-world-state.php',
