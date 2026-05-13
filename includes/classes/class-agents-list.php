@@ -20,14 +20,14 @@ class Neoweaver_Agents_List {
 
         wp_enqueue_style(
             'tw-agents-list',
-            $base . 'assets/css/agents-list.css',
+            $base . 'assets/css/public/agents-list.css',
             [],
             filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/css/public/agents-list.css' )
         );
 
         wp_enqueue_script(
             'tw-agents-list',
-            $base . 'assets/js/agents-list.js',
+            $base . 'assets/js/public/agents-list.js',
             [],
             filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/public/agents-list.js' ),
             true  // load in footer
