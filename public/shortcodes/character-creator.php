@@ -3,67 +3,70 @@
  * NeoWeaver Character Creator shortcode
  * File: public/shortcodes/shortcode-character-creator.php
  */
+
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
+
 /**
  * Register assets.
  */
 if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
-    function neoweaver_register_character_creator_assets(): void {
-        $css_handle = 'neoweaver-character-creator';
-        $js_handle  = 'neoweaver-character-creator';
+	function neoweaver_register_character_creator_assets(): void {
+		$css_handle = 'neoweaver-character-creator';
+		$js_handle  = 'neoweaver-character-creator';
 
-        $css_path = plugin_dir_path( __FILE__ ) . '../../assets/css/tw-character-creator.css';
-        $js_path  = plugin_dir_path( __FILE__ ) . '../../assets/js/tw-character-creator.js';
+		$css_path = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/character-creator.css';
+		$js_path  = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/character-creator.js';
 
-        $css_url = plugin_dir_url( __FILE__ ) . '../../assets/css/tw-character-creator.css';
-        $js_url  = plugin_dir_url( __FILE__ ) . '../../assets/js/tw-character-creator.js';
+		$css_url = NEOWEAVER_PLUGIN_URL . 'assets/css/public/character-creator.css';
+		$js_url  = NEOWEAVER_PLUGIN_URL . 'assets/js/public/character-creator.js';
 
-        wp_register_style(
-            $css_handle,
-            $css_url,
-            array(),
-            file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
-        );
+		wp_register_style(
+			$css_handle,
+			$css_url,
+			[],
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
+		);
 
-        wp_register_script(
-            $js_handle,
-            $js_url,
-            array(),
-            file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
-            true
-        );
+		wp_register_script(
+			$js_handle,
+			$js_url,
+			[],
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
+			true
+		);
 
-        $uploads = wp_get_upload_dir();
+		$uploads = wp_get_upload_dir();
 
-        wp_localize_script(
-            $js_handle,
-            'twCharCreatorConfig',
-            array(
-                'ajaxurl'        => admin_url( 'admin-ajax.php' ),
-                'ajax_url'       => admin_url( 'admin-ajax.php' ),
-                'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
-                'sitebase'       => home_url(),
-                'site_base'      => home_url(),
-                'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
-                'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
-                'avatar_gallery' => array(
-                    array(
-                        'id'   => 'avatar-1',
-                        'name' => 'Avatar',
-                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
-                    ),
-                    array(
-                        'id'   => 'avatar-2',
-                        'name' => 'Avatar 2',
-                        'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
-                    ),
-                ),
-            )
-        );
-    }
+		wp_localize_script(
+			$js_handle,
+			'twCharCreatorConfig',
+			[
+				'ajaxurl'        => admin_url( 'admin-ajax.php' ),
+				'ajax_url'       => admin_url( 'admin-ajax.php' ),
+				'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
+				'sitebase'       => home_url(),
+				'site_base'      => home_url(),
+				'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
+				'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
+				'avatar_gallery' => [
+					[
+						'id'   => 'avatar-1',
+						'name' => 'Avatar',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
+					],
+					[
+						'id'   => 'avatar-2',
+						'name' => 'Avatar 2',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
+					],
+				],
+			]
+		);
+	}
 }
+
 add_action( 'wp_enqueue_scripts', 'neoweaver_register_character_creator_assets' );
 /**
  * Shortcode renderer.
