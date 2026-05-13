@@ -42,72 +42,87 @@ final class NeoWeaver_Core {
 
 	// ── File loading ──────────────────────────────────────────────────────
 
-	private static function load_files(): void {
-		require_once NEOWEAVER_PLUGIN_DIR . 'includes/trait-transient-cache.php';
-
+		private static function load_files(): void {
 		$files = [
+			// includes
+			'includes/trait-transient-cache.php',
+			'includes/api-endpoints-character-data.php',
+			'includes/api-endpoints.php',
+			'includes/char-panel.php',
+			'includes/chat-realtime.php',
+			'includes/checkout.php',
+			'includes/core.php',
+			'includes/deck-core.php',
+			'includes/game-data.php',
+			'includes/head-injection.php',
+			'includes/inventory-system.php',
+			'includes/lexicon-shortcodes.php',
+			'includes/quest-helpers.php',
+			'includes/quick-actions.php',
+			'includes/scenarios-loader.php',
+			'includes/shortcodes-tags.php',
+			'includes/skills-loader.php',
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
-			'includes/classes/class-nw-supabase.php',
-			'includes/game-data.php',
-			'includes/ajax/public-profile.php',
-			'includes/head-injection.php',
-			'includes/lexicon-shortcodes.php',
-			'includes/ajax.php',
+
+			// includes/ajax
+			'includes/ajax/ajax.php',
+			'includes/ajax/buffer.php',
+			'includes/ajax/deck-scenarios.php',
+			'includes/ajax/ensure-world-state.php',
+			'includes/ajax/get-char-state.php',
+			'includes/ajax/get-scenarios.php',
+			'includes/ajax/get-session-state.php',
 			'includes/ajax/handlers.php',
 			'includes/ajax/lobby-heartbeat.php',
-			'includes/chat-realtime.php',
-			'includes/char-panel.php',
-			'includes/scenarios-loader.php',
-			'includes/deck-core.php',
-			'includes/skills-loader.php',
-			'includes/inventory-system.php',
-			'includes/quick-actions.php',
-			'includes/ajax/deck-scenarios.php',
-			'includes/ajax-buffer.php',
-			'includes/quest-helpers.php',
-			'includes/shortcodes-tags.php',
-			'includes/ajax-save-player-notes.php',
-			'includes/ajax/tw-update-vehicle-module.php',
-			'includes/checkout-block.php',
-			'includes/classes/class-agents-repository.php',
+			'includes/ajax/public-profile.php',
+			'includes/ajax/save-player-notes.php',
+			'includes/ajax/update-vehicle-module.php',
+
+			// includes/classes
 			'includes/classes/class-agents-list.php',
-			'includes/classes/class-deployments-creator.php',
-			'includes/classes/class-nodes-creator.php',
+			'includes/classes/class-agents-repository.php',
 			'includes/classes/class-checkout-block.php',
-			'public/shortcodes/achivments.php',
-			'public/shortcodes/active-id.php',
-			'public/shortcodes/campaign-creator.php',
-			'public/shortcodes/character-creator.php',
-			'public/shortcodes/character-echo.php',
-			'public/shortcodes/compas.php',
-			'public/shortcodes/cyber-hud.php',
-			'public/shortcodes/deck-panel.php',
-			'public/shortcodes/fate-of-loom.php',
+			'includes/classes/class-core.php',
+			'includes/classes/class-deployments-creator.php',
+			'includes/classes/class-loader.php',
+			'includes/classes/class-nodes-creator.php',
+			'includes/classes/class-nw-supabase.php',
+
+			// public
+			'public/class-public.php',
+
+			// public/shortcodes
+			'public/shortcodes/connect-campaign-world.php',
+			'public/shortcodes/connect-character-campaign.php',
+			'public/shortcodes/essence.php',
 			'public/shortcodes/foundry.php',
 			'public/shortcodes/join-terminal.php',
 			'public/shortcodes/kingdom-info.php',
 			'public/shortcodes/library.php',
+			'public/shortcodes/list-campaigns.php',
+			'public/shortcodes/list-worlds.php',
 			'public/shortcodes/lobby.php',
 			'public/shortcodes/map.php',
-			'public/shortcodes/world-archive.php',
 			'public/shortcodes/quests.php',
 			'public/shortcodes/quick-actions-cmd-center.php',
 			'public/shortcodes/services.php',
+			'public/shortcodes/shortcode-achivments.php',
+			'public/shortcodes/shortcode-active-id.php',
+			'public/shortcodes/shortcode-campaign-creator.php',
+			'public/shortcodes/shortcode-character-creator.php',
+			'public/shortcodes/shortcode-character-echo.php',
+			'public/shortcodes/shortcode-compas.php',
+			'public/shortcodes/shortcode-cyber-hud.php',
+			'public/shortcodes/shortcode-deck-panel.php',
+			'public/shortcodes/shortcode-fate-of-loom.php',
 			'public/shortcodes/signal-quality.php',
 			'public/shortcodes/time-wheel.php',
-			'public/shortcodes/connect-character-campaign.php',
-			'public/shortcodes/connect-campaign-world.php',
-			'public/shortcodes/essence.php',
-			'public/shortcodes/list-campaigns.php',
-			'public/shortcodes/list-worlds.php',
 			'public/shortcodes/vehicle-panel.php',
 			'public/shortcodes/weaver-list.php',
+			'public/shortcodes/world-archive.php',
 			'public/shortcodes/world-creator.php',
 			'public/shortcodes/world-news.php',
-			'public/class-public.php',
-			'includes/api-endpoints.php',
-			'includes/api-endpoints-character-data.php',
 		];
 
 		foreach ( $files as $file ) {
@@ -219,17 +234,17 @@ final class NeoWeaver_Core {
 		);
 
 		wp_enqueue_style( 'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/neoweaver-public.css', [], NEOWEAVER_VERSION );
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/neoweaver-public.css', [], NEOWEAVER_VERSION );
 
 		wp_enqueue_script( 'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/neoweaver-public.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/neoweaver-public.js',
 			[ 'jquery', 'nw-lucide-public' ], NEOWEAVER_VERSION, true );
 
 		wp_enqueue_style( 'neoweaver-buffer',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/buffer.css', [], NEOWEAVER_VERSION );
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/buffer.css', [], NEOWEAVER_VERSION );
 
 		wp_enqueue_script( 'neoweaver-buffer',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/buffer.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/buffer.js',
 			[ 'jquery' ], NEOWEAVER_VERSION, true );
 
 		wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
@@ -242,7 +257,7 @@ final class NeoWeaver_Core {
 		] );
 
 		wp_enqueue_script( 'nw-list-worlds',
-			NEOWEAVER_PLUGIN_URL . 'public/assets/js/tw-list-worlds.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/list-worlds.js',
 			[ 'jquery' ], NEOWEAVER_VERSION, true );
 
 		// Chart.js — register only, enqueue on demand (e.g. adventure page)
@@ -258,13 +273,13 @@ final class NeoWeaver_Core {
 
 		wp_enqueue_script( 'chartjs' );
 
-		$css_url = NEOWEAVER_PLUGIN_URL . 'assets/css/';
-		$css_dir = NEOWEAVER_PLUGIN_DIR . 'assets/css/';
+		$css_url = NEOWEAVER_PLUGIN_URL . 'assets/css/public/';
+		$css_dir = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/';
 
 		$styles = [
-			'neoweaver-tw-core'      => [ 'tw-core.css',                [],                        '1.0.0' ],
-			'neoweaver-tw-chat'      => [ 'tw-chat.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
-			'neoweaver-tw-deck'      => [ 'tw-deck.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
+			'neoweaver-tw-core'      => [ 'core.css',                [],                        '1.0.0' ],
+			'neoweaver-tw-chat'      => [ 'chat.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
+			'neoweaver-tw-deck'      => [ 'deck.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
 			'neoweaver-terminal'     => [ 'neoweaver-terminal.css',     [],                        NEOWEAVER_VERSION ],
 			'neoweaver-interference' => [ 'neoweaver-interference.css', [],                        NEOWEAVER_VERSION ],
 			'world-news'             => [ 'world-news.css',             [],                        NEOWEAVER_VERSION ],
@@ -275,24 +290,24 @@ final class NeoWeaver_Core {
 		}
 
 		// Char panel — use filemtime for reliable cache-busting in development
-		$char_panel_file = $css_dir . 'tw-char-panel.css';
+		$char_panel_file = $css_dir . 'char-panel.css';
 		wp_enqueue_style(
-			'neoweaver-tw-char-panel',
-			$css_url . 'tw-char-panel.css',
-			[ 'neoweaver-tw-core' ],
+			'neoweaver-char-panel',
+			$css_url . 'char-panel.css',
+			[ 'neoweaver-core' ],
 			file_exists( $char_panel_file ) ? (string) filemtime( $char_panel_file ) : NEOWEAVER_VERSION
 		);
 
 		$js_url = NEOWEAVER_PLUGIN_URL;
 		$scripts = [
-			'nw-panel-tactical-left' => [ 'assets/js/panel-tactical-left.js',    [],           '1.0.0'          ],
-			'neoweaver-interference' => [ 'assets/js/neoweave-interference.js',  [ 'jquery' ], NEOWEAVER_VERSION ],
-			'world-news'             => [ 'assets/js/world-news.js',             [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-deck-panel'          => [ 'public/assets/js/deck-panel.js',      [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-vehicle-panel'       => [ 'public/assets/js/vehicle-panel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-services'            => [ 'public/assets/js/services.js',        [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-time-wheel'          => [ 'public/assets/js/tw-time-wheel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
-			'neoweaver-header-node'  => [ 'assets/js/neoweaver-header-node.js',  [],           '1.0.0'          ],
+			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js',    [],           '1.0.0'          ],
+			'neoweaver-interference' => [ 'assets/js/public/neoweave-interference.js',  [ 'jquery' ], NEOWEAVER_VERSION ],
+			'world-news'             => [ 'assets/js/public/world-news.js',             [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js',      [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-services'            => [ 'assets/js/public/services.js',        [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-time-wheel'          => [ 'assets/js/public/time-wheel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
+			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js',  [],           '1.0.0'          ],
 		];
 
 		foreach ( $scripts as $handle => [ $file, $deps, $ver ] ) {
@@ -313,7 +328,7 @@ final class NeoWeaver_Core {
 		}
 
 		wp_enqueue_script( 'neoweaver-checkout-block',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/checkout-block.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/checkout-block.js',
 			[ 'jquery' ], NEOWEAVER_VERSION, true );
 
 		$characters    = function_exists( 'neoweaver_get_player_characters' )
@@ -346,10 +361,10 @@ final class NeoWeaver_Core {
 		}
 
 		wp_enqueue_style( 'neoweaver-agents-list',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/agents-list.css', [], NEOWEAVER_VERSION );
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/agents-list.css', [], NEOWEAVER_VERSION );
 
 		wp_enqueue_script( 'neoweaver-agents-list',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/agents-list.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/agents-list.js',
 			[], NEOWEAVER_VERSION, true );
 
 		wp_localize_script( 'neoweaver-agents-list', 'twCharData', [
