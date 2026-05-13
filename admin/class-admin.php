@@ -21,7 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Format: 'filename.php' => 'ClassName'
  * Files are relative to the admin/ directory.
- * Order matters only if one class depends on another (rare).
+ * Order matters: admin.php (root menu) MUST come first so the parent slug
+ * exists before any add_submenu_page() calls in the modules below.
  *
  * IMPORTANT: every file listed here MUST NOT call `new ClassName()` or
  * `add_action( 'plugins_loaded', ... )` at the bottom of the file itself.
@@ -30,6 +31,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class NW_Admin_Bootstrap {
 
 	private const MODULES = [
+		// Root menu & dashboard — must be first.
+		'admin.php'             => 'NeoWeaver_Admin',
+		// Subpages (alphabetical after the root).
 		'achievements.php'      => 'NeoWeaver_Achievements_Admin',
 		'abilities.php'         => 'NW_Abilities_Admin',
 		'classes.php'           => 'NW_Classes_Admin',
