@@ -22,25 +22,29 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Format: 'filename.php' => 'ClassName'
  * Files are relative to the admin/ directory.
  * Order matters only if one class depends on another (rare).
+ *
+ * IMPORTANT: every file listed here MUST NOT call `new ClassName()` or
+ * `add_action( 'plugins_loaded', ... )` at the bottom of the file itself.
+ * Bootstrap owns all instantiation. Individual files: class definition only.
  */
 final class NW_Admin_Bootstrap {
 
 	private const MODULES = [
-		'achievements.php'        => 'NeoWeaver_Achievements_Admin',
-		'abilities.php'           => 'NW_Abilities_Admin',
-		'classes.php'             => null, // TODO: add class name when refactored
-		'containers.php'          => null,
-		'deck.php'                => null,
-		'items.php'               => null,
-		'races.php'               => null,
-		'scenarios.php'           => null,
-		'seasons.php'             => null,
-		'skills.php'              => null,
-		'starting-packages.php'   => null,
-		'status-tags.php'         => null,
-		'style-dictionary.php'    => null,
-		'widget.php'              => null,
-		'world-tag-defs.php'      => null,
+		'achievements.php'      => 'NeoWeaver_Achievements_Admin',
+		'abilities.php'         => 'NW_Abilities_Admin',
+		'classes.php'           => 'NW_Classes_Admin',
+		'containers.php'        => 'NeoWeaver_Containers_Admin',
+		'deck.php'              => 'NW_Deck_Admin',
+		'items.php'             => 'NW_Items_Admin',
+		'races.php'             => 'NeoWeaver_Races_Admin',
+		'scenarios.php'         => 'NeoWeaver_Scenarios_Admin',
+		'seasons.php'           => 'NeoWeaver_Seasons_Admin',
+		'skills.php'            => 'NW_Skills_Admin',
+		'starting-packages.php' => 'NeoWeaver_Starting_Packages_Admin',
+		'status-tags.php'       => 'NW_Status_Tags_Admin',
+		'style-dictionary.php'  => 'NeoWeaver_Style_Dictionary_Admin',
+		'widget.php'            => 'NeoWeaver_Stats_Widget',
+		'world-tag-defs.php'    => 'NeoWeaver_World_Tag_Defs_Admin',
 	];
 
 	public static function init(): void {
@@ -53,8 +57,8 @@ final class NW_Admin_Bootstrap {
 
 			require_once $path;
 
-			if ( $class && class_exists( $class ) ) {
-				new $class();
+			if ( $class && class_exists( $class, false ) && ! isset( $GLOBALS[ 'nw_admin_inst_' . $class ] ) ) {
+				$GLOBALS[ 'nw_admin_inst_' . $class ] = new $class();
 			}
 		}
 	}
