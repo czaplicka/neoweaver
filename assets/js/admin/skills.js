@@ -4,6 +4,9 @@
 	const NW_Skills = {
 		currentId: null,
 		allRows: [],
+		noticeTimer: null,
+		activeListXhr: null,
+		activeEditXhr: null,
 		uploadsBase: (window.NW_SK && window.NW_SK.uploadsBase) ? window.NW_SK.uploadsBase : '',
 
 		init() {
@@ -60,6 +63,13 @@
 			};
 		},
 
+		getAllowedCategories() {
+			if (window.NW_SK && Array.isArray(window.NW_SK.categories)) {
+				return window.NW_SK.categories;
+			}
+			return [];
+		},
+
 		resolveImageUrl(value) {
 			const v = String(value || '').trim();
 
@@ -74,22 +84,31 @@
 			return this.uploadsBase.replace(/\/+$/, '') + '/' + v.replace(/^\/+/, '');
 		},
 
-		request(data, onSuccess, fallbackErrorMessage = 'Request failed.') {
+		request(data, onSuccess, fallbackErrorMessage = 'Request failed.', options = {}) {
 			const cfg = this.getAjaxConfig();
+			const noticeTarget = options.noticeTarget || 'form';
 
 			if (!cfg.ajaxUrl) {
-				this.showFormNotice('Missing AJAX URL.', 'error');
-				return;
+				if (noticeTarget === 'global') {
+					this.showGlobalNotice('Missing AJAX URL.', 'error');
+				} else {
+					this.showFormNotice('Missing AJAX URL.', 'error');
+				}
+				return null;
 			}
 
 			if (!cfg.nonce) {
-				this.showFormNotice('Missing security token. Refresh the page.', 'error');
-				return;
+				if (noticeTarget === 'global') {
+					this.showGlobalNotice('Missing security token. Refresh the page.', 'error');
+				} else {
+					this.showFormNotice('Missing security token. Refresh the page.', 'error');
+				}
+				return null;
 			}
 
 			const payload = Object.assign({}, data, { nonce: cfg.nonce });
 
-			$.ajax({
+			return $.ajax({
 				url: cfg.ajaxUrl,
 				method: 'POST',
 				dataType: 'json',
@@ -99,9 +118,18 @@
 						onSuccess(res);
 					}
 				},
-				error: (xhr) => {
+				error: (xhr, statusText) => {
+					if (statusText === 'abort') {
+						return;
+					}
+
 					const msg = this.extractError(xhr, fallbackErrorMessage);
-					this.showFormNotice(msg, 'error');
+
+					if (noticeTarget === 'global') {
+						this.showGlobalNotice(msg, 'error');
+					} else {
+						this.showFormNotice(msg, 'error');
+					}
 				}
 			});
 		},
@@ -132,16 +160,22 @@
 		},
 
 		loadSkills() {
+			if (this.activeListXhr && this.activeListXhr.readyState !== 4) {
+				this.activeListXhr.abort();
+			}
+
 			$('#nw-skills-tbody').html(
 				'<tr class="nw-loading-row"><td colspan="7" style="text-align:center;padding:32px;"><div class="nw-spinner"></div> Loading skills…</td></tr>'
 			);
 
-			this.request(
+			this.activeListXhr = this.request(
 				{
 					action: 'nw_skills_get_all',
 					filter_category: $('#nw-filter-category').val() || ''
 				},
 				(res) => {
+					this.activeListXhr = null;
+
 					if (!res || !res.success) {
 						const msg = res && res.data ? res.data : 'Could not load skills.';
 						this.showGlobalNotice(msg, 'error');
@@ -153,7 +187,8 @@
 					this.renderTable(this.getFilteredRows());
 					this.updateStats(this.allRows);
 				},
-				'Failed to load skills.'
+				'Failed to load skills.',
+				{ noticeTarget: 'global' }
 			);
 		},
 
@@ -273,7 +308,9 @@
 
 		closeModal() {
 			this.currentId = null;
-			$('#nw-skill-form')[0].reset();
+			if ($('#nw-skill-form').length && $('#nw-skill-form')[0]) {
+				$('#nw-skill-form')[0].reset();
+			}
 			$('#nw-field-id').val('');
 			$('#nw-field-is_active').prop('checked', true);
 			this.updateImgPreview('');
@@ -307,12 +344,18 @@
 		handleEdit(e) {
 			const id = $(e.currentTarget).data('id');
 
-			this.request(
+			if (this.activeEditXhr && this.activeEditXhr.readyState !== 4) {
+				this.activeEditXhr.abort();
+			}
+
+			this.activeEditXhr = this.request(
 				{
 					action: 'nw_skills_get_one',
 					id: id
 				},
 				(res) => {
+					this.activeEditXhr = null;
+
 					if (!res || !res.success || !res.data) {
 						this.showGlobalNotice(res && res.data ? res.data : 'Could not load skill.', 'error');
 						return;
@@ -320,25 +363,27 @@
 
 					this.openModal(res.data);
 				},
-				'Failed to load skill details.'
+				'Failed to load skill details.',
+				{ noticeTarget: 'global' }
 			);
 		},
 
 		saveSkill() {
 			const name = ($('#nw-field-name').val() || '').trim();
 			const category = ($('#nw-field-category').val() || '').trim();
+			const allowedCategories = this.getAllowedCategories();
 
 			if (!name) {
 				this.showFormNotice('Skill name is required.', 'error');
 				return;
 			}
 
-			if (
-				category &&
-				Array.isArray(window.NW_SK.categories) &&
-				window.NW_SK.categories.length &&
-				window.NW_SK.categories.indexOf(category) === -1
-			) {
+			if (!allowedCategories.length) {
+				this.showFormNotice('Missing category configuration. Refresh the page.', 'error');
+				return;
+			}
+
+			if (category && allowedCategories.indexOf(category) === -1) {
 				this.showFormNotice('Invalid category selected.', 'error');
 				return;
 			}
@@ -373,7 +418,8 @@
 					this.closeModal();
 					this.loadSkills();
 				},
-				'Failed to save skill.'
+				'Failed to save skill.',
+				{ noticeTarget: 'form' }
 			);
 		},
 
@@ -398,7 +444,8 @@
 					this.showGlobalNotice('Skill status updated.', 'success');
 					this.loadSkills();
 				},
-				'Failed to update skill status.'
+				'Failed to update skill status.',
+				{ noticeTarget: 'global' }
 			);
 		},
 
@@ -421,10 +468,15 @@
 					}
 
 					this.showGlobalNotice('Skill deleted.', 'success');
-					this.closeModal();
+
+					if (this.currentId && String(this.currentId) === String(id) && $('#nw-modal-overlay').is(':visible')) {
+						this.closeModal();
+					}
+
 					this.loadSkills();
 				},
-				'Failed to delete skill.'
+				'Failed to delete skill.',
+				{ noticeTarget: 'global' }
 			);
 		},
 
