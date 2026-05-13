@@ -2,7 +2,6 @@
 /**
  * NeoWeaver Admin — Skills (cyber_skills)
  *
- * @package NeoWeaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
