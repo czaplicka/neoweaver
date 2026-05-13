@@ -8,10 +8,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/*
- * This file should only declare the class.
- * Instantiation belongs in the central admin bootstrap.
- */
 if ( class_exists( 'NW_Skills_Admin', false ) ) {
 	return;
 }
