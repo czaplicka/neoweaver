@@ -20,14 +20,6 @@
  *   - JS lives in assets/js/ and is enqueued via wp_enqueue_script().
  *   No inline <style> or <script> blocks belong in this class.
  *
- * WIZARD SHORTCODES:
- *   The three creation wizards (character, campaign, world) have been extracted
- *   into their own files under public/shortcodes/:
- *     - shortcode-character-creator.php  → [tale_weaver_character_creator]
- *     - shortcode-campaign-creator.php   → [tw_create_campaign]
- *     - shortcode-world-creator.php      → [tw_world_creator]
- *   The methods here delegate to the standalone functions defined in those files.
- *   Asset enqueueing and shortcode registration remain in this class.
  *
  * @package Neoweaver
  */
@@ -80,6 +72,8 @@ class Neoweaver_Public {
 
 		$url = NEOWEAVER_PLUGIN_URL;
 		$ver = NEOWEAVER_VERSION;
+		// ── Agents list ──────────────────────────────────────────────────────
+Neoweaver_Agents_List::enqueue_assets();
 
 		// ── Character creator ──────────────────────────────────────────────
 		wp_localize_script(
