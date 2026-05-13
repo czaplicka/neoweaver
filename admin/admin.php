@@ -61,24 +61,62 @@ if ( ! class_exists( 'NeoWeaver_Admin', false ) ) {
 			}
 		}
 
-		public function sort_submenu(): void {
-			global $submenu;
+public function sort_submenu(): void {
+	global $submenu;
 
-			if ( empty( $submenu[ $this->slug ] ) || count( $submenu[ $this->slug ] ) < 2 ) {
-				return;
+	if ( empty( $submenu[ $this->slug ] ) || count( $submenu[ $this->slug ] ) < 2 ) {
+		return;
+	}
+
+	// Zdefiniuj docelową kolejność po slugach
+	$desired_order = [
+		$this->slug,       // Dashboard (główna strona)
+		'nw-abilities',
+		'nw-achievements',
+		'nw-classes',
+		'nw-containers',
+		'nw-deck',
+		'nw-items',
+		'nw-races',
+		'nw-scenarios',
+		'nw-seasons',
+		'nw-skills',
+		'nw-starting-packages',
+		'nw-status-tags',
+		'nw-style-dictionary',
+		'nw-world-tags-def',
+		'nw-settings',
+	];
+
+	$current = $submenu[ $this->slug ];
+	$ordered = [];
+	$rest    = [];
+
+	// Najpierw poukładaj wg desired_order
+	foreach ( $desired_order as $slug ) {
+		foreach ( $current as $idx => $item ) {
+			// $item[2] to menu_slug z add_submenu_page()
+			if ( isset( $item[2] ) && $item[2] === $slug ) {
+				$ordered[] = $item;
+				unset( $current[ $idx ] );
+				break;
 			}
-
-			$dashboard = array_shift( $submenu[ $this->slug ] );
-
-			usort(
-				$submenu[ $this->slug ],
-				static function ( array $a, array $b ): int {
-					return strcasecmp( $a[0], $b[0] );
-				}
-			);
-
-			array_unshift( $submenu[ $this->slug ], $dashboard );
 		}
+	}
+
+	// Reszta (np. nowe ekrany) na końcu, w kolejności alfabetycznej po labelu
+	if ( ! empty( $current ) ) {
+		usort(
+			$current,
+			static function ( array $a, array $b ): int {
+				return strcasecmp( (string) $a[0], (string) $b[0] );
+			}
+		);
+		$rest = array_values( $current );
+	}
+
+	$submenu[ $this->slug ] = array_merge( $ordered, $rest );
+}
 
 		/* ------------------------------------------------------------------ */
 		/* ASSETS                                                             */
