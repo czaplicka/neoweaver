@@ -4,6 +4,7 @@
 	const NW_Skills = {
 		currentId: null,
 		allRows: [],
+		uploadsBase: 'https://neoweaver.nieodparady.pl/wp-content/uploads/',
 
 		init() {
 			if (!window.NW_SK || !window.NW_SK.ajax_url || !window.NW_SK.nonce) {
@@ -59,6 +60,20 @@
 			};
 		},
 
+		resolveImageUrl(value) {
+			const v = String(value || '').trim();
+
+			if (!v) {
+				return '';
+			}
+
+			if (/^https?:\/\//i.test(v)) {
+				return v;
+			}
+
+			return this.uploadsBase.replace(/\/+$/, '') + '/' + v.replace(/^\/+/, '');
+		},
+
 		request(data, onSuccess, fallbackErrorMessage = 'Request failed.') {
 			const cfg = this.getAjaxConfig();
 
@@ -110,9 +125,7 @@
 					if (parsed && typeof parsed.data === 'string' && parsed.data.trim()) {
 						return parsed.data.trim();
 					}
-				} catch (e) {
-					// ignore JSON parse failure
-				}
+				} catch (e) {}
 			}
 
 			return fallbackMessage || 'Request failed.';
@@ -160,9 +173,7 @@
 					row.card_effect,
 					Array.isArray(row.tags) ? row.tags.join(' ') : '',
 					Array.isArray(row.linked_attributes) ? row.linked_attributes.join(' ') : ''
-				]
-					.join(' ')
-					.toLowerCase();
+				].join(' ').toLowerCase();
 
 				return haystack.indexOf(q) !== -1;
 			});
@@ -198,8 +209,11 @@
 
 			rows.forEach((s) => {
 				const tags = Array.isArray(s.tags) ? s.tags : [];
-				const img = s.img_url
-					? '<img class="nw-skill-img" src="' + this.esc(s.img_url) + '" alt="" loading="lazy" style="max-width:48px;max-height:48px;border-radius:8px;">'
+				const imgSrc = this.resolveImageUrl(s.img_url || s.img_input || '');
+
+				const img = imgSrc
+					? '<img class="nw-skill-img" src="' + this.esc(imgSrc) + '" alt="" loading="lazy" style="max-width:48px;max-height:48px;border-radius:8px;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' +
+					  '<div class="nw-skill-img-placeholder" style="display:none;width:48px;height:48px;border-radius:8px;background:#111;align-items:center;justify-content:center;">⚡</div>'
 					: '<div class="nw-skill-img-placeholder" style="width:48px;height:48px;border-radius:8px;background:#111;display:flex;align-items:center;justify-content:center;">⚡</div>';
 
 				const tagHtml = tags.length
@@ -245,13 +259,13 @@
 			$('#nw-field-category').val(skill ? (skill.category || '') : '');
 			$('#nw-field-application').val(skill ? (skill.application || '') : '');
 			$('#nw-field-card_effect').val(skill ? (skill.card_effect || '') : '');
-			$('#nw-field-img_url').val(skill ? (skill.img_url || '') : '');
+			$('#nw-field-img_url').val(skill ? (skill.img_input || skill.img_url || '') : '');
 			$('#nw-field-tags').val(skill && Array.isArray(skill.tags) ? skill.tags.join(', ') : '');
 			$('#nw-field-linked_attributes').val(skill && Array.isArray(skill.linked_attributes) ? skill.linked_attributes.join(', ') : '');
 			$('#nw-field-is_active').prop('checked', skill ? !!skill.is_active : true);
 
 			this.clearFormNotice();
-			this.updateImgPreview($('#nw-field-img_url').val());
+			this.updateImgPreview(skill ? (skill.img_url || skill.img_input || '') : '');
 			$('#nw-modal-overlay').show();
 
 			setTimeout(() => $('#nw-field-name').trigger('focus'), 30);
@@ -270,14 +284,22 @@
 			$('#nw-modal-overlay').hide();
 		},
 
-		updateImgPreview(url) {
-			const cleanUrl = (url || '').trim();
+		updateImgPreview(value) {
+			const imgSrc = this.resolveImageUrl(value);
 
-			if (cleanUrl) {
-				$('#nw-img-preview').attr('src', cleanUrl);
+			if (imgSrc) {
+				$('#nw-img-preview')
+					.attr('src', imgSrc)
+					.off('error')
+					.on('error', function () {
+						$(this).attr('src', '').hide();
+						$('#nw-img-preview-wrap').hide();
+					})
+					.show();
+
 				$('#nw-img-preview-wrap').show();
 			} else {
-				$('#nw-img-preview').attr('src', '');
+				$('#nw-img-preview').attr('src', '').hide();
 				$('#nw-img-preview-wrap').hide();
 			}
 		},
@@ -419,7 +441,7 @@
 					border: '1px solid ' + border
 				})
 				.text(msg || '')
-				show();
+				.show();
 
 			clearTimeout(this.noticeTimer);
 			this.noticeTimer = setTimeout(() => {
