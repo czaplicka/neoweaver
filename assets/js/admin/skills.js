@@ -1,4 +1,3 @@
-// assets/js/admin/skills-admin.js
 (function ($) {
 	'use strict';
 
