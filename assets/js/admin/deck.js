@@ -7,23 +7,36 @@
     var nonce = cfg.nonce || '';
 
     var cards = [];
-    var currentId = 0;
+    var currentId = '';
     var activeXhr = null;
+    var noticeTimer = null;
+
+    function hasAjaxConfig() {
+        return !!(ajax && nonce);
+    }
+
+    function clearNoticeTimer() {
+        if (noticeTimer) {
+            clearTimeout(noticeTimer);
+            noticeTimer = null;
+        }
+    }
 
     function notice(msg, type) {
         var $msg = $('#nw-deck-msg');
         var color = (type === 'error') ? '#ff6b6b' : '#adff00';
+
+        clearNoticeTimer();
 
         $msg.stop(true, true)
             .css('color', color)
             .text(msg)
             .show();
 
-        if (type !== 'error') {
-            setTimeout(function () {
-                $msg.fadeOut(250);
-            }, 2200);
-        }
+        noticeTimer = setTimeout(function () {
+            $msg.fadeOut(250);
+            noticeTimer = null;
+        }, type === 'error' ? 5000 : 2200);
     }
 
     function esc(str) {
@@ -39,6 +52,10 @@
         if (Array.isArray(val)) return val.join(', ');
         if (typeof val === 'string') return val;
         return '';
+    }
+
+    function normalizeId(id) {
+        return $.trim(String(id == null ? '' : id));
     }
 
     function rarityBadge(rarity) {
@@ -61,7 +78,8 @@
     function closeModal() {
         $('#nw-deck-modal').hide();
         $('#nw-deck-msg').hide().text('');
-        currentId = 0;
+        clearNoticeTimer();
+        currentId = '';
     }
 
     function updateImagePreview() {
@@ -80,7 +98,7 @@
     }
 
     function resetForm() {
-        currentId = 0;
+        currentId = '';
 
         $('#nw-deck-id').val('');
         $('#nw-deck-name').val('');
@@ -119,10 +137,11 @@
         $('#nw-deck-modal-title').text('Add Card');
         $('#nw-deck-delete-btn').hide();
         $('#nw-deck-msg').hide().text('');
+        clearNoticeTimer();
     }
 
     function fillForm(card) {
-        currentId = parseInt(card.id, 10) || 0;
+        currentId = normalizeId(card.id);
 
         $('#nw-deck-id').val(currentId);
         $('#nw-deck-name').val(card.name || '');
@@ -160,6 +179,7 @@
         $('#nw-deck-modal-title').text('Edit Card');
         $('#nw-deck-delete-btn').show();
         $('#nw-deck-msg').hide().text('');
+        clearNoticeTimer();
     }
 
     function renderTable(rows) {
@@ -172,18 +192,19 @@
 
         var html = rows.map(function (card) {
             var active = boolVal(card.is_active);
+            var id = normalizeId(card.id);
 
             return ''
-                + '<tr data-id="' + esc(card.id) + '">'
+                + '<tr data-id="' + esc(id) + '">'
                 + '<td>' + imageThumb(card.img_url) + '</td>'
                 + '<td>' + esc(card.name || '') + '</td>'
                 + '<td>' + esc(card.deck_category || '') + '</td>'
                 + '<td>' + esc(card.type || '') + '</td>'
                 + '<td>' + rarityBadge(card.rarity) + '</td>'
-                + '<td><input type="checkbox" class="nw-deck-toggle" data-id="' + esc(card.id) + '"' + (active ? ' checked' : '') + '></td>'
+                + '<td><input type="checkbox" class="nw-deck-toggle" data-id="' + esc(id) + '"' + (active ? ' checked' : '') + '></td>'
                 + '<td>'
-                + '<button type="button" class="button button-small nw-deck-edit" data-id="' + esc(card.id) + '">Edit</button> '
-                + '<button type="button" class="button button-small nw-deck-delete-row" data-id="' + esc(card.id) + '">Delete</button>'
+                + '<button type="button" class="button button-small nw-deck-edit" data-id="' + esc(id) + '">Edit</button> '
+                + '<button type="button" class="button button-small nw-deck-delete-row" data-id="' + esc(id) + '">Delete</button>'
                 + '</td>'
                 + '</tr>';
         }).join('');
@@ -192,7 +213,8 @@
     }
 
     function loadCards() {
-        if (!ajax || !nonce) {
+        if (!hasAjaxConfig()) {
+            $('#nw-deck-tbody').html('<tr><td colspan="7">Missing AJAX config.</td></tr>');
             notice('Missing AJAX config.', 'error');
             return;
         }
@@ -232,10 +254,22 @@
     }
 
     function loadSingle(id) {
+        var normalizedId = normalizeId(id);
+
+        if (!hasAjaxConfig()) {
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
+
+        if (!normalizedId) {
+            notice('Invalid card ID.', 'error');
+            return;
+        }
+
         $.post(ajax, {
             action: 'nw_deck_get',
             nonce: nonce,
-            id: id
+            id: normalizedId
         }, function (res) {
             if (!res || !res.success || !res.data) {
                 notice((res && res.data) || 'Cannot load card.', 'error');
@@ -250,10 +284,12 @@
     }
 
     function collectPayload() {
+        var id = normalizeId($('#nw-deck-id').val());
+
         return {
             action: 'nw_deck_save',
             nonce: nonce,
-            id: $('#nw-deck-id').val() || '',
+            id: id,
             name: ($('#nw-deck-name').val() || '').trim(),
             deck_category: $('#nw-deck-category').val(),
             type: ($('#nw-deck-type').val() || '').trim(),
@@ -318,16 +354,30 @@
     $('#nw-deck-img-url').on('input change blur', updateImagePreview);
 
     $(document).on('click', '.nw-deck-edit', function () {
-        var id = parseInt($(this).data('id'), 10) || 0;
-        if (id) {
-            loadSingle(id);
+        var id = normalizeId($(this).attr('data-id'));
+        if (!id) {
+            notice('Invalid card ID.', 'error');
+            return;
         }
+        loadSingle(id);
     });
 
     $(document).on('change', '.nw-deck-toggle', function () {
-        var id = parseInt($(this).data('id'), 10) || 0;
+        var id = normalizeId($(this).attr('data-id'));
         var state = $(this).is(':checked') ? 1 : 0;
         var $checkbox = $(this);
+
+        if (!hasAjaxConfig()) {
+            $checkbox.prop('checked', !$checkbox.is(':checked'));
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
+
+        if (!id) {
+            $checkbox.prop('checked', !$checkbox.is(':checked'));
+            notice('Invalid card ID.', 'error');
+            return;
+        }
 
         $.post(ajax, {
             action: 'nw_deck_toggle',
@@ -350,6 +400,11 @@
 
     $('#nw-deck-save-btn').on('click', function (e) {
         e.preventDefault();
+
+        if (!hasAjaxConfig()) {
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
 
         var payload = collectPayload();
         var $btn = $(this);
@@ -382,7 +437,12 @@
     $('#nw-deck-delete-btn').on('click', function (e) {
         e.preventDefault();
 
-        var id = parseInt($('#nw-deck-id').val(), 10) || 0;
+        if (!hasAjaxConfig()) {
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
+
+        var id = normalizeId($('#nw-deck-id').val());
         if (!id) return;
 
         if (!window.confirm('Delete this card? This cannot be undone.')) {
@@ -408,7 +468,13 @@
     });
 
     $(document).on('click', '.nw-deck-delete-row', function () {
-        var id = parseInt($(this).data('id'), 10) || 0;
+        var id = normalizeId($(this).attr('data-id'));
+
+        if (!hasAjaxConfig()) {
+            notice('Missing AJAX config.', 'error');
+            return;
+        }
+
         if (!id) return;
 
         if (!window.confirm('Delete this card? This cannot be undone.')) {
@@ -432,8 +498,6 @@
         });
     });
 
-    $(function () {
-        loadCards();
-    });
+    loadCards();
 
 })(jQuery);
