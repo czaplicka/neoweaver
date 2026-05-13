@@ -94,6 +94,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/connect-campaign-world.php',
 			'public/shortcodes/connect-character-campaign.php',
 			'public/shortcodes/essence.php',
+			'public/shortcodes/hand.php',
 			'public/shortcodes/foundry.php',
 			'public/shortcodes/join-terminal.php',
 			'public/shortcodes/kingdom-info.php',
