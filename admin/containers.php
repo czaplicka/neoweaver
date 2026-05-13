@@ -453,11 +453,3 @@ class NeoWeaver_Containers_Admin {
 		);
 	}
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NeoWeaver_Containers_Admin();
-	},
-	20
-);
