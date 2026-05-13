@@ -3,11 +3,12 @@
 jQuery(function ($) {
     'use strict';
 
-    var cfg          = window.NWContainers || {};
+    var cfg = window.NWContainers || {};
     var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-    var nonce        = cfg.nonce || '';
-    var all          = [];
-    var activeXhr    = null;
+    var nonce = cfg.nonce || '';
+    var all = [];
+    var activeXhr = null;
+    var noticeTimer = null;
 
     /* ---------------------------------------------------------------- */
     /*  Helpers                                                          */
@@ -17,12 +18,27 @@ jQuery(function ($) {
         return $('<span>').text(s || '').html();
     }
 
+    function clearNoticeTimer() {
+        if (noticeTimer) {
+            clearTimeout(noticeTimer);
+            noticeTimer = null;
+        }
+    }
+
     function notice(msg, type) {
         var el = $('#nw-notice');
         var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
-        el.attr('class', 'nw-notice nw-notice-' + safeType).text(msg).stop(true, true).show();
-        setTimeout(function () {
+
+        clearNoticeTimer();
+
+        el.attr('class', 'nw-notice nw-notice-' + safeType)
+            .text(msg)
+            .stop(true, true)
+            .show();
+
+        noticeTimer = setTimeout(function () {
             el.fadeOut(300);
+            noticeTimer = null;
         }, 3500);
     }
 
@@ -34,6 +50,12 @@ jQuery(function ($) {
         $('#nw-total').text(data.length || 0);
         $('#nw-active').text(active);
         $('#nw-inactive').text((data.length || 0) - active);
+    }
+
+    function isValidUuid(value) {
+        var v = String(value || '').trim();
+        if (!v) return false;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
     }
 
     function normaliseRow(r) {
@@ -176,15 +198,26 @@ jQuery(function ($) {
             is_active: val ? 1 : 0
         }, function (res) {
             if (res && res.success) {
-                row.toggleClass('nw-row-inactive', !val);
+                var serverValue = val;
+
+                if (res.data && typeof res.data === 'object' && typeof res.data.is_active !== 'undefined') {
+                    serverValue = !!res.data.is_active;
+                }
+
+                row.toggleClass('nw-row-inactive', !serverValue);
+                checkbox.prop('checked', !!serverValue);
+
                 all = all.map(function (r) {
                     if (r.id === id) {
-                        r.is_active = val;
+                        return $.extend({}, r, {
+                            is_active: !!serverValue
+                        });
                     }
                     return r;
                 });
+
                 updateStats(all);
-                notice((val ? 'Activated' : 'Deactivated') + '.', 'success');
+                notice((serverValue ? 'Activated' : 'Deactivated') + '.', 'success');
             } else {
                 notice('Toggle failed: ' + ((res && res.data) || 'Unknown'), 'error');
                 checkbox.prop('checked', !val);
@@ -211,6 +244,7 @@ jQuery(function ($) {
         $('#nw-val-total_slots').text(5);
         $("input[name='allowed_sizes[]']").prop('checked', true);
         $('#nw-field-is_active').prop('checked', true);
+        $('#nw-field-parent_id').val('');
 
         if (id) {
             var r = all.find(function (x) {
@@ -278,8 +312,15 @@ jQuery(function ($) {
 
     $('#nw-save-btn').on('click', function () {
         var name = $('#nw-field-name').val().trim();
+        var parentId = $('#nw-field-parent_id').val().trim();
+
         if (!name) {
             notice('Name is required.', 'error');
+            return;
+        }
+
+        if (parentId && !isValidUuid(parentId)) {
+            notice('Parent ID must be a valid UUID.', 'error');
             return;
         }
 
@@ -295,7 +336,10 @@ jQuery(function ($) {
         });
 
         if (!sizes.length) {
-            sizes = ['tiny', 'small', 'medium', 'large'];
+            btn.prop('disabled', false);
+            $('#nw-save-label').text(previousLabel);
+            notice('Select at least one allowed size.', 'error');
+            return;
         }
 
         var fd = {
@@ -308,7 +352,7 @@ jQuery(function ($) {
                 img_url: $('#nw-field-img_url').val().trim(),
                 rarity: $('#nw-field-rarity').val(),
                 total_slots: $('#nw-field-total_slots').val(),
-                parent_id: $('#nw-field-parent_id').val().trim(),
+                parent_id: parentId,
                 allowed_sizes: sizes,
                 is_active: $('#nw-field-is_active').is(':checked') ? 1 : 0
             }
