@@ -623,11 +623,3 @@ class NW_Items_Admin {
 		wp_send_json_success( 'deleted' );
 	}
 }
-
-add_action(
-	'plugins_loaded',
-	static function () {
-		new NW_Items_Admin();
-	},
-	20
-);
