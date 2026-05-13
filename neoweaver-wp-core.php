@@ -81,7 +81,6 @@ final class NeoWeaver_Core {
 
 			// includes/classes
 		'includes/classes/class-nw-supabase.php',
-		'includes/classes/class-core.php',
 		'includes/classes/class-loader.php',
 		'includes/classes/class-agents-repository.php',
 		'includes/classes/class-agents-list.php',
