@@ -1,46 +1,34 @@
 /* ============================================================
-   NeoWeaver Admin — Classes panel
-   Depends on: nw-admin-core.css (shared layout, table, modal,
-               buttons, tags, spinner, notice)
-   This file holds only classes-specific overrides/additions.
+   NeoWeaver Admin — CLASSES PANEL
+   Module-specific styles (extension for admin-core.css)
    ============================================================ */
 
-/* ----------------------------------------------------------
-   Panel ID
-   ---------------------------------------------------------- */
-#nw-classes-panel {
-    /* inherit everything from nw-admin-core */
-}
+/* ---- Table: Class Visuals & Identity ---- */
+#nw-classes-panel .nw-col-img { width: 52px; }
 
-/* ----------------------------------------------------------
-   Table — class-specific columns
-   ---------------------------------------------------------- */
-#nw-classes-panel .nw-col-img {
-    width: 52px;
-}
-
-#nw-classes-panel .nw-class-img {
-    width: 40px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid #2e2e2e;
-    display: block;
-}
-
+#nw-classes-panel .nw-class-img,
 #nw-classes-panel .nw-class-img-placeholder {
     width: 40px;
     height: 40px;
+    border-radius: 4px;
+    border: 1px solid #2e2e2e;
+}
+
+#nw-classes-panel .nw-class-img { 
+    object-fit: cover; 
+    display: block; 
+}
+
+#nw-classes-panel .nw-class-img-placeholder {
     display: flex;
     align-items: center;
     justify-content: center;
     background: #1a1a1a;
-    border-radius: 4px;
-    border: 1px solid #2e2e2e;
     font-size: 18px;
     color: #555;
 }
 
+/* ---- Typography & Details ---- */
 #nw-classes-panel .nw-class-name {
     font-weight: 600;
     color: #adff00;
@@ -58,9 +46,7 @@
     text-overflow: ellipsis;
 }
 
-/* ----------------------------------------------------------
-   Active badge
-   ---------------------------------------------------------- */
+/* ---- Status Badges ---- */
 .nw-active-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -83,36 +69,22 @@
     border: 1px solid #2a2a2a;
 }
 
-/* ----------------------------------------------------------
-   Stats bar pills — classes-specific colours
-   ---------------------------------------------------------- */
-#nw-classes-panel .nw-stat-pill {
-    /* inherits core style */
-}
-
-/* ----------------------------------------------------------
-   Gold column
-   ---------------------------------------------------------- */
+/* ---- Specialized Data Columns ---- */
 .nw-gold-value {
     font-family: 'Chakra Petch', sans-serif;
     color: #ffd700;
     font-size: 12px;
 }
 
-/* ----------------------------------------------------------
-   Vulnerability column
-   ---------------------------------------------------------- */
 .nw-vuln-value {
     font-size: 11px;
     color: #ff6b6b;
 }
 
-/* ----------------------------------------------------------
-   Attribute bonuses JSON preview (form hint)
-   ---------------------------------------------------------- */
+/* ---- Form Helpers ---- */
 .nw-json-hint {
     font-size: 10px;
     color: #555;
     margin-top: 3px;
-    font-family: monospace;
+    font-family: 'Courier New', monospace; /* optymalizacja czytelności kodu */
 }
