@@ -15,7 +15,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             return '';
         }
 
-        // Enqueue tw-core.css if not already loaded (e.g. on non-adventure pages)
         if ( ! wp_style_is( 'neoweaver-tw-core', 'enqueued' ) ) {
             wp_enqueue_style(
                 'neoweaver-tw-core',
@@ -23,14 +22,15 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 [],
                 NEOWEAVER_VERSION
             );
-        };
-            	wp_enqueue_script(
-			'list-campaigns-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/list-campaigns.js',
-			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
-			true
-		);
+        }
+
+        wp_enqueue_script(
+            'list-campaigns-script',
+            NEOWEAVER_PLUGIN_URL . 'assets/js/admin/list-campaigns.js',
+            [ 'jquery', 'nw-lucide' ],
+            NEOWEAVER_VERSION,
+            true
+        );
 
         $user_id = get_current_user_id();
         if ( ! $user_id ) {
@@ -77,7 +77,9 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             error_log( '[NeoWeaver v18] JSON decode failed. Raw: ' . $raw );
             return '<p class="tw-error">CRITICAL ERROR: Invalid payload received from Matrix.</p>';
         }
+
         $active_campaigns = $decoded;
+
         if ( empty( $active_campaigns ) ) {
             return '
             <div class="tw-campaigns-empty">
@@ -102,15 +104,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             <div class="tw-char-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:25px;">
                 <?php foreach ( $active_campaigns as $c ) :
 
-                    $c_id_safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
-                    $c_name    = esc_html( $c['name'] ?: 'UNNAMED_THREAD_' . $c_id_safe );
+                    $c_id_safe  = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $c['id'] ?? '' ) );
+                    $c_name_raw = ! empty( $c['name'] ) ? $c['name'] : 'UNNAMED_THREAD_' . $c_id_safe;
+                    $c_name     = esc_html( $c_name_raw );
 
-                    /*
-                     * v15 FIX: PostgREST może zwrócić obiekt (jeden rekord) lub tablicę.
-                     * Obsługujemy oba przypadki dla junction tables.
-                     */
-
-                    /* Świat przez junction */
                     $cw_raw         = $c['cyber_campaign_worlds'] ?? null;
                     $world_junction = null;
                     if ( ! empty( $cw_raw ) ) {
@@ -119,7 +116,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                     $world_rel = $world_junction ? ( $world_junction['cyber_worlds'] ?? null ) : null;
                     $world_id  = $world_junction ? ( $world_junction['world_id'] ?? null ) : null;
 
-                    /* Postać przez junction */
                     $cc_raw        = $c['cyber_campaign_characters'] ?? null;
                     $char_junction = null;
                     if ( ! empty( $cc_raw ) ) {
@@ -136,21 +132,19 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
                     $operative_name = 'PENDING ASSIGNMENT';
                     if ( $char_rel ) {
-                        $race  = isset( $char_rel['cyber_races']['name'] )   ? $char_rel['cyber_races']['name']   : 'Unknown';
+                        $race  = isset( $char_rel['cyber_races']['name'] ) ? $char_rel['cyber_races']['name'] : 'Unknown';
                         $class = isset( $char_rel['cyber_classes']['name'] ) ? $char_rel['cyber_classes']['name'] : 'Agent';
                         $operative_name = esc_html( $char_rel['name'] )
                             . " <small style='color:#666; font-size:0.7rem;'>[" . esc_html( $race ) . ' | ' . esc_html( $class ) . "]</small>";
                     }
 
-                    // v17: /nodes/ anchor
-                    $nodes_url  = '/nodes/?campaign_id=' . esc_attr( $c_id_safe ) . '#tw-deployment-root';
-                    // v18: /agents/ anchor
-                    $agents_url = '/agents/?campaign_id=' . esc_attr( $c_id_safe ) . '#tw-deployment-root';
+                    $nodes_url  = '/nodes/?campaign_id=' . rawurlencode( $c_id_safe ) . '#tw-deployment-root';
+                    $agents_url = '/agents/?campaign_id=' . rawurlencode( $c_id_safe ) . '#tw-deployment-root';
 
                     if ( ! $world_rel ) {
-                        $main_btn = '<a href="' . $nodes_url . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
+                        $main_btn = '<a href="' . esc_url( $nodes_url ) . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
                     } elseif ( ! $char_rel ) {
-                        $main_btn = '<a href="' . $agents_url . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
+                        $main_btn = '<a href="' . esc_url( $agents_url ) . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
                     } else {
                         $main_btn = '<button class="tw-action-btn enter-matrix"'
                             . ' data-id="'        . esc_attr( $c_id_safe ) . '"'
@@ -186,7 +180,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:<?php echo $world_rel ? '#fff' : '#ff0055'; ?>; font-weight:bold; text-align:right;">
                                     <?php echo $world_rel ? esc_html( $world_rel['name'] ) : 'MISSING ANCHOR'; ?>
                                     <?php if ( ! $world_rel ) : ?>
-                                        <a href="<?php echo $nodes_url; ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">LINK NODE</a>
+                                        <a href="<?php echo esc_url( $nodes_url ); ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">LINK NODE</a>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -196,7 +190,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <span style="font-size:0.85rem; color:#adff00; font-weight:bold; text-align:right;">
                                     <?php echo $operative_name; ?>
                                     <?php if ( ! $char_rel ) : ?>
-                                        <a href="<?php echo $agents_url; ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">ASSIGN AGENT</a>
+                                        <a href="<?php echo esc_url( $agents_url ); ?>" class="tw-mini-btn" style="margin-left:8px; font-size:0.65rem; padding:2px 8px; border:1px solid #adff00; color:#adff00; text-decoration:none;">ASSIGN AGENT</a>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -218,7 +212,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                                 <button class="tw-copy-join-btn" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>" style="background:transparent; border:1px solid #adff00; color:#adff00; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">COPY HASH</button>
                             <?php endif; ?>
 
-                            <button class="tw-delete-campaign-btn" data-id="<?php echo esc_attr( $c_id_safe ); ?>" data-name="<?php echo esc_attr( $c_name ); ?>" style="background:transparent; border:1px solid #222; color:#333; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">TERMINATE</button>
+                            <button class="tw-delete-campaign-btn" data-id="<?php echo esc_attr( $c_id_safe ); ?>" data-name="<?php echo esc_attr( $c_name_raw ); ?>" style="background:transparent; border:1px solid #222; color:#333; font-family:'Chakra Petch'; font-size:0.65rem; padding:0 15px; cursor:pointer; transition:0.3s; font-weight:bold;">TERMINATE</button>
                         </div>
 
                         <?php if ( ! $world_rel && $is_active ) : ?>
