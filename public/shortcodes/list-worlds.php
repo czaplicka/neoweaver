@@ -117,7 +117,7 @@ function tw_list_worlds_v14() {
 		[
 			'wp_user_id' => 'eq.' . $user_id,
 			'select'     => '*,cyber_campaign_worlds(campaign_id, cyber_campaign(name))',
-			'order'      => 'id.desc',
+			'order' => 'created_at.desc',
 		]
 	);
 
