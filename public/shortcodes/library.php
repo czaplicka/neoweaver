@@ -1,7 +1,7 @@
 <?php
 function cyber_deck_builder_shortcode() {
     $user_id = get_current_user_id();
-    if (!$user_id) return "Zaloguj się, aby zarządzać taliami.";
+    if (!$user_id) return "Log in, to manage cards.";
 
     // Pobranie Twojego ID postaci (zakładam że masz tę funkcję)
     $character_id = get_cyber_character_id_by_wp_id($user_id);
