@@ -1,15 +1,35 @@
-/* ---- Dashboard Specific Layout ---- */
-.nw-dash { max-width: 1280px; margin: 0 auto; } /* Dodatkowe ograniczenie szerokości */
+/* ============================================================
+   NeoWeaver Admin — DASHBOARD PANEL
+   Module-specific styles (extension for admin-core.css)
+   ============================================================ */
 
-.nw-dash-logo { display: flex; align-items: center; gap: 14px; }
-.nw-logo-name { display: block; font-size: 26px; font-weight: 700; color: #fff; line-height: 1; }
-.nw-logo-version { display: block; font-size: 11px; color: #555; margin-top: 4px; letter-spacing: .5px; }
+/* ---- Layout & Grid Containers ---- */
+.nw-dash { max-width: 1280px; margin: 0 auto; }
+
+.nw-dash-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
+}
 
 .nw-grid-main { display: flex; flex-direction: column; gap: 18px; }
 .nw-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media(max-width:980px){ .nw-grid-2 { grid-template-columns: 1fr; } }
 
-/* ---- Dashboard Blocks & Stats ---- */
+.nw-stat-grid, .nw-messages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.nw-chart-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+@media(max-width:1100px) {
+    .nw-stat-grid, .nw-chart-grid, .nw-messages-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media(max-width:782px) {
+    .nw-grid-2, .nw-stat-grid, .nw-chart-grid, .nw-messages-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Brand & Logo ---- */
+.nw-dash-logo { display: flex; align-items: center; gap: 14px; }
+.nw-logo-name { font-size: 26px; font-weight: 700; color: #fff; line-height: 1; }
+.nw-logo-version { font-size: 11px; color: #555; margin-top: 4px; letter-spacing: .5px; }
+
+/* ---- Dashboard Blocks ---- */
 .nw-block { 
     background: #101010; border: 1px solid #1f1f1f; border-radius: 14px; 
     padding: 18px 18px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.18); 
@@ -18,307 +38,74 @@
 .nw-section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #adff00; font-weight: 700; margin: 0; }
 .nw-section-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: #555; }
 
-.nw-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-@media(max-width:1100px){ .nw-stat-grid { grid-template-columns: repeat(2, 1fr); } }
-@media(max-width:600px){ .nw-stat-grid { grid-template-columns: 1fr; } }
-
+/* ---- Stat Cards & Messages ---- */
 .nw-stat-card { 
     background: #141414; border: 1px solid #242424; border-radius: 12px; 
     padding: 16px; transition: border-color .2s, transform .2s; 
 }
 .nw-stat-card:hover { border-color: #adff00; transform: translateY(-1px); }
 .nw-stat-label-top { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #666; }
-.nw-stat-value { font-size: 36px; font-weight: 700; color: #adff00; font-variant-numeric: tabular-nums; min-height: 44px; display: flex; align-items: center; margin-top: 8px; }
+.nw-stat-value { font-size: 36px; font-weight: 700; color: #adff00; font-variant-numeric: tabular-nums; margin-top: 8px; }
 .nw-stat-sub { font-size: 11px; color: #8a8a8a; }
 
-/* ---- Charts ---- */
-.nw-chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-@media(max-width:1100px){ .nw-chart-grid { grid-template-columns: repeat(2, 1fr); } }
-@media(max-width:600px){ .nw-chart-grid { grid-template-columns: 1fr; } }
+.nw-stat-card--message { position: relative; overflow: hidden; }
+.nw-stat-card--message::after {
+    content: ""; position: absolute; right: -18px; bottom: -34px; width: 110px; height: 110px;
+    background: radial-gradient(circle, rgba(173,255,0,.12) 0%, rgba(173,255,0,0) 72%);
+    pointer-events: none;
+}
+
+/* ---- Interactive Components (Range Switch) ---- */
+.nw-range-switch {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px;
+    border: 1px solid rgba(173, 255, 0, 0.14); border-radius: 999px; background: #101010;
+}
+.nw-range-switch .nw-range-btn {
+    min-width: 56px; border: none; background: transparent; color: #9a9a9a;
+    font-family: inherit; font-weight: 700; font-size: 11px; cursor: pointer; border-radius: 999px;
+    padding: 6px 12px; transition: all .2s ease;
+}
+.nw-range-switch .nw-range-btn.is-active {
+    background: #adff00; color: #11150c; box-shadow: 0 4px 14px rgba(173, 255, 0, 0.22);
+}
+
+/* ---- Visual Charts ---- */
 .nw-chart-card { background: #141414; border: 1px solid #232323; border-radius: 12px; padding: 14px; }
 .nw-chart-title { font-size: 12px; color: #fff; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
-.nw-chart { height: 120px; }
-.nw-chart svg { width: 100%; height: 120px; display: block; }
 .nw-chart-empty { height: 120px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 12px; border: 1px dashed #2a2a2a; border-radius: 10px; }
+.nw-chart svg { width: 100%; height: 120px; display: block; }
 
-/* ---- Deck Library (Unique logic) ---- */
+/* ---- Deck Library Analytics ---- */
 .nw-deck-grid { display: grid; grid-template-columns: 1fr 1fr 180px; gap: 18px; align-items: start; }
-@media(max-width:900px){ .nw-deck-grid { grid-template-columns: 1fr 1fr; } }
-@media(max-width:560px){ .nw-deck-grid { grid-template-columns: 1fr; } }
-.nw-deck-col-title { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #666; margin-bottom: 12px; }
+@media(max-width:900px){ .nw-deck-grid { grid-template-columns: 1fr; } }
+
 .nw-deck-bars { display: flex; flex-direction: column; gap: 10px; }
-.nw-deck-bar-row { display: flex; flex-direction: column; gap: 4px; }
 .nw-deck-bar-meta { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; text-transform: capitalize; }
 .nw-deck-bar-track { height: 8px; background: #1e1e1e; border-radius: 999px; overflow: hidden; }
 .nw-deck-bar-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
-.nw-deck-bar-count { font-size: 12px; color: #e0e0e0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Category & Rarity Colors */
+/* Deck Indicators */
 .nw-deck-cat-action { background: #adff00; }
 .nw-deck-cat-magic { background: #00d4ff; }
 .nw-deck-cat-equipment { background: #ffb703; }
-.nw-deck-rar-common { background: #888; }
-.nw-deck-rar-uncommon { background: #3cb371; }
-.nw-deck-rar-rare { background: #4a9eff; }
-.nw-deck-rar-epic { background: #a64dff; }
-.nw-deck-rar-legendary { background: #ff9900; }
+.nw-deck-rar-legendary { background: #ff9900; } /* Rarity colors share logic with core, but kept here for bar-fills */
 
 .nw-deck-status-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1e1e1e; }
-.nw-deck-status-dot { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
-.nw-deck-dot-active { background: #adff00; }
-.nw-deck-dot-inactive { background: #555; }
-.nw-deck-status-label { flex: 1; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
-.nw-deck-status-val { font-size: 22px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.nw-deck-status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.nw-deck-dot-active { background: #adff00; box-shadow: 0 0 8px #adff0066; }
 
-/* ---- Alerts & Health ---- */
-.nw-alerts-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
-.nw-alert-card { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid #262626; background: #151515; }
-.nw-alert-dot { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; margin-top: 5px; }
+/* ---- Alerts, Health & Logs ---- */
+.nw-alert-card { display: flex; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid #262626; background: #151515; }
+.nw-alert-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+
 .nw-alert-warn .nw-alert-dot { background: #ffb703; }
-.nw-alert-info .nw-alert-dot { background: #00d4ff; }
 .nw-alert-ok .nw-alert-dot { background: #adff00; }
-.nw-alert-body { display: flex; flex-direction: column; gap: 3px; }
-.nw-alert-label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: #777; }
-.nw-alert-text { font-size: 13px; color: #ddd; line-height: 1.45; }
 
-.nw-health-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-@media(max-width:560px){ .nw-health-grid { grid-template-columns: 1fr; } }
-.nw-health-card { background: #141414; border: 1px solid #232323; border-radius: 10px; padding: 14px; }
-.nw-health-label { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: #666; }
-.nw-health-value { font-size: 28px; color: #fff; font-weight: 700; margin-top: 8px; }
-
-/* ---- Logs & System Info ---- */
-.nw-logs-list { display: flex; flex-direction: column; gap: 10px; }
-.nw-log-item { background: #141414; border: 1px solid #232323; border-radius: 10px; padding: 12px 14px; }
-.nw-log-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
-.nw-log-level { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; padding: 4px 8px; border-radius: 999px; border: 1px solid #333; color: #ccc; }
-.nw-log-level-info { color: #00d4ff; border-color: #004e60; background: #07191d; }
-.nw-log-level-warn { color: #ffb703; border-color: #5c4300; background: #211800; }
+.nw-log-item { background: #141414; border: 1px solid #232323; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.nw-log-level { font-size: 10px; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; border: 1px solid #333; }
 .nw-log-level-error { color: #ff5c5c; border-color: #5b1f1f; background: #1f1010; }
-.nw-log-date { font-size: 11px; color: #777; }
-.nw-log-message { font-size: 13px; color: #fff; line-height: 1.4; }
-.nw-log-meta { margin-top: 6px; font-size: 11px; color: #777; word-break: break-word; }
 
-.nw-sysinfo { background: #141414; border: 1px solid #232323; border-radius: 12px; overflow: hidden; font-size: 12px; }
-.nw-sysinfo-row { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid #1a1a1a; gap: 10px; }
-.nw-sysinfo-label { width: 130px; flex-shrink: 0; color: #666; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; }
-.nw-sysinfo-val { color: #aaa; font-family: monospace; font-size: 12px; word-break: break-word; }
-
-.nw-empty-state { background: #141414; border: 1px dashed #2a2a2a; border-radius: 10px; padding: 18px; color: #777; font-size: 12px; text-align: center; }
-/* =========================================================
-   NeoWeaver Admin Dashboard — clean patch
-   ========================================================= */
-
-/* Header */
-#nw-dashboard.nw-dash {
-	max-width: 1280px;
-	margin: 0 auto;
-}
-
-#nw-dashboard .nw-dash-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	flex-wrap: wrap;
-	margin-bottom: 18px;
-}
-
-#nw-dashboard .nw-dash-logo {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-}
-
-#nw-dashboard .nw-dash-actions {
-	margin-left: auto;
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	gap: 12px;
-	flex-wrap: wrap;
-}
-
-/* Buttons */
-#nw-dashboard .nw-dash-actions button,
-#nw-dashboard .nw-dash-actions .nw-btn,
-#nw-dashboard .nw-dash-actions .nw-range-btn,
-#nw-dashboard #nw-refresh-dashboard {
-	appearance: none;
-	-webkit-appearance: none;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	min-height: 40px;
-	padding: 0 14px;
-	margin: 0;
-	border-radius: 999px;
-	border: 1px solid rgba(173, 255, 0, 0.18);
-	background: #161616;
-	color: #d8d8d8;
-	font-family: "Chakra Petch", sans-serif;
-	font-size: 12px;
-	font-weight: 700;
-	line-height: 1;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	text-decoration: none;
-	box-shadow: none;
-	cursor: pointer;
-	transition:
-		background-color .18s ease,
-		border-color .18s ease,
-		color .18s ease,
-		box-shadow .18s ease,
-		transform .18s ease;
-}
-
-#nw-dashboard .nw-dash-actions button:hover,
-#nw-dashboard .nw-dash-actions .nw-btn:hover,
-#nw-dashboard .nw-dash-actions .nw-range-btn:hover,
-#nw-dashboard #nw-refresh-dashboard:hover {
-	background: #1d1d1d;
-	border-color: rgba(173, 255, 0, 0.32);
-	color: #fff;
-}
-
-#nw-dashboard .nw-dash-actions button:focus,
-#nw-dashboard .nw-dash-actions button:focus-visible,
-#nw-dashboard .nw-dash-actions .nw-btn:focus,
-#nw-dashboard .nw-dash-actions .nw-btn:focus-visible,
-#nw-dashboard .nw-dash-actions .nw-range-btn:focus,
-#nw-dashboard .nw-dash-actions .nw-range-btn:focus-visible,
-#nw-dashboard #nw-refresh-dashboard:focus,
-#nw-dashboard #nw-refresh-dashboard:focus-visible {
-	outline: none;
-	box-shadow:
-		0 0 0 2px #0d0d0d,
-		0 0 0 4px rgba(173, 255, 0, 0.85);
-	color: #fff;
-}
-
-#nw-dashboard .nw-dash-actions button:active,
-#nw-dashboard .nw-dash-actions .nw-btn:active,
-#nw-dashboard .nw-dash-actions .nw-range-btn:active,
-#nw-dashboard #nw-refresh-dashboard:active {
-	transform: translateY(1px);
-}
-
-/* Range switch */
-#nw-dashboard .nw-range-switch {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px;
-	border: 1px solid rgba(173, 255, 0, 0.14);
-	border-radius: 999px;
-	background: #101010;
-}
-
-#nw-dashboard .nw-range-switch .nw-range-btn {
-	min-width: 56px;
-	border-color: transparent;
-	background: transparent;
-	color: #9a9a9a;
-}
-
-#nw-dashboard .nw-range-switch .nw-range-btn.is-active,
-#nw-dashboard .nw-range-switch .nw-range-btn[aria-pressed="true"] {
-	background: #adff00;
-	border-color: #adff00;
-	color: #11150c;
-	box-shadow: 0 4px 14px rgba(173, 255, 0, 0.22);
-}
-
-/* Refresh */
-#nw-dashboard #nw-refresh-dashboard {
-	padding-inline: 16px;
-}
-
-/* Messages */
-#nw-dashboard .nw-messages-grid {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 14px;
-}
-
-#nw-dashboard .nw-stat-card--message {
-	position: relative;
-	overflow: hidden;
-}
-
-#nw-dashboard .nw-stat-card--message::after {
-	content: "";
-	position: absolute;
-	right: -18px;
-	bottom: -34px;
-	width: 110px;
-	height: 110px;
-	border-radius: 50%;
-	background: radial-gradient(circle, rgba(173,255,0,.12) 0%, rgba(173,255,0,.03) 48%, rgba(173,255,0,0) 72%);
-	pointer-events: none;
-}
-
-#nw-dashboard .nw-stat-card--message .nw-stat-label-top {
-	color: #d0d0d0;
-}
-
-#nw-dashboard .nw-stat-card--message .nw-stat-sub {
-	color: #8f8f8f;
-}
-
-/* Trends now 3 cols, not 4 */
-#nw-dashboard .nw-chart-grid {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 14px;
-}
-
-@media (max-width: 1100px) {
-	#nw-dashboard .nw-chart-grid,
-	#nw-dashboard .nw-messages-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-}
-
-@media (max-width: 782px) {
-	#nw-dashboard .nw-dash-actions {
-		margin-left: 0;
-		width: 100%;
-		justify-content: space-between;
-	}
-
-	#nw-dashboard .nw-range-switch {
-		flex: 1 1 auto;
-	}
-
-	#nw-dashboard #nw-refresh-dashboard {
-		flex: 0 0 auto;
-	}
-
-	#nw-dashboard .nw-chart-grid,
-	#nw-dashboard .nw-messages-grid {
-		grid-template-columns: 1fr;
-	}
-}
-
-@media (max-width: 560px) {
-	#nw-dashboard .nw-dash-actions {
-		flex-direction: column;
-		align-items: stretch;
-	}
-
-	#nw-dashboard .nw-range-switch {
-		width: 100%;
-		justify-content: stretch;
-	}
-
-	#nw-dashboard .nw-range-switch .nw-range-btn {
-		flex: 1 1 0;
-		min-width: 0;
-	}
-
-	#nw-dashboard #nw-refresh-dashboard {
-		width: 100%;
-	}
-}
+.nw-sysinfo { background: #141414; border: 1px solid #232323; border-radius: 12px; overflow: hidden; }
+.nw-sysinfo-row { display: flex; padding: 10px 14px; border-bottom: 1px solid #1a1a1a; }
+.nw-sysinfo-label { width: 130px; color: #666; font-size: 10px; text-transform: uppercase; }
+.nw-sysinfo-val { color: #aaa; font-family: monospace; }
