@@ -15,13 +15,13 @@ function cyber_deck_builder_shortcode() {
     $safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
 
     // Pobieramy karty postaci z join do cyber_cards (name, img_url, level)
-    $all_cards = tw_supabase_get(
-        'cyber_character_cards',
-        [
-            'character_id' => 'eq.' . $safe_id,
-            'select'       => 'instance_id,location,level,cyber_cards(name,img_url)',
-        ]
-    );
+$cards = tw_supabase_get(
+    'cyber_character_deck',
+    [
+        'character_id' => 'eq.' . $safe_id,
+        'select'       => '*,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect)',
+    ]
+);
 
     ob_start();
     ?>
