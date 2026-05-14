@@ -90,36 +90,6 @@ class Neoweaver_Public {
 				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			]
 		);
-
-		// ── Campaign creator ─────────────────────────────────────────────
-		wp_enqueue_style(
-			'neoweaver-campaign-creator',
-			$url . 'assets/css/tw-campaign-creator.css',
-			[ 'neoweaver-public' ],
-			$ver
-		);
-		wp_enqueue_script(
-			'neoweaver-campaign-creator',
-			$url . 'assets/js/tw-campaign-creator.js',
-			[ 'jquery' ],
-			$ver,
-			true
-		);
-
-		// ── World creator ────────────────────────────────────────────────
-		wp_enqueue_style(
-			'neoweaver-world-creator',
-			$url . 'assets/css/world-creator.css',
-			[ 'neoweaver-public' ],
-			$ver
-		);
-		wp_enqueue_script(
-			'neoweaver-world-creator',
-			$url . 'assets/js/tw-world-creator.js',
-			[ 'jquery' ],
-			$ver,
-			true
-		);
 	}
 
 	// =========================================================================
