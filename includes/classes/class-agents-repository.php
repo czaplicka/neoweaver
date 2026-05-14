@@ -145,7 +145,7 @@ class Neoweaver_Agents_Repository {
 		$chars_url = $this->table_url( 'cyber_characters', [
 			'wp_user_id' => 'eq.' . $wp_user_id,
 			'select'     => '*,cyber_classes(name),cyber_races(name),cyber_campaign_characters(cyber_campaign(name,cyber_campaign_worlds(cyber_worlds(name))))',
-			'order'      => 'id.desc',
+			'order' => 'created_at.desc',
 		] );
 
 		$characters = $this->get_json( $chars_url );
