@@ -35,7 +35,6 @@ final class NeoWeaver_Core {
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'register_admin_globals' ] );
 		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_public_assets'   ] );
 		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_adventure_assets' ] );
-		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_checkout_assets'  ] );
 		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_agents_list_assets' ] );
 		add_action( 'wp_footer',           [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
