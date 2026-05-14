@@ -18,7 +18,7 @@ function deployment_enqueue_assets() {
         'deployment',
         NEOWEAVER_PLUGIN_URL . 'assets/js/public/deployment2.js',
         [],
-        NEOWEAVER_VERSION
+        NEOWEAVER_VERSION,
         true
     );
 }
