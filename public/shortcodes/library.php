@@ -2,7 +2,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 /**
  * Shortcode [cyber_deck_builder]
  * Wyświetla deck buildera dla wybranej postaci gracza.
