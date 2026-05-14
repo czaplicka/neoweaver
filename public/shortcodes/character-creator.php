@@ -111,9 +111,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 <div id="tw-char-progress-phase" class="tw-progress-phase">IDENTITY SYNC</div>
             </div>
 
-            <div class="tw-char-status" aria-live="polite"></div>
-
-            <section class="tw-char-step active" data-phase="IDENTITY SYNC">
+                        <section class="tw-char-step active" data-phase="IDENTITY SYNC">
                 <div class="tw-step-error">
                     <span class="tw-step-error-icon" aria-hidden="true"></span>
                     <span class="tw-step-error-msg"></span>
