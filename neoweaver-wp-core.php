@@ -79,13 +79,12 @@ final class NeoWeaver_Core {
 			'includes/ajax/update-vehicle-module.php',
 
 			// includes/classes
-		'includes/classes/class-nw-supabase.php',
+		'includes/classes/class-supabase.php',
 		'includes/classes/class-loader.php',
 		'includes/classes/class-agents-repository.php',
 		'includes/classes/class-agents-list.php',
 		'includes/classes/class-deployments-creator.php',
 		'includes/classes/class-nodes-creator.php',
-		'includes/classes/class-checkout-block.php',
 
 			// public
 			'public/class-public.php',
@@ -318,39 +317,6 @@ final class NeoWeaver_Core {
 			'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
 			'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
-		] );
-	}
-
-	public static function enqueue_checkout_assets(): void {
-		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
-			return;
-		}
-
-		wp_enqueue_script( 'neoweaver-checkout-block',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/public/checkout-block.js',
-			[ 'jquery' ], NEOWEAVER_VERSION, true );
-
-		$characters    = function_exists( 'neoweaver_get_player_characters' )
-			? neoweaver_get_player_characters( get_current_user_id() )
-			: [];
-
-		$has_neoweaver = false;
-		if ( function_exists( 'WC' ) && WC()->cart ) {
-			foreach ( WC()->cart->get_cart() as $cart_item ) {
-				if ( ! empty( $cart_item['data'] )
-					&& method_exists( $cart_item['data'], 'get_attribute' )
-					&& $cart_item['data']->get_attribute( 'neoweaver_item_id' )
-				) {
-					$has_neoweaver = true;
-					break;
-				}
-			}
-		}
-
-		wp_localize_script( 'neoweaver-checkout-block', 'neoweaverCheckout', [
-			'characters'   => $characters ?: [],
-			'hasNeoweaver' => $has_neoweaver ? '1' : '0',
-			'createUrl'    => home_url( '/new-agent/' ),
 		] );
 	}
 
