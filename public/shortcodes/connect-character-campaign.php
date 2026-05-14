@@ -5,24 +5,25 @@
  * World-Lock: agent locked to world via cyber_campaign_worlds junction table
  *
  */
-function tw_deployment_enqueue_assets() {
+function deployment_enqueue_assets() {
 
     wp_register_style(
-        'tw-deployment',
+        'deployment',
         NEOWEAVER_PLUGIN_URL . 'assets/css/public/deployment2.css',
         [],
-        '1.0.0'
+        NEOWEAVER_VERSION
     );
 
     wp_register_script(
-        'tw-deployment',
+        'deployment',
         NEOWEAVER_PLUGIN_URL . 'assets/js/public/deployment2.js',
         [],
-        '1.0.0',
+        NEOWEAVER_VERSION
         true
     );
 }
-add_action( 'wp_enqueue_scripts', 'tw_deployment_enqueue_assets' );
+add_action( 'wp_enqueue_scripts', 'deployment_enqueue_assets' );
+
 function tw_connect_character_campaign_direct_v2() {
     if ( ! is_user_logged_in() ) {
         return '<p class="tw-message">UPLINK REQUIRED. IDENTIFY YOURSELF, FIELD AGENT.</p>';
