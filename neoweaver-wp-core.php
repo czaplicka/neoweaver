@@ -236,7 +236,7 @@ final class NeoWeaver_Core {
 			NEOWEAVER_PLUGIN_URL . 'assets/css/public/neoweaver-public.css', [], NEOWEAVER_VERSION );
 
 		wp_enqueue_script( 'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/public/neoweaver-public.js',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/public.js',
 			[ 'jquery', 'nw-lucide-public' ], NEOWEAVER_VERSION, true );
 
 		wp_enqueue_style( 'neoweaver-buffer',
