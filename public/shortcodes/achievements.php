@@ -58,24 +58,24 @@ function render_player_achievements( $atts ) {
     add_action( 'wp_footer', static function () {
         wp_enqueue_style(
             'neoweaver-achievements',
-            plugin_dir_url( __FILE__ ) . '../assets/css/achievements.css',
+            NW_PLUGIN_URL . 'assets/css/public/achievements.css',
             [],
             '1.0.0'
         );
+		wp_enqueue_script(
+			'lucide',
+			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
+			[],
+			'0.468.0',
+			true
+		);
         wp_enqueue_script(
-            'lucide',
-            'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
-            [],
-            null,
-            true
-        );
-        wp_enqueue_script(
-            'neoweaver-achievements',
-            plugin_dir_url( __FILE__ ) . '../assets/js/achievements.js',
-            [ 'lucide' ],
-            '1.0.0',
-            true
-        );
+			'achievements-script',
+			NW_PLUGIN_URL . 'assets/js/public/achievements.js',
+			[ 'jquery', 'lucide' ],
+			NW_VERSION,
+			true
+		);
     }, 5 );
 
     $a = shortcode_atts(
