@@ -79,7 +79,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         }
         $active_campaigns = $decoded;
         if ( empty( $active_campaigns ) ) {
-            return $empty_styles . '
+            return '
             <div class="tw-campaigns-empty">
                 <div class="tw-campaigns-empty-icon">⚠️</div>
                 <p class="tw-campaigns-empty-main">NO DEPLOYMENTS DETECTED IN YOUR GRID.</p>
