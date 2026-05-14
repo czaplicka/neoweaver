@@ -72,14 +72,24 @@ class Neoweaver_Agents_List {
                 $char_json    = wp_json_encode( $char );
             ?>
                 <div class="tw-card">
-                    <div class="tw-top-meta">
-                        <span>Views: <?php echo esc_html( $views ); ?></span>
-                        <?php if ( $is_public ) : ?>
-                            <a href="<?php echo esc_url( $legend_url ); ?>" target="_blank" rel="noopener noreferrer">Agent public profile</a>
-                        <?php else : ?>
-                            <span style="opacity:0.5;">Not public</span>
-                        <?php endif; ?>
-                    </div>
+                    <div class="tw-top-meta" data-public-meta="<?php echo $char_id_safe; ?>">
+    <span class="tw-views-count" style="<?php echo $is_public ? '' : 'display:none;'; ?>">
+        Views: <span class="tw-views-number"><?php echo esc_html( $views ); ?></span>
+    </span>
+    <?php if ( $is_public ) : ?>
+        <a href="<?php echo esc_url( $legend_url ); ?>" class="tw-legend-link" target="_blank" rel="noopener noreferrer">
+            Agent public profile
+        </a>
+    <?php else : ?>
+        <a href="<?php echo esc_url( $legend_url ); ?>" class="tw-legend-link" 
+           target="_blank" rel="noopener noreferrer" 
+           data-legend-url="<?php echo esc_url( $legend_url ); ?>"
+           style="display:none;">
+            Agent public profile
+        </a>
+        <span class="tw-not-public">Not public</span>
+    <?php endif; ?>
+</div>
                     <div class="tw-card-header">
                         <img src="<?php echo esc_url( $avatar ); ?>" class="tw-avatar" alt="">
                         <div>
@@ -94,9 +104,13 @@ class Neoweaver_Agents_List {
                             </div>
                             <div style="margin-top:8px; font-size:11px; color:#aaa;">
                                 <label class="tw-toggle-label">
-                                    <input type="checkbox" class="tw-toggle-public" data-char-id="<?php echo $char_id_safe; ?>" <?php checked( $is_public ); ?>>
-                                    <span>Public on /legend</span>
-                                </label>
+    <input type="checkbox" 
+           class="tw-toggle-public" 
+           data-char-id="<?php echo $char_id_safe; ?>"
+           data-legend-url="<?php echo esc_url( $legend_url ); ?>"
+           <?php checked( $is_public ); ?>>
+    <span>Public on /legend</span>
+</label>
                             </div>
                         </div>
                     </div>
