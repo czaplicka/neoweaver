@@ -5,16 +5,10 @@
  * Shortcode: [tw_deck_panel]
  *
  * Renders the sliding side-panel with three tabs.
- * JS is enqueued as a proper deferred asset via
- * Neoweaver_Public::enqueue_scripts() — see class-neoweaver-public.php.
- *
- * Opt 3 fix: removed inline <script> block; JS moved to
- * public/assets/js/deck-panel.js, enqueued with in_footer:true.
- * The only PHP-originated runtime value (sound base URL) is passed
- * via wp_localize_script() as window.twDeckPanelConfig.soundBase.
+ * JS is enqueued as a proper asset via Neoweaver_Public::enqueue_scripts().
  *
  * CSS scope  : .neoweaver-screen #deck-panel
- * JS globals : window.twInitDeckPanel  (set by deck-panel.js)
+ * JS globals : window.twInitDeckPanel
  *
  * @package Neoweaver
  */
@@ -30,52 +24,77 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return string
  */
 function tw_deck_panel_render(): string {
-	// Bug 8 fix: restrict output to the adventure template.
 	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return '';
 	}
 
-	// Opt 3 fix: tell the enqueue layer to actually load the script.
-	// wp_enqueue_scripts runs before shortcodes on normal page loads, so
-	// we use wp_enqueue_script() here as a late-enqueue safety net in case
-	// the shortcode fires after the hook (e.g. via AJAX or block editor
-	// preview). wp_enqueue_script() is idempotent when the handle is already
-	// registered — it just marks it for output.
-	if ( ! wp_script_is( 'tw-deck-panel', 'enqueued' ) ) {
+	if ( wp_script_is( 'tw-deck-panel', 'registered' ) && ! wp_script_is( 'tw-deck-panel', 'enqueued' ) ) {
 		wp_enqueue_script( 'tw-deck-panel' );
 	}
 
 	ob_start();
 	?>
-<div id="deck-panel" class="is-collapsed">
-	<div class="deck-tabs-wrapper">
+	<div id="deck-panel" class="is-collapsed" aria-label="<?php echo esc_attr__( 'Deck panel', 'neoweaver' ); ?>">
+		<div class="deck-tabs-wrapper">
 
-		<!-- Toggle button -->
-		<button id="toggle-deck" class="panel-tab" aria-label="Toggle deck panel">&#9776;</button>
+			<button
+				id="toggle-deck"
+				class="panel-tab"
+				type="button"
+				aria-label="<?php echo esc_attr__( 'Toggle deck panel', 'neoweaver' ); ?>"
+				aria-controls="deck-panel"
+				aria-expanded="false"
+			>
+				&#9776;
+			</button>
 
-		<!-- Tab buttons -->
-		<button class="panel-tab" data-tab="tab-mission">MISSION</button>
-		<button class="panel-tab" data-tab="tab-augments">AUGMENTS</button>
-		<button class="panel-tab" data-tab="tab-skills">SKILLS</button>
+			<button
+				class="panel-tab is-active"
+				type="button"
+				data-tab="tab-mission"
+				aria-controls="tab-mission"
+				aria-pressed="true"
+			>
+				<?php echo esc_html__( 'MISSION', 'neoweaver' ); ?>
+			</button>
 
+			<button
+				class="panel-tab"
+				type="button"
+				data-tab="tab-augments"
+				aria-controls="tab-augments"
+				aria-pressed="false"
+			>
+				<?php echo esc_html__( 'AUGMENTS', 'neoweaver' ); ?>
+			</button>
+
+			<button
+				class="panel-tab"
+				type="button"
+				data-tab="tab-skills"
+				aria-controls="tab-skills"
+				aria-pressed="false"
+			>
+				<?php echo esc_html__( 'SKILLS', 'neoweaver' ); ?>
+			</button>
+
+		</div>
+
+		<div id="tab-mission" class="deck-tab-content is-active">
+			<h3 class="deck-tab-title"><?php echo esc_html__( '// MISSION_DATA', 'neoweaver' ); ?></h3>
+			<div id="tw-mission-content"><?php echo esc_html__( 'Loading mission data...', 'neoweaver' ); ?></div>
+		</div>
+
+		<div id="tab-augments" class="deck-tab-content">
+			<h3 class="deck-tab-title"><?php echo esc_html__( '// AUGMENTS', 'neoweaver' ); ?></h3>
+			<div id="tw-augments-content"><?php echo esc_html__( 'Loading augments...', 'neoweaver' ); ?></div>
+		</div>
+
+		<div id="tab-skills" class="deck-tab-content">
+			<h3 class="deck-tab-title"><?php echo esc_html__( '// SKILLS & ABILITIES', 'neoweaver' ); ?></h3>
+			<div id="tw-skills-content"><?php echo esc_html__( 'Loading skills...', 'neoweaver' ); ?></div>
+		</div>
 	</div>
-
-	<!-- Tab content areas -->
-	<div id="tab-mission"  class="deck-tab-content is-active">
-		<h3 class="deck-tab-title">// MISSION_DATA</h3>
-		<div id="tw-mission-content">Loading mission data...</div>
-	</div>
-
-	<div id="tab-augments" class="deck-tab-content">
-		<h3 class="deck-tab-title">// AUGMENTS</h3>
-		<div id="tw-augments-content">Loading augments...</div>
-	</div>
-
-	<div id="tab-skills" class="deck-tab-content">
-		<h3 class="deck-tab-title">// SKILLS &amp; ABILITIES</h3>
-		<div id="tw-skills-content">Loading skills...</div>
-	</div>
-</div>
 	<?php
 	return ob_get_clean();
 }
