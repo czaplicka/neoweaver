@@ -27,7 +27,7 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 				'neoweaver-campaign-creator',
 				NEOWEAVER_PLUGIN_URL . 'assets/css/public/campaign-creator.css',
 				[],
-				(string) filemtime( $campaign_css )
+				NEOWEAVER_VERSION
 			);
 		}
 
@@ -37,7 +37,7 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 				'neoweaver-campaign-creator',
 				NEOWEAVER_PLUGIN_URL . 'assets/js/public/campaign-creator.js',
 				[],
-				(string) filemtime( $campaign_js ),
+				NEOWEAVER_VERSION,
 				true
 			);
 		}
