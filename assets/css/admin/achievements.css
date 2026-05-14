@@ -1,36 +1,34 @@
 /* ============================================================
    NeoWeaver — Achievements Admin Panel
-   Module-specific styles (builds on nw-admin-core.css)
+   Module-specific styles (extension for admin-core.css)
    ============================================================ */
 
-/* ---- Stats bar pills (achievements-specific) ---- */
-.nw-pill-account strong  { color: #4da6ff; }
+/* ---- Stats & Indicators ---- */
+.nw-pill-account strong   { color: #4da6ff; }
 .nw-pill-character strong { color: #b04dff; }
-.nw-pill-hidden strong   { color: #ff9f43; }
+.nw-pill-hidden strong    { color: #ff9f43; }
 
-/* ---- Table: icon column ---- */
+/* ---- Visual Components: Icons & Badges ---- */
 .nw-col-icon { width: 56px; text-align: center; }
 
-/* ---- Achievement badge icon (table cell) ---- */
-.nw-ach-icon {
+.nw-ach-icon,
+.nw-badge-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
     border-radius: 8px;
-    font-size: 18px;
     color: #fff;
     border: 1px solid rgba(255,255,255,.08);
+    flex-shrink: 0;
 }
 
-.nw-ach-icon svg {
-    width: 18px;
-    height: 18px;
-    stroke: #fff;
-}
+.nw-ach-icon { width: 36px; height: 36px; font-size: 18px; }
+.nw-badge-icon { width: 48px; height: 48px; border-radius: 10px; background: #2c3e50; }
 
-/* ---- ID + title cell ---- */
+.nw-ach-icon svg { width: 18px; height: 18px; stroke: #fff; }
+.nw-badge-icon svg { width: 24px; height: 24px; stroke: #fff; }
+
+/* ---- Typography ---- */
 .nw-ach-id {
     font-size: 10px;
     color: #555;
@@ -39,162 +37,67 @@
     margin-bottom: 2px;
 }
 
-.nw-ach-title {
-    font-weight: 600;
-    color: #fff;
-    font-size: 13px;
-}
+.nw-ach-title { font-weight: 600; color: #fff; font-size: 13px; }
+.nw-badge-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.nw-badge-desc { font-size: 12px; color: #666; }
 
-/* ---- Category badge ---- */
-.nw-cat-badge {
+/* ---- Categorization Badges ---- */
+.nw-cat-badge,
+.nw-scope-badge {
     font-size: 10px;
     padding: 2px 8px;
     border-radius: 3px;
     background: #1e1e1e;
     border: 1px solid #2e2e2e;
-    color: #aaa;
     text-transform: uppercase;
     letter-spacing: .4px;
     white-space: nowrap;
 }
 
-.nw-cat-system      { border-color: #4da6ff; color: #4da6ff; }
+.nw-scope-badge { background: #1a1a1a; color: #888; }
+
+/* Dynamic Coloring */
+.nw-cat-system, .nw-scope-account { border-color: #4da6ff; color: #4da6ff; }
 .nw-cat-exploration { border-color: #4fc874; color: #4fc874; }
 .nw-cat-social      { border-color: #ff9f43; color: #ff9f43; }
 .nw-cat-progression { border-color: #adff00; color: #adff00; }
 .nw-cat-mission     { border-color: #ff6b35; color: #ff6b35; }
 .nw-cat-loot        { border-color: #ffd700; color: #ffd700; }
-.nw-cat-secret      { border-color: #b04dff; color: #b04dff; }
+.nw-cat-secret, .nw-scope-character { border-color: #b04dff; color: #b04dff; }
 
-/* ---- Scope badge ---- */
-.nw-scope-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: #1a1a1a;
-    border: 1px solid #2e2e2e;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-}
+/* ---- Form Controls: Toggles & Inputs ---- */
+.nw-toggle-row { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.nw-toggle-label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #ccc; cursor: pointer; }
 
-.nw-scope-account   { border-color: #4da6ff; color: #4da6ff; }
-.nw-scope-character { border-color: #b04dff; color: #b04dff; }
+/* Custom Orange Toggle for Hidden States */
+.nw-toggle input:checked + .nw-toggle-orange { background: #2e1800; border-color: #ff9f43; }
+.nw-toggle input:checked + .nw-toggle-orange::before { background: #ff9f43; transform: translateX(18px); }
 
-/* ---- Toggle: orange variant (hidden until earned) ---- */
-.nw-toggle input:checked + .nw-toggle-orange {
-    background: #2e1800;
-    border-color: #ff9f43;
-}
-
-.nw-toggle input:checked + .nw-toggle-orange::before {
-    background: #ff9f43;
-    transform: translateX(18px);
-}
-
-/* ---- Icon input row (icon preview + text input) ---- */
-.nw-icon-input-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.nw-icon-preview {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: #1a1a1a;
-    border: 1px solid #2e2e2e;
-    border-radius: 6px;
-    flex-shrink: 0;
-    color: #adff00;
-}
-
-.nw-icon-preview svg {
-    width: 18px;
-    height: 18px;
-}
-
-/* ---- Color picker row ---- */
-.nw-color-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.nw-color-picker {
-    width: 36px;
-    height: 36px;
-    border: 1px solid #2e2e2e;
-    border-radius: 6px;
-    padding: 2px;
-    background: #0d0d0d;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.nw-color-text {
-    flex: 1;
-}
-
-/* ---- Toggle row (side-by-side toggles) ---- */
-.nw-toggle-row {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding-top: 4px;
-}
-
-.nw-toggle-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: #ccc;
-    cursor: pointer;
-}
-
-/* ---- Badge preview (modal) ---- */
+/* Input Groupings */
+.nw-icon-input-row,
+.nw-color-row,
 .nw-badge-preview {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    background: #0d0d0d;
-    border: 1px solid #2a2a2a;
-    border-radius: 8px;
-    margin-top: 4px;
+    gap: 8px;
 }
 
-.nw-badge-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    background: #2c3e50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.nw-badge-preview { 
+    gap: 14px; padding: 14px 16px; background: #0d0d0d; 
+    border: 1px solid #2a2a2a; border-radius: 8px; margin-top: 4px; 
+}
+
+.nw-icon-preview,
+.nw-color-picker {
+    width: 36px;
+    height: 36px;
+    background: #1a1a1a;
+    border: 1px solid #2e2e2e;
+    border-radius: 6px;
     flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,.08);
-    color: #fff;
 }
 
-.nw-badge-icon svg {
-    width: 24px;
-    height: 24px;
-    stroke: #fff;
-}
-
-.nw-badge-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 3px;
-}
-
-.nw-badge-desc {
-    font-size: 12px;
-    color: #666;
-}
+.nw-icon-preview { display: inline-flex; align-items: center; justify-content: center; color: #adff00; }
+.nw-icon-preview svg { width: 18px; height: 18px; }
+.nw-color-picker { padding: 2px; background: #0d0d0d; cursor: pointer; }
+.nw-color-text { flex: 1; }
