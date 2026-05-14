@@ -2,12 +2,23 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+
 /**
  * Shortcode [cyber_deck_builder]
  * Wyświetla deck buildera dla wybranej postaci gracza.
  * Selektor postaci wzorowany na [achievements].
  */
 function cyber_deck_builder_shortcode( $atts ) {
+
+    // Ładujemy ten sam CSS co achievements — zawiera style selektora postaci
+    add_action( 'wp_footer', static function () {
+        wp_enqueue_style(
+            'neoweaver-achievements',
+            NW_PLUGIN_URL . 'assets/css/public/achievements.css',
+            [],
+            NW_VERSION
+        );
+    }, 5 );
 
     $a = shortcode_atts(
         [
@@ -28,7 +39,7 @@ function cyber_deck_builder_shortcode( $atts ) {
     if ( ! empty( $_GET['char_id'] ) ) {
         $selected_char_id = sanitize_text_field( wp_unslash( $_GET['char_id'] ) );
     } elseif ( ! empty( $a['char_id'] ) ) {
-        $selected_char_id = (string) $a['char_id'] ;
+        $selected_char_id = (string) $a['char_id'];
     }
 
     // Lista postaci usera
