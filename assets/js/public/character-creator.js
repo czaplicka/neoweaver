@@ -178,12 +178,12 @@
   }
 
   // ─── Status / error helpers ───────────────────────────────────────────────────
-  function setStatus(message, type) {
-    var box = q('.tw-char-status', root);
-    if (!box) return;
-    box.className = 'tw-char-status' + (type ? ' is-' + type : '');
-    box.textContent = message || '';
-  }
+ // function setStatus(message, type) {
+ //   var box = q('.tw-char-status', root);
+ //   if (!box) return;
+ //   box.className = 'tw-char-status' + (type ? ' is-' + type : '');
+  //  box.textContent = message || '';
+ // }
 
   function clearStepErrors() {
     qa('.tw-char-step .tw-step-error', root).forEach(function (el) {
