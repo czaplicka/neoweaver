@@ -184,3 +184,61 @@ document.addEventListener('change', function(e) {
 		cb.checked = !cb.checked;
 	});
 });
+document.addEventListener( 'change', function ( e ) {
+    if ( ! e.target.classList.contains( 'tw-toggle-public' ) ) return;
+
+    const checkbox   = e.target;
+    const charId     = checkbox.dataset.charId;
+    const legendUrl  = checkbox.dataset.legendUrl;
+    const isPublic   = checkbox.checked;
+
+    // Find the tw-top-meta container for this card
+    const metaBox    = document.querySelector( `.tw-top-meta[data-public-meta="${ charId }"]` );
+    if ( ! metaBox ) return;
+
+    const viewsEl    = metaBox.querySelector( '.tw-views-count' );
+    const linkEl     = metaBox.querySelector( '.tw-legend-link' );
+    const notPublicEl = metaBox.querySelector( '.tw-not-public' );
+
+    if ( isPublic ) {
+        // Show views + public link, hide "Not public"
+        if ( viewsEl )     viewsEl.style.display     = '';
+        if ( linkEl )      linkEl.style.display       = '';
+        if ( notPublicEl ) notPublicEl.style.display  = 'none';
+    } else {
+        // Hide views + public link, show "Not public"
+        if ( viewsEl )     viewsEl.style.display     = 'none';
+        if ( linkEl )      linkEl.style.display       = 'none';
+        if ( notPublicEl ) {
+            notPublicEl.style.display = '';
+        } else {
+            // Create the "Not public" span if it doesn't exist yet
+            const span = document.createElement( 'span' );
+            span.className = 'tw-not-public';
+            span.style.opacity = '0.5';
+            span.textContent = 'Not public';
+            metaBox.appendChild( span );
+        }
+    }
+
+    // Persist to Supabase (twTogglePublic must be defined in your existing toggle handler)
+    if ( typeof twTogglePublic === 'function' ) {
+        twTogglePublic( charId, isPublic );
+    } else {
+        // Fallback: inline fetch if no existing handler
+        const supabaseUrl = window.twConfig?.supabaseUrl;
+        const anonKey     = window.twConfig?.anonKey;
+        if ( ! supabaseUrl || ! anonKey ) return;
+
+        fetch( `${ supabaseUrl }/rest/v1/cyber_characters?id=eq.${ charId }`, {
+            method  : 'PATCH',
+            headers : {
+                'Content-Type'  : 'application/json',
+                'apikey'        : anonKey,
+                'Authorization' : `Bearer ${ anonKey }`,
+                'Prefer'        : 'return=minimal',
+            },
+            body: JSON.stringify( { is_public: isPublic } ),
+        } ).catch( err => console.error( 'tw toggle public error:', err ) );
+    }
+} );
