@@ -2,7 +2,6 @@
 /**
  * NeoWeaver — Checkout integration
  * Handles Field Agent selection during WooCommerce checkout.
- *
  * @package NeoWeaver
  */
 
