@@ -19,7 +19,12 @@ function neoweaver_cart_has_item(): bool {
     }
     foreach ( WC()->cart->get_cart() as $cart_item ) {
         $product = $cart_item['data'] ?? null;
-        if ( $product && get_post_meta( $product->get_id(), '_neoweaver_item_id', true ) ) {
+        if ( ! $product ) continue;
+        // sprawdź post meta ORAZ atrybut produktu
+        if ( get_post_meta( $product->get_id(), '_neoweaver_item_id', true ) ) {
+            return true;
+        }
+        if ( method_exists( $product, 'get_attribute' ) && $product->get_attribute( 'neoweaver_item_id' ) ) {
             return true;
         }
     }
@@ -44,7 +49,7 @@ function neoweaver_get_player_characters( int $wp_user_id ): array {
     $response = wp_remote_get(
         $supa_url . '/rest/v1/cyber_characters'
             . '?wp_user_id=eq.' . $wp_user_id
-            . '&is_active=eq.true'
+            . '&status=eq.ALIVE'
             . '&select=id,name',
         [
             'headers' => [
