@@ -1,35 +1,58 @@
 /* =============================================================
-   NeoWeaver Admin — Abilities-specific styles
-   Requires: nw-core.css
+   NeoWeaver Admin — ABILITIES-SPECIFIC STYLES
+   Extension for: admin-core.css
    ============================================================= */
 
-/* ---- Ability image in table ---- */
+/* ---- Media & Visuals ---- */
 .nw-col-img { width: 50px; }
-.nw-ability-img {
-    width: 40px; height: 40px; border-radius: 6px;
-    object-fit: cover; border: 1px solid #2e2e2e; background: #1a1a1a;
-}
+
+.nw-ability-img, 
 .nw-ability-img-placeholder {
-    width: 40px; height: 40px; border-radius: 6px;
-    background: #1a1a1a; border: 1px solid #2e2e2e;
-    display: flex; align-items: center; justify-content: center;
-    color: #444; font-size: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    border: 1px solid #2e2e2e;
+    background: #1a1a1a;
 }
 
-/* ---- Ability name + description in table ---- */
+.nw-ability-img { object-fit: cover; }
+
+.nw-ability-img-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 20px;
+}
+
+/* ---- Text Content ---- */
 .nw-ability-name { font-weight: 600; color: #fff; }
-.nw-ability-desc {
-    font-size: 11px; color: #666; margin-top: 3px;
-    max-width: 300px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
+
+.nw-ability-desc,
+.nw-source {
+    font-size: 11px;
+    color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* ---- Type badges ---- */
+.nw-ability-desc { margin-top: 3px; max-width: 300px; }
+.nw-source { max-width: 160px; }
+
+/* ---- Badges & Tags ---- */
 .nw-type-badge {
-    display: inline-block; font-size: 10px; padding: 2px 9px;
-    border-radius: 3px; text-transform: uppercase;
-    letter-spacing: .5px; font-weight: 700; white-space: nowrap;
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 9px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 700;
+    white-space: nowrap;
 }
+
+/* Badge Variants — Energy Alignments */
 .nw-type-active   { background: #1a2800; border: 1px solid #adff00; color: #adff00; }
 .nw-type-passive  { background: #001a3a; border: 1px solid #4da6ff; color: #4da6ff; }
 .nw-type-reaction { background: #2a1a00; border: 1px solid #ff9f00; color: #ff9f00; }
@@ -39,21 +62,17 @@
 .nw-type-item     { background: #2a2000; border: 1px solid #e8af34; color: #e8af34; }
 .nw-type-special  { background: #1a1a1a; border: 1px solid #888;    color: #aaa;    }
 
-/* ---- Source cell ---- */
-.nw-source {
-    font-size: 11px; color: #666; max-width: 160px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* ---- Cost badge ---- */
-.nw-cost-badge {
-    font-size: 11px; padding: 2px 8px; background: #1e1e1e;
-    border: 1px solid #2e2e2e; border-radius: 3px; color: #aaa; white-space: nowrap;
-}
-
-/* ---- Tags ---- */
-.nw-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Cost & Metadata Tags */
+.nw-cost-badge,
 .nw-tag {
-    font-size: 10px; padding: 2px 7px; background: #1e1e1e;
-    border: 1px solid #2e2e2e; border-radius: 3px; color: #888;
+    font-size: 10px;
+    padding: 2px 7px;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+    border-radius: 3px;
+    white-space: nowrap;
 }
+
+.nw-cost-badge { font-size: 11px; padding: 2px 8px; color: #aaa; }
+.nw-tag { color: #888; }
+.nw-tags { display: flex; flex-wrap: wrap; gap: 4px; }
