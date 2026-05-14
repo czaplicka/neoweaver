@@ -96,7 +96,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         $session_rest_url = get_rest_url( null, 'neoweaver/v1/session/start' );
 
         ob_start();
-        echo $empty_styles; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         ?>
 
         <div class="tw-char-wrapper" style="font-family:'Chakra Petch', sans-serif;">
