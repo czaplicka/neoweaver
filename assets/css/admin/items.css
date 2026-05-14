@@ -1,41 +1,9 @@
 /* ============================================================
-   NeoWeaver Admin — Items panel
-   Scoped styles for the cyber_items admin screen.
-   Font: Chakra Petch | Accent: #adff00
+   NeoWeaver Admin — ITEMS PANEL
+   Module-specific styles (extension for admin-core.css)
    ============================================================ */
 
-/* ── Rarity badges ───────────────────────────────────────── */
-.nw-rarity {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 4px;
-	font-family: 'Chakra Petch', monospace;
-	font-size: 0.75rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-}
-.nw-rarity--common    { background: #444;   color: #ccc; }
-.nw-rarity--uncommon  { background: #1a4d1a; color: #6eff6e; }
-.nw-rarity--rare      { background: #0d2a4d; color: #4db8ff; }
-.nw-rarity--epic      { background: #2d0d4d; color: #bf7fff; }
-.nw-rarity--legendary { background: #4d2d00; color: #ffb347; }
-
-/* ── Item type badge ─────────────────────────────────────── */
-.nw-item-type {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 4px;
-	font-family: 'Chakra Petch', monospace;
-	font-size: 0.72rem;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	background: rgba(173,255,0,.12);
-	color: #adff00;
-	border: 1px solid rgba(173,255,0,.3);
-}
-
-/* ── Item image thumbnail ─────────────────────────────────── */
+/* ---- Item Visuals & Thumbnails ---- */
 .nw-item-thumb {
 	width: 40px;
 	height: 40px;
@@ -43,6 +11,7 @@
 	border-radius: 4px;
 	border: 1px solid rgba(173,255,0,.25);
 }
+
 .nw-item-thumb--empty {
 	width: 40px;
 	height: 40px;
@@ -56,35 +25,68 @@
 	font-size: 1.1rem;
 }
 
-/* ── Tags list ────────────────────────────────────────────── */
-.nw-tags {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-}
-.nw-tag {
+/* ---- Item Badges & Type ---------------------------------- */
+.nw-item-type {
 	display: inline-block;
-	padding: 1px 6px;
-	border-radius: 3px;
-	font-size: 0.7rem;
-	background: #1e1e1e;
-	color: #888;
-	border: 1px solid #333;
-}
-
-/* ── Stats bar ────────────────────────────────────────────── */
-.nw-stats-bar {
-	display: flex;
-	gap: 24px;
-	margin: 12px 0;
-	color: #888;
-	font-size: 0.85rem;
-}
-.nw-stats-bar strong {
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	background: rgba(173,255,0,.12);
 	color: #adff00;
+	border: 1px solid rgba(173,255,0,.3);
 }
 
-/* ── Active toggle ────────────────────────────────────────── */
+/* ---- Rarity Palette (Item-Specific) ----------------------- */
+.nw-rarity {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.nw-rarity--common    { background: #444;    color: #ccc; }
+.nw-rarity--uncommon  { background: #1a4d1a; color: #6eff6e; }
+.nw-rarity--rare      { background: #0d2a4d; color: #4db8ff; }
+.nw-rarity--epic      { background: #2d0d4d; color: #bf7fff; }
+.nw-rarity--legendary { background: #4d2d00; color: #ffb347; }
+
+/* ---- Tabs System (Inside Modals/Forms) -------------------- */
+.nw-tabs {
+	display: flex;
+	gap: 0;
+	border-bottom: 2px solid #333;
+	margin-bottom: 16px;
+}
+
+.nw-tab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -2px;
+	padding: 8px 18px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: #888;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.nw-tab:hover { color: #ccc; }
+.nw-tab.active {
+	color: #adff00;
+	border-bottom-color: #adff00;
+}
+
+/* ---- Component Extensions -------------------------------- */
 .nw-toggle {
 	cursor: pointer;
 	background: none;
@@ -98,34 +100,6 @@
 .nw-toggle--on  { color: #adff00; }
 .nw-toggle--off { color: #555; }
 
-/* ── Tabs (inside modal) ──────────────────────────────────── */
-.nw-tabs {
-	display: flex;
-	gap: 0;
-	border-bottom: 2px solid #333;
-	margin-bottom: 16px;
-}
-.nw-tab {
-	background: none;
-	border: none;
-	border-bottom: 2px solid transparent;
-	margin-bottom: -2px;
-	padding: 8px 18px;
-	font-family: 'Chakra Petch', monospace;
-	font-size: 0.85rem;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: #888;
-	cursor: pointer;
-	transition: color 0.15s, border-color 0.15s;
-}
-.nw-tab:hover { color: #ccc; }
-.nw-tab.active {
-	color: #adff00;
-	border-bottom-color: #adff00;
-}
-
-/* ── Help text ────────────────────────────────────────────── */
 .nw-help-text {
 	margin-bottom: 8px;
 	color: #888;
