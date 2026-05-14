@@ -27,14 +27,14 @@ function tw_list_worlds_enqueue_assets() {
 
     wp_enqueue_style(
         'tw-list-worlds',
-        $plugin_url . 'public/assets/css/tw-list-worlds.css',
+        $plugin_url . 'assets/css/public/list-worlds.css',
         [],
         '1.0.1'
     );
 
     wp_enqueue_script(
         'tw-list-worlds',
-        $plugin_url . 'public/assets/js/tw-list-worlds.js',
+        $plugin_url . 'assets/js/public/list-worlds.js',
         [ 'jquery' ],
         '1.0.1',
         true
