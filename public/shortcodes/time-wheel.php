@@ -3,14 +3,14 @@
 function tw_register_time_wheel_assets() {
     wp_register_style(
         'tw-time-wheel',
-        get_stylesheet_directory_uri() . '/assets/css/tw-time-wheel.css',
+        get_stylesheet_directory_uri() . '/assets/css/public/time-wheel.css',
         [],
         '1.0.0'
     );
 
     wp_register_script(
         'tw-time-wheel',
-        get_stylesheet_directory_uri() . '/assets/js/tw-time-wheel.js',
+        get_stylesheet_directory_uri() . '/assets/js/public/time-wheel.js',
         [ 'jquery' ],
         '1.0.0',
         true
