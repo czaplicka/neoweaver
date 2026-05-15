@@ -1,10 +1,6 @@
 (function() {
     'use strict';
-
-    // P8 FIX: Cast char ID to integer in JS so Supabase receives a number type,
-    // not the string "123" — which causes a type mismatch on the .eq() filter.
     const charId = <?php echo intval( $char_id ); ?>;
-
     async function initLoom() {
         if ( ! window.twSupabase ) {
             await new Promise( resolve =>
@@ -12,7 +8,6 @@
             );
         }
         const sb = window.twSupabase;
-
         const categories = {
             brutality: ['Attack', 'Fire', 'Melee', 'Physical', 'Lethal', 'Grit'],
             cunning:   ['Stealth', 'Reflex', 'Glitch', 'Escape', 'Thievery'],
@@ -20,19 +15,13 @@
             spirit:    ['Magic', 'Chaos', 'Willpower', 'Madness', 'Void'],
             presence:  ['Persuasion', 'Diplomacy', 'Intimidation', 'Social'],
         };
-
-        // P4 FIX: Wrap Supabase call in try/catch so a network or auth failure
-        // shows a meaningful message rather than leaving the chart blank/frozen.
         try {
             const { data: deckData, error } = await sb
                 .from('cyber_character_deck')
                 .select('cyber_deck(tags)')
                 .eq('character_id', charId);
-
             if ( error ) throw error;
-
             const stats = { brutality: 0, cunning: 0, intellect: 0, spirit: 0, presence: 0 };
-
             if ( Array.isArray( deckData ) ) {
                 deckData.forEach( entry => {
                     const tags = ( entry.cyber_deck?.tags || '' ).toLowerCase();
@@ -43,20 +32,16 @@
                     } );
                 } );
             }
-
             renderChart( stats );
         } catch ( err ) {
             console.error( 'Loom init error:', err );
-            // P4 FIX: Surface the failure to the user instead of silently failing.
             const nameEl = document.getElementById( 'archetype-name' );
             if ( nameEl ) nameEl.textContent = 'DATA UNAVAILABLE';
         }
     }
-
     function renderChart( stats ) {
         const canvas = document.getElementById( 'fateChart' );
         if ( ! canvas ) return;
-
         new Chart( canvas.getContext( '2d' ), {
             type: 'radar',
             data: {
@@ -83,7 +68,6 @@
                 plugins: { legend: { display: false } },
             },
         } );
-
         const sorted  = Object.entries( stats ).sort( ( a, b ) => b[1] - a[1] );
         const titles  = {
             brutality: 'THE JUGGERNAUT',
@@ -96,19 +80,14 @@
         const topVal  = topKey ? stats[topKey] : 0;
         const nameEl  = document.getElementById( 'archetype-name' );
         if ( nameEl ) {
-            // P6 FIX: textContent instead of innerText — avoids forced layout reflow.
             nameEl.textContent = topVal > 0 ? ( titles[topKey] || 'UNKNOWN PATTERN' ) : 'VOID SOUL';
         }
     }
-
     initLoom();
 } )();
-
-// Share button
 document.addEventListener( 'click', function( e ) {
     const btn = e.target.closest( '.share-btn' );
     if ( ! btn ) return;
-
     const url = btn.dataset.shareUrl;
     if ( navigator.share ) {
         navigator.share( { title: 'Character Profile', url: url } );
