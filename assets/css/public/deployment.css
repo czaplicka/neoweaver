@@ -208,11 +208,11 @@ a.tw-btn-deploy:hover {
 .tw-sidebar-card {
     background: #0a0a0a;
     border: 1px solid #1a1a1a;
-    padding: 14px 16px;
+    padding: 7px 8px;
     border-radius: 2px;
 }
 .tw-sidebar-card + .tw-sidebar-card {
-    margin-top: 10px;
+    margin-top: 5px;
 }
 .tw-sidebar-card h4 {
     color: #adff00;
