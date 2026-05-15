@@ -209,7 +209,7 @@ $display_views = ( isset( $char['view_count'] ) ? (int) $char['view_count'] : 0 
 $inventory     = tw_get_public_character_inventory( $char_id, $supabase_url, $anon_key );
 $profile_url   = add_query_arg( 'char_id', rawurlencode( $char_id ), site_url( '/legend/' ) );
 
-$avatar     = isset( $char['avatar'] ) ? $char['avatar'] : 'https://via.placeholder.com/140x180?text=No+Data';
+$avatar = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://via.placeholder.com/140x180?text=No+Data';
 $char_name  = isset( $char['name'] ) ? $char['name'] : 'Unknown';
 $class_name = isset( $char['cyber_classes']['name'] ) ? $char['cyber_classes']['name'] : 'Operative';
 $race_name  = isset( $char['cyber_races']['name'] ) ? $char['cyber_races']['name'] : 'Unknown';
