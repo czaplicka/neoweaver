@@ -141,7 +141,7 @@
                     fetch(
                         cfg.url + 'rest/v1/cyber_campaign_worlds' +
                         '?select=campaign_id' +
-                        '&creator_wp_id=eq.' + cfg.uid,
+                        '&user_wp_id=eq.' + cfg.uid,
                         { headers: h }
                     )
                 ]);
