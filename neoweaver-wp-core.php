@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: NeoWeaver WP Core
- * Description: Core logic for NeoWeaver game (Agents, Nodes, Deployments).
+ * Plugin Name: NeoWeaver
+ * Description: Core logic for NeoWeaver game
  * Version:     0.7.4
  * Author:      Monika Czaplicka
  * Text Domain: neoweaver
@@ -12,36 +12,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Primary constants (NEOWEAVER_* namespace)
-define( 'NEOWEAVER_VERSION',     '0.7.4' );
+define( 'NEOWEAVER_VERSION', '0.7.4' );
 define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
-define( 'NEOWEAVER_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
-define( 'NEOWEAVER_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
+define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 // Legacy aliases (NW_* namespace) for backward compatibility
-define( 'NW_VERSION',     NEOWEAVER_VERSION );
+define( 'NW_VERSION', NEOWEAVER_VERSION );
 define( 'NW_PLUGIN_FILE', NEOWEAVER_PLUGIN_FILE );
-define( 'NW_PLUGIN_DIR',  NEOWEAVER_PLUGIN_DIR );
+define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
 define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );
-define( 'NW_PLUGIN_URL',  NEOWEAVER_PLUGIN_URL );
+define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 
 final class NeoWeaver_Core {
 
 	public static function init(): void {
 		self::load_files();
 
-		add_action( 'plugins_loaded',      [ __CLASS__, 'load_admin_files'       ] );
-		add_action( 'plugins_loaded',      [ __CLASS__, 'register_page_templates' ] );
-		add_action( 'plugins_loaded',      [ __CLASS__, 'bootstrap_game_classes'  ] );
+		add_action( 'plugins_loaded', [ __CLASS__, 'load_admin_files' ] );
+		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
+		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
+
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'register_admin_globals' ] );
-		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_public_assets'   ] );
-		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_adventure_assets' ] );
-		add_action( 'wp_enqueue_scripts',  [ __CLASS__, 'enqueue_agents_list_assets' ] );
-		add_action( 'wp_footer',           [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
+
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_agents_list_assets' ] );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_character_profile_assets' ] );
+
+		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
 
 	// ── File loading ──────────────────────────────────────────────────────
 
-		private static function load_files(): void {
+	private static function load_files(): void {
 		$files = [
 			// includes
 			'includes/trait-transient-cache.php',
@@ -78,12 +82,12 @@ final class NeoWeaver_Core {
 			'includes/ajax/update-vehicle-module.php',
 
 			// includes/classes
-		'includes/classes/class-supabase.php',
-		'includes/classes/class-loader.php',
-		'includes/classes/class-agents-repository.php',
-		'includes/classes/class-agents-list.php',
-		'includes/classes/class-deployments-creator.php',
-		'includes/classes/class-nodes-creator.php',
+			'includes/classes/class-supabase.php',
+			'includes/classes/class-loader.php',
+			'includes/classes/class-agents-repository.php',
+			'includes/classes/class-agents-list.php',
+			'includes/classes/class-deployments-creator.php',
+			'includes/classes/class-nodes-creator.php',
 
 			// public
 			'public/class-public.php',
@@ -137,32 +141,23 @@ final class NeoWeaver_Core {
 	 * Classes must NOT have their own add_action('plugins_loaded') at the bottom.
 	 */
 	public static function load_admin_files(): void {
-    if ( ! is_admin() ) {
-        return;
-    }
+		if ( ! is_admin() ) {
+			return;
+		}
 
-    // 1. Root menu — musi być pierwszy
-    $root = NW_PLUGIN_DIR . 'admin/admin.php';
-    if ( file_exists( $root ) ) {
-        require_once $root;
-    }
+		$root = NW_PLUGIN_DIR . 'admin/admin.php';
+		if ( file_exists( $root ) ) {
+			require_once $root;
+		}
 
-    // 2. Bootstrap wszystkich klas subpage
-    $bootstrap = NW_PLUGIN_DIR . 'admin/class-admin.php';
-    if ( file_exists( $bootstrap ) ) {
-        require_once $bootstrap;
-    }
-}
-	
+		$bootstrap = NW_PLUGIN_DIR . 'admin/class-admin.php';
+		if ( file_exists( $bootstrap ) ) {
+			require_once $bootstrap;
+		}
+	}
 
 	// ── Global asset registration ─────────────────────────────────────────
 
-	/**
-	 * Register shared admin assets so individual admin classes can declare
-	 * them as dependencies without worrying about double-loading.
-	 * wp_register_* does NOT output anything — assets are only loaded
-	 * when a class calls wp_enqueue_* with these handles as dependencies.
-	 */
 	public static function register_admin_globals(): void {
 		wp_register_style(
 			'nw-font-chakra-petch',
@@ -183,8 +178,8 @@ final class NeoWeaver_Core {
 	// ── Page templates ────────────────────────────────────────────────────
 
 	public static function register_page_templates(): void {
-		add_filter( 'theme_page_templates', [ __CLASS__, 'filter_page_templates'  ] );
-		add_filter( 'template_include',     [ __CLASS__, 'include_plugin_template' ] );
+		add_filter( 'theme_page_templates', [ __CLASS__, 'filter_page_templates' ] );
+		add_filter( 'template_include', [ __CLASS__, 'include_plugin_template' ] );
 	}
 
 	public static function filter_page_templates( array $templates ): array {
@@ -197,46 +192,20 @@ final class NeoWeaver_Core {
 		if ( ! is_page() ) {
 			return $template;
 		}
+
 		$slug = get_page_template_slug( get_queried_object_id() );
 		$map  = [
 			'templates/public-character-profile.php' => NEOWEAVER_PLUGIN_DIR . 'templates/public-character-profile.php',
 			'templates/adventure.php'                => NEOWEAVER_PLUGIN_DIR . 'templates/adventure.php',
 		];
+
 		if ( isset( $map[ $slug ] ) && file_exists( $map[ $slug ] ) ) {
 			return $map[ $slug ];
 		}
+
 		return $template;
 	}
 
-	function neoweaver_enqueue_public_character_profile_assets(): void {
-	if ( ! is_page_template( 'templates/public-character-profile.php' ) ) {
-		return;
-	}
-
-	wp_register_style(
-		'neo-public-character-profile',
-		NEOWEAVER_PLUGIN_URL . 'assets/css/public/public-character-profile.css',
-		array(),
-		NEOWEAVER_VERSION
-	);
-
-	wp_register_script(
-		'chart-js',
-		'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
-		array(),
-		'4.5.1',
-		true
-	);
-
-	wp_register_script(
-		'neo-public-character-profile',
-		NEOWEAVER_PLUGIN_URL . 'assets/js/public/public-character-profile.js',
-		array( 'chart-js' ),
-		NEOWEAVER_VERSION,
-		true
-	);
-}
-add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_assets' );
 	// ── Game class bootstrap ──────────────────────────────────────────────
 
 	public static function bootstrap_game_classes(): void {
@@ -244,13 +213,13 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 		$list                = new Neoweaver_Agents_List( $repo );
 		$deployments_creator = new Neoweaver_Deployments_Creator();
 		$nodes_creator       = new Neoweaver_Nodes_Creator();
+
 		new Neoweaver_Public( $list, $deployments_creator, $nodes_creator );
 	}
 
 	// ── Frontend assets ───────────────────────────────────────────────────
 
 	public static function enqueue_public_assets(): void {
-		// Lucide — single version, jsdelivr (same CDN as admin)
 		wp_enqueue_script(
 			'nw-lucide-public',
 			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
@@ -259,37 +228,64 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 			true
 		);
 
-		wp_enqueue_style( 'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/public/public.css', [], NEOWEAVER_VERSION );
+		wp_enqueue_style(
+			'neoweaver-public',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/public.css',
+			[],
+			NEOWEAVER_VERSION
+		);
 
-		wp_enqueue_script( 'neoweaver-public',
+		wp_enqueue_script(
+			'neoweaver-public',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/public.js',
-			[ 'jquery', 'nw-lucide-public' ], NEOWEAVER_VERSION, true );
+			[ 'jquery', 'nw-lucide-public' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
-		wp_enqueue_style( 'neoweaver-buffer',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/public/buffer.css', [], NEOWEAVER_VERSION );
+		wp_enqueue_style(
+			'neoweaver-buffer',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/buffer.css',
+			[],
+			NEOWEAVER_VERSION
+		);
 
-		wp_enqueue_script( 'neoweaver-buffer',
+		wp_enqueue_script(
+			'neoweaver-buffer',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/buffer.js',
-			[ 'jquery' ], NEOWEAVER_VERSION, true );
+			[ 'jquery' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
-		wp_localize_script( 'neoweaver-buffer', 'nwApiData', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonces'  => [
-				'use_card'  => wp_create_nonce( 'use_card_nonce' ),
-				'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
-				'foundry'   => wp_create_nonce( 'foundry_nonce' ),
-			],
-		] );
+		wp_localize_script(
+			'neoweaver-buffer',
+			'nwApiData',
+			[
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonces'  => [
+					'use_card'  => wp_create_nonce( 'use_card_nonce' ),
+					'deck_sync' => wp_create_nonce( 'cyber_deck_nonce' ),
+					'foundry'   => wp_create_nonce( 'foundry_nonce' ),
+				],
+			]
+		);
 
-		wp_enqueue_script( 'nw-list-worlds',
+		wp_enqueue_script(
+			'nw-list-worlds',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/list-worlds.js',
-			[ 'jquery' ], NEOWEAVER_VERSION, true );
+			[ 'jquery' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 
-		// Chart.js — register only, enqueue on demand (e.g. adventure page)
-		wp_register_script( 'chartjs',
-			'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-			[], '4.4.0', true );
+		wp_register_script(
+			'chartjs',
+			'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+			[],
+			'4.5.1',
+			true
+		);
 	}
 
 	public static function enqueue_adventure_assets(): void {
@@ -303,37 +299,36 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 		$css_dir = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/';
 
 		$styles = [
-			'neoweaver-tw-core'      => [ 'core.css',                [],                        '1.0.0' ],
-			'neoweaver-tw-chat'      => [ 'chat.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
-			'neoweaver-tw-deck'      => [ 'deck.css',                [ 'neoweaver-tw-core' ],   '1.0.0' ],
-			'neoweaver-terminal'     => [ 'neoweaver-terminal.css',     [],                        NEOWEAVER_VERSION ],
-			'neoweaver-interference' => [ 'neoweaver-interference.css', [],                        NEOWEAVER_VERSION ],
-			'world-news'             => [ 'world-news.css',             [],                        NEOWEAVER_VERSION ],
+			'neoweaver-tw-core'      => [ 'core.css', [], '1.0.0' ],
+			'neoweaver-tw-chat'      => [ 'chat.css', [ 'neoweaver-tw-core' ], '1.0.0' ],
+			'neoweaver-tw-deck'      => [ 'deck.css', [ 'neoweaver-tw-core' ], '1.0.0' ],
+			'neoweaver-terminal'     => [ 'neoweaver-terminal.css', [], NEOWEAVER_VERSION ],
+			'neoweaver-interference' => [ 'neoweaver-interference.css', [], NEOWEAVER_VERSION ],
+			'world-news'             => [ 'world-news.css', [], NEOWEAVER_VERSION ],
 		];
 
 		foreach ( $styles as $handle => [ $file, $deps, $ver ] ) {
 			wp_enqueue_style( $handle, $css_url . $file, $deps, $ver );
 		}
 
-		// Char panel — use filemtime for reliable cache-busting in development
 		$char_panel_file = $css_dir . 'char-panel.css';
 		wp_enqueue_style(
 			'neoweaver-char-panel',
 			$css_url . 'char-panel.css',
-			[ 'neoweaver-tw-core' ],  // <-- było 'neoweaver-core'
+			[ 'neoweaver-tw-core' ],
 			file_exists( $char_panel_file ) ? (string) filemtime( $char_panel_file ) : NEOWEAVER_VERSION
 		);
 
 		$js_url = NEOWEAVER_PLUGIN_URL;
 		$scripts = [
-			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js',    [],           '1.0.0'          ],
-			'neoweaver-interference' => [ 'assets/js/public/neoweave-interference.js',  [ 'jquery' ], NEOWEAVER_VERSION ],
-			'world-news'             => [ 'assets/js/public/world-news.js',             [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js',      [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-services'            => [ 'assets/js/public/services.js',        [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-time-wheel'          => [ 'assets/js/public/time-wheel.js',   [ 'jquery' ], NEOWEAVER_VERSION ],
-			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js',  [],           '1.0.0'          ],
+			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js', [], '1.0.0' ],
+			'neoweaver-interference' => [ 'assets/js/public/neoweave-interference.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'world-news'             => [ 'assets/js/public/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'nw-time-wheel'          => [ 'assets/js/public/time-wheel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [], '1.0.0' ],
 		];
 
 		foreach ( $scripts as $handle => [ $file, $deps, $ver ] ) {
@@ -341,11 +336,15 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 		}
 
 		$uploads = wp_upload_dir();
-		wp_localize_script( 'neoweaver-header-node', 'twNeoWeaverData', [
-			'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
-			'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-			'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
-		] );
+		wp_localize_script(
+			'neoweaver-header-node',
+			'twNeoWeaverData',
+			[
+				'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
+				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
+				'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
+			]
+		);
 	}
 
 	public static function enqueue_agents_list_assets(): void {
@@ -353,17 +352,52 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 			return;
 		}
 
-		wp_enqueue_style( 'neoweaver-agents-list',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/public/agents-list.css', [], NEOWEAVER_VERSION );
+		wp_enqueue_style(
+			'neoweaver-agents-list',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/agents-list.css',
+			[],
+			NEOWEAVER_VERSION
+		);
 
-		wp_enqueue_script( 'neoweaver-agents-list',
+		wp_enqueue_script(
+			'neoweaver-agents-list',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/agents-list.js',
-			[], NEOWEAVER_VERSION, true );
+			[],
+			NEOWEAVER_VERSION,
+			true
+		);
 
-		wp_localize_script( 'neoweaver-agents-list', 'twCharData', [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
-		] );
+		wp_localize_script(
+			'neoweaver-agents-list',
+			'twCharData',
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'tw_char_nonce' ),
+			]
+		);
+	}
+
+	public static function enqueue_public_character_profile_assets(): void {
+		if ( ! is_page_template( 'templates/public-character-profile.php' ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'neo-public-character-profile',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/public-character-profile.css',
+			[],
+			NEOWEAVER_VERSION
+		);
+
+		wp_enqueue_script( 'chartjs' );
+
+		wp_enqueue_script(
+			'neo-public-character-profile',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/public-character-profile.js',
+			[ 'chartjs' ],
+			NEOWEAVER_VERSION,
+			true
+		);
 	}
 
 	// ── Supabase frontend bootstrap ───────────────────────────────────────
@@ -372,17 +406,20 @@ add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_as
 		if ( ! is_user_logged_in() || ! is_page_template( 'templates/adventure.php' ) ) {
 			return;
 		}
+
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return;
 		}
+
 		$url = tw_supabase_url();
 		$key = tw_supabase_anon_key();
+
 		if ( ! $url || ! $key ) {
 			return;
 		}
 		?>
 		<script>
-		if ( ! window.twSupabase && window.supabase ) {
+		if (!window.twSupabase && window.supabase) {
 			window.twSupabase = window.supabase.createClient(
 				<?php echo wp_json_encode( $url ); ?>,
 				<?php echo wp_json_encode( $key ); ?>
