@@ -8,37 +8,35 @@
 add_action( 'wp_enqueue_scripts', 'tw_list_worlds_enqueue_assets' );
 
 function tw_list_worlds_enqueue_assets() {
-    if ( is_admin() ) {
-        return;
-    }
+	if ( is_admin() ) {
+		return;
+	}
 
-    // Ładuj tylko gdy shortcode jest na stronie
-    if ( is_singular() ) {
-        global $post;
-        if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
-            return;
-        }
-    }
+	if ( is_singular() ) {
+		global $post;
+		if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
+			return;
+		}
+	}
 
-    // __FILE__ jest w /public/shortcodes/ więc dwa poziomy w górę = root pluginu
-    $plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' )
-        ? NEOWEAVER_PLUGIN_URL
-        : plugin_dir_url( dirname( __FILE__, 2 ) );
+	$plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' )
+		? NEOWEAVER_PLUGIN_URL
+		: plugin_dir_url( dirname( __FILE__, 2 ) );
 
-    wp_enqueue_style(
-        'tw-list-worlds',
-        $plugin_url . 'assets/css/public/list-worlds.css',
-        [],
-        '1.0.1'
-    );
+	wp_enqueue_style(
+		'tw-list-worlds',
+		$plugin_url . 'assets/css/public/list-worlds.css',
+		[],
+		'1.0.1'
+	);
 
-    wp_enqueue_script(
-        'tw-list-worlds',
-        $plugin_url . 'assets/js/public/list-worlds.js',
-        [ 'jquery' ],
-        '1.0.1',
-        true
-    );
+	wp_enqueue_script(
+		'tw-list-worlds',
+		$plugin_url . 'assets/js/public/list-worlds.js',
+		[ 'jquery' ],
+		'1.0.1',
+		true
+	);
 }
 
 /**
@@ -113,7 +111,7 @@ function tw_list_worlds_v14() {
 		[
 			'wp_user_id' => 'eq.' . $user_id,
 			'select'     => '*,cyber_campaign_worlds(campaign_id, cyber_campaign(name))',
-			'order' => 'created_at.desc',
+			'order'      => 'created_at.desc',
 		]
 	);
 
@@ -142,32 +140,38 @@ function tw_list_worlds_v14() {
 				$campaign_ids[] = (string) $cd['campaign_id'];
 			}
 		}
+
 		$campaign_ids = array_values( array_unique( $campaign_ids ) );
 		$world_ids    = array_values( array_unique( $world_ids ) );
-$camp_char_rows = $supa_get(
-    'cyber_campaign_characters',
-    [
-        'campaign_id' => 'in.(' . implode( ',', $campaign_ids ) . ')',
-        'wp_user_id'  => 'eq.' . $user_id,  // ← TAK
-        'select'      => 'campaign_id,character_id,cyber_characters(name)',
-        'order'       => 'id.asc',
-    ]
-);
-	}
-			foreach ( $camp_char_rows as $row ) {
-				if ( empty( $row['campaign_id'] ) ) continue;
-				$cid = (string) $row['campaign_id'];
-				if ( isset( $agents_by_campaign[ $cid ] ) ) continue;
 
-				$char_id   = ! empty( $row['character_id'] ) ? (string) $row['character_id'] : '';
-				$char_name = null;
-				if ( isset( $row['cyber_characters'] ) && is_array( $row['cyber_characters'] ) ) {
-					$char_name = $row['cyber_characters']['name'] ?? null;
-				}
-				$agents_by_campaign[ $cid ] = [ 'character_id' => $char_id, 'char_name' => $char_name ];
-			}
+		// ── Agenci przypisani do kampanii ────────────────────────────────────
+		$camp_char_rows = [];
+		if ( ! empty( $campaign_ids ) ) {
+			$camp_char_rows = $supa_get(
+				'cyber_campaign_characters',
+				[
+					'campaign_id' => 'in.(' . implode( ',', $campaign_ids ) . ')',
+					'wp_user_id'  => 'eq.' . $user_id,
+					'select'      => 'campaign_id,character_id,cyber_characters(name)',
+					'order'       => 'id.asc',
+				]
+			);
 		}
 
+		foreach ( $camp_char_rows as $row ) {
+			if ( empty( $row['campaign_id'] ) ) continue;
+			$cid = (string) $row['campaign_id'];
+			if ( isset( $agents_by_campaign[ $cid ] ) ) continue;
+
+			$char_id   = ! empty( $row['character_id'] ) ? (string) $row['character_id'] : '';
+			$char_name = null;
+			if ( isset( $row['cyber_characters'] ) && is_array( $row['cyber_characters'] ) ) {
+				$char_name = $row['cyber_characters']['name'] ?? null;
+			}
+			$agents_by_campaign[ $cid ] = [ 'character_id' => $char_id, 'char_name' => $char_name ];
+		}
+
+		// ── Sesje gry dla światów ────────────────────────────────────────────
 		if ( ! empty( $world_ids ) ) {
 			$session_rows = $supa_get(
 				'cyber_game_sessions',
@@ -190,6 +194,7 @@ $camp_char_rows = $supa_get(
 			}
 		}
 
+		// ── Dociągnij brakujące nazwy postaci ───────────────────────────────
 		$char_ids_needed = [];
 		foreach ( $agents_by_campaign as $agent ) {
 			if ( ! empty( $agent['character_id'] ) && null === $agent['char_name'] ) {
@@ -204,13 +209,20 @@ $camp_char_rows = $supa_get(
 		$char_ids_needed = array_values( array_unique( $char_ids_needed ) );
 
 		if ( ! empty( $char_ids_needed ) ) {
-			$char_rows = $supa_get( 'cyber_characters', [ 'id' => 'in.(' . implode( ',', $char_ids_needed ) . ')', 'select' => 'id,name' ] );
+			$char_rows = $supa_get(
+				'cyber_characters',
+				[
+					'id'     => 'in.(' . implode( ',', $char_ids_needed ) . ')',
+					'select' => 'id,name',
+				]
+			);
 			foreach ( $char_rows as $row ) {
 				if ( empty( $row['id'] ) ) continue;
 				$char_names[ (string) $row['id'] ] = $row['name'];
 			}
 		}
-	}
+
+	} // endif ! $no_data
 
 	ob_start();
 	?>
@@ -296,11 +308,11 @@ $camp_char_rows = $supa_get(
 						'diff'         => (int) $w['difficulty'],
 						'gods'         => $w['gods']     ?? 'Unknown / None',
 						'relations'    => $w['relations'] ?? 'No data on world conflict.',
-						'tag1'         => $w['global_tag_1']       ?? '',
-						'tag2'         => $w['global_tag_2']       ?? '',
-						'tag3'         => $w['global_tag_3']       ?? '',
-						'conf_title'   => $w['conflict_title']     ?? '',
-						'conf_summary' => $w['conflict_summary']   ?? '',
+						'tag1'         => $w['global_tag_1']         ?? '',
+						'tag2'         => $w['global_tag_2']         ?? '',
+						'tag3'         => $w['global_tag_3']         ?? '',
+						'conf_title'   => $w['conflict_title']       ?? '',
+						'conf_summary' => $w['conflict_summary']     ?? '',
 						'conf_side_1'  => $w['conflict_race_1_name'] ?? '',
 						'conf_side_2'  => $w['conflict_race_2_name'] ?? '',
 					];
