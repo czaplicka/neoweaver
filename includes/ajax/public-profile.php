@@ -1,47 +1,70 @@
 <?php
 // ==========================================
-// 4. AJAX – PUBLICZNY PROFIL POSTACI
+// AJAX – PUBLICZNY PROFIL POSTACI
 // ==========================================
 
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 add_action( 'wp_ajax_tw_toggle_char_public', 'tw_handle_toggle_char_public' );
 
 if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
-    function tw_handle_toggle_char_public() {
-        check_ajax_referer( 'tw_char_nonce', 'nonce' );
+	function tw_handle_toggle_char_public(): void {
+		check_ajax_referer( 'tw_char_nonce', 'nonce' );
 
-        // BUG-FIX: char_id is a UUID — intval() collapses it to 0, causing the
-        // PATCH to match no rows. Sanitize with UUID-safe stripping instead.
-        $char_id    = isset( $_POST['char_id'] )
-            ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['char_id'] )
-            : '';
-        $is_public  = filter_var( $_POST['is_public'] ?? false, FILTER_VALIDATE_BOOLEAN );
-        $wp_user_id = get_current_user_id();
+		$char_id_raw = isset( $_POST['char_id'] ) ? wp_unslash( $_POST['char_id'] ) : '';
+		$char_id     = sanitize_text_field( $char_id_raw );
+		$is_public   = isset( $_POST['is_public'] )
+			? filter_var( wp_unslash( $_POST['is_public'] ), FILTER_VALIDATE_BOOLEAN )
+			: false;
+		$wp_user_id  = get_current_user_id();
 
-        if ( empty( $char_id ) || ! $wp_user_id ) {
-            wp_send_json_error( 'Unauthorized' );
-            return;
-        }
+		if ( ! $wp_user_id ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Unauthorized',
+				),
+				401
+			);
+		}
 
-        // Używamy centralnego helpera request
-        $result = tw_supabase_request(
-            'PATCH',
-            'cyber_characters',
-            [
-                'id'         => 'eq.' . $char_id,
-                'wp_user_id' => 'eq.' . $wp_user_id,
-            ],
-            [ 'is_public' => $is_public ]
-        );
+		if ( empty( $char_id ) || ! wp_is_uuid( $char_id ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Invalid character ID',
+				),
+				400
+			);
+		}
 
-        if ( ! $result['ok'] ) {
-            wp_send_json_error( 'Database Error' );
-            return;
-        }
+		$result = tw_supabase_request(
+			'PATCH',
+			'cyber_characters',
+			array(
+				'id'         => 'eq.' . $char_id,
+				'wp_user_id' => 'eq.' . $wp_user_id,
+			),
+			array(
+				'is_public' => $is_public,
+			)
+		);
 
-        wp_send_json_success();
-    }
+		if ( empty( $result['ok'] ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Database Error',
+					'result'  => $result,
+				),
+				500
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'char_id'   => $char_id,
+				'is_public' => $is_public,
+			)
+		);
+	}
 }
