@@ -22,13 +22,11 @@ add_action( 'wp_enqueue_scripts', 'tw_connect_campaign_world_enqueue_assets' );
 
 /**
  * SHORTCODE: [tw_connect_campaign_world]
- * Version: v18 — campaign ↔ world link only, no agent assignment
+ * Version: v19 — added #connector alias anchor + NEW DEPLOYMENT button
  *
- * CHANGES vs v17:
- * 1. Removed agent/character selection entirely
- * 2. Payload to cyber_campaign_worlds: campaign_id, world_id,user_wp_id only
- * 3. CSS and JS moved to external files via enqueue
- * 4. Config passed to JS via wp_localize_script
+ * CHANGES vs v18:
+ * 1. Added id="connector" span above root so list-worlds #connector scroll works
+ * 2. Added NEW DEPLOYMENT button in sidebar
  */
 function tw_connect_campaign_world_final() {
     if ( ! is_user_logged_in() ) {
@@ -45,6 +43,7 @@ function tw_connect_campaign_world_final() {
     ] );
 
     ob_start(); ?>
+    <span id="connector" style="display:block; height:0; overflow:hidden;" aria-hidden="true"></span>
     <div id="tw-deployment-root" class="tw-deployment-main-container">
 
         <audio id="tw-glitch-sound"
@@ -128,6 +127,13 @@ function tw_connect_campaign_world_final() {
                     <h4><i class="dashicons dashicons-admin-users"></i> AGENT BINDING</h4>
                     <p>You can assign a <strong>Field Agent</strong> to this Deployment later from the
                        Deployment management panel via <code>cyber_campaign_characters</code>.</p>
+                </div>
+                <div class="tw-sidebar-card" style="margin-top:16px;">
+                    <h4><i class="dashicons dashicons-plus-alt"></i> NEW DEPLOYMENT</h4>
+                    <p>No deployment yet? Initialize a new mission thread first.</p>
+                    <a href="/new-deployment/" class="tw-btn-deploy" style="display:inline-block; margin-top:10px; text-align:center; text-decoration:none; font-size:0.75rem; padding:10px 20px;">
+                        + NEW DEPLOYMENT
+                    </a>
                 </div>
             </aside>
         </div>
