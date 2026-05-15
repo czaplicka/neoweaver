@@ -1,6 +1,6 @@
 /* NeoWeaver — Deployment UI (campaign ↔ world)
  * Font: Chakra Petch | Accent: #adff00
- * v18: agent panel removed
+ * v19: sidebar padding reduced, btn-deploy as <a> fix
  */
 
 .tw-deployment-main-container *,
@@ -171,28 +171,36 @@
     padding: 8px;
 }
 
-/* ── Deploy button ── */
-.tw-btn-deploy {
+/* ── Deploy button (button + a) ── */
+.tw-btn-deploy,
+a.tw-btn-deploy {
+    display: block;
     width: 100%;
-    padding: 20px;
+    padding: 14px 20px;
     background: #adff00;
-    color: #000;
+    color: #000 !important;
     border: none;
     font-weight: 900;
-    font-size: 1rem;
+    font-size: 0.85rem;
     cursor: pointer;
     clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%);
     transition: 0.3s;
     letter-spacing: 2px;
     font-family: 'Chakra Petch', sans-serif;
+    text-decoration: none !important;
+    text-align: center;
+    line-height: 1.2;
+    box-sizing: border-box;
 }
-.tw-btn-deploy:hover:not(:disabled) {
+.tw-btn-deploy:hover:not(:disabled),
+a.tw-btn-deploy:hover {
     background: #fff;
+    color: #000 !important;
     transform: translateY(-2px);
 }
 .tw-btn-deploy:disabled {
     background: #1a1a1a;
-    color: #333;
+    color: #333 !important;
     cursor: not-allowed;
 }
 
@@ -200,22 +208,23 @@
 .tw-sidebar-card {
     background: #0a0a0a;
     border: 1px solid #1a1a1a;
-    padding: 25px;
+    padding: 14px 16px;
     border-radius: 2px;
 }
 .tw-sidebar-card + .tw-sidebar-card {
-    margin-top: 16px;
+    margin-top: 10px;
 }
 .tw-sidebar-card h4 {
     color: #adff00;
-    margin-top: 0;
-    font-size: 0.9rem;
+    margin: 0 0 6px 0;
+    font-size: 0.8rem;
     letter-spacing: 1px;
 }
 .tw-sidebar-card p {
     color: #666;
-    font-size: 0.85rem;
-    line-height: 1.6;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin: 0 0 8px 0;
 }
 
 /* ── Glitch shake on success ── */
