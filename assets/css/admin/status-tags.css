@@ -1,4 +1,9 @@
-/* assets/css/admin/status-tags.css */
+/* ============================================================
+   NeoWeaver Admin — STATUS TAGS
+   Module-specific overrides for WP List Tables
+   ============================================================ */
+
+/* ---- Layout & Toolbar ---- */
 .nw-status-tags-admin .nw-subtitle {
 	margin: 6px 0 18px;
 	color: #666;
@@ -8,47 +13,47 @@
 	margin: 0 0 16px;
 }
 
+/* ---- Card Container (Unique light-theme variant) ---- */
 .nw-status-tags-admin .nw-card {
-	background: #fff;
-	border: 1px solid #dcdcde;
+	background: #141414; /* Zmieniono na ciemny, by pasował do reszty */
+	border: 1px solid #2a2a2a;
 	border-radius: 12px;
 	padding: 20px;
 	margin: 16px 0 24px;
-	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	box-shadow: 0 4px 12px rgba(0,0,0,.2);
 }
 
-.nw-status-tags-admin h1,
-.nw-status-tags-admin h2,
-.nw-status-tags-admin,
-.nw-status-tags-admin input,
-.nw-status-tags-admin textarea,
-.nw-status-tags-admin select,
-.nw-status-tags-admin button {
-	font-family: "Chakra Petch", sans-serif;
-}
-
+/* ---- Table Adjustments ---- */
 .nw-status-tags-admin .form-table th {
 	width: 180px;
-}
-
-.nw-status-tags-admin input[type="color"] {
-	width: 64px;
-	height: 40px;
-	padding: 2px;
-	border: 1px solid #c3c4c7;
-	border-radius: 8px;
-	background: #fff;
+	color: #aaa;
+	font-size: 12px;
+	text-transform: uppercase;
 }
 
 .nw-status-tags-admin .wp-list-table td,
 .nw-status-tags-admin .wp-list-table th {
 	vertical-align: middle;
+	border-color: #1d1d1d;
 }
 
+/* ---- Specialized Inputs ---- */
+.nw-status-tags-admin input[type="color"] {
+	width: 64px;
+	height: 40px;
+	padding: 2px;
+	border: 1px solid #2a2a2a;
+	border-radius: 8px;
+	background: #0d0d0d;
+	cursor: pointer;
+}
+
+/* ---- Actions ---- */
 .nw-status-tags-admin .button-link-delete {
-	color: #b32d2e;
+	color: #ff4444; /* Dostosowano do palety NeoWeaver */
+	text-decoration: none;
 }
 
-.nw-status-tags-admin #nw-notice {
-	border-radius: 10px;
+.nw-status-tags-admin .button-link-delete:hover {
+	color: #ff6666;
 }
