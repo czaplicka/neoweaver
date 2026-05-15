@@ -22,9 +22,9 @@ $total_steps = 1 + $choice_count + 1 + 1;
 
 <div id="tw-creator-wrapper" data-total-steps="<?php echo esc_attr( $total_steps ); ?>">
 
-	<!-- ═══════════════════════════════════════════════════════════════════════
+	<!-- ═══════════════════════════════════════════════════════════════════════════
 	     PROGRESS BAR  — always visible, updated by JS
-	     ═══════════════════════════════════════════════════════════════════════ -->
+	     ═══════════════════════════════════════════════════════════════════════════ -->
 	<div class="tw-progress-bar" aria-label="Node configuration progress">
 		<div class="tw-progress-header">
 			<span class="tw-progress-label">NODE_INIT<span class="tw-blink">_</span></span>
@@ -39,9 +39,14 @@ $total_steps = 1 + $choice_count + 1 + 1;
 		<div class="tw-progress-phase" id="tw-progress-phase">IDENTITY MATRIX</div>
 	</div>
 
-	<!-- ═══════════════════════════════════════════════════════════════════════
+	<!-- ═══════════════════════════════════════════════════════════════════════════
+	     STATUS BAR — always in DOM, displays errors/info on all steps
+	     ═══════════════════════════════════════════════════════════════════════════ -->
+	<div class="tw-world-status" aria-live="polite"></div>
+
+	<!-- ═══════════════════════════════════════════════════════════════════════════
 	     STEP 1 — Name & Description
-	     ═══════════════════════════════════════════════════════════════════════ -->
+	     ═══════════════════════════════════════════════════════════════════════════ -->
 	<div class="tw-step active" data-step="1" data-phase="IDENTITY MATRIX">
 		<h2>// INITIALIZE NODE</h2>
 		<p class="tw-question-text">Define the node identity before deploying.</p>
@@ -65,9 +70,9 @@ $total_steps = 1 + $choice_count + 1 + 1;
 		</div>
 	</div>
 
-	<!-- ═══════════════════════════════════════════════════════════════════════
+	<!-- ═══════════════════════════════════════════════════════════════════════════
 	     STEPS 2–N+1 — Choice steps
-	     ═══════════════════════════════════════════════════════════════════════ -->
+	     ═══════════════════════════════════════════════════════════════════════════ -->
 	<?php
 	$step_num = 1;
 	foreach ( $world_steps as $step_index => $step_def ) :
@@ -115,9 +120,9 @@ $total_steps = 1 + $choice_count + 1 + 1;
 		</div>
 	<?php endforeach; ?>
 
-	<!-- ═══════════════════════════════════════════════════════════════════════
+	<!-- ═══════════════════════════════════════════════════════════════════════════
 	     STEP N+2 — Customize
-	     ═══════════════════════════════════════════════════════════════════════ -->
+	     ═══════════════════════════════════════════════════════════════════════════ -->
 	<?php $customize_step = $step_num + 1; ?>
 	<div class="tw-step" data-step="<?php echo esc_attr( $customize_step ); ?>" data-phase="CUSTOM DIRECTIVES">
 		<h2>// CUSTOM DIRECTIVES</h2>
@@ -135,9 +140,9 @@ $total_steps = 1 + $choice_count + 1 + 1;
 		</div>
 	</div>
 
-	<!-- ═══════════════════════════════════════════════════════════════════════
+	<!-- ═══════════════════════════════════════════════════════════════════════════
 	     STEP N+3 — Summary + Deploy
-	     ═══════════════════════════════════════════════════════════════════════ -->
+	     ═══════════════════════════════════════════════════════════════════════════ -->
 	<?php $summary_step = $customize_step + 1; ?>
 	<div class="tw-step tw-step--summary" data-step="<?php echo esc_attr( $summary_step ); ?>" data-phase="SYSTEM REVIEW">
 
@@ -187,7 +192,6 @@ $total_steps = 1 + $choice_count + 1 + 1;
 			<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-world-submit">&#9658; DEPLOY NODE</button>
 		</div>
 
-		<div class="tw-world-status" aria-live="polite"></div>
 	</div>
 
 </div><!-- /#tw-creator-wrapper -->
