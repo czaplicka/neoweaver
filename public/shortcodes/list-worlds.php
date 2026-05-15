@@ -153,6 +153,7 @@ $camp_char_rows = $supa_get(
         'order'       => 'id.asc',
     ]
 );
+	}
 			foreach ( $camp_char_rows as $row ) {
 				if ( empty( $row['campaign_id'] ) ) continue;
 				$cid = (string) $row['campaign_id'];
