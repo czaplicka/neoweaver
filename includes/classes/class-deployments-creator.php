@@ -10,9 +10,7 @@
  * never outputs HTML, and knows nothing about the multi-step wizard UI.
  * Rendering lives in Neoweaver_Public::shortcode_campaign_creator().
  *
- * ARCHITECTURAL RULES (do not violate):
- *  - Never modify Node Entropy or any Agent Echo tag from here.
- *    All world-state changes must go through the Make.com tag pipeline.
+ * ARCHITECTURAL RULES (do not violate):\n *  - Never modify Node Entropy or any Agent Echo tag from here.\n *    All world-state changes must go through the Make.com tag pipeline.
  *  - Table names are fixed: cyber_campaign, cyber_campaign_worlds,
  *    cyber_campaign_characters. Do not alias or rename them.
  *  - Column names sent to Supabase must exactly match the existing schema
@@ -240,6 +238,9 @@ class Neoweaver_Deployments_Creator {
 	 * The parameter is now typed as string|int and run through sanitize_id()
 	 * before use. Callers in create() are updated accordingly.
 	 *
+	 * BUG-FIX 2: payload key was 'creator_wp_id' but the table column is
+	 * 'wp_user_id'. Changed to match the actual schema.
+	 *
 	 * @param string      $campaign_id    UUID of the newly created campaign.
 	 * @param string|int  $world_id       Supabase primary key (UUID) of cyber_worlds.
 	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
@@ -254,9 +255,9 @@ class Neoweaver_Deployments_Creator {
 		}
 
 		$payload = [
-			'campaign_id'   => $campaign_id,
-			'world_id'      => $safe_world_id,
-			'creator_wp_id' => $creator_wp_id,
+			'campaign_id' => $campaign_id,
+			'world_id'    => $safe_world_id,
+			'wp_user_id'  => $creator_wp_id,
 		];
 
 		$url = $this->table_url( 'cyber_campaign_worlds' );
@@ -279,6 +280,9 @@ class Neoweaver_Deployments_Creator {
 	 * value. The parameter is now typed as string|int and run through
 	 * sanitize_id() before use. Callers in create() are updated accordingly.
 	 *
+	 * BUG-FIX 2: payload key was 'creator_wp_id' but the table column is
+	 * 'wp_user_id'. Changed to match the actual schema.
+	 *
 	 * @param string      $campaign_id    UUID of the newly created campaign.
 	 * @param string|int  $character_id   Supabase primary key (UUID) of cyber_characters.
 	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
@@ -293,9 +297,9 @@ class Neoweaver_Deployments_Creator {
 		}
 
 		$payload = [
-			'campaign_id'   => $campaign_id,
-			'character_id'  => $safe_character_id,
-			'creator_wp_id' => $creator_wp_id,
+			'campaign_id'  => $campaign_id,
+			'character_id' => $safe_character_id,
+			'wp_user_id'   => $creator_wp_id,
 		];
 
 		$url = $this->table_url( 'cyber_campaign_characters' );
