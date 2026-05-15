@@ -720,3 +720,8 @@
 		.tw-option-grid--3 { grid-template-columns: repeat(3, 1fr); }
 		.tw-binding-section { border-left:2px solid #adff00; padding-left:20px; }
 		.tw-binding-label { font-size:.85rem; letter-spacing:2px; margin-bottom:16px; color:#adff00; }
+.neoweaver-screen #tw-campaign-creator-wrapper a.tw-btn-deploy,
+.neoweaver-screen #tw-campaign-creator-wrapper a.tw-btn-nav {
+    color: #000 !important;
+    text-decoration: none !important;
+}
