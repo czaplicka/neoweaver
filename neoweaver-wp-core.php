@@ -208,6 +208,35 @@ final class NeoWeaver_Core {
 		return $template;
 	}
 
+	function neoweaver_enqueue_public_character_profile_assets(): void {
+	if ( ! is_page_template( 'templates/public-character-profile.php' ) ) {
+		return;
+	}
+
+	wp_register_style(
+		'neo-public-character-profile',
+		NEOWEAVER_PLUGIN_URL . 'assets/css/public/public-character-profile.css',
+		array(),
+		NEOWEAVER_VERSION
+	);
+
+	wp_register_script(
+		'chart-js',
+		'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+		array(),
+		'4.5.1',
+		true
+	);
+
+	wp_register_script(
+		'neo-public-character-profile',
+		NEOWEAVER_PLUGIN_URL . 'assets/js/public/public-character-profile.js',
+		array( 'chart-js' ),
+		NEOWEAVER_VERSION,
+		true
+	);
+}
+add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_character_profile_assets' );
 	// ── Game class bootstrap ──────────────────────────────────────────────
 
 	public static function bootstrap_game_classes(): void {
