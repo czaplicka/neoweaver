@@ -32,6 +32,14 @@ class Neoweaver_Agents_List {
             filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/public/agents-list.js' ),
             true  // load in footer
         );
+        wp_localize_script( 'list-campaigns', 'twCampaignData', [
+    'nonce'       => wp_create_nonce( 'neoweaver_game' ),
+    'restNonce'   => wp_create_nonce( 'wp_rest' ),
+    'sessionUrl'  => rest_url( 'neoweaver/v1/session/start' ),
+    'terminalUrl' => home_url( '/terminal/' ),
+    'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
+    'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
+] );
     }
 
     public function render_roster( int $wp_user_id ): string {
