@@ -1,8 +1,8 @@
 jQuery(document).ready(function($) {
 
-            const GLOBAL_NONCE      = '<?php echo esc_js( $game_nonce ); ?>';
-            const REST_NONCE        = '<?php echo esc_js( $rest_nonce ); ?>';
-            const SESSION_START_URL = '<?php echo esc_js( $session_rest_url ); ?>';
+            const GLOBAL_NONCE      = twCampaignData.nonce;
+            const REST_NONCE        = twCampaignData.restNonce;
+            const SESSION_START_URL = twCampaignData.sessionUrl;
 
             function resetBtn(btn, label) {
                 btn.prop('disabled', false).text(label).css('opacity', '1');
@@ -44,11 +44,11 @@ jQuery(document).ready(function($) {
                     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                     .then(response => {
                         if (response.success) {
-                            window.location.href = '<?php echo esc_js( home_url( '/terminal/' ) ); ?>';
+                            window.location.href = twCampaignData.terminalUrl;
                         } else {
                             const data = response.data || {};
                             if (data.message === 'no_character') {
-                                window.location.href = '/agents/?campaign_id=' + campId;
+                                window.location.href = twCampaignData.agentsUrl + campId;
                             } else {
                                 alert('SESSION INIT FAILED: ' + (data.message || 'Unknown interference'));
                                 resetBtn(btn, 'ENTER MATRIX');
@@ -64,14 +64,14 @@ jQuery(document).ready(function($) {
                     if (!currentWpUserId) { alert('SIGNUP FAILED: Cannot detect operator ID.'); resetBtn(btn, 'ENTER MATRIX'); return; }
                     (async () => {
                         try {
-                            if (!characterId) { window.location.href = '/agents/?campaign_id=' + campId; return; }
+                            if (!characterId) { window.location.href = twCampaignData.agentsUrl + campId;; return; }
                             const { data: ex, error: exErr } = await window.twSupabase.from('cyber_campaign_signups').select('id').eq('campaign_id', campId).eq('wp_user_id', currentWpUserId).limit(1);
                             if (exErr) { alert('SIGNUP FAILED: Cannot verify link.'); resetBtn(btn, 'ENTER MATRIX'); return; }
                             if (!ex || !ex.length) {
                                 const { error: sigErr } = await window.twSupabase.from('cyber_campaign_signups').insert({ campaign_id: campId, character_id: characterId, wp_user_id: currentWpUserId });
                                 if (sigErr) { alert('SIGNUP FAILED: ' + (sigErr.message || 'Unknown')); resetBtn(btn, 'ENTER MATRIX'); return; }
                             }
-                            window.location.href = '<?php echo esc_js( home_url( '/lobby/?campaign_id=' ) ); ?>' + campId;
+                            window.location.href = twCampaignData.lobbyUrl  + campId;
                         } catch (err) { alert('SIGNUP FAILED: EXCEPTION'); resetBtn(btn, 'ENTER MATRIX'); }
                     })();
                 }
