@@ -26,7 +26,7 @@ add_action( 'wp_enqueue_scripts', 'tw_connect_campaign_world_enqueue_assets' );
  *
  * CHANGES vs v17:
  * 1. Removed agent/character selection entirely
- * 2. Payload to cyber_campaign_worlds: campaign_id, world_id, creator_wp_id only
+ * 2. Payload to cyber_campaign_worlds: campaign_id, world_id,user_wp_id only
  * 3. CSS and JS moved to external files via enqueue
  * 4. Config passed to JS via wp_localize_script
  */
