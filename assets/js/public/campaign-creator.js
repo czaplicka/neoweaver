@@ -1,5 +1,11 @@
 /**
- * tw-campaign-creator.js  — 8-step Deployment wizard
+ * campaign-creator.js  — 8-step Deployment wizard
+ *
+ * Agent eligibility rule:
+ *   An agent belongs to exactly one world (cyber_characters.world_id).
+ *   They may be in many campaigns, but only within that same world.
+ *   → When a world is selected, show only agents whose world_id matches.
+ *   → If no world is selected yet, show nothing (empty + hint).
  */
 ( function () {
 	'use strict';
@@ -267,6 +273,7 @@
 							row.id, row.name, sub, '🌐',
 							formState.world_id ? formState.world_id.id : null,
 							function ( id, name ) {
+								// Reset agent selection whenever the world changes.
 								formState.world_id     = { id, name };
 								formState.character_id = null;
 								setStatus( '', false );
@@ -274,6 +281,7 @@
 							}
 						) );
 					} );
+					// Show the agent grid empty state until a world is chosen.
 					loadAgents( null );
 				} )
 				.catch( function ( err ) {
@@ -283,58 +291,48 @@
 		}
 
 		// ── loadAgents ────────────────────────────────────────────────────────
-		// An agent may belong to multiple campaigns as long as they share the
-		// same world. We only exclude an agent when they are already assigned
-		// to an *active* campaign that is bound to the *currently selected*
-		// world (worldId). If no world has been selected yet, no filtering is
-		// applied and all non-dead agents are shown.
+		// Rule: an agent belongs to exactly ONE world (cyber_characters.world_id).
+		// They may join many campaigns, but only within that same world.
+		//
+		// Implementation:
+		//   • If worldId is null  → show "select a Node first" hint, no query.
+		//   • If worldId is given → query cyber_characters filtered by
+		//     world_id = worldId AND status != STATUS_DEAD.
+		//     No campaign-join needed: the constraint is on the character row.
 		function loadAgents( worldId ) {
 			const grid = document.getElementById( 'tw-camp-agent-grid' );
 			const hint = document.getElementById( 'tw-agent-hint' );
 			if ( ! grid ) return;
+
+			// No world selected yet — prompt the user.
+			if ( ! worldId ) {
+				grid.innerHTML = '';
+				if ( hint ) {
+					hint.style.display = '';
+					hint.textContent   = '← Select a Node first to see its available agents.';
+				}
+				return;
+			}
+
+			if ( hint ) hint.style.display = 'none';
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
-			if ( hint ) hint.style.display = worldId ? 'none' : '';
 
-			// Resolve IDs of agents already in an active campaign for this world.
-			// When no worldId is given, skip filtering entirely.
-			const takenIdsPromise = worldId
-				? sbGet( 'cyber_campaign_characters', {
-					// Join to cyber_campaign_worlds so we can filter by world_id,
-					// and to cyber_campaign so we can filter by is_active.
-					select : 'character_id,cyber_campaign(is_active,cyber_campaign_worlds(world_id))',
-				} ).then( function ( rows ) {
-					return ( Array.isArray( rows ) ? rows : [] )
-						.filter( function ( r ) {
-							const campaign = r.cyber_campaign;
-							if ( ! campaign || campaign.is_active !== true ) return false;
-							const worlds = campaign.cyber_campaign_worlds;
-							if ( ! Array.isArray( worlds ) ) return false;
-							return worlds.some( function ( w ) { return w.world_id === worldId; } );
-						} )
-						.map( function ( r ) { return r.character_id; } )
-						.filter( Boolean );
-				} )
-				: Promise.resolve( [] );
+			// Fetch only agents whose home world matches the selected Node.
+			const params = {
+				select     : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
+				world_id   : 'eq.' + worldId,   // ← the key filter
+				status     : 'neq.STATUS_DEAD',
+				order      : 'name.asc',
+			};
+			if ( userId ) params.wp_user_id = 'eq.' + userId;
 
-			takenIdsPromise
-				.then( function ( takenIds ) {
-					const params = {
-						select : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
-						status : 'neq.STATUS_DEAD',
-						order  : 'name.asc',
-					};
-					if ( userId ) params.wp_user_id = 'eq.' + userId;
-
-					return sbGet( 'cyber_characters', params ).then( function ( rows ) {
-						return ( Array.isArray( rows ) ? rows : [] ).filter( function ( r ) {
-							return ! takenIds.includes( r.id );
-						} );
-					} );
-				} )
+			sbGet( 'cyber_characters', params )
 				.then( function ( rows ) {
 					grid.innerHTML = '';
 					if ( ! rows || ! rows.length ) {
-						grid.innerHTML = '<p class="tw-error-msg">No eligible agents found. <a href="/new-agent/" class="tw-link">Create one first →</a></p>';
+						grid.innerHTML =
+							'<p class="tw-error-msg">No agents found in this Node. ' +
+							'<a href="/new-agent/" class="tw-link">Create one first →</a></p>';
 						return;
 					}
 					rows.forEach( function ( row ) {
