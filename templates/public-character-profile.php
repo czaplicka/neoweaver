@@ -299,8 +299,8 @@ get_header();
 
 			<div class="loom-container">
 				<div class="loom-header">
-					<span class="loom-label">SOUL ARCHETYPE:</span><br>
-					<span id="archetype-name">CALCULATING...</span>
+					<span class="loom-label">FATE OF LOOM:</span><br>
+					<span id="archetype-name">CALCULATING ARCHETYPE...</span>
 				</div>
 				<div class="chart-wrapper">
 					<canvas id="fateChart"></canvas>
@@ -330,7 +330,7 @@ get_header();
 		<div class="character-panel">
 			<h2>Field Loadout</h2>
 			<?php if ( empty( $inventory ) ) : ?>
-				<p>No visible gear registered.</p>
+				<p>No visible gear registered/equipped.</p>
 			<?php else : ?>
 				<ul class="loadout-list">
 					<?php foreach ( $inventory as $item ) : ?>
