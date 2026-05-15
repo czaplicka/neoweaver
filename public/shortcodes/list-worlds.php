@@ -341,7 +341,7 @@ function tw_list_worlds_v14() {
 										<button class="tw-btn-setup" onclick="event.stopPropagation(); window.location.href='/agents/?world_id=<?php echo esc_attr( $world_id ); ?>&campaign_id=<?php echo esc_attr( $active_campaign_id ); ?>'">ASSIGN FIELD AGENT</button>
 									<?php endif; ?>
 								<?php else : ?>
-									<button class="tw-btn-setup" onclick="event.stopPropagation(); document.getElementById('connector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });">BIND CAMPAIGN</button>
+									<button class="tw-btn-setup" onclick="event.stopPropagation(); document.getElementById('tw-deployment-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });">BIND CAMPAIGN</button>
 								<?php endif; ?>
 								<button class="tw-btn-delete" onclick="event.stopPropagation(); twDeleteWorld('<?php echo esc_attr( $world_id ); ?>');">ERASE WORLD</button>
 							</div>
