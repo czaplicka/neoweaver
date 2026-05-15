@@ -196,18 +196,20 @@
 				formState[ key ] = { value: checked.value, label: labels[ checked.value ] || checked.value };
 				return true;
 			}
-if ( phase === 'NODE & AGENT BINDING' ) {
-    if ( ! formState.world_id ) {
-        showFieldError( step, 'Select a Node (world) to continue.' );
-        return false;
-    }
-    if ( ! formState.character_id ) {
-        showFieldError( step, 'Select an Agent to continue.' );
-        NW_SFX.error();
-        return false;
-    }
-    return true;
-}
+
+			if ( phase === 'NODE & AGENT BINDING' ) {
+				if ( ! formState.world_id ) {
+					showFieldError( step, 'Select a Node (world) to continue.' );
+					return false;
+				}
+				if ( ! formState.character_id ) {
+					showFieldError( step, 'Select an Agent to continue.' );
+					NW_SFX.error();
+					return false;
+				}
+				return true;
+			}
+
 			return true;
 		}
 
@@ -281,8 +283,11 @@ if ( phase === 'NODE & AGENT BINDING' ) {
 		}
 
 		// ── loadAgents ────────────────────────────────────────────────────────
-		// Fetches all non-dead agents of the current user, then excludes those
-		// already assigned to any campaign via cyber_campaign_characters.
+		// An agent may belong to multiple campaigns as long as they share the
+		// same world. We only exclude an agent when they are already assigned
+		// to an *active* campaign that is bound to the *currently selected*
+		// world (worldId). If no world has been selected yet, no filtering is
+		// applied and all non-dead agents are shown.
 		function loadAgents( worldId ) {
 			const grid = document.getElementById( 'tw-camp-agent-grid' );
 			const hint = document.getElementById( 'tw-agent-hint' );
@@ -290,24 +295,37 @@ if ( phase === 'NODE & AGENT BINDING' ) {
 			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 			if ( hint ) hint.style.display = worldId ? 'none' : '';
 
-			// Step 1: IDs of agents already in a campaign
-			sbGet( 'cyber_campaign_characters', { select: 'character_id' } )
-				.then( function ( assigned ) {
-					const takenIds = ( Array.isArray( assigned ) ? assigned : [] )
+			// Resolve IDs of agents already in an active campaign for this world.
+			// When no worldId is given, skip filtering entirely.
+			const takenIdsPromise = worldId
+				? sbGet( 'cyber_campaign_characters', {
+					// Join to cyber_campaign_worlds so we can filter by world_id,
+					// and to cyber_campaign so we can filter by is_active.
+					select : 'character_id,cyber_campaign(is_active,cyber_campaign_worlds(world_id))',
+				} ).then( function ( rows ) {
+					return ( Array.isArray( rows ) ? rows : [] )
+						.filter( function ( r ) {
+							const campaign = r.cyber_campaign;
+							if ( ! campaign || campaign.is_active !== true ) return false;
+							const worlds = campaign.cyber_campaign_worlds;
+							if ( ! Array.isArray( worlds ) ) return false;
+							return worlds.some( function ( w ) { return w.world_id === worldId; } );
+						} )
 						.map( function ( r ) { return r.character_id; } )
 						.filter( Boolean );
+				} )
+				: Promise.resolve( [] );
 
-					// Step 2: all non-dead agents of this user
+			takenIdsPromise
+				.then( function ( takenIds ) {
 					const params = {
 						select : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
 						status : 'neq.STATUS_DEAD',
 						order  : 'name.asc',
 					};
 					if ( userId ) params.wp_user_id = 'eq.' + userId;
-					// NOTE: world_id filter removed — cyber_characters has no direct world_id column.
 
 					return sbGet( 'cyber_characters', params ).then( function ( rows ) {
-						// Step 3: exclude already-assigned agents
 						return ( Array.isArray( rows ) ? rows : [] ).filter( function ( r ) {
 							return ! takenIds.includes( r.id );
 						} );
