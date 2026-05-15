@@ -30,6 +30,31 @@ body.character-profile {
     color: #b4ff7a;
 }
 
+.back-to-agents {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #adff00;
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-family: 'Chakra Petch', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(173, 255, 0, 0.4);
+    border-radius: 999px;
+    padding: 4px 12px;
+    transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.back-to-agents:hover,
+.back-to-agents:focus-visible {
+    color: #000;
+    background: #adff00;
+    border-color: #adff00;
+    box-shadow: 0 0 10px rgba(173, 255, 0, 0.6);
+    outline: none;
+}
+
 .share-btn {
     border-radius: 999px;
     border: 1px solid #adff00;
@@ -37,6 +62,19 @@ body.character-profile {
     color: #adff00;
     padding: 6px 14px;
     cursor: pointer;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.share-btn:hover,
+.share-btn:focus-visible {
+    color: #000;
+    background: #adff00;
+    box-shadow: 0 0 10px rgba(173, 255, 0, 0.6);
+    outline: none;
 }
 
 .character-header {
