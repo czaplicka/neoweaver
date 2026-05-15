@@ -6,14 +6,14 @@ if ( ! function_exists( 'tw_connect_campaign_world_enqueue_assets' ) ) {
         'tw-deployment',
         NEOWEAVER_PLUGIN_URL . 'assets/css/public/deployment.css',
         [],
-        '1.0.0'
+        NEOWEAVER_VERSION
     );
 
     wp_register_script(
         'tw-deployment',
         NEOWEAVER_PLUGIN_URL . 'assets/js/public/deployment.js',
         [],
-        '1.0.0',
+        NEOWEAVER_VERSION,
         true
     );
 }
