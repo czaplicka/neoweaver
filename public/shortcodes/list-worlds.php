@@ -41,10 +41,6 @@ function tw_list_worlds_enqueue_assets() {
     );
 }
 
-// ─── SHORTCODE LOGIKA ─────────────────────────────────────────────────────────
-
-add_shortcode( 'tw_list_worlds', 'tw_list_worlds_v14' );
-
 /**
  * SHORTCODE LOGIKA
  */
@@ -148,18 +144,15 @@ function tw_list_worlds_v14() {
 		}
 		$campaign_ids = array_values( array_unique( $campaign_ids ) );
 		$world_ids    = array_values( array_unique( $world_ids ) );
-
-		if ( ! empty( $campaign_ids ) ) {
-			$camp_char_rows = $supa_get(
-				'cyber_campaign_characters',
-				[
-					'campaign_id'   => 'in.(' . implode( ',', $campaign_ids ) . ')',
-					'creator_wp_id' => 'eq.' . $user_id,
-					'select'        => 'campaign_id,character_id,cyber_characters(name)',
-					'order'         => 'id.asc',
-				]
-			);
-
+$camp_char_rows = $supa_get(
+    'cyber_campaign_characters',
+    [
+        'campaign_id' => 'in.(' . implode( ',', $campaign_ids ) . ')',
+        'wp_user_id'  => 'eq.' . $user_id,  // ← TAK
+        'select'      => 'campaign_id,character_id,cyber_characters(name)',
+        'order'       => 'id.asc',
+    ]
+);
 			foreach ( $camp_char_rows as $row ) {
 				if ( empty( $row['campaign_id'] ) ) continue;
 				$cid = (string) $row['campaign_id'];
