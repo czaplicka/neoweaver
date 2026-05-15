@@ -209,12 +209,14 @@ $display_views = ( isset( $char['view_count'] ) ? (int) $char['view_count'] : 0 
 $inventory     = tw_get_public_character_inventory( $char_id, $supabase_url, $anon_key );
 $profile_url   = add_query_arg( 'char_id', rawurlencode( $char_id ), site_url( '/legend/' ) );
 
-$avatar = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://via.placeholder.com/140x180?text=No+Data';
+$avatar     = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://via.placeholder.com/140x180?text=No+Data';
 $char_name  = isset( $char['name'] ) ? $char['name'] : 'Unknown';
 $class_name = isset( $char['cyber_classes']['name'] ) ? $char['cyber_classes']['name'] : 'Operative';
 $race_name  = isset( $char['cyber_races']['name'] ) ? $char['cyber_races']['name'] : 'Unknown';
 $level      = isset( $char['lvl'] ) ? (int) $char['lvl'] : 1;
 $bio        = ! empty( $char['bio'] ) ? $char['bio'] : 'No records found in the archives.';
+
+$agents_url = site_url( '/agents/' );
 
 $qr_api_url = add_query_arg(
 	array(
@@ -274,10 +276,13 @@ get_header();
 <div class="character-card">
 	<div class="profile-meta-bar">
 		<div class="profile-meta-left">
-			<span>ID: <?php echo esc_html( $char['id'] ); ?></span> |
-			<span>Created: <?php echo esc_html( date_i18n( 'Y-m-d', strtotime( $char['created_at'] ) ) ); ?></span>
+			<a href="<?php echo esc_url( $agents_url ); ?>" class="back-to-agents">
+				&larr; <?php esc_html_e( 'Field Agents', 'neoweaver' ); ?>
+			</a>
 		</div>
 		<div class="profile-meta-right">
+			<span>ID: <?php echo esc_html( $char['id'] ); ?></span> |
+			<span>Created: <?php echo esc_html( date_i18n( 'Y-m-d', strtotime( $char['created_at'] ) ) ); ?></span> |
 			<span>Views: <?php echo esc_html( $display_views ); ?></span>
 			<button class="share-btn" type="button" data-share-url="<?php echo esc_url( $profile_url ); ?>">Share</button>
 		</div>
