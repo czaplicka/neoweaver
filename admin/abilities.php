@@ -51,21 +51,21 @@ class NW_Abilities_Admin {
 			'nw-admin-core',
 			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
 			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
 		);
 
 		wp_enqueue_style(
 			'nw-abilities-style',
 			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
 			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
 		);
 
 		wp_enqueue_script(
 			'nw-abilities-script',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
 			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
 			true
 		);
 
