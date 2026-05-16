@@ -51,8 +51,8 @@ class Neoweaver_Public {
 		$this->nodes_creator       = $nodes_creator;
 
 		add_shortcode( 'tw_list_characters',            [ $this, 'shortcode_list_characters' ] );
-		add_shortcode( 'tw_character_creator', [ $this, 'shortcode_character_creator' ] );
-		add_shortcode( 'tw_campaign_creator',            [ $this, 'shortcode_campaign_creator' ] );
+		add_shortcode( 'tale_weaver_character_creator', [ $this, 'shortcode_character_creator' ] );
+		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
 		add_shortcode( 'tw_active_node',                [ $this, 'shortcode_active_node' ] );
 
