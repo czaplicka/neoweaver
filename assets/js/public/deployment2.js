@@ -1,17 +1,10 @@
     (function() {
         'use strict';
-
         const config = {
-            url: "<?php echo esc_js( $supabase_url ); ?>",
-            key: "<?php echo esc_js( $anon_key ); ?>",
-            uid: <?php echo (int) $user_id; ?>
-        };
-
-        /* ── FIX #14: Auto-scroll when arriving via ?campaign_id= OR #hash ──
-         * The link /agents/?campaign_id=xxx has no hash, so the old check on
-         * window.location.hash never fired. Now we scroll whenever the element
-         * exists AND either a hash OR a campaign_id query param is present.
-         */
+    url: nwAgentsConfig.url,
+    key: nwAgentsConfig.key,
+    uid: nwAgentsConfig.uid
+};
         (function autoScroll() {
             var el = document.getElementById('tw-deployment-root');
             var hasCampaignParam = new URLSearchParams(window.location.search).has('campaign_id');
