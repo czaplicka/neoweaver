@@ -84,7 +84,7 @@ function tw_display_active_scenarios_shortcode(): string {
     $anon_key = tw_supabase_anon_key();
 
     $url = add_query_arg( [
-        'character_id' => 'eq.' . rawrawurlencode( $character_id ),
+        'character_id' => 'eq.' . rawurlencode( $character_id ),
         'select'       => '*,cyber_scenarios(*,cyber_areas(*))',
     ], trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests' );
 
