@@ -56,9 +56,9 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 					<div class="tw-onboarding-slider__header">
 						<p class="tw-onboarding-slider__eyebrow">NEOWEAVE // CRT INIT</p>
-						<h3 class="tw-onboarding-slider__title">Initialize access</h3>
+						<h3 class="tw-onboarding-slider__title">ONBOARDING</h3>
 						<p class="tw-onboarding-slider__desc">
-							Complete the setup sequence to enter the Terminal.
+							Complete the setup sequence to start.
 						</p>
 					</div>
 
@@ -67,7 +67,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
 							<div class="tw-onboarding-slider__body">
 								<strong>Create a Node</strong>
-								<p>Generate the world instance your run will persist in.</p>
+								<p>Generate a world to save</p>
 								<a href="<?php echo esc_url( site_url( '/new-node' ) ); ?>">Open node creator</a>
 							</div>
 						</li>
@@ -76,7 +76,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
 							<div class="tw-onboarding-slider__body">
 								<strong>Create an Agent</strong>
-								<p>Bind your Operator to a Field Agent.</p>
+								<p>Bind your Operator to an Agent</p>
 								<a href="<?php echo esc_url( site_url( '/new-agent' ) ); ?>">Open agent creator</a>
 							</div>
 						</li>
@@ -85,7 +85,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
 							<div class="tw-onboarding-slider__body">
 								<strong>Create a Deployment</strong>
-								<p>Launch your first campaign inside the active Node.</p>
+								<p>Launch campaign inside a Node</p>
 								<a href="<?php echo esc_url( site_url( '/new-deployment' ) ); ?>">Open deployment creator</a>
 							</div>
 						</li>
@@ -93,9 +93,9 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 	<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
 	<div class="tw-onboarding-slider__body">
 		<strong>Enter the Terminal</strong>
-		<p>Launch your session or join an active team terminal.</p>
+		<p>Launch a session | join a team</p>
 		<div class="tw-onboarding-slider__actions">
-			<a href="<?php echo esc_url( site_url( '/terminal/' ) ); ?>">Open terminal</a>
+			<a href="<?php echo esc_url( site_url( '/terminal/' ) ); ?>">Open terminal</a> // 
 			<a href="<?php echo esc_url( site_url( '/join-terminal/' ) ); ?>">Join team</a>
 		</div>
 	</div>
