@@ -299,6 +299,10 @@ final class NeoWeaver_Core {
 			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/onboarding.js' ),
 			true
 		);
+		wp_localize_script( 'tw-onboarding', 'twOnboarding', [
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'tw_user_setting' ),
+			] );
 	}
 
 	public static function enqueue_adventure_assets(): void {
