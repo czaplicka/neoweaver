@@ -133,7 +133,28 @@ final class NeoWeaver_Core {
 			}
 		}
 	}
+add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_assets', 20 );
 
+function neoweaver_enqueue_public_assets() {
+	if ( ! defined( 'NEOWEAVER_PLUGIN_URL' ) || ! defined( 'TW_PLUGIN_VERSION' ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'neoweaver-onboarding',
+		NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
+		[],
+		TW_PLUGIN_VERSION
+	);
+
+	wp_enqueue_script(
+		'neoweaver-onboarding',
+		NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
+		[],
+		TW_PLUGIN_VERSION,
+		true
+	);
+}
 	/**
 	 * Load and instantiate admin classes.
 	 * Files are loaded here (inside plugins_loaded) so Supabase helpers
