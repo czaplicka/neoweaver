@@ -31,11 +31,6 @@ function neoweaver_deployment_register_assets(): void {
 		NEOWEAVER_VERSION,
 		true
 	);
-wp_localize_script( 'nw-agents', 'nwAgentsConfig', [
-    'url' => $supabase_url,
-    'key' => $anon_key,
-    'uid' => (int) $user_id,
-] );
 }
 add_action( 'wp_enqueue_scripts', 'neoweaver_deployment_register_assets' );
 
@@ -70,6 +65,7 @@ function tw_connect_character_campaign_direct_v2(): string {
 			'deploymentsUrl' => home_url( '/deployments/' ),
 		]
 	);
+
 
 	ob_start();
 	?>
