@@ -7,13 +7,9 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 		const SHORTCODE = 'tw_onboarding_slider';
 
-		protected static $should_enqueue = false;
-		protected static $localized_data = [];
-
 		public static function init() {
 			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
 			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'register_assets' ], 5 );
-			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'maybe_enqueue_assets' ], 20 );
 		}
 
 		public static function register_assets() {
@@ -37,28 +33,6 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 			);
 		}
 
-		public static function maybe_enqueue_assets() {
-			if ( ! self::$should_enqueue ) {
-				return;
-			}
-
-			if ( wp_style_is( 'tw-onboarding-slider', 'registered' ) ) {
-				wp_enqueue_style( 'tw-onboarding-slider' );
-			}
-
-			if ( wp_script_is( 'tw-onboarding-slider', 'registered' ) ) {
-				wp_enqueue_script( 'tw-onboarding-slider' );
-
-				if ( ! empty( self::$localized_data ) ) {
-					wp_localize_script(
-						'tw-onboarding-slider',
-						'twOnboardingSlider',
-						self::$localized_data
-					);
-				}
-			}
-		}
-
 		public static function render_shortcode( $atts = [] ) {
 			if ( ! is_user_logged_in() ) {
 				return '';
@@ -75,27 +49,38 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 			$progress = self::get_user_progress( $wp_user_id );
 
-			self::$should_enqueue = true;
-			self::$localized_data = [
-				'steps' => [
-					'world' => [
-						'completed' => ! empty( $progress['world'] ),
-						'url'       => site_url( '/new-node' ),
-					],
-					'character' => [
-						'completed' => ! empty( $progress['character'] ),
-						'url'       => site_url( '/new-agent' ),
-					],
-					'campaign' => [
-						'completed' => ! empty( $progress['campaign'] ),
-						'url'       => site_url( '/new-deployment' ),
-					],
-				],
-				'labels' => [
-					'collapsed' => 'Open onboarding',
-					'expanded'  => 'Collapse onboarding',
-				],
-			];
+			if ( wp_style_is( 'tw-onboarding-slider', 'registered' ) ) {
+				wp_enqueue_style( 'tw-onboarding-slider' );
+			}
+
+			if ( wp_script_is( 'tw-onboarding-slider', 'registered' ) ) {
+				wp_enqueue_script( 'tw-onboarding-slider' );
+
+				wp_localize_script(
+					'tw-onboarding-slider',
+					'twOnboardingSlider',
+					[
+						'steps' => [
+							'world' => [
+								'completed' => ! empty( $progress['world'] ),
+								'url'       => site_url( '/new-node' ),
+							],
+							'character' => [
+								'completed' => ! empty( $progress['character'] ),
+								'url'       => site_url( '/new-agent' ),
+							],
+							'campaign' => [
+								'completed' => ! empty( $progress['campaign'] ),
+								'url'       => site_url( '/new-deployment' ),
+							],
+						],
+						'labels' => [
+							'collapsed' => 'Open onboarding',
+							'expanded'  => 'Collapse onboarding',
+						],
+					]
+				);
+			}
 
 			$all_done = ! empty( $progress['world'] ) && ! empty( $progress['character'] ) && ! empty( $progress['campaign'] );
 
