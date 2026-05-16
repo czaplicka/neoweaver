@@ -41,6 +41,13 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 				aria-label="NeoWeave onboarding"
 			>
 					<aside id="tw-onboarding-slider-panel" class="tw-onboarding-slider__panel">
+			<button
+	type="button"
+	class="tw-onboarding-slider__dismiss"
+	aria-label="Dismiss onboarding panel"
+>
+	<span aria-hidden="true">×</span>
+</button>
 					<div class="tw-onboarding-slider__scanline"></div>
 
 					<div class="tw-onboarding-slider__header">
