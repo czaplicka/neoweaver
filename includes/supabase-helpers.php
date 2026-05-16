@@ -256,3 +256,94 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
         return is_array( $data ) ? $data : [];
     }
 }
+/**
+ * Zapisuje lub aktualizuje preferencję użytkownika w cyber_user_settings.
+ */
+if ( ! function_exists( 'tw_save_user_setting' ) ) {
+	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
+		if ( ! defined('TW_SUPABASE_SERVICE_KEY') ) {
+			error_log('TW: TW_SUPABASE_SERVICE_KEY not defined.');
+			return false;
+		}
+
+		$service_headers = [
+			'headers' => [
+				'apikey'        => TW_SUPABASE_SERVICE_KEY,
+				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				'Content-Type'  => 'application/json',
+				'Prefer'        => 'resolution=merge-duplicates',
+			],
+		];
+
+		$result = tw_supabase_request(
+			'POST',
+			'cyber_user_settings',
+			[],
+			[
+				'wp_user_id' => $wp_user_id,
+				'key'        => $key,
+				'value'      => $value,
+				'updated_at' => gmdate('c'),
+			],
+			$service_headers
+		);
+
+		return $result['ok'] ?? false;
+	}
+}
+
+/**
+ * Pobiera preferencję użytkownika z cyber_user_settings.
+ */
+if ( ! function_exists( 'tw_get_user_setting' ) ) {
+	function tw_get_user_setting( int $wp_user_id, string $key ): ?string {
+		if ( ! defined('TW_SUPABASE_SERVICE_KEY') ) {
+			error_log('TW: TW_SUPABASE_SERVICE_KEY not defined.');
+			return null;
+		}
+
+		$service_headers = [
+			'headers' => [
+				'apikey'        => TW_SUPABASE_SERVICE_KEY,
+				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+			],
+		];
+
+		$rows = tw_supabase_get(
+			'cyber_user_settings',
+			[
+				'wp_user_id' => 'eq.' . $wp_user_id,
+				'key'        => 'eq.' . $key,
+				'select'     => 'value',
+				'limit'      => 1,
+			],
+			$service_headers
+		);
+
+		return $rows[0]['value'] ?? null;
+	}
+}
+add_action('wp_ajax_tw_save_user_setting', 'tw_ajax_save_user_setting');
+
+function tw_ajax_save_user_setting(): void {
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error(['message' => 'Unauthorized'], 401);
+	}
+
+	check_ajax_referer('tw_user_setting', 'nonce');
+
+	$key   = sanitize_key( $_POST['key'] ?? '' );
+	$value = sanitize_text_field( $_POST['value'] ?? '' );
+
+	$allowed_keys = ['onboarding_dismissed'];  // biała lista — rozszerzaj w razie potrzeby
+
+	if ( empty($key) || ! in_array($key, $allowed_keys, true) ) {
+		wp_send_json_error(['message' => 'Invalid key'], 400);
+	}
+
+	$success = tw_save_user_setting( get_current_user_id(), $key, $value );
+
+	$success
+		? wp_send_json_success()
+		: wp_send_json_error(['message' => 'Supabase error'], 500);
+}
