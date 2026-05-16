@@ -10,7 +10,7 @@ if ( ! function_exists( 'tw_supabase_url' ) ) {
         if ( defined( 'TW_SUPABASE_PROJECT_ID' ) ) {
             return 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co';
         }
-        return 'https://kkccgwbywkxlhtvfxekm.supabase.co';
+        return;
     }
 }
 
@@ -19,7 +19,7 @@ if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
         if ( defined( 'TW_SUPABASE_ANON_KEY' ) ) {
             return TW_SUPABASE_ANON_KEY;
         }
-        return 'sb_publishable_13RdJpqcXalg1L6nedytVQ_7MlyKSsY';
+        return;
     }
 }
 
