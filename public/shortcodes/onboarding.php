@@ -26,8 +26,11 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 			}
 
 			$progress = self::get_user_progress( $wp_user_id );
-
-			$all_done = ! empty( $progress['world'] ) && ! empty( $progress['character'] ) && ! empty( $progress['campaign'] );
+			$terminal_done = ! empty( $progress['terminal'] );
+			$all_done = ! empty( $progress['world'] ) 
+	&& ! empty( $progress['character'] ) 
+	&& ! empty( $progress['campaign'] ) 
+	&& ! empty( $progress['terminal'] );
 
 			ob_start();
 			?>
@@ -86,6 +89,17 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 								<a href="<?php echo esc_url( site_url( '/new-deployment' ) ); ?>">Open deployment creator</a>
 							</div>
 						</li>
+			<li class="tw-onboarding-slider__item<?php echo $terminal_done ? ' is-done' : ''; ?>" data-step="terminal">
+	<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
+	<div class="tw-onboarding-slider__body">
+		<strong>Enter the Terminal</strong>
+		<p>Launch your session or join an active team terminal.</p>
+		<div class="tw-onboarding-slider__actions">
+			<a href="<?php echo esc_url( site_url( '/terminal/' ) ); ?>">Open terminal</a>
+			<a href="<?php echo esc_url( site_url( '/join-terminal/' ) ); ?>">Join team</a>
+		</div>
+	</div>
+</li>
 					</ol>
 				</aside>
 			</div>
@@ -107,40 +121,51 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 		}
 
 		protected static function get_user_progress( $wp_user_id ) {
-			$wp_user_id = intval( $wp_user_id );
+	$wp_user_id = intval( $wp_user_id );
 
-			$worlds = tw_supabase_get(
-				'cyber_worlds',
-				[
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				]
-			);
+	$worlds = tw_supabase_get(
+		'cyber_worlds',
+		[
+			'wp_user_id' => 'eq.' . $wp_user_id,
+			'select'     => 'id',
+			'limit'      => 1,
+		]
+	);
 
-			$characters = tw_supabase_get(
-				'cyber_characters',
-				[
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				]
-			);
+	$characters = tw_supabase_get(
+		'cyber_characters',
+		[
+			'wp_user_id' => 'eq.' . $wp_user_id,
+			'select'     => 'id',
+			'limit'      => 1,
+		]
+	);
 
-			$campaigns = tw_supabase_get(
-				'cyber_campaigns',
-				[
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				]
-			);
+	$campaigns = tw_supabase_get(
+		'cyber_campaigns',
+		[
+			'wp_user_id' => 'eq.' . $wp_user_id,
+			'select'     => 'id',
+			'limit'      => 1,
+		]
+	);
 
-			return [
-				'world'     => ! empty( $worlds ),
-				'character' => ! empty( $characters ),
-				'campaign'  => ! empty( $campaigns ),
-			];
+	$terminal_sessions = tw_supabase_get(
+		'cyber_game_sessions',
+		[
+			'wp_user_id' => 'eq.' . $wp_user_id,
+			'select'     => 'id,status,campaign_id,character_id,world_id',
+			'status'     => 'eq.active',
+			'limit'      => 1,
+		]
+	);
+
+	return [
+		'world'     => ! empty( $worlds ),
+		'character' => ! empty( $characters ),
+		'campaign'  => ! empty( $campaigns ),
+		'terminal'  => ! empty( $terminal_sessions ),
+	];
 		}
 	}
 
