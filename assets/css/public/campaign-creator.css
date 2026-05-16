@@ -49,6 +49,7 @@
 	background-size: 100% 3px, 3px 100%;
 	z-index        : 2;
 	pointer-events : none;
+	border-radius: var(--tw-radius-xl);
 }
 
 /* ── Typography ────────────────────────────────────────────────────────────── */
