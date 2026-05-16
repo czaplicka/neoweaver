@@ -62,7 +62,8 @@ Scoped to: #tw-char-creator-wrapper
   padding: 28px;
   box-shadow: var(--tw-shadow);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  overflow-x: clip;
 }
 
 #tw-char-creator-wrapper::before {
