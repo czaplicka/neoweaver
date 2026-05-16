@@ -373,3 +373,30 @@
 		font-size: 19px;
 	}
 }
+#tw-onboarding-slider .tw-onboarding-slider__item.is-done .tw-onboarding-slider__body strong {
+	position: relative;
+	display: inline-block;
+	color: rgba(220, 255, 231, 0.72);
+	opacity: 0.82;
+}
+
+#tw-onboarding-slider .tw-onboarding-slider__item.is-done .tw-onboarding-slider__body strong::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 54%;
+	height: 1px;
+	background: linear-gradient(
+		90deg,
+		rgba(126, 255, 178, 0.05) 0%,
+		rgba(126, 255, 178, 0.65) 18%,
+		rgba(220, 255, 231, 0.9) 50%,
+		rgba(126, 255, 178, 0.65) 82%,
+		rgba(126, 255, 178, 0.05) 100%
+	);
+	box-shadow:
+		0 0 4px rgba(126, 255, 178, 0.18),
+		0 0 8px rgba(126, 255, 178, 0.08);
+	pointer-events: none;
+}
