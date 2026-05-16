@@ -176,7 +176,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
                 <div id="tw-race-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
                 <div id="tw-subrace-section" class="tw-subrace-section" hidden style="display:none;">
-                    <h3 class="tw-subrace-heading">Subrace selection</h3>
+					<h3 class="tw-subrace-heading" id="subrace-selection">Subrace selection</h3>
                     <div id="tw-subrace-grid" class="tw-dynamic-grid" aria-live="polite"></div>
                 </div>
 
