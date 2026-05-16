@@ -1,9 +1,9 @@
     (function() {
         'use strict';
-        const config = {
-    url: nwAgentsConfig.url,
-    key: nwAgentsConfig.key,
-    uid: nwAgentsConfig.uid
+const config = {
+    url: twDeploymentConfig.supabaseUrl,
+    key: twDeploymentConfig.supabaseKey,
+    uid: twDeploymentConfig.userId
 };
         (function autoScroll() {
             var el = document.getElementById('tw-deployment-root');
