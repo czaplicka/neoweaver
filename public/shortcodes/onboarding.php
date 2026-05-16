@@ -13,7 +13,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 		}
 
 		public static function register_assets() {
-			if ( ! defined( 'TW_PLUGIN_URL' ) || ! defined( 'TW_PLUGIN_VERSION' ) ) {
+			if ( ! defined( 'NEOWEAVER_PLUGIN_URL' ) || ! defined( 'TW_PLUGIN_VERSION' ) ) {
 				return;
 			}
 
