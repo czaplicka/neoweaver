@@ -31,12 +31,12 @@ function neoweaver_deployment_register_assets(): void {
 		NEOWEAVER_VERSION,
 		true
 	);
-}
 wp_localize_script( 'nw-agents', 'nwAgentsConfig', [
     'url' => $supabase_url,
     'key' => $anon_key,
     'uid' => (int) $user_id,
 ] );
+}
 add_action( 'wp_enqueue_scripts', 'neoweaver_deployment_register_assets' );
 
 
