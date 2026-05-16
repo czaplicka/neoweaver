@@ -34,6 +34,7 @@
 	border-radius  : 12px;
 	min-height     : 1000px;
 	overflow       : visible;
+	overflow-x: clip;
 	box-sizing     : border-box;
 }
 
