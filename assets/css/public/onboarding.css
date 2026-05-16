@@ -400,3 +400,23 @@
 		0 0 8px rgba(126, 255, 178, 0.08);
 	pointer-events: none;
 }
+#tw-onboarding-slider .tw-onboarding-slider__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin-top: 8px;
+}
+
+#tw-onboarding-slider .tw-onboarding-slider__actions a {
+	color: #8effb8;
+	text-decoration: none;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+}
+
+#tw-onboarding-slider .tw-onboarding-slider__actions a:hover,
+#tw-onboarding-slider .tw-onboarding-slider__actions a:focus {
+	color: #e2ffee;
+	text-decoration: underline;
+}
