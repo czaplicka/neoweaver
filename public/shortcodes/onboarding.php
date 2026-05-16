@@ -47,7 +47,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 					aria-controls="tw-onboarding-slider-panel"
 					aria-label="Collapse onboarding"
 				>
-					<span class="tw-onboarding-slider__toggle-text">BOOT</span>
+					<span class="tw-onboarding-slider__toggle-text"></span>
 					<span class="tw-onboarding-slider__toggle-icon">▸</span>
 				</button>
 
@@ -58,7 +58,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 						<p class="tw-onboarding-slider__eyebrow">NEOWEAVE // CRT INIT</p>
 						<h3 class="tw-onboarding-slider__title">ONBOARDING</h3>
 						<p class="tw-onboarding-slider__desc">
-							Complete the setup sequence to start.
+							Complete the setup to start
 						</p>
 					</div>
 
