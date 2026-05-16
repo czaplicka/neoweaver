@@ -133,28 +133,6 @@ final class NeoWeaver_Core {
 			}
 		}
 	}
-add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_public_assets', 20 );
-
-function neoweaver_enqueue_public_assets() {
-	if ( ! defined( 'NEOWEAVER_PLUGIN_URL' ) || ! defined( 'TW_PLUGIN_VERSION' ) ) {
-		return;
-	}
-
-	wp_enqueue_style(
-		'neoweaver-onboarding',
-		NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
-		[],
-		TW_PLUGIN_VERSION
-	);
-
-	wp_enqueue_script(
-		'neoweaver-onboarding',
-		NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
-		[],
-		TW_PLUGIN_VERSION,
-		true
-	);
-}
 	/**
 	 * Load and instantiate admin classes.
 	 * Files are loaded here (inside plugins_loaded) so Supabase helpers
@@ -253,14 +231,14 @@ function neoweaver_enqueue_public_assets() {
 			'neoweaver-public',
 			NEOWEAVER_PLUGIN_URL . 'assets/css/public/public.css',
 			[],
-			NEOWEAVER_VERSION
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/public.css' )
 		);
 
 		wp_enqueue_script(
 			'neoweaver-public',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/public.js',
 			[ 'jquery', 'nw-lucide-public' ],
-			NEOWEAVER_VERSION,
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/public.js' ),
 			true
 		);
 
@@ -268,14 +246,14 @@ function neoweaver_enqueue_public_assets() {
 			'neoweaver-buffer',
 			NEOWEAVER_PLUGIN_URL . 'assets/css/public/buffer.css',
 			[],
-			NEOWEAVER_VERSION
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/buffer.css' )
 		);
 
 		wp_enqueue_script(
 			'neoweaver-buffer',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/buffer.js',
 			[ 'jquery' ],
-			NEOWEAVER_VERSION,
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/buffer.js' ),
 			true
 		);
 
@@ -296,7 +274,7 @@ function neoweaver_enqueue_public_assets() {
 			'nw-list-worlds',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/list-worlds.js',
 			[ 'jquery' ],
-			NEOWEAVER_VERSION,
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/list-worlds.js' ),
 			true
 		);
 
@@ -305,6 +283,20 @@ function neoweaver_enqueue_public_assets() {
 			'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
 			[],
 			'4.5.1',
+			true
+		);
+				wp_enqueue_style(
+			'neoweaver-onboarding',
+			NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
+			[],
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/onboarding.css' )
+		);
+
+		wp_enqueue_script(
+			'neoweaver-onboarding',
+			NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
+			[],
+			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/onboarding.js' ),
 			true
 		);
 	}
