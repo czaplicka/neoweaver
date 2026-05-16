@@ -27,6 +27,7 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 				),
 				401
 			);
+			return;
 		}
 
 		if ( empty( $char_id ) || ! wp_is_uuid( $char_id ) ) {
@@ -36,6 +37,7 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 				),
 				400
 			);
+			return;
 		}
 
 		$result = tw_supabase_request(
@@ -58,6 +60,7 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 				),
 				500
 			);
+			return;
 		}
 
 		wp_send_json_success(
