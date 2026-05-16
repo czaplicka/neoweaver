@@ -255,6 +255,7 @@ function neoweaver_create_character( WP_REST_Request $request ) {
  */
 function neoweaver_create_campaign( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_CAMPAIGN: START (REST API)' );
+	error_log( 'TW_CAMPAIGN payload: ' . print_r( $request->get_params(), true ) );
 
 	$nonce = $request->get_param( 'nonce' ) ?? '';
 	if ( ! wp_verify_nonce( $nonce, 'tw_campaign_nonce' ) ) {
