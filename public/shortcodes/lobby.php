@@ -34,6 +34,13 @@
  *   Supabase, both of which are UUID strings. intval() on a UUID returns 0,
  *   causing the FK constraints to reject the insert.
  *   Fixed: UUIDs are preserved as strings via sanitize_text_field().
+ *
+ * BUG-FIX (missing nonce in leave-lobby FormData):
+ *   The neoweave_leave_lobby JS handler built a FormData with action +
+ *   campaign_id but omitted the nonce field. The PHP handler calls
+ *   check_ajax_referer( 'neoweave_heartbeat', 'nonce' ), so every leave
+ *   attempt failed with a nonce error.
+ *   Fixed: formData.append('nonce', nonceHeartbeat) added.
  */
 
 add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
@@ -470,8 +477,11 @@ function neoweave_lobby_terminal() {
 							} catch (e) { console.error('LEAVE: ready reset exception', e); }
 						}
 
+						// BUG-FIX: nonce was not appended — every leave attempt
+						// failed with a nonce error from check_ajax_referer().
 						const formData = new FormData();
 						formData.append('action',      'neoweave_leave_lobby');
+						formData.append('nonce',       nonceHeartbeat);
 						formData.append('campaign_id', campaignId);
 
 						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
