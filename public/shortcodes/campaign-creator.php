@@ -20,23 +20,21 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
 
-		$campaign_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/campaign-creator.css';
 		if ( file_exists( $campaign_css ) ) {
 			wp_enqueue_style(
 				'neoweaver-campaign-creator',
 				NEOWEAVER_PLUGIN_URL . 'assets/css/public/campaign-creator.css',
 				[],
-				NEOWEAVER_VERSION
+				(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/campaign-creator.css' )
 			);
 		}
 
-		$campaign_js = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/campaign-creator.js';
 		if ( file_exists( $campaign_js ) ) {
 			wp_enqueue_script(
 				'neoweaver-campaign-creator',
 				NEOWEAVER_PLUGIN_URL . 'assets/js/public/campaign-creator.js',
 				[],
-				NEOWEAVER_VERSION,
+				(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/campaign-creator.js' ),
 				true
 			);
 		}
