@@ -725,3 +725,14 @@
     color: #000 !important;
     text-decoration: none !important;
 }
+.tw-badge-free {
+    font-size: 0.65em;
+    background: oklch(0.75 0.25 115 / 0.2);  /* neon-green przytłumiony */
+    color: #adff00;
+    border: 1px solid #adff00;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+    margin-left: 4px;
+}
