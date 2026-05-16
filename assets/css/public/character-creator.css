@@ -82,6 +82,7 @@ Scoped to: #tw-char-creator-wrapper
     );
   opacity: 0.7;
   mix-blend-mode: soft-light;
+  border-radius: var(--tw-radius-xl);
 }
 
 .tw-progress-bar,
