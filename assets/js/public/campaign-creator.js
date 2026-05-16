@@ -5,7 +5,6 @@
  *   An agent belongs to exactly one world (cyber_characters.world_id).
  *   They may be in many campaigns, but only within that same world.
  *   → When a world is selected, show only agents whose world_id matches.
- *   → If no world is selected yet, show nothing (empty + hint).
  */
 ( function () {
 	'use strict';
@@ -291,65 +290,73 @@
 		}
 
 		// ── loadAgents ────────────────────────────────────────────────────────
-		// Rule: an agent belongs to exactly ONE world (cyber_characters.world_id).
-		// They may join many campaigns, but only within that same world.
-		//
-		// Implementation:
-		//   • If worldId is null  → show "select a Node first" hint, no query.
-		//   • If worldId is given → query cyber_characters filtered by
-		//     world_id = worldId AND status != STATUS_DEAD.
-		//     No campaign-join needed: the constraint is on the character row.
-		function loadAgents( worldId ) {
-			const grid = document.getElementById( 'tw-camp-agent-grid' );
-			const hint = document.getElementById( 'tw-agent-hint' );
-			if ( ! grid ) return;
+// Rule: show agents whose world_id matches the selected world
+//       OR whose world_id is null (unassigned — free to join any world).
+function loadAgents( worldId ) {
+    const grid = document.getElementById( 'tw-camp-agent-grid' );
+    const hint = document.getElementById( 'tw-agent-hint' );
+    if ( ! grid ) return;
 
-			// No world selected yet — prompt the user.
-			if ( ! worldId ) {
-				grid.innerHTML = '';
-				if ( hint ) {
-					hint.style.display = '';
-					hint.textContent   = '← Select a Node first to see its available agents.';
-				}
-				return;
-			}
+    // No world selected yet — prompt the user.
+    if ( ! worldId ) {
+        grid.innerHTML = '';
+        if ( hint ) {
+            hint.style.display = '';
+            hint.textContent   = '← Select a Node first to see its available agents.';
+        }
+        return;
+    }
 
-			if ( hint ) hint.style.display = 'none';
-			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
+    if ( hint ) hint.style.display = 'none';
+    grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 
-			// Fetch only agents whose home world matches the selected Node.
-			const params = {
-				select     : 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)',
-				world_id   : 'eq.' + worldId,   // ← the key filter
-				status     : 'neq.STATUS_DEAD',
-				order      : 'name.asc',
-			};
-			if ( userId ) params.wp_user_id = 'eq.' + userId;
+    // Supabase OR filter: world_id matches selected world OR world_id is null.
+    const orFilter = 'or=(world_id.eq.' + worldId + ',world_id.is.null)';
+    const selectFields = 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)';
+    let url = sbBase + 'cyber_characters'
+        + '?select=' + encodeURIComponent( selectFields )
+        + '&' + orFilter
+        + '&status=neq.STATUS_DEAD'
+        + '&order=name.asc';
+    if ( userId ) url += '&wp_user_id=eq.' + userId;
 
-			sbGet( 'cyber_characters', params )
-				.then( function ( rows ) {
-					grid.innerHTML = '';
-					if ( ! rows || ! rows.length ) {
-						grid.innerHTML =
-							'<p class="tw-error-msg">No agents found in this Node. ' +
-							'<a href="/new-agent/" class="tw-link">Create one first →</a></p>';
-						return;
-					}
-					rows.forEach( function ( row ) {
-						const className = ( row.cyber_classes && row.cyber_classes.name ) || '—';
-						const raceName  = ( row.cyber_races  && row.cyber_races.name  ) || '—';
-						grid.appendChild( makeCard(
-							row.id, row.name, raceName + ' · ' + className, '🕵️',
-							formState.character_id ? formState.character_id.id : null,
-							function ( id, name ) { formState.character_id = { id, name }; setStatus( '', false ); }
-						) );
-					} );
-				} )
-				.catch( function ( err ) {
-					console.error( 'NeoWeaver: loadAgents error', err );
-					grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>';
-				} );
-		}
+    fetch( url, {
+        headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey },
+    } )
+        .then( r => r.json() )
+        .then( function ( rows ) {
+            grid.innerHTML = '';
+            if ( ! rows || ! rows.length ) {
+                grid.innerHTML =
+                    '<p class="tw-error-msg">No agents found in this Node. ' +
+                    '<a href="/new-agent/" class="tw-link">Create one first →</a></p>';
+                return;
+            }
+            rows.forEach( function ( row ) {
+                const className = ( row.cyber_classes && row.cyber_classes.name ) || '—';
+                const raceName  = ( row.cyber_races  && row.cyber_races.name  ) || '—';
+                // Badge for unassigned agents
+                const badge = row.world_id === null
+                    ? ' <span class="tw-badge-free">FREE AGENT</span>'
+                    : '';
+                const card = makeCard(
+                    row.id, row.name, raceName + ' · ' + className, '🕵️',
+                    formState.character_id ? formState.character_id.id : null,
+                    function ( id, name ) { formState.character_id = { id, name }; setStatus( '', false ); }
+                );
+                // Append badge to card name if unassigned
+                if ( row.world_id === null ) {
+                    const strong = card.querySelector( 'strong' );
+                    if ( strong ) strong.insertAdjacentHTML( 'afterend', badge );
+                }
+                grid.appendChild( card );
+            } );
+        } )
+        .catch( function ( err ) {
+            console.error( 'NeoWeaver: loadAgents error', err );
+            grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>';
+        } );
+}
 
 		function populateSummary() {
 			function set( field, val ) {
