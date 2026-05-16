@@ -11,6 +11,8 @@
 	display: flex;
 	align-items: flex-end;
 	justify-content: flex-end;
+	height: auto;
+	max-height: 180px; /* zabezpieczenie */
 	font-family: "Courier New", Consolas, monospace;
 	color: #b7ffcb;
 	text-shadow:
@@ -98,7 +100,7 @@
 }
 
 #tw-onboarding-slider.is-collapsed .tw-onboarding-slider__panel {
-	transform: translateX(calc(100% + 4px));
+	transform: translateY(100%);
 	opacity: 0;
 	pointer-events: none;
 	visibility: hidden;
