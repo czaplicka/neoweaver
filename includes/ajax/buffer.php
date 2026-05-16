@@ -15,13 +15,14 @@
  *     any logged-in player could discard another character's card by supplying
  *     a known instance_id. Nonce + character ownership check added.
  *   - Missing return after wp_send_json_error() calls added.
+ *   - handle_foundry_upgrade(): null-safe $data guard added before keyed access.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Helper: resolve character_id from WP user ───────────────────────────────
+// ─── Helper: resolve character_id from WP user ──────────────────────────────────────────────
 
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
@@ -33,7 +34,7 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 	}
 }
 
-// ─── Helper: call a Supabase RPC function ────────────────────────────────────
+// ─── Helper: call a Supabase RPC function ────────────────────────────────────────────
 
 if ( ! function_exists( 'cyber_call_rpc' ) ) {
 	/**
@@ -81,7 +82,7 @@ if ( ! function_exists( 'cyber_call_rpc' ) ) {
 	}
 }
 
-// ─── Helper: PATCH a card's location in cyber_character_buffer ───────────────
+// ─── Helper: PATCH a card's location in cyber_character_buffer ───────────────────────
 
 if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 	/**
@@ -126,7 +127,7 @@ if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 	}
 }
 
-// ─── 1. DECK BUILDER SYNC ────────────────────────────────────────────────────
+// ─── 1. DECK BUILDER SYNC ─────────────────────────────────────────────────────────────
 
 add_action( 'wp_ajax_save_cyber_deck_rpc', 'handle_save_cyber_deck_rpc' );
 
@@ -150,7 +151,7 @@ function handle_save_cyber_deck_rpc(): void {
 	wp_send_json_success( $result );
 }
 
-// ─── 2. USE CARD & DRAW NEW ──────────────────────────────────────────────────
+// ─── 2. USE CARD & DRAW NEW ────────────────────────────────────────────────────────────
 
 add_action( 'wp_ajax_use_buffer_card', 'handle_use_buffer_card' );
 
@@ -202,7 +203,7 @@ function handle_use_buffer_card(): void {
 	}
 }
 
-// ─── 3. FOUNDRY UPGRADE ──────────────────────────────────────────────────────
+// ─── 3. FOUNDRY UPGRADE ─────────────────────────────────────────────────────────────────
 
 add_action( 'wp_ajax_foundry_upgrade', 'handle_foundry_upgrade' );
 
@@ -229,12 +230,20 @@ function handle_foundry_upgrade(): void {
 		'p_instance_id'  => $instance_id,
 	] );
 
-	if ( isset( $data['status'] ) && $data['status'] === 'success' ) {
+	// BUG-FIX: cyber_call_rpc() returns ?array (null on network/HTTP failure).
+	// Accessing $data['message'] on null triggers a PHP 8 notice and produces
+	// an unhelpful wp_send_json_error(null). Guard against null first.
+	if ( null === $data ) {
+		wp_send_json_error( array( 'message' => 'RPC call failed. Please try again.' ), 502 );
+		return;
+	}
+
+	if ( isset( $data['status'] ) && 'success' === $data['status'] ) {
 		wp_send_json_success( [
 			'message'   => $data['message'],
 			'new_level' => $data['new_level'],
 		] );
 	} else {
-		wp_send_json_error( $data['message'] ?? 'Upgrade failed.' );
+		wp_send_json_error( array( 'message' => $data['message'] ?? 'Upgrade failed.' ) );
 	}
 }
