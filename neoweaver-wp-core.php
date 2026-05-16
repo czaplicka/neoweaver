@@ -54,6 +54,7 @@ final class NeoWeaver_Core {
 			'includes/char-panel.php',
 			'includes/chat-realtime.php',
 			'includes/checkout.php',
+			// includes/core.php removed — shortcodes are registered by Neoweaver_Public
 			'includes/deck-core.php',
 			'includes/game-data.php',
 			'includes/head-injection.php',
@@ -116,7 +117,6 @@ final class NeoWeaver_Core {
 			'public/shortcodes/cyber-hud.php',
 			'public/shortcodes/deck-panel.php',
 			'public/shortcodes/fate-of-loom.php',
-			'public/shortcodes/onboarding.php',
 			'public/shortcodes/signal-quality.php',
 			'public/shortcodes/time-wheel.php',
 			'public/shortcodes/vehicle-panel.php',
