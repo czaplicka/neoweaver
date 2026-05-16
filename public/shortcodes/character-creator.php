@@ -11,470 +11,546 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Register assets.
  */
-if ( ! function_exists( 'neoweaver_character_creator_enqueue' ) ) {
-	function neoweaver_character_creator_enqueue() {
-		$base = plugin_dir_url( dirname( __FILE__, 2 ) );
+if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
+	function neoweaver_register_character_creator_assets(): void {
+		$css_handle = 'neoweaver-character-creator';
+		$js_handle  = 'neoweaver-character-creator';
 
-		wp_enqueue_style(
-			'neoweaver-char-creator',
-			$base . 'assets/css/public/character-creator.css',
+		$css_path = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/character-creator.css';
+		$js_path  = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/character-creator.js';
+
+		$css_url = NEOWEAVER_PLUGIN_URL . 'assets/css/public/character-creator.css';
+		$js_url  = NEOWEAVER_PLUGIN_URL . 'assets/js/public/character-creator.js';
+
+		wp_register_style(
+			$css_handle,
+			$css_url,
 			[],
-			filemtime( plugin_dir_path( dirname( __FILE__, 2 ) ) . 'assets/css/public/character-creator.css' )
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
 		);
 
-		wp_enqueue_script(
-			'neoweaver-char-creator',
-			$base . 'assets/js/public/character-creator.js',
+		wp_register_script(
+			$js_handle,
+			$js_url,
 			[],
-			filemtime( plugin_dir_path( dirname( __FILE__, 2 ) ) . 'assets/js/public/character-creator.js' ),
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
 			true
 		);
 
-		$cfg = neoweaver_char_creator_js_config();
-		wp_localize_script( 'neoweaver-char-creator', 'twCharCreatorAjax',   $cfg );
-		wp_localize_script( 'neoweaver-char-creator', 'twCharCreatorConfig', $cfg );
-	}
-}
-add_action( 'wp_enqueue_scripts', 'neoweaver_character_creator_enqueue' );
+		$uploads = wp_get_upload_dir();
 
-/**
- * Build JS config array (shared between enqueue and inline fallback).
- */
-if ( ! function_exists( 'neoweaver_char_creator_js_config' ) ) {
-	function neoweaver_char_creator_js_config() {
-		// ── Avatar gallery ──────────────────────────────────────────────────
-		$gallery     = [];
-		$gallery_ids = get_option( 'neoweaver_avatar_gallery', [] );
-		if ( is_array( $gallery_ids ) ) {
-			foreach ( $gallery_ids as $id ) {
-				$url = wp_get_attachment_url( (int) $id );
-				if ( $url ) {
-					$gallery[] = [
-						'id'   => (int) $id,
-						'url'  => $url,
-						'name' => get_the_title( (int) $id ) ?: basename( $url ),
-					];
-				}
-			}
-		}
-
-		return [
-			'ajaxurl'     => admin_url( 'admin-ajax.php' ),
-			'nonce'       => wp_create_nonce( 'neoweaver_char_creator' ),
-			'uploadsbase' => wp_upload_dir()['baseurl'],
-			'avatar_gallery' => $gallery,
-		];
+		wp_localize_script(
+			$js_handle,
+			'twCharCreatorConfig',
+			[
+				'ajaxurl'        => admin_url( 'admin-ajax.php' ),
+				'ajax_url'       => admin_url( 'admin-ajax.php' ),
+				'nonce'          => wp_create_nonce( 'neoweaver_nonce' ),
+				'sitebase'       => home_url(),
+				'site_base'      => home_url(),
+				'uploadsbase'    => trailingslashit( $uploads['baseurl'] ),
+				'uploads_base'   => trailingslashit( $uploads['baseurl'] ),
+				'avatar_gallery' => [
+					[
+						'id'   => 'avatar-1',
+						'name' => 'Avatar',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar.svg',
+					],
+					[
+						'id'   => 'avatar-2',
+						'name' => 'Avatar 2',
+						'url'  => trailingslashit( $uploads['baseurl'] ) . 'Avatar-1.svg',
+					],
+				],
+			]
+		);
 	}
 }
 
+add_action( 'wp_enqueue_scripts', 'neoweaver_register_character_creator_assets' );
 /**
- * Shortcode callback.
+ * Shortcode renderer.
  */
-if ( ! function_exists( 'neoweaver_character_creator_shortcode' ) ) {
-	function neoweaver_character_creator_shortcode() {
-		if ( ! is_user_logged_in() ) {
-			return '<p class="tw-login-notice">Please <a href="' . esc_url( wp_login_url( get_permalink() ) ) . '">log in</a> to create a character.</p>';
-		}
+if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
+    function neoweaver_shortcode_character_creator(): string {
+        if ( ! is_user_logged_in() ) {
+            return '<div class="tw-char-login-required">You need to be logged in to create a character.</div>';
+        }
 
-		// ── Inline JS config fallback (covers edge cases where wp_localize runs
-		//    before the shortcode decides to enqueue). ─────────────────────────
-		$cfg = neoweaver_char_creator_js_config();
-		$inline = '<script>window.twCharCreatorAjax=' . wp_json_encode( $cfg ) . ';'
-		        . 'window.twCharCreatorConfig=' . wp_json_encode( $cfg ) . ';'
-		        . 'window.neoweaverAjax=' . wp_json_encode( $cfg ) . ';</script>';
+        wp_enqueue_style( 'neoweaver-character-creator' );
+        wp_enqueue_script( 'neoweaver-character-creator' );
 
-		ob_start();
-		echo $inline; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		?>
-
-<div id="tw-char-creator" class="tw-char-creator" data-initialized="false">
-
-  <!-- ── Progress bar ─────────────────────────────────────────── -->
-  <div class="tw-progress-bar">
-    <div class="tw-progress-info">
-      <span class="tw-progress-label">Step <span id="tw-char-step-current">1</span> of 11</span>
-      <span id="tw-char-progress-phase" class="tw-progress-phase"></span>
-    </div>
-    <div class="tw-progress-track">
-      <div id="tw-char-progress-fill" class="tw-progress-fill" style="width:9.09%"></div>
-    </div>
-    <div class="tw-progress-ticks">
-      <?php for ( $i = 0; $i < 11; $i++ ) : ?>
-        <span class="tw-progress-tick<?php echo $i === 0 ? ' active' : ''; ?>"></span>
-      <?php endfor; ?>
-    </div>
-  </div>
-
-  <!-- ── Status message ──────────────────────────────────────── -->
-  <div class="tw-char-status" role="status" aria-live="polite"></div>
-
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 1 – Name & Pronouns                                  -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="0" data-phase="Identity">
-
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Who are you?</h2>
-      <p class="tw-step-subtitle">Give your Field Agent a name and pronouns.</p>
-    </div>
-
-    <div class="tw-form-group">
-      <label class="tw-label" for="tw-char-name">Agent designation</label>
-      <input id="tw-char-name" class="tw-input" type="text" maxlength="60"
-             placeholder="Enter character name…" autocomplete="off">
-    </div>
-
-    <fieldset class="tw-fieldset">
-      <legend class="tw-label">Pronouns</legend>
-      <div class="tw-pronoun-grid">
-        <?php
-        $pronouns = [
-          'he/him'   => 'He / Him',
-          'she/her'  => 'She / Her',
-          'they/them'=> 'They / Them',
-          'it/its'   => 'It / Its',
-          'custom'   => 'Custom…',
-        ];
-        foreach ( $pronouns as $val => $label ) :
+        ob_start();
         ?>
-          <label class="tw-pronoun-option">
-            <input type="radio" name="tw-char-pronouns" value="<?php echo esc_attr( $val ); ?>">
-            <span class="tw-pronoun-label"><?php echo esc_html( $label ); ?></span>
-          </label>
-        <?php endforeach; ?>
-      </div>
-    </fieldset>
+        <div id="tw-char-creator-wrapper" class="tw-character-creator tw-char-creator">
+            <div class="tw-progress-bar">
+                <div class="tw-progress-header">
+                    <div class="tw-progress-label">
+                        OPERATIVE INITIALIZATION <span class="tw-blink" aria-hidden="true"></span>
+                    </div>
+                    <div class="tw-progress-counter">
+                        STEP <span id="tw-char-step-current">1</span> / 11
+                    </div>
+                </div>
 
-    <div id="tw-char-pronouns-custom-wrap" hidden style="display:none;">
-      <label class="tw-label" for="tw-char-pronouns-custom">Custom pronouns</label>
-      <input id="tw-char-pronouns-custom" class="tw-input" type="text" maxlength="40"
-             placeholder="e.g. xe/xem">
-    </div>
+                <div class="tw-progress-track" aria-hidden="true">
+                    <div id="tw-char-progress-fill" class="tw-progress-fill"></div>
+                    <span class="tw-progress-tick active" data-tick="1"></span>
+                    <span class="tw-progress-tick" data-tick="2"></span>
+                    <span class="tw-progress-tick" data-tick="3"></span>
+                    <span class="tw-progress-tick" data-tick="4"></span>
+                    <span class="tw-progress-tick" data-tick="5"></span>
+                    <span class="tw-progress-tick" data-tick="6"></span>
+                    <span class="tw-progress-tick" data-tick="7"></span>
+                    <span class="tw-progress-tick" data-tick="8"></span>
+                    <span class="tw-progress-tick" data-tick="9"></span>
+                    <span class="tw-progress-tick" data-tick="10"></span>
+                    <span class="tw-progress-tick" data-tick="11"></span>
+                </div>
 
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-    <div class="tw-nav-row tw-nav-row--right">
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-  </div><!-- /step 0 -->
+                <div id="tw-char-progress-phase" class="tw-progress-phase">IDENTITY SYNC</div>
+            </div>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 2 – Race & Subrace                                   -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="1" data-phase="Origin" hidden style="display:none;">
+                        <section class="tw-char-step active" data-phase="IDENTITY SYNC">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Choose your race</h2>
-      <p class="tw-question-text">Choose your race first. Then pick a subrace. Only the subrace is stored in the character record.</p>
-    </div>
+                <h2>Identity Sync</h2>
+                <p class="tw-question-text">Define your operative signal, visible identity, and pronoun channel before entering the Node.</p>
 
-    <div id="tw-race-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                <label class="tw-field-label" for="tw-char-name">
+                    <span>Character name <span class="tw-required">*</span></span>
+                    <input type="text" id="tw-char-name" name="character_name" placeholder="Enter operative designation" autocomplete="off" maxlength="80">
+                </label>
 
-    <div id="tw-subrace-section" class="tw-subrace-section" hidden style="display:none;">
-        <h3 id="subrace-selection" class="tw-subrace-heading">Subrace selection</h3>
-        <div id="tw-subrace-grid" class="tw-dynamic-grid" aria-live="polite"></div>
-    </div>
+                <fieldset class="tw-pronoun-fieldset">
+                    <legend>Pronouns <span class="tw-required">*</span></legend>
+                    <div class="tw-pronoun-options">
+                        <label class="tw-pronoun-option">
+                            <input type="radio" class="tw-pronoun-radio" name="tw-char-pronouns" value="she">
+                            <span class="tw-pronoun-label">she / her</span>
+                        </label>
+                        <label class="tw-pronoun-option">
+                            <input type="radio" class="tw-pronoun-radio" name="tw-char-pronouns" value="he">
+                            <span class="tw-pronoun-label">he / him</span>
+                        </label>
+                        <label class="tw-pronoun-option">
+                            <input type="radio" class="tw-pronoun-radio" name="tw-char-pronouns" value="they">
+                            <span class="tw-pronoun-label">they / them</span>
+                        </label>
+                        <label class="tw-pronoun-option">
+                            <input type="radio" class="tw-pronoun-radio" name="tw-char-pronouns" value="xe">
+                            <span class="tw-pronoun-label">xe / xem</span>
+                        </label>
+                        <label class="tw-pronoun-option">
+                            <input type="radio" class="tw-pronoun-radio" name="tw-char-pronouns" value="custom">
+                            <span class="tw-pronoun-label">custom</span>
+                        </label>
+                    </div>
+                </fieldset>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 1 -->
+                <div id="tw-char-pronouns-custom-wrap" class="tw-pronouns-custom-wrap" hidden style="display:none;">
+                    <label class="tw-field-label" for="tw-char-pronouns-custom">
+                        <span>Custom pronouns</span>
+                        <input type="text" id="tw-char-pronouns-custom" name="tw-char-pronouns-custom" placeholder="Enter custom pronouns" autocomplete="off" maxlength="80">
+                    </label>
+                </div>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 3 – Class                                            -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="2" data-phase="Class" hidden style="display:none;">
+                <div class="tw-nav-row">
+                    <div></div>
+                    <button type="button" id="tw-char-step1-next" class="tw-btn tw-btn--primary tw-btn-next">Continue</button>
+                </div>
+            </section>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Choose your class</h2>
-      <p class="tw-step-subtitle">Your class shapes your skill set and combat approach.</p>
-    </div>
+            <section class="tw-char-step" data-phase="RACE PROTOCOL">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div id="tw-class-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                <h2>Race Protocol</h2>
+                <p class="tw-question-text">Choose your race first. Then pick a subrace. Only the subrace is stored in the character record.</p>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 2 -->
+                <div id="tw-race-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 4 – Attributes                                       -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="3" data-phase="Attributes" hidden style="display:none;">
+                <div id="tw-subrace-section" class="tw-subrace-section" hidden style="display:none;">
+                    <h3 class="tw-subrace-heading">Subrace selection</h3>
+                    <div id="tw-subrace-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Allocate attributes</h2>
-      <p class="tw-step-subtitle">Distribute <strong>12 points</strong> across Body, Reflex, Mind, and Spirit (1–5 each).</p>
-    </div>
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-    <p class="tw-attr-remaining-label">Points remaining: <strong id="tw-attr-remaining">8</strong></p>
+            <section class="tw-char-step" data-phase="CLASS MATRIX">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-attr-presets">
-      <span class="tw-attr-presets-label">Quick presets:</span>
-      <?php
-      $presets = [
-        'balanced'    => 'Balanced',
-        'agile'       => 'Agile',
-        'tank'        => 'Tank',
-        'bodybuilder' => 'Bodybuilder',
-        'gunslinger'  => 'Gunslinger',
-        'genius'      => 'Genius',
-        'warlock'     => 'Warlock',
-      ];
-      foreach ( $presets as $key => $label ) :
-      ?>
-        <button type="button" class="tw-attr-preset-btn" data-preset="<?php echo esc_attr( $key ); ?>"
-                aria-pressed="false"><?php echo esc_html( $label ); ?></button>
-      <?php endforeach; ?>
-    </div>
+                <h2>Class Matrix</h2>
+                <p class="tw-question-text">Select your operative class. The chosen class sets your skill limit and filters compatible starting packages by class tag.</p>
 
-    <div class="tw-attr-list">
-      <?php
-      $attrs = [
-        'body'   => [ 'label' => 'Body',   'icon' => '💪' ],
-        'reflex' => [ 'label' => 'Reflex', 'icon' => '⚡' ],
-        'mind'   => [ 'label' => 'Mind',   'icon' => '🧠' ],
-        'spirit' => [ 'label' => 'Spirit', 'icon' => '✨' ],
-      ];
-      foreach ( $attrs as $key => $meta ) :
-      ?>
-        <div class="tw-attr-row" data-attr="<?php echo esc_attr( $key ); ?>">
-          <span class="tw-attr-icon"><?php echo $meta['icon']; // phpcs:ignore ?></span>
-          <span class="tw-attr-label"><?php echo esc_html( $meta['label'] ); ?></span>
-          <div class="tw-attr-pips">
-            <?php for ( $p = 1; $p <= 5; $p++ ) : ?>
-              <button type="button" class="tw-pip" data-pip="<?php echo $p; ?>" aria-label="Set <?php echo esc_attr( $meta['label'] ); ?> to <?php echo $p; ?>"></button>
-            <?php endfor; ?>
-          </div>
-          <button type="button" class="tw-attr-minus" aria-label="Decrease <?php echo esc_attr( $meta['label'] ); ?>">−</button>
-          <input id="tw-attr-<?php echo esc_attr( $key ); ?>" class="tw-attr-input" type="number"
-                 min="1" max="5" value="1" readonly aria-label="<?php echo esc_attr( $meta['label'] ); ?> value">
-          <button type="button" class="tw-attr-plus" aria-label="Increase <?php echo esc_attr( $meta['label'] ); ?>">+</button>
-        </div>
-      <?php endforeach; ?>
-    </div>
+                <div id="tw-class-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 3 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 5 – Skills                                           -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="4" data-phase="Skills" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="BIOMETRIC CALIBRATION">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Choose your skills</h2>
-      <p class="tw-step-subtitle" id="tw-skill-counter">0 / 3 skills</p>
-    </div>
+                <h2>Biometric Calibration</h2>
+                <p class="tw-question-text">
+                    Distribute all 12 attribute points. Each attribute starts at 1 and caps at 5.
+                    <span class="tw-attr-remaining-label">Remaining <strong id="tw-attr-remaining">8</strong></span>
+                </p>
 
-    <div id="tw-skill-grid" class="tw-skill-grid" aria-live="polite"></div>
+<div class="tw-attr-presets">
+  <span class="tw-attr-presets-label">Presets</span>
+  <button type="button" class="tw-attr-preset-btn" data-preset="balanced" aria-pressed="false">Balanced</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="gunslinger" aria-pressed="false">Gunslinger</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="genius" aria-pressed="false">Genius</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="warlock" aria-pressed="false">Warlock</button>
+  <button type="button" class="tw-attr-preset-btn" data-preset="bodybuilder" aria-pressed="false">Body Builder</button>
+</div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 4 -->
+                <div class="tw-attr-grid">
+                    <div class="tw-attr-row" data-attr="body">
+                        <div class="tw-attr-icon" aria-hidden="true">⬢</div>
+                        <div class="tw-attr-info">
+                            <h4>Body <small>BODY</small></h4>
+                            <span>Strength, endurance, damage soak.</span>
+                        </div>
+                        <div class="tw-attr-controls">
+                            <div class="tw-attr-stepper">
+<button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Body">−</button>
+<input type="number" id="tw-attr-body" class="tw-attr-val" value="1" min="1" max="5" readonly>
+<button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Body">+</button>
+                            </div>
+                            <div class="tw-attr-pips" aria-hidden="true">
+                                <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Body to 1"></button>
+                                <button type="button" class="tw-pip" data-pip="2" aria-label="Set Body to 2"></button>
+                                <button type="button" class="tw-pip" data-pip="3" aria-label="Set Body to 3"></button>
+                                <button type="button" class="tw-pip" data-pip="4" aria-label="Set Body to 4"></button>
+                                <button type="button" class="tw-pip" data-pip="5" aria-label="Set Body to 5"></button>
+                            </div>
+                        </div>
+                    </div>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 6 – Starting Package                                 -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="5" data-phase="Equipment" hidden style="display:none;">
+                    <div class="tw-attr-row" data-attr="reflex">
+                        <div class="tw-attr-icon" aria-hidden="true">⬡</div>
+                        <div class="tw-attr-info">
+                            <h4>Reflex <small>REFLEX</small></h4>
+                            <span>Speed, initiative, evasion.</span>
+                        </div>
+                        <div class="tw-attr-controls">
+                            <div class="tw-attr-stepper">
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Reflex">-</button>
+                                <input type="number" id="tw-attr-reflex" class="tw-attr-val" value="1" min="1" max="5" readonly>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Reflex">=</button>
+                            </div>
+                            <div class="tw-attr-pips" aria-hidden="true">
+                                <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Reflex to 1"></button>
+                                <button type="button" class="tw-pip" data-pip="2" aria-label="Set Reflex to 2"></button>
+                                <button type="button" class="tw-pip" data-pip="3" aria-label="Set Reflex to 3"></button>
+                                <button type="button" class="tw-pip" data-pip="4" aria-label="Set Reflex to 4"></button>
+                                <button type="button" class="tw-pip" data-pip="5" aria-label="Set Reflex to 5"></button>
+                            </div>
+                        </div>
+                    </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Starting package</h2>
-      <p class="tw-step-subtitle">Your initial gear and credits loadout.</p>
-    </div>
+                    <div class="tw-attr-row" data-attr="mind">
+                        <div class="tw-attr-icon" aria-hidden="true">◈</div>
+                        <div class="tw-attr-info">
+                            <h4>Mind <small>MIND</small></h4>
+                            <span>Logic, analysis, arcane-tech control.</span>
+                        </div>
+                        <div class="tw-attr-controls">
+                            <div class="tw-attr-stepper">
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Mind">-</button>
+                                <input type="number" id="tw-attr-mind" class="tw-attr-val" value="1" min="1" max="5" readonly>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Mind">+</button>
+                            </div>
+                            <div class="tw-attr-pips" aria-hidden="true">
+                                <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Mind to 1"></button>
+                                <button type="button" class="tw-pip" data-pip="2" aria-label="Set Mind to 2"></button>
+                                <button type="button" class="tw-pip" data-pip="3" aria-label="Set Mind to 3"></button>
+                                <button type="button" class="tw-pip" data-pip="4" aria-label="Set Mind to 4"></button>
+                                <button type="button" class="tw-pip" data-pip="5" aria-label="Set Mind to 5"></button>
+                            </div>
+                        </div>
+                    </div>
 
-    <div id="tw-package-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                    <div class="tw-attr-row" data-attr="spirit">
+                        <div class="tw-attr-icon" aria-hidden="true">✦</div>
+                        <div class="tw-attr-info">
+                            <h4>Spirit <small>SPIRIT</small></h4>
+                            <span>Will, sync stability, magical resonance.</span>
+                        </div>
+                        <div class="tw-attr-controls">
+                            <div class="tw-attr-stepper">
+                                <button type="button" class="tw-attr-btn tw-attr-minus" aria-label="Decrease Spirit">-</button>
+                                <input type="number" id="tw-attr-spirit" class="tw-attr-val" value="1" min="1" max="5" readonly>
+                                <button type="button" class="tw-attr-btn tw-attr-plus" aria-label="Increase Spirit">+</button>
+                            </div>
+                            <div class="tw-attr-pips" aria-hidden="true">
+                                <button type="button" class="tw-pip active" data-pip="1" aria-label="Set Spirit to 1"></button>
+                                <button type="button" class="tw-pip" data-pip="2" aria-label="Set Spirit to 2"></button>
+                                <button type="button" class="tw-pip" data-pip="3" aria-label="Set Spirit to 3"></button>
+                                <button type="button" class="tw-pip" data-pip="4" aria-label="Set Spirit to 4"></button>
+                                <button type="button" class="tw-pip" data-pip="5" aria-label="Set Spirit to 5"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 5 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 7 – Data Origin                                      -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="6" data-phase="Backstory" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="SKILL SELECTION">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Data origin</h2>
-      <p class="tw-step-subtitle">Where did your consciousness first stabilize?</p>
-    </div>
+                <h2>Skill Selection</h2>
+                <p class="tw-question-text">Choose your active skills. The maximum number depends on the class selected in the previous step.</p>
 
-    <div id="tw-origin-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                <div id="tw-skill-counter" class="tw-skill-counter">0 / 5 skills</div>
+                <div id="tw-skill-grid" class="tw-skill-grid" aria-live="polite"></div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 6 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 8 – Previous Operation                               -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="7" data-phase="Backstory" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="STARTING PACKAGE">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Previous operation</h2>
-      <p class="tw-step-subtitle">What was your primary function before the current deployment?</p>
-    </div>
+                <h2>Starting Package</h2>
+                <p class="tw-question-text">Choose one player-selectable package compatible with your class tag.</p>
 
-    <div id="tw-operation-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                <div id="tw-package-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 7 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 9 – Sync Crisis                                      -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="8" data-phase="Backstory" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="DATA ORIGIN">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Sync crisis</h2>
-      <p class="tw-step-subtitle">How did you first encounter entropy — and how did you respond?</p>
-    </div>
+                <h2>Data Origin</h2>
+                <p class="tw-question-text">Select the environment where your consciousness first stabilized.</p>
 
-    <div id="tw-crisis-grid" class="tw-dynamic-grid" aria-live="polite"></div>
+                <div id="tw-origin-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 8 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 10 – Bio & Avatar                                    -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="9" data-phase="Identity" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="PREVIOUS OPERATION">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Bio &amp; Avatar</h2>
-      <p class="tw-step-subtitle">Optional — write a short background and pick a visual for your agent.</p>
-    </div>
+                <h2>Previous Operation</h2>
+                <p class="tw-question-text">Choose the main operational pattern your unit was shaped by before this deployment.</p>
 
-    <div class="tw-form-group">
-      <label class="tw-label" for="tw-char-bio">Background story</label>
-      <textarea id="tw-char-bio" class="tw-input tw-textarea" rows="5"
-                placeholder="What shaped this agent before deployment…"></textarea>
-    </div>
+                <div id="tw-operation-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-    <div class="tw-avatar-section">
-      <p class="tw-label">Avatar</p>
-      <p class="tw-step-subtitle">Upload your own image or pick from the gallery below.</p>
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-      <label class="tw-btn tw-btn--secondary tw-avatar-upload-btn" for="tw-char-avatar">
-        Upload image
-        <input id="tw-char-avatar" type="file" accept="image/*" class="tw-sr-only" aria-label="Upload avatar image">
-      </label>
+            <section class="tw-char-step" data-phase="SYNCHRONIZATION CRISIS">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-      <div id="tw-avatar-selected" style="display:none;" class="tw-avatar-preview">
-        <img id="tw-avatar-img" src="" alt="" loading="lazy">
-        <button type="button" id="tw-char-avatar-clear" class="tw-avatar-clear-btn" aria-label="Remove selected avatar">✕</button>
-      </div>
+                <h2>Synchronization Crisis</h2>
+                <p class="tw-question-text">Select your crisis response profile.</p>
 
-      <div id="tw-avatar-gallery" class="tw-avatar-gallery" aria-label="Avatar gallery"></div>
-    </div>
+                <div id="tw-crisis-grid" class="tw-dynamic-grid" aria-live="polite"></div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
-    </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 9 -->
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
 
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <!-- STEP 11 – Summary & Submit                                -->
-  <!-- ══════════════════════════════════════════════════════════ -->
-  <div class="tw-char-step" data-step="10" data-phase="Review" hidden style="display:none;">
+            <section class="tw-char-step" data-phase="VISUAL SIGNATURE">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
 
-    <div class="tw-step-header">
-      <h2 class="tw-step-title">Review &amp; confirm</h2>
-      <p class="tw-step-subtitle">Check all your choices before creating the agent.</p>
-    </div>
+                <h2>Visual Signature</h2>
+                <p class="tw-question-text">Add a portrait and optional short bio for your operative.</p>
 
-    <div class="tw-summary-grid">
-      <div class="tw-summary-row">
+                <div class="tw-upload-box" id="tw-avatar-preview">
+                    <div class="tw-upload-preview">
+                        <div class="tw-upload-icon" aria-hidden="true"></div>
+                        <p>Drag &amp; drop or upload a portrait file.</p>
+                        <p>JPG / PNG / WEBP / SVG, max 2 MB</p>
+                        <label class="tw-btn tw-btn--primary" for="tw-char-avatar">Upload portrait</label>
+                        <input type="file" id="tw-char-avatar" name="avatar" accept=".jpg,.jpeg,.png,.webp,.svg,image/jpeg,image/png,image/webp,image/svg+xml" hidden>
+                    </div>
+                </div>
+
+                <div id="tw-avatar-selected" class="tw-avatar-selected" style="display:none;">
+                    <img id="tw-avatar-img" src="" alt="">
+                    <button type="button" id="tw-char-avatar-clear" class="tw-avatar-clear">Remove portrait</button>
+                </div>
+
+                <div class="tw-avatar-gallery-wrap">
+                    <p class="tw-question-text">Or choose from gallery.</p>
+                    <div id="tw-avatar-gallery" class="tw-dynamic-grid" aria-live="polite"></div>
+                </div><br>
+
+                <label class="tw-field-label" for="tw-char-bio">
+                    <span>Short bio</span>
+                    <textarea id="tw-char-bio" name="bio" placeholder="Write a short bio, personality trace, or external-facing profile." maxlength="1000"></textarea>
+                </label>
+
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
+                    <button type="button" class="tw-btn tw-btn--primary tw-btn-next" data-dir="next">Continue</button>
+                </div>
+            </section>
+
+            <section class="tw-char-step" data-phase="SYSTEM REVIEW">
+                <div class="tw-step-error">
+                    <span class="tw-step-error-icon" aria-hidden="true"></span>
+                    <span class="tw-step-error-msg"></span>
+                </div>
+
+                <h2>System Review</h2>
+                <p class="tw-question-text">Review the full configuration before deployment.</p>
+
+<div class="tw-summary-grid">
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Name</div>
-        <div id="tw-summary-character-name" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-character-name"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="0">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Pronouns</div>
-        <div id="tw-summary-pronouns" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-pronouns"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="0">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Race / subrace</div>
-        <div id="tw-summary-race" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-race"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="1">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Class</div>
-        <div id="tw-summary-class" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-class"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="2">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Attributes</div>
-        <div id="tw-summary-attrs" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-attrs"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="3">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Skills</div>
-        <div id="tw-summary-skills" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
-        <div class="tw-summary-key">Starting package</div>
-        <div id="tw-summary-package" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-skills"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="4">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Package</div>
+        <div class="tw-summary-val" id="tw-summary-package"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="5">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Data origin</div>
-        <div id="tw-summary-origin" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-origin"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="6">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Previous operation</div>
-        <div id="tw-summary-operation" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-operation"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="7">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Sync crisis</div>
-        <div id="tw-summary-crisis" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-crisis"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="8">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Backstory tags</div>
-        <div id="tw-summary-tag-bundle" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
+        <div class="tw-summary-val" id="tw-summary-tag-bundle"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="8">Edit</button>
+    </div>
+
+    <div class="tw-summary-row">
         <div class="tw-summary-key">Bio</div>
-        <div id="tw-summary-bio" class="tw-summary-val">—</div>
-      </div>
-      <div class="tw-summary-row">
-        <div class="tw-summary-key">Avatar</div>
-        <div id="tw-summary-avatar" class="tw-summary-val">—</div>
-      </div>
+        <div class="tw-summary-val" id="tw-summary-bio"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="9">Edit</button>
     </div>
 
-    <div class="tw-nav-row">
-      <button type="button" class="tw-btn-nav tw-btn-prev" data-dir="prev">Back</button>
-      <button type="button" id="tw-char-submit" class="tw-btn tw-btn--primary">Create Agent</button>
+    <div class="tw-summary-row">
+        <div class="tw-summary-key">Portrait</div>
+        <div class="tw-summary-val" id="tw-summary-avatar"></div>
+        <button type="button" class="tw-summary-edit tw-btn-review-edit" data-target-step="9">Edit</button>
     </div>
-    <div class="tw-step-error"><span class="tw-step-error-msg"></span></div>
-  </div><!-- /step 10 -->
+</div>
+                <div class="tw-nav-row">
+                    <button type="button" class="tw-btn-nav tw-btn-prev tw-btn-review-return" data-dir="prev">Back</button>
+                    <button type="button" id="tw-char-submit" class="tw-btn tw-btn--primary">DEPLOY OPERATIVE</button>
+                </div>
+            </section>
 
-</div><!-- /#tw-char-creator -->
-
-		<?php
-		return ob_get_clean();
-	}
+            <div id="tw-char-spinner" aria-hidden="true">
+                <div class="tw-spinner-inner">
+                    <div class="tw-spinner-ring"></div>
+                    <div class="tw-spinner-ring tw-spinner-ring--2"></div>
+                    <p class="tw-spinner-text">Synchronizing field agent profile</p>
+                    <p class="tw-spinner-sub">Finding agent in the database.</p>
+                </div>
+            </div>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
 }
-add_shortcode( 'neoweaver_character_creator', 'neoweaver_character_creator_shortcode' );
+add_shortcode( 'neoweaver_character_creator', 'neoweaver_shortcode_character_creator' );
