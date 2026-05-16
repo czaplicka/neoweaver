@@ -16,27 +16,6 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'maybe_enqueue_assets' ], 20 );
 		}
 
-		public static function register_assets() {
-			if ( ! defined( 'NEOWEAVER_PLUGIN_URL' ) || ! defined( 'TW_PLUGIN_VERSION' ) ) {
-				return;
-			}
-
-			wp_register_style(
-				'tw-onboarding-slider',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
-				[],
-				TW_PLUGIN_VERSION
-			);
-
-			wp_register_script(
-				'tw-onboarding-slider',
-				NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
-				[],
-				TW_PLUGIN_VERSION,
-				true
-			);
-		}
-
 		public static function maybe_enqueue_assets() {
 			if ( ! self::$should_enqueue ) {
 				return;
