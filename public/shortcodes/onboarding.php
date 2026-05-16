@@ -19,14 +19,14 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 			wp_register_style(
 				'tw-onboarding-slider',
-				TW_PLUGIN_URL . 'assets/css/public/onboarding.css',
+				NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
 				[],
 				TW_PLUGIN_VERSION
 			);
 
 			wp_register_script(
 				'tw-onboarding-slider',
-				TW_PLUGIN_URL . 'assets/js/public/onboarding.js',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
 				[],
 				TW_PLUGIN_VERSION,
 				true
