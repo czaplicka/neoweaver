@@ -24,7 +24,7 @@
  *
  * @package Neoweaver
  */
-
+error_log( 'TW_CAMPAIGN payload: ' . print_r( $request->get_params(), true ) );
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
