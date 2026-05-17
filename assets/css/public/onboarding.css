@@ -108,7 +108,7 @@
 }
 
 #tw-onboarding-slider.is-collapsed .tw-onboarding-slider__toggle-icon {
-	transform: rotate(180deg);
+	transform: rotate(90deg);
 	opacity: 1;
 }
 
