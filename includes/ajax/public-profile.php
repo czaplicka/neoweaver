@@ -22,9 +22,7 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 
 		if ( ! $wp_user_id ) {
 			wp_send_json_error(
-				array(
-					'message' => 'Unauthorized',
-				),
+				array( 'message' => 'Unauthorized' ),
 				401
 			);
 			return;
@@ -32,36 +30,35 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 
 		if ( empty( $char_id ) || ! wp_is_uuid( $char_id ) ) {
 			wp_send_json_error(
-				array(
-					'message' => 'Invalid character ID',
-				),
+				array( 'message' => 'Invalid character ID' ),
 				400
 			);
 			return;
 		}
 
 		$result = tw_supabase_request(
-	'PATCH',
-	'cyber_characters',
-	array(
-		'id'         => 'eq.' . $char_id,
-		'wp_user_id' => 'eq.' . $wp_user_id,
-	),
-	array(
-		'is_public' => $is_public,
-	)
-);
+			'PATCH',
+			'cyber_characters',
+			array(
+				'id'         => 'eq.' . $char_id,
+				'wp_user_id' => 'eq.' . $wp_user_id,
+			),
+			array(
+				'is_public' => $is_public,
+			)
+		);
 
-if ( is_wp_error( $result ) ) {
-	wp_send_json_error(
-		array(
-			'message' => 'Database Error',
-			'error'   => $result->get_error_message(),
-		),
-		500
-	);
-	return;
-}
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Database Error',
+					'error'   => $result->get_error_message(),
+				),
+				500
+			);
+			return;
+		}
+
 		wp_send_json_success(
 			array(
 				'char_id'   => $char_id,
