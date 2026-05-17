@@ -1,238 +1,233 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+    exit;
 }
 
 /**
- * TALE WEAVER - QUICK ACTIONS (LOOM SYNCED)
- * Przyciski szybkich akcji, combo system z cooldown.
- * Hook: wp_footer, priorytet 45 (po inventory-system.php który ma 40).
+ * NEOWEAVER - QUICK ACTIONS (SERVER-SIDE COOLDOWN)
+ * Hook: wp_footer, priorytet 45
  */
 add_action( 'wp_footer', function () {
-	if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
-		return;
-	}
-	?>
-	<script>
-	(function() {
-	    const COMBO_COOLDOWN_TIME  = 30;
-	    window.isDeleteMode        = false;
-	    window.currentQAFilter     = 'ALL';
+    if ( ! is_page_template( 'templates/adventure.php' ) || ! get_current_user_id() ) {
+        return;
+    }
+    ?>
+    <script>
+    (function() {
+        window.isDeleteMode    = false;
+        window.currentQAFilter = 'ALL';
 
-	    window.toggleQAManager = function() {
-	        const panel = document.getElementById('qa-manager-panel');
-	        const btn   = document.getElementById('qa-manager-toggle');
-	        if (!panel || !btn) return;
-	        const isOpen        = panel.style.display === 'block';
-	        panel.style.display = isOpen ? 'none' : 'block';
-	        btn.innerText       = isOpen ? '[+] CMD_CENTER' : '[-] CLOSE_CENTER';
-	    };
+        // ------------------------------------------------------------------
+        // UI helpers
+        // ------------------------------------------------------------------
+        window.toggleQAManager = function() {
+            const panel = document.getElementById('qa-manager-panel');
+            const btn   = document.getElementById('qa-manager-toggle');
+            if (!panel || !btn) return;
+            const isOpen        = panel.style.display === 'block';
+            panel.style.display = isOpen ? 'none' : 'block';
+            btn.innerText       = isOpen ? '[+] CMD_CENTER' : '[-] CLOSE_CENTER';
+        };
 
-	    window.handleQAClick = function(template, isCombo = false, comboId = null) {
-	        if (window.isDeleteMode) return;
+        // ------------------------------------------------------------------
+        // Countdown timer — działa na data-atrybucie, bez localStorage
+        // ------------------------------------------------------------------
+        let _cdInterval = null;
 
-	        if (isCombo && comboId) {
-	            const now   = Date.now();
-	            const cdKey = `combo_cd_${comboId}`;
-	            const last  = localStorage.getItem(cdKey);
-	            if (last && (now - parseInt(last, 10)) < COMBO_COOLDOWN_TIME * 1000) return;
-	            localStorage.setItem(cdKey, now.toString());
-	            window.twLoadQuickActions();
-	        }
+        function startCooldownUI(btn, seconds) {
+            btn.disabled      = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor  = 'not-allowed';
 
-	        const inputField = document.getElementById('chat-input');
-	        if (inputField) {
-	            inputField.value = template;
-	            inputField.focus();
-	            if (!template.includes('[')) {
-	                document.querySelector('.send-button')?.click();
-	            }
-	        }
-	    };
+            const originalHtml = btn.innerHTML;
+            let remaining      = seconds;
 
-	    function normalizeArchetype(str) {
-	        if (!str) return 'DEFAULT';
-	        return str.toUpperCase().replace('THE ', '').trim();
-	    }
+            btn.textContent = `⏳ ${remaining}s`;
 
-	    window.twLoadQuickActions = async function() {
-	        const client = window.twSupabase;
-	        const charId = window.twGameState?.currentCharacterId;
+            if (_cdInterval) clearInterval(_cdInterval);
+            _cdInterval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(_cdInterval);
+                    _cdInterval = null;
+                    // Przycisk odżywa — pełny reload żeby pobrać aktualny stan z serwera
+                    if (window.twGameReady) window.twLoadQuickActions();
+                } else {
+                    btn.textContent = `⏳ ${remaining}s`;
+                }
+            }, 1000);
+        }
 
-	        if (!client || !charId) {
-	            console.warn('QA: Waiting for Master Bootstrapper...');
-	            return;
-	        }
+        // ------------------------------------------------------------------
+        // Główna akcja kliknięcia
+        // ------------------------------------------------------------------
+        window.handleQAClick = async function(template, isCombo = false, comboId = null) {
+            if (window.isDeleteMode) return;
 
-	        const rawArchetype     = window.twGameState?.currentArchetype || 'DEFAULT';
-	        const currentArchetype = normalizeArchetype(rawArchetype);
-	        const playerTags       = window.currentPlayerTags || [];
+            if (isCombo && comboId) {
+                const charId = window.twGameState?.currentCharacterId;
+                if (!charId) return;
 
-	        console.log(`⚡ QA REFRESH | Szukam: "${currentArchetype}" (Oryginał: ${rawArchetype})`);
+                const btn = event?.target?.closest('button');
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
 
-	        try {
-	            const { data: actionsData, error } = await client
-	                .from('cyber_quick_actions')
-	                .select('*')
-	                .order('action_slot', { ascending: true });
+                const { data, error } = await window.twSupabase
+                    .rpc('cyber_use_combo_ability', {
+                        p_character_id: charId,
+                        p_combo_key:    comboId,
+                        p_cooldown_secs: 30
+                    });
 
-	            if (error) throw error;
+                if (error || !data?.success) {
+                    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+                    if (data?.remaining && btn) {
+                        startCooldownUI(btn, data.remaining);
+                    }
+                    return;
+                }
 
-	            const [combosRes, userRes] = await Promise.all([
-	                client.from('cyber_combos').select('*'),
-	                client.from('cyber_user_actions').select('*').eq('character_id', charId)
-	            ]);
+                // Serwer zaakceptował — uruchom odliczanie na przycisku
+                if (btn) startCooldownUI(btn, 30);
+            }
 
-	            let finalActionsHtml = '';
-	            const slots = [1, 2, 3, 4];
+            const inputField = document.getElementById('chat-input');
+            if (inputField) {
+                inputField.value = template;
+                inputField.focus();
+                if (!template.includes('[')) {
+                    document.querySelector('.send-button')?.click();
+                }
+            }
+        };
 
-	            slots.forEach(slotNum => {
-	                const actionsInSlot = (actionsData || []).filter(a => a.action_slot === slotNum);
+        // ------------------------------------------------------------------
+        // Helpers
+        // ------------------------------------------------------------------
+        function normalizeArchetype(str) {
+            if (!str) return 'DEFAULT';
+            return str.toUpperCase().replace('THE ', '').trim();
+        }
 
-	                let match = actionsInSlot.find(a =>
-	                    normalizeArchetype(a.required_archetype) === currentArchetype
-	                );
-	                if (!match) {
-	                    match = actionsInSlot.find(a =>
-	                        normalizeArchetype(a.required_archetype) === 'DEFAULT'
-	                    );
-	                }
+        // ------------------------------------------------------------------
+        // Ładowanie przycisków z Supabase
+        // ------------------------------------------------------------------
+        window.twLoadQuickActions = async function() {
+            const client = window.twSupabase;
+            const charId = window.twGameState?.currentCharacterId;
 
-	                if (match) {
-	                    let borderColor = 'var(--tw-monitor, #00d2ff)';
-	                    if (currentArchetype === 'JUGGERNAUT') borderColor = '#ff4444';
-	                    else if (currentArchetype === 'GHOST')   borderColor = '#d946ef';
-	                    else if (currentArchetype === 'CONDUIT') borderColor = '#8b5cf6';
-	                    else if (currentArchetype === 'ICON')    borderColor = '#adff00';
-	                    if (normalizeArchetype(match.required_archetype) === 'DEFAULT') {
-	                        borderColor = 'var(--tw-monitor, #00d2ff)';
-	                    }
-	                    const glowRgb = borderColor === '#ff4444' ? '255,68,68' : '0,210,255';
+            if (!client || !charId) {
+                console.warn('QA: Waiting for Master Bootstrapper...');
+                return;
+            }
 
-	                    finalActionsHtml += `
-	                    <button
-	                        class="qa-btn"
-	                        onclick="window.handleQAClick('${match.template}')"
-	                        style="
-	                            border: 1px solid ${borderColor};
-	                            border-radius: 12px; padding: 12px 18px;
-	                            background: rgba(3,7,18,0.8); backdrop-filter: blur(10px);
-	                            color: ${borderColor}; cursor: pointer;
-	                            font-weight: 700; text-transform: uppercase; font-size: 11px;
-	                            letter-spacing: 1px;
-	                            box-shadow: 0 4px 12px rgba(0,0,0,0.6), 0 0 12px rgba(${glowRgb},0.3);
-	                            transition: all 0.3s ease; margin-right: 8px;
-	                        "
-	                        onmouseover="this.style.transform='scale(1.05)'"
-	                        onmouseout="this.style.transform='scale(1)'"
-	                    >
-	                        ${match.label}
-	                    </button>`;
-	                }
-	            });
+            const rawArchetype     = window.twGameState?.currentArchetype || 'DEFAULT';
+            const currentArchetype = normalizeArchetype(rawArchetype);
+            const playerTags       = window.currentPlayerTags || [];
 
-	            const availableCombos = (combosRes.data || []).filter(c => {
-	                if (normalizeArchetype(c.required_archetype) !== currentArchetype) return false;
-	                if (!c.required_tags || c.required_tags.length === 0) return true;
-	                return c.required_tags.some(reqTag =>
-	                    playerTags.some(pt => pt.toLowerCase() === reqTag.toLowerCase())
-	                );
-	            });
+            console.log(`⚡ QA REFRESH | Szukam: "${currentArchetype}" (Oryginał: ${rawArchetype})`);
 
-	            const combosHtml = availableCombos.map(combo => {
-	                const key         = `combo_cd_${combo.id}`;
-	                const lastUsed    = localStorage.getItem(key);
-	                const cdRemaining = lastUsed
-	                    ? COMBO_COOLDOWN_TIME * 1000 - (Date.now() - parseInt(lastUsed, 10))
-	                    : 0;
+            try {
+                const { data: actionsData, error } = await client
+                    .from('cyber_quick_actions')
+                    .select('*')
+                    .order('action_slot', { ascending: true });
 
-	                if (cdRemaining > 0) {
-	                    return `
-	                    <button style="opacity:0.5; cursor:not-allowed; padding: 10px;
-	                        border: 1px solid #555; background: #222; color: #888;
-	                        border-radius: 12px;" disabled>
-	                        ⏳ ${Math.ceil(cdRemaining / 1000)}s
-	                    </button>`;
-	                }
+                if (error) throw error;
 
-	                const glow = combo.glow_color || '#adff00';
-	                return `
-	                <button
-	                    class="combo-btn"
-	                    onclick="window.handleQAClick('${combo.template}', true, '${combo.id}')"
-	                    style="
-	                        border: 2px double ${glow}; box-shadow: 0 0 16px ${glow};
-	                        border-radius: 12px; padding: 12px 18px;
-	                        background: rgba(3,7,18,0.9); color: ${glow};
-	                        cursor: pointer; font-weight: 700; text-transform: uppercase;
-	                        margin-right: 8px;
-	                    "
-	                >
-	                    ⚡ ${combo.label}
-	                </button>`;
-	            }).join('');
+                const [combosRes] = await Promise.all([
+                    client.from('cyber_combos').select('*'),
+                    client.from('cyber_user_actions').select('*').eq('character_id', charId)
+                ]);
 
-	            const bar = document.getElementById('quick-actions-bar');
-	            if (bar) bar.innerHTML = finalActionsHtml + combosHtml;
+                // --- Sloty akcji ---
+                let finalActionsHtml = '';
+                [1, 2, 3, 4].forEach(slotNum => {
+                    const actionsInSlot = (actionsData || []).filter(a => a.action_slot === slotNum);
+                    let match = actionsInSlot.find(a =>
+                        normalizeArchetype(a.required_archetype) === currentArchetype
+                    ) || actionsInSlot.find(a =>
+                        normalizeArchetype(a.required_archetype) === 'DEFAULT'
+                    );
 
-	            const container = document.getElementById('quick-actions-container');
-	            if (container) container.style.display = 'block';
+                    if (match) {
+                        let borderColor = 'var(--tw-monitor, #00d2ff)';
+                        if (normalizeArchetype(match.required_archetype) !== 'DEFAULT') {
+                            if (currentArchetype === 'JUGGERNAUT') borderColor = '#ff4444';
+                            else if (currentArchetype === 'GHOST')   borderColor = '#d946ef';
+                            else if (currentArchetype === 'CONDUIT') borderColor = '#8b5cf6';
+                            else if (currentArchetype === 'ICON')    borderColor = '#adff00';
+                        }
+                        const glowRgb = borderColor === '#ff4444' ? '255,68,68' : '0,210,255';
 
-	        } catch (err) {
-	            console.error('QA Load Error:', err);
-	        }
-	    };
+                        finalActionsHtml += `
+                        <button class="qa-btn"
+                            onclick="window.handleQAClick('${match.template}')"
+                            style="border:1px solid ${borderColor}; border-radius:12px;
+                                   padding:12px 18px; background:rgba(3,7,18,0.8);
+                                   backdrop-filter:blur(10px); color:${borderColor};
+                                   cursor:pointer; font-weight:700; text-transform:uppercase;
+                                   font-size:11px; letter-spacing:1px;
+                                   box-shadow:0 4px 12px rgba(0,0,0,0.6),0 0 12px rgba(${glowRgb},0.3);
+                                   transition:all 0.3s ease; margin-right:8px;"
+                            onmouseover="this.style.transform='scale(1.05)'"
+                            onmouseout="this.style.transform='scale(1)'">
+                            ${match.label}
+                        </button>`;
+                    }
+                });
 
-	    // Listens for the shared twTagsUpdated event (dispatched by twUpdatePlayerTags).
-	    document.addEventListener('twTagsUpdated', function() {
-	        if (window.twGameReady) window.twLoadQuickActions();
-	    });
+                // --- Combo przyciski ---
+                const availableCombos = (combosRes.data || []).filter(c => {
+                    if (normalizeArchetype(c.required_archetype) !== currentArchetype) return false;
+                    if (!c.required_tags || c.required_tags.length === 0) return true;
+                    return c.required_tags.some(reqTag =>
+                        playerTags.some(pt => pt.toLowerCase() === reqTag.toLowerCase())
+                    );
+                });
 
-	    window.twUpdatePlayerTags = function(tags) {
-	        window.currentPlayerTags = Array.isArray(tags) ? tags : [];
-	        document.dispatchEvent(new CustomEvent('twTagsUpdated', { detail: window.currentPlayerTags }));
-	    };
+                const combosHtml = availableCombos.map(combo => {
+                    const glow = combo.glow_color || '#adff00';
+                    return `
+                    <button class="combo-btn"
+                        onclick="window.handleQAClick('${combo.template}', true, '${combo.id}')"
+                        style="border:2px double ${glow}; box-shadow:0 0 16px ${glow};
+                               border-radius:12px; padding:12px 18px;
+                               background:rgba(3,7,18,0.9); color:${glow};
+                               cursor:pointer; font-weight:700; text-transform:uppercase;
+                               margin-right:8px;">
+                        ⚡ ${combo.label}
+                    </button>`;
+                }).join('');
 
-	    // BUG-FIX: the previous setInterval called twLoadQuickActions() — a full
-	    // Supabase round-trip — every second whenever any disabled button existed
-	    // on the page. During an active combo cooldown (up to 30 s) this fired
-	    // 30 consecutive full-reload queries just to update the countdown text.
-	    // Fix: the interval only updates the countdown label in-place using
-	    // localStorage, and triggers a real reload only when a cooldown actually
-	    // expires so the button re-enables itself.
-	    setInterval(() => {
-	        const disabledBtns = document.querySelectorAll('#quick-actions-bar button[disabled]');
-	        if (!disabledBtns.length) return;
+                const bar = document.getElementById('quick-actions-bar');
+                if (bar) bar.innerHTML = finalActionsHtml + combosHtml;
 
-	        let anyExpired = false;
-	        disabledBtns.forEach(btn => {
-	            // Extract combo id from the onclick of the sibling combo buttons
-	            // by scanning localStorage keys that are still active.
-	            // We update the countdown text without a network call.
-	            const text = btn.textContent || '';
-	            const match = text.match(/(\d+)s/);
-	            if (match) {
-	                const remaining = parseInt(match[1], 10) - 1;
-	                if (remaining <= 0) {
-	                    anyExpired = true;
-	                } else {
-	                    btn.textContent = `⏳ ${remaining}s`;
-	                }
-	            }
-	        });
+                const container = document.getElementById('quick-actions-container');
+                if (container) container.style.display = 'block';
 
-	        // Only do a real reload when at least one cooldown has expired.
-	        if (anyExpired && window.twGameReady) {
-	            window.twLoadQuickActions();
-	        }
-	    }, 1000);
+            } catch (err) {
+                console.error('QA Load Error:', err);
+            }
+        };
 
-	    if (window.twGameReady) {
-	        window.twLoadQuickActions();
-	    } else {
-	        document.addEventListener('twGameStateHydrated', window.twLoadQuickActions);
-	    }
-	})();
-	</script>
-	<?php
+        // ------------------------------------------------------------------
+        // Eventy
+        // ------------------------------------------------------------------
+        document.addEventListener('twTagsUpdated', function() {
+            if (window.twGameReady) window.twLoadQuickActions();
+        });
+
+        window.twUpdatePlayerTags = function(tags) {
+            window.currentPlayerTags = Array.isArray(tags) ? tags : [];
+            document.dispatchEvent(new CustomEvent('twTagsUpdated', { detail: window.currentPlayerTags }));
+        };
+
+        if (window.twGameReady) {
+            window.twLoadQuickActions();
+        } else {
+            document.addEventListener('twGameStateHydrated', window.twLoadQuickActions);
+        }
+    })();
+    </script>
+    <?php
 }, 45 );
