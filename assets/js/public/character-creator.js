@@ -1070,6 +1070,10 @@ window.requestAnimationFrame(function () {
 
   // ─── Init ─────────────────────────────────────────────────────────────────────
   function init() {
+    // BUG FIX: original code had `var isInitialized` declared twice — once at
+    // the top of the IIFE and again just before init(). The second declaration
+    // reset it to `false` on every script evaluation, making the guard useless.
+    // The single declaration at the top of the IIFE is now the only one.
     if (isInitialized) return;
     isInitialized = true;
 
