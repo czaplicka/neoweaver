@@ -31,7 +31,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             NEOWEAVER_VERSION,
             true
         );
-
+wp_localize_script(
+    'list-campaigns-script',
+    'twCampaignConfig',
+    [
+        'security'        => wp_create_nonce( 'tw_game_nonce' ),
+        'restNonce'       => wp_create_nonce( 'wp_rest' ),
+        'sessionStartUrl' => get_rest_url( null, 'neoweaver/v1/session/start' ),
+        'sessionEndUrl'   => get_rest_url( null, 'neoweaver/v1/session/end' ),
+    ]
+);
         $user_id = get_current_user_id();
         if ( ! $user_id ) {
             return '<p class="tw-error">UPLINK REQUIRED. IDENTIFY YOURSELF, FIELD AGENT.</p>';
@@ -92,11 +101,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 </div>
             </div>';
         }
-
-        $game_nonce       = wp_create_nonce( 'tw_game_nonce' );
-        $rest_nonce       = wp_create_nonce( 'wp_rest' );
-        $session_rest_url = get_rest_url( null, 'neoweaver/v1/session/start' );
-
         ob_start();
         ?>
 
