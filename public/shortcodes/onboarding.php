@@ -53,17 +53,19 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 					aria-expanded="true"
 					aria-controls="tw-onboarding-slider-panel"
 					aria-label="Collapse onboarding"
+					title="Collapse onboarding"
 				>
 					<span class="tw-onboarding-slider__toggle-text"></span>
-					<span class="tw-onboarding-slider__toggle-icon">▸</span>
+					<span class="tw-onboarding-slider__toggle-icon">&#9654;</span>
 				</button>
 				<aside id="tw-onboarding-slider-panel" class="tw-onboarding-slider__panel">
 					<button
 						type="button"
 						class="tw-onboarding-slider__dismiss"
 						aria-label="Dismiss onboarding panel"
+						title="Dismiss onboarding panel"
 					>
-						<span aria-hidden="true">×</span>
+						<span aria-hidden="true">&times;</span>
 					</button>
 
 					<div class="tw-onboarding-slider__scanline"></div>
