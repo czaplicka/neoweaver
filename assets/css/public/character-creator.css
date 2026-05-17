@@ -1606,3 +1606,46 @@ button[data-action="plus"]:hover:not(:disabled) {
     max-height: 120px;
   }
 }
+/* ===== FIX: Footer nie przycina kart ===== */
+
+/* 1. Nav-row NIE może mieć nieprzezroczystego tła nakrywającego karty */
+.tw-nav-row {
+  position: relative;
+  z-index: 10;
+  margin-top: 24px;
+  /* USUNIĘTE: background: var(--tw-bg) — to nakrywało karty */
+  background: transparent;
+  padding-top: 16px;
+  border-top: 1px solid rgba(173,255,0,0.12);
+}
+
+/* 2. Wrapper: overflow-x: clip tworzy BFC który może ucinać overflow:visible dzieci */
+#tw-char-creator-wrapper {
+  overflow: visible !important;
+  overflow-x: hidden; /* zamiast clip */
+}
+
+/* 3. Step musi mieć padding-bottom żeby ostatnie karty były widoczne */
+.tw-step.active {
+  padding-bottom: 120px; /* miejsce na nav-row + oddech */
+}
+
+/* 4. Nav-row sticky na dole step — zamiast flow */
+.tw-nav-row {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    rgba(4, 7, 4, 1) 60%,
+    transparent 100%
+  );
+  padding-bottom: 16px;
+  margin-top: 0;
+  /* gradient fade zamiast hard background */
+}
+
+/* 5. Jeśli kreator jest w modal/overlay WP — upewnij się że parent nie uciął */
+#tw-char-creator-wrapper,
+#tw-char-creator-wrapper .tw-step {
+  contain: none !important; /* wyłącz CSS containment jeśli WP je dodaje */
+}
