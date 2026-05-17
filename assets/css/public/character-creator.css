@@ -63,8 +63,7 @@ Scoped to: #tw-char-creator-wrapper
   box-shadow: var(--tw-shadow);
   position: relative;
   overflow: visible;
-  min-height: calc(100vh - 200px);
-  padding-bottom: 80px
+  overflow-x: clip;
 }
 
 #tw-char-creator-wrapper::before {
@@ -236,7 +235,7 @@ Scoped to: #tw-char-creator-wrapper
 }
 
 .tw-step.active {
-  display: flex; flex: 1; min-height: 0;
+  display: block;
   animation: twFadeIn 0.24s ease;
 }
 
@@ -1135,7 +1134,6 @@ button[data-action="plus"]:hover:not(:disabled) {
 
 .tw-nav-row {
   display: flex;
-  flex-grow: 1;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -1607,65 +1605,4 @@ button[data-action="plus"]:hover:not(:disabled) {
     min-height: 120px;
     max-height: 120px;
   }
-}
-/* ===== FIX: Footer nie przycina kart ===== */
-
-/* 1. Nav-row NIE może mieć nieprzezroczystego tła nakrywającego karty */
-.tw-nav-row {
-  position: relative;
-  z-index: 10;
-  margin-top: 24px;
-  /* USUNIĘTE: background: var(--tw-bg) — to nakrywało karty */
-  background: transparent;
-  padding-top: 16px;
-  border-top: 1px solid rgba(173,255,0,0.12);
-}
-
-/* 2. Wrapper: overflow-x: clip tworzy BFC który może ucinać overflow:visible dzieci */
-#tw-char-creator-wrapper {
-  overflow: visible !important;
-  overflow-x: hidden; /* zamiast clip */
-}
-
-/* 3. Step musi mieć padding-bottom żeby ostatnie karty były widoczne */
-.tw-step.active {
-  padding-bottom: 120px; /* miejsce na nav-row + oddech */
-}
-
-/* 4. Nav-row sticky na dole step — zamiast flow */
-.tw-nav-row {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(
-    to top,
-    rgba(4, 7, 4, 1) 60%,
-    transparent 100%
-  );
-  padding-bottom: 16px;
-  margin-top: 0;
-  /* gradient fade zamiast hard background */
-}
-
-/* 5. Jeśli kreator jest w modal/overlay WP — upewnij się że parent nie uciął */
-#tw-char-creator-wrapper,
-#tw-char-creator-wrapper .tw-step {
-  contain: none !important; /* wyłącz CSS containment jeśli WP je dodaje */
-}
-/* Fix: form grows with content */
-.tw-char-creator {
-    height: auto !important;
-    min-height: unset !important;
-    max-height: none !important;
-    overflow: visible !important;
-}
-
-.tw-char-step {
-    height: auto !important;
-    min-height: unset !important;
-    overflow: visible !important;
-}
-
-#tw-char-creator-wrapper {
-    height: auto !important;
-    min-height: unset !important;
 }
