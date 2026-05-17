@@ -63,7 +63,8 @@ Scoped to: #tw-char-creator-wrapper
   box-shadow: var(--tw-shadow);
   position: relative;
   overflow: visible;
-  overflow-x: clip;
+  min-height: calc(100vh - 200px);
+  padding-bottom: 80px
 }
 
 #tw-char-creator-wrapper::before {
@@ -235,7 +236,7 @@ Scoped to: #tw-char-creator-wrapper
 }
 
 .tw-step.active {
-  display: block;
+  display: flex; flex: 1; min-height: 0;
   animation: twFadeIn 0.24s ease;
 }
 
@@ -1134,6 +1135,7 @@ button[data-action="plus"]:hover:not(:disabled) {
 
 .tw-nav-row {
   display: flex;
+  flex-grow: 1;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
