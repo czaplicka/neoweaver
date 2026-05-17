@@ -574,10 +574,9 @@ class NW_Deck_Admin {
 			'GET',
 			$endpoint,
 			[],
-			[ 'Range' => '0-199' ]
 		);
 
-		if ( is_wp_error( $result ) ) {
+		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Failed to load deck.' );
 			return;
 		}
@@ -605,7 +604,7 @@ class NW_Deck_Admin {
 			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=*'
 		);
 
-		if ( is_wp_error( $result ) ) {
+		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Failed to fetch card.' );
 			return;
 		}
@@ -672,8 +671,6 @@ class NW_Deck_Admin {
 			'cooldown_messages'       => max( 0, intval( wp_unslash( $_POST['cooldown_messages'] ?? 0 ) ) ),
 			'entropy_on_fail'         => max( 0, intval( wp_unslash( $_POST['entropy_on_fail'] ?? 0 ) ) ),
 			'rarity'                  => $rarity,
-			'xp_current'              => max( 0, intval( wp_unslash( $_POST['xp_current'] ?? 0 ) ) ),
-			'xp_to_next'              => max( 0, intval( wp_unslash( $_POST['xp_to_next'] ?? 10 ) ) ),
 			'is_leveling'             => filter_var( wp_unslash( $_POST['is_leveling'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
 			'is_disposable'           => filter_var( wp_unslash( $_POST['is_disposable'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
 			'is_active'               => filter_var( wp_unslash( $_POST['is_active'] ?? true ), FILTER_VALIDATE_BOOLEAN ),
@@ -681,7 +678,10 @@ class NW_Deck_Admin {
 			'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
 			'class_id'                => $this->maybe_uuid( wp_unslash( $_POST['class_id'] ?? '' ) ),
 		];
-
+if ( ! $id ) {
+    $payload['xp_current'] = 0;
+    $payload['xp_to_next'] = 10;
+}
 		if ( $id ) {
 			$result = $this->supa(
 				'PATCH',
@@ -696,7 +696,7 @@ class NW_Deck_Admin {
 			);
 		}
 
-		if ( is_wp_error( $result ) ) {
+		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Save failed.' );
 			return;
 		}
@@ -727,7 +727,7 @@ class NW_Deck_Admin {
 			[ 'is_active' => $state ]
 		);
 
-		if ( is_wp_error( $result ) ) {
+		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Toggle failed.' );
 			return;
 		}
@@ -755,7 +755,7 @@ class NW_Deck_Admin {
 			'cyber_deck?id=eq.' . rawurlencode( $id )
 		);
 
-		if ( is_wp_error( $result ) ) {
+		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Delete failed.' );
 			return;
 		}
