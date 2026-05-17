@@ -9,7 +9,6 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 		public static function init() {
 			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
-			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 		}
 
 		public static function render_shortcode( $atts = [] ) {
