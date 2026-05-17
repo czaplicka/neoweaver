@@ -27,7 +27,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         wp_enqueue_script(
             'list-campaigns-script',
             NEOWEAVER_PLUGIN_URL . 'assets/js/public/list-campaigns.js',
-            [ 'jquery', 'nw-lucide' ],
+            [ 'jquery' ],
             (string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/list-campaigns.js' ),
             true
         );
