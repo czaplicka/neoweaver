@@ -20,7 +20,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
                 'neoweaver-tw-core',
                 NEOWEAVER_PLUGIN_URL . 'assets/css/public/core.css',
                 [],
-                NEOWEAVER_VERSION
+                (string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/core.css' )
             );
         }
 
@@ -28,7 +28,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
             'list-campaigns-script',
             NEOWEAVER_PLUGIN_URL . 'assets/js/public/list-campaigns.js',
             [ 'jquery', 'nw-lucide' ],
-            NEOWEAVER_VERSION,
+            (string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/list-campaigns.js' ),
             true
         );
 wp_localize_script(
