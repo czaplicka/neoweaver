@@ -47,6 +47,16 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 				data-all-complete="<?php echo $all_done ? '1' : '0'; ?>"
 				aria-label="NeoWeave onboarding"
 			>
+				<button
+					type="button"
+					class="tw-onboarding-slider__toggle"
+					aria-expanded="true"
+					aria-controls="tw-onboarding-slider-panel"
+					aria-label="Collapse onboarding"
+				>
+					<span class="tw-onboarding-slider__toggle-text"></span>
+					<span class="tw-onboarding-slider__toggle-icon">▸</span>
+				</button>
 				<aside id="tw-onboarding-slider-panel" class="tw-onboarding-slider__panel">
 					<button
 						type="button"
@@ -107,17 +117,6 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 						</li>
 					</ol>
 				</aside>
-
-				<button
-					type="button"
-					class="tw-onboarding-slider__toggle"
-					aria-expanded="true"
-					aria-controls="tw-onboarding-slider-panel"
-					aria-label="Collapse onboarding"
-				>
-					<span class="tw-onboarding-slider__toggle-text"></span>
-					<span class="tw-onboarding-slider__toggle-icon">▸</span>
-				</button>
 			</div>
 			<?php
 			return ob_get_clean();
