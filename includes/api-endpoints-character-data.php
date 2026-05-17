@@ -1167,7 +1167,9 @@ if ( ! function_exists( 'nw_get_races_handler' ) ) {
         $rows = nw_fetch_lookup_table(
             'cyber_races',
             'id,name,description,tags,bonus,img_url,parent_race',
-            'name.asc'
+            'name.asc',
+			300,
+			array( 'parent_race' => 'is.null' )
         );
 
         if ( is_wp_error( $rows ) ) {
@@ -1180,6 +1182,28 @@ if ( ! function_exists( 'nw_get_races_handler' ) ) {
     add_action( 'wp_ajax_neoweaver_get_races', 'nw_get_races_handler' );
     add_action( 'wp_ajax_nopriv_neoweaver_get_races', 'nw_get_races_handler' );
 }
+
+function nw_get_subraces_handler(): void {
+    $parent = sanitize_text_field( $_POST['parent'] ?? $_GET['parent'] ?? '' );
+    if ( '' === $parent ) {
+        wp_send_json_error( array( 'message' => 'Parent race required.' ), 400 );
+        return;
+    }
+    $rows = nw_fetch_lookup_table(
+        'cyber_races',
+        'id,name,description,tags,bonus,img_url,parent_race',
+        'name.asc',
+        300,
+        array( 'parent_race' => 'eq.' . $parent )
+    );
+    if ( is_wp_error( $rows ) ) {
+        wp_send_json_error( array( 'message' => $rows->get_error_message() ), 500 );
+        return;
+    }
+    wp_send_json_success( nw_map_race_card_shape( nw_resolve_img_urls( $rows ) ) );
+}
+add_action( 'wp_ajax_neoweaver_get_subraces', 'nw_get_subraces_handler' );
+add_action( 'wp_ajax_nopriv_neoweaver_get_subraces', 'nw_get_subraces_handler' );
 
 if ( ! function_exists( 'nw_get_classes_handler' ) ) {
     function nw_get_classes_handler(): void {
