@@ -16,7 +16,7 @@
         .tw-input-cyber { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 10px; font-size: 0.8rem; border-bottom: none; box-sizing: border-box; }
         .tw-select-cyber { width: 100%; background: #080808; border: 1px solid #222; color: #00e5ff; padding: 10px; font-size: 0.8rem; outline: none; box-sizing: border-box; }
         .tw-select-cyber option { font-size: 0.8rem; }
-        .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: background 0.3s; text-transform: uppercase; }
+        .tw-btn-deploy { width: 100%; padding: 20px; background: #adff00; color: #000; border: none; font-weight: 900; cursor: pointer; clip-path: polygon(0 0, 98% 0, 100% 20%, 100% 100%, 2% 100%, 0 80%); transition: background 0.3s; text-color: #000; text-transform: uppercase; }
         .tw-btn-deploy:disabled { background: #1a1a1a; color: #333; cursor: not-allowed; }
         .tw-btn-deploy:hover:not(:disabled) { background: #fff; }
         .tw-pulse-stat { animation: tw-pulse 2s infinite; }
