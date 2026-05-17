@@ -335,7 +335,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			$patch_body
 		);
 
-		if ( ! $result['ok'] ) {
+		if ( ! is_wp_error( $result ) ) {
 			error_log( 'TW tw_handle_update_inventory_slot: Supabase PATCH failed, code=' . $result['code'] );
 			wp_send_json_error( [ 'message' => 'Database update failed', 'code' => $result['code'] ] );
 			return;
