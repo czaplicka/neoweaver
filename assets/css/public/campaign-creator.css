@@ -32,9 +32,10 @@
 	box-shadow     : 0 0 40px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.6);
 	padding        : 60px;
 	border-radius  : 12px;
-	min-height     : 1000px;
+	min-height: calc(100vh - 200px);
 	overflow       : visible;
 	box-sizing     : border-box;
+	padding-bottom: 80px
 }
 
 .neoweaver-screen #tw-campaign-creator-wrapper::before {
@@ -170,7 +171,7 @@
 	opacity: 0;
 }
 .neoweaver-screen #tw-campaign-creator-wrapper .tw-step.active {
-	display       : flex;
+	display       : flex; 	flex: 1; min-height: 0;
 	flex-direction: column;
 	animation     : tw-camp-fadein 0.5s cubic-bezier(0.25,0.46,0.45,0.94) both;
 }
@@ -510,6 +511,7 @@
 /* ── Navigation row ───────────────────────────────────────────────────────────── */
 .neoweaver-screen #tw-campaign-creator-wrapper .tw-nav-row {
 	display        : flex;
+	flex-grow: 1;
 	justify-content: space-between;
 	align-items    : center;
 	margin-top     : 44px;
