@@ -293,30 +293,36 @@ function neoweaver_create_character( WP_REST_Request $request ) {
  * @return WP_REST_Response|WP_Error
  */
 function neoweaver_create_campaign( WP_REST_Request $request ) {
-	error_log( 'TW_ENDPOINT_CAMPAIGN: START (REST API)' );
-	error_log( 'TW_CAMPAIGN payload: ' . print_r( $request->get_params(), true ) );
+    error_log( 'TW_ENDPOINT_CAMPAIGN: START (REST API)' );
+    error_log( 'TW_CAMPAIGN payload: ' . print_r( $request->get_params(), true ) );
 
-	$nonce = $request->get_param( 'nonce' ) ?? '';
-	if ( ! wp_verify_nonce( $nonce, 'tw_campaign_nonce' ) ) {
-		return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
-	}
+    $nonce = $request->get_param( 'nonce' ) ?? '';
+    if ( ! wp_verify_nonce( $nonce, 'tw_campaign_nonce' ) ) {
+        return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
+    }
 
-	if ( ! class_exists( 'Neoweaver_Deployments_Creator' ) ) {
-		return new WP_Error( 'class_missing', 'Deployments creator class not loaded.', [ 'status' => 500 ] );
-	}
+    // ✅ check PRZED tablicą
+    $wp_user_id = get_current_user_id();
+    if ( ! $wp_user_id ) {
+        return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+    }
 
-	$creator = new Neoweaver_Deployments_Creator();
+    if ( ! class_exists( 'Neoweaver_Deployments_Creator' ) ) {
+        return new WP_Error( 'class_missing', 'Deployments creator class not loaded.', [ 'status' => 500 ] );
+    }
 
-	$data = [
-		'wp_user_id'  => get_current_user_id(),
-		'name'        => sanitize_text_field( $request->get_param( 'name' )        ?? '' ),
-		'game_mode'   => (int) ( $request->get_param( 'game_mode' )                ?? 1 ),
-		'world_type'  => (int) ( $request->get_param( 'world_type' )               ?? 1 ),
-		'gm_style'    => sanitize_text_field( $request->get_param( 'gm_style' )    ?? '' ),
-		'customize'   => sanitize_textarea_field( $request->get_param( 'customize' ) ?? '' ),
-		'game_length' => (int) ( $request->get_param( 'game_length' )              ?? 1 ),
-		'priority'    => (int) ( $request->get_param( 'priority' )                 ?? 1 ),
-	];
+    $creator = new Neoweaver_Deployments_Creator();
+
+    $data = [
+        'wp_user_id'  => $wp_user_id,   // ✅ zmienna, nie inline call
+        'name'        => sanitize_text_field( $request->get_param( 'name' )        ?? '' ),
+        'game_mode'   => (int) ( $request->get_param( 'game_mode' )                ?? 1 ),
+        'world_type'  => (int) ( $request->get_param( 'world_type' )               ?? 1 ),
+        'gm_style'    => sanitize_text_field( $request->get_param( 'gm_style' )    ?? '' ),
+        'customize'   => sanitize_textarea_field( $request->get_param( 'customize' ) ?? '' ),
+        'game_length' => (int) ( $request->get_param( 'game_length' )              ?? 1 ),
+        'priority'    => (int) ( $request->get_param( 'priority' )                 ?? 1 ),
+    ];
 
 	if ( empty( $data['name'] ) ) {
 		return new WP_Error( 'missing_name', 'Campaign name is required.', [ 'status' => 400 ] );
@@ -395,12 +401,15 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		'campaign_id' => 'neq.' . $campaign_id,
 	], $base . 'cyber_game_sessions' );
 
-	wp_remote_request( $pause_url, [
-		'method'  => 'PATCH',
-		'headers' => nw_supabase_headers(),
-		'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
-		'timeout' => 10,
-	] );
+	$pause_resp = wp_remote_request( $pause_url, [
+'method' => 'PATCH',
+'headers' => nw_supabase_headers(),
+'body' => wp_json_encode( [ 'status' => 'paused' ] ),
+'timeout' => 10,
+] );
+if ( is_wp_error( $pause_resp ) || wp_remote_retrieve_response_code( $pause_resp ) >= 300 ) {
+return new WP_Error( 'pause_failed', 'Could not pause existing session.', [ 'status' => 500 ] );
+}
 
 	// ------------------------------------------------------------------
 	// Step 2 — check for a paused session for THIS campaign (resume it).
