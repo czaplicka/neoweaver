@@ -1649,3 +1649,21 @@ button[data-action="plus"]:hover:not(:disabled) {
 #tw-char-creator-wrapper .tw-step {
   contain: none !important; /* wyłącz CSS containment jeśli WP je dodaje */
 }
+/* Fix: form grows with content */
+.tw-char-creator {
+    height: auto !important;
+    min-height: unset !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.tw-char-step {
+    height: auto !important;
+    min-height: unset !important;
+    overflow: visible !important;
+}
+
+#tw-char-creator-wrapper {
+    height: auto !important;
+    min-height: unset !important;
+}
