@@ -16,6 +16,9 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
 		$css_handle = 'neoweaver-character-creator';
 		$js_handle  = 'neoweaver-character-creator';
 
+		$css_path = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/character-creator.css';
+		$js_path  = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/character-creator.js';
+
 		$css_url = NEOWEAVER_PLUGIN_URL . 'assets/css/public/character-creator.css';
 		$js_url  = NEOWEAVER_PLUGIN_URL . 'assets/js/public/character-creator.js';
 
@@ -23,14 +26,14 @@ if ( ! function_exists( 'neoweaver_register_character_creator_assets' ) ) {
 			$css_handle,
 			$css_url,
 			[],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/character-creator.css' )
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.21'
 		);
 
 		wp_register_script(
 			$js_handle,
 			$js_url,
 			[],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/character-creator.js' ),
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.20',
 			true
 		);
 
