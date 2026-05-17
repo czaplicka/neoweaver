@@ -159,7 +159,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 			);
 
 			$campaigns = tw_supabase_get(
-				'cyber_campaigns',
+				'cyber_campaign',
 				[
 					'wp_user_id' => 'eq.' . $wp_user_id,
 					'select'     => 'id',
