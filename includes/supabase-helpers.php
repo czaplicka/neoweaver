@@ -1,183 +1,307 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 /**
- * Podstawa URL dla Supabase REST.
+ * NEOWEAVER — SUPABASE HELPERS
+ *
+ * Jedyne miejsce gdzie definiujemy niskpoziomowe helpery HTTP do Supabase.
+ * Kontrakt zwracanych wartości:
+ *
+ *   tw_supabase_get()     → array (może być []) LUB WP_Error przy błędzie sieci/HTTP
+ *   tw_supabase_request() → WP_Error przy błędzie sieci lub HTTP ≥ 300
+ *                           array ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
+ *   tw_supabase_rpc()     → array (może być []) LUB WP_Error przy błędzie
+ *
+ * Wszystkie wywołujące handlery sprawdzają is_wp_error() zanim użyją wyniku.
  */
+
+// ============================================================
+// BASE HELPERS
+// ============================================================
+
 if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
-	function tw_supabase_rest_base() {
+	function tw_supabase_rest_base(): string {
 		if ( ! function_exists( 'tw_supabase_url' ) ) {
 			error_log( 'TW: tw_supabase_url() is not defined.' );
 			return '';
 		}
-
 		return trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	}
 }
 
-/**
- * Ogólny helper GET: tw_supabase_get('cyber_characters', ['id' => 'eq.123', 'select' => '*']);
- */
+// ============================================================
+// tw_supabase_get() — GET zapytania
+// Zwraca: array przy sukcesie, WP_Error przy błędzie sieci lub HTTP ≥ 300
+// ============================================================
+
 if ( ! function_exists( 'tw_supabase_get' ) ) {
-	function tw_supabase_get( $endpoint, $query = [], $extra_args = [] ) {
+	function tw_supabase_get( string $endpoint, array $query = [], array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
 		if ( empty( $base ) ) {
-			return [];
+			return new WP_Error( 'tw_supabase_config', 'Supabase REST base URL not configured.' );
 		}
 
-		$endpoint = ltrim( (string) $endpoint, '/' );
+		$endpoint = ltrim( $endpoint, '/' );
 		if ( $endpoint === '' ) {
-			error_log( 'TW tw_supabase_get error: empty endpoint' );
-			return [];
-		}
-
-		$url = $base . $endpoint;
-
-		if ( ! empty( $query ) && is_array( $query ) ) {
-			$url = add_query_arg( $query, $url );
+			return new WP_Error( 'tw_supabase_args', 'tw_supabase_get: empty endpoint.' );
 		}
 
 		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-			error_log( 'TW: tw_supabase_anon_key() is not defined.' );
-			return [];
+			return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
 		}
 
-		$default_args = [
-			'headers'  => [
-				'apikey'        => tw_supabase_anon_key(),
-				'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
-			],
-			'timeout'   => 15,
-			'sslverify' => true,
+		$url = $base . $endpoint;
+		if ( ! empty( $query ) ) {
+			$url = add_query_arg( $query, $url );
+		}
+
+		$default_headers = [
+			'apikey'        => tw_supabase_anon_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
 		];
 
-		// Zamiast array_merge_recursive – zwykły merge.
-		$args = array_merge( $default_args, (array) $extra_args );
+		// Merge nagłówków: extra_args['headers'] nadpisuje/rozszerza domyślne.
+		$merged_headers = array_merge(
+			$default_headers,
+			(array) ( $extra_args['headers'] ?? [] )
+		);
 
-		// Safeguard: timeout MUSI być liczbą, nie tablicą.
-		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
+		$args = array_merge(
+			[
+				'timeout'   => 15,
+				'sslverify' => true,
+			],
+			$extra_args,
+			[ 'headers' => $merged_headers ] // headers zawsze po merge
+		);
+
+		if ( ! is_numeric( $args['timeout'] ?? null ) ) {
 			$args['timeout'] = 15;
 		}
 
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW tw_supabase_get error: ' . print_r( $response, true ) );
-			return [];
+			error_log( 'TW tw_supabase_get network error: ' . $response->get_error_message() );
+			return $response;
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			$body = wp_remote_retrieve_body( $response );
+			error_log( 'TW tw_supabase_get HTTP ' . $code . ' on ' . $endpoint . ': ' . $body );
+			return new WP_Error(
+				'tw_supabase_http_' . $code,
+				'Supabase HTTP error ' . $code,
+				[ 'status' => $code, 'body' => $body ]
+			);
+		}
 
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		return is_array( $data ) ? $data : [];
 	}
 }
 
-/**
- * Ogólny helper request (POST/PATCH/DELETE).
- */
+// ============================================================
+// tw_supabase_request() — POST / PATCH / PUT / DELETE
+// Zwraca: WP_Error przy błędzie sieci lub HTTP ≥ 300
+//         ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
+// ============================================================
+
 if ( ! function_exists( 'tw_supabase_request' ) ) {
-	function tw_supabase_request( $method, $endpoint, $query = [], $body = null, $extra_args = [] ) {
+	function tw_supabase_request( string $method, string $endpoint, array $query = [], $body = null, array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
 		if ( empty( $base ) ) {
-			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+			return new WP_Error( 'tw_supabase_config', 'Supabase REST base URL not configured.' );
 		}
 
-		$endpoint = ltrim( (string) $endpoint, '/' );
+		$endpoint = ltrim( $endpoint, '/' );
 		if ( $endpoint === '' ) {
-			error_log( 'TW tw_supabase_request error: empty endpoint' );
-			return [ 'ok' => false, 'code' => 0, 'data' => null ];
-		}
-
-		$url = $base . $endpoint;
-
-		if ( ! empty( $query ) && is_array( $query ) ) {
-			$url = add_query_arg( $query, $url );
+			return new WP_Error( 'tw_supabase_args', 'tw_supabase_request: empty endpoint.' );
 		}
 
 		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-			error_log( 'TW: tw_supabase_anon_key() is not defined.' );
-			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+			return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
 		}
 
-		$default_args = [
-			'method'  => strtoupper( (string) $method ),
-			'headers' => [
-				'apikey'        => tw_supabase_anon_key(),
-				'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
-				'Content-Type'  => 'application/json',
-			],
-			'timeout'   => 15,
-			'sslverify' => true,
+		$url = $base . $endpoint;
+		if ( ! empty( $query ) ) {
+			$url = add_query_arg( $query, $url );
+		}
+
+		$default_headers = [
+			'apikey'        => tw_supabase_anon_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+			'Content-Type'  => 'application/json',
 		];
 
-		if ( ! is_null( $body ) ) {
-			$default_args['body'] = wp_json_encode( $body );
+		// Merge nagłówków: extra_args['headers'] (np. service key, Prefer) nadpisuje/rozszerza.
+		$merged_headers = array_merge(
+			$default_headers,
+			(array) ( $extra_args['headers'] ?? [] )
+		);
+
+		$args = array_merge(
+			[
+				'method'    => strtoupper( $method ),
+				'timeout'   => 15,
+				'sslverify' => true,
+			],
+			$extra_args,
+			[ 'headers' => $merged_headers ] // headers zawsze po merge, nie nadpisane przez extra_args
+		);
+
+		if ( ! is_numeric( $args['timeout'] ?? null ) ) {
+			$args['timeout'] = 15;
 		}
 
-		$args = array_merge( $default_args, (array) $extra_args );
-
-		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
-			$args['timeout'] = 15;
+		if ( ! is_null( $body ) ) {
+			$args['body'] = wp_json_encode( $body );
 		}
 
 		$response = wp_remote_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW tw_supabase_request error: ' . print_r( $response, true ) );
-			return [ 'ok' => false, 'code' => 0, 'data' => null ];
+			error_log( 'TW tw_supabase_request network error (' . $method . ' ' . $endpoint . '): ' . $response->get_error_message() );
+			return $response;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		$code      = wp_remote_retrieve_response_code( $response );
+		$body_raw  = wp_remote_retrieve_body( $response );
+		$data      = json_decode( $body_raw, true );
+
+		if ( $code < 200 || $code >= 300 ) {
+			error_log( 'TW tw_supabase_request HTTP ' . $code . ' (' . $method . ' ' . $endpoint . '): ' . $body_raw );
+			return new WP_Error(
+				'tw_supabase_http_' . $code,
+				'Supabase HTTP error ' . $code,
+				[ 'status' => $code, 'body' => $body_raw, 'data' => $data ]
+			);
+		}
 
 		return [
-			'ok'   => ( $code >= 200 && $code < 300 ),
+			'ok'   => true,
 			'code' => $code,
 			'data' => $data,
 		];
 	}
 }
 
-/**
- * Stary helper kompatybilności: tw_get_data($url, $args);
- */
-if ( ! function_exists( 'tw_get_data' ) ) {
-	function tw_get_data( $url, $args = [] ) {
-		$defaults = [
-			'timeout'   => 15,
-			'sslverify' => true,
+// ============================================================
+// tw_supabase_rpc() — wywołanie funkcji Postgres przez RPC
+// Zwraca: array przy sukcesie, WP_Error przy błędzie
+// ============================================================
+
+if ( ! function_exists( 'tw_supabase_rpc' ) ) {
+	function tw_supabase_rpc( string $function_name, array $params = [], array $extra_args = [] ) {
+		$base = tw_supabase_rest_base();
+		if ( empty( $base ) ) {
+			return new WP_Error( 'tw_supabase_config', 'Supabase REST base URL not configured.' );
+		}
+
+		$function_name = preg_replace( '/[^a-zA-Z0-9_]/', '', $function_name );
+		if ( $function_name === '' ) {
+			return new WP_Error( 'tw_supabase_args', 'tw_supabase_rpc: empty function name.' );
+		}
+
+		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
+		}
+
+		$url = $base . 'rpc/' . $function_name;
+
+		$default_headers = [
+			'apikey'        => tw_supabase_anon_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+			'Content-Type'  => 'application/json',
+			'Accept'        => 'application/json',
 		];
 
-		$args = array_merge( $defaults, (array) $args );
+		$merged_headers = array_merge(
+			$default_headers,
+			(array) ( $extra_args['headers'] ?? [] )
+		);
 
-		if ( isset( $args['timeout'] ) && ! is_numeric( $args['timeout'] ) ) {
+		$args = array_merge(
+			[
+				'method'    => 'POST',
+				'timeout'   => 15,
+				'sslverify' => true,
+			],
+			$extra_args,
+			[
+				'headers' => $merged_headers,
+				'body'    => wp_json_encode( (object) $params ),
+			]
+		);
+
+		$response = wp_remote_request( $url, $args );
+
+		if ( is_wp_error( $response ) ) {
+			error_log( 'TW tw_supabase_rpc network error (' . $function_name . '): ' . $response->get_error_message() );
+			return $response;
+		}
+
+		$code     = wp_remote_retrieve_response_code( $response );
+		$body_raw = wp_remote_retrieve_body( $response );
+		$data     = json_decode( $body_raw, true );
+
+		if ( $code < 200 || $code >= 300 ) {
+			error_log( 'TW tw_supabase_rpc HTTP ' . $code . ' (' . $function_name . '): ' . $body_raw );
+			return new WP_Error(
+				'tw_supabase_http_' . $code,
+				'Supabase RPC error ' . $code,
+				[ 'status' => $code, 'body' => $body_raw, 'data' => $data ]
+			);
+		}
+
+		return is_array( $data ) ? $data : [];
+	}
+}
+
+// ============================================================
+// tw_get_data() — stary helper kompatybilności (nie usuwamy, bo
+// może być używany w zewnętrznych plikach szablonu)
+// ============================================================
+
+if ( ! function_exists( 'tw_get_data' ) ) {
+	function tw_get_data( string $url, array $args = [] ): array {
+		$args = array_merge(
+			[ 'timeout' => 15, 'sslverify' => true ],
+			$args
+		);
+
+		if ( ! is_numeric( $args['timeout'] ?? null ) ) {
 			$args['timeout'] = 15;
 		}
 
 		$response = wp_remote_get( $url, $args );
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW tw_get_data error: ' . print_r( $response, true ) );
+			error_log( 'TW tw_get_data error: ' . $response->get_error_message() );
 			return [];
 		}
-		$body = wp_remote_retrieve_body( $response );
-		return json_decode( $body, true ) ?: [];
+
+		return json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
 	}
 }
 
-/**
- * Pobiera założone (is_equipped=true) przedmioty postaci z cyber_character_inventory.
- */
+// ============================================================
+// get_character_equipped_items()
+// ============================================================
+
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
-	function get_character_equipped_items( $character_id ) {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id );
+	function get_character_equipped_items( string $character_id ): array {
+		// Poprawiony regex: pojedynczy backslash przed myślnikiem w klasie znaków.
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
 
 		if ( empty( $safe_id ) ) {
-			error_log( 'Invalid character_id in get_character_equipped_items' );
+			error_log( 'TW get_character_equipped_items: invalid character_id.' );
 			return [];
 		}
 
-		return tw_supabase_get(
+		$result = tw_supabase_get(
 			'cyber_character_inventory',
 			[
 				'character_id' => 'eq.' . $safe_id,
@@ -185,96 +309,25 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 				'select'       => 'quantity,cyber_items(name,img_url,slot,rarity,size)',
 			]
 		);
+
+		// Zwróć puste array przy WP_Error — caller nie musi sprawdzać.
+		return is_wp_error( $result ) ? [] : $result;
 	}
 }
-/**
- * Helper RPC: wywołuje funkcję Postgres przez POST /rest/v1/rpc/{function_name}
- *
- * Użycie:
- *   $rows = tw_supabase_rpc( 'get_player_achievements', [
- *       'p_user_id'      => 5,
- *       'p_character_id' => null,
- *       'p_type'         => 'all',
- *   ] );
- *
- * Zwraca tablicę wyników albo [] przy błędzie.
- */
-if ( ! function_exists( 'tw_supabase_rpc' ) ) {
-    function tw_supabase_rpc( $function_name, $params = [], $extra_args = [] ) {
-        $base = tw_supabase_rest_base();
-        if ( empty( $base ) ) {
-            error_log( 'TW RPC error: empty rest base' );
-            return [];
-        }
 
-        $function_name = preg_replace( '/[^a-zA-Z0-9_]/', '', (string) $function_name );
-        if ( $function_name === '' ) {
-            error_log( 'TW RPC error: empty function name' );
-            return [];
-        }
+// ============================================================
+// tw_save_user_setting() — wymaga SERVICE KEY (pomija RLS)
+// ============================================================
 
-        if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-            error_log( 'TW RPC error: anon key helper missing' );
-            return [];
-        }
-
-        $url = $base . 'rpc/' . $function_name;
-
-        $default_args = [
-            'method'  => 'POST',
-            'headers' => [
-                'apikey'        => tw_supabase_anon_key(),
-                'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
-                'Content-Type'  => 'application/json',
-                'Accept'        => 'application/json',
-            ],
-            'body'      => wp_json_encode( (object) $params ),
-            'timeout'   => 15,
-            'sslverify' => true,
-        ];
-
-        $args = array_merge( $default_args, (array) $extra_args );
-
-        $response = wp_remote_request( $url, $args );
-
-        if ( is_wp_error( $response ) ) {
-            error_log( 'TW RPC wp_error (' . $function_name . '): ' . print_r( $response, true ) );
-            return [];
-        }
-
-        $code = wp_remote_retrieve_response_code( $response );
-        $body = wp_remote_retrieve_body( $response );
-
-        error_log( 'TW RPC ' . $function_name . ' HTTP ' . $code . ': ' . $body );
-
-        $data = json_decode( $body, true );
-
-        if ( $code < 200 || $code >= 300 ) {
-            return [];
-        }
-
-        return is_array( $data ) ? $data : [];
-    }
-}
-/**
- * Zapisuje lub aktualizuje preferencję użytkownika w cyber_user_settings.
- */
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
-		if ( ! defined('TW_SUPABASE_SERVICE_KEY') ) {
-			error_log('TW: TW_SUPABASE_SERVICE_KEY not defined.');
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined.' );
 			return false;
 		}
 
-		$service_headers = [
-			'headers' => [
-				'apikey'        => TW_SUPABASE_SERVICE_KEY,
-				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-				'Content-Type'  => 'application/json',
-				'Prefer'        => 'resolution=merge-duplicates',
-			],
-		];
-
+		// extra_args['headers'] jest mergowany w tw_supabase_request(),
+		// więc Prefer i service key nie giną — nadpisują tylko te klucze.
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_user_settings',
@@ -283,33 +336,38 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 				'wp_user_id' => $wp_user_id,
 				'key'        => $key,
 				'value'      => $value,
-				'updated_at' => gmdate('c'),
+				'updated_at' => gmdate( 'c' ),
 			],
-			$service_headers
+			[
+				'headers' => [
+					'apikey'        => TW_SUPABASE_SERVICE_KEY,
+					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+					'Prefer'        => 'resolution=merge-duplicates',
+				],
+			]
 		);
+
+		if ( is_wp_error( $result ) ) {
+			error_log( 'TW tw_save_user_setting error: ' . $result->get_error_message() );
+			return false;
+		}
 
 		return $result['ok'] ?? false;
 	}
 }
 
-/**
- * Pobiera preferencję użytkownika z cyber_user_settings.
- */
+// ============================================================
+// tw_get_user_setting() — wymaga SERVICE KEY
+// ============================================================
+
 if ( ! function_exists( 'tw_get_user_setting' ) ) {
 	function tw_get_user_setting( int $wp_user_id, string $key ): ?string {
-		if ( ! defined('TW_SUPABASE_SERVICE_KEY') ) {
-			error_log('TW: TW_SUPABASE_SERVICE_KEY not defined.');
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined.' );
 			return null;
 		}
 
-		$service_headers = [
-			'headers' => [
-				'apikey'        => TW_SUPABASE_SERVICE_KEY,
-				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-			],
-		];
-
-		$rows = tw_supabase_get(
+		$result = tw_supabase_get(
 			'cyber_user_settings',
 			[
 				'wp_user_id' => 'eq.' . $wp_user_id,
@@ -317,33 +375,55 @@ if ( ! function_exists( 'tw_get_user_setting' ) ) {
 				'select'     => 'value',
 				'limit'      => 1,
 			],
-			$service_headers
+			[
+				'headers' => [
+					'apikey'        => TW_SUPABASE_SERVICE_KEY,
+					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				],
+			]
 		);
 
-		return $rows[0]['value'] ?? null;
+		if ( is_wp_error( $result ) ) {
+			error_log( 'TW tw_get_user_setting error: ' . $result->get_error_message() );
+			return null;
+		}
+
+		return $result[0]['value'] ?? null;
 	}
 }
-add_action('wp_ajax_tw_save_user_setting', 'tw_ajax_save_user_setting');
 
-function tw_ajax_save_user_setting(): void {
-	if ( ! is_user_logged_in() ) {
-		wp_send_json_error(['message' => 'Unauthorized'], 401);
+// ============================================================
+// AJAX: tw_ajax_save_user_setting
+// ============================================================
+
+add_action( 'wp_ajax_tw_save_user_setting', 'tw_ajax_save_user_setting' );
+
+if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
+	function tw_ajax_save_user_setting(): void {
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( [ 'message' => 'Unauthorized' ], 401 );
+			return; // NAPRAWIONE: brakowało return po wp_send_json_error
+		}
+
+		check_ajax_referer( 'tw_user_setting', 'nonce' );
+
+		$key   = sanitize_key( $_POST['key'] ?? '' );
+		$value = sanitize_text_field( $_POST['value'] ?? '' );
+
+		// Biała lista kluczy — rozszerzaj tu gdy dodajesz nowe preferencje.
+		$allowed_keys = [ 'onboarding_dismissed' ];
+
+		if ( empty( $key ) || ! in_array( $key, $allowed_keys, true ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid key' ], 400 );
+			return;
+		}
+
+		$success = tw_save_user_setting( get_current_user_id(), $key, $value );
+
+		if ( $success ) {
+			wp_send_json_success();
+		} else {
+			wp_send_json_error( [ 'message' => 'Supabase error' ], 500 );
+		}
 	}
-
-	check_ajax_referer('tw_user_setting', 'nonce');
-
-	$key   = sanitize_key( $_POST['key'] ?? '' );
-	$value = sanitize_text_field( $_POST['value'] ?? '' );
-
-	$allowed_keys = ['onboarding_dismissed'];  // biała lista — rozszerzaj w razie potrzeby
-
-	if ( empty($key) || ! in_array($key, $allowed_keys, true) ) {
-		wp_send_json_error(['message' => 'Invalid key'], 400);
-	}
-
-	$success = tw_save_user_setting( get_current_user_id(), $key, $value );
-
-	$success
-		? wp_send_json_success()
-		: wp_send_json_error(['message' => 'Supabase error'], 500);
 }
