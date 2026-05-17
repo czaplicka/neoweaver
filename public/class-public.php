@@ -16,8 +16,8 @@
  * SEPARATION OF CONCERNS:
  *   - PHP methods prepare data and pass it to template partials via $tw_data.
  *   - HTML lives in templates/partials/*.php.
- *   - CSS lives in assets/css/ and is enqueued via wp_enqueue_style().
- *   - JS lives in assets/js/ and is enqueued via wp_enqueue_script().
+ *   - CSS lives in assets/css/public/ and is enqueued via wp_enqueue_style().
+ *   - JS lives in assets/js/public/ and is enqueued via wp_enqueue_script().
  *   No inline <style> or <script> blocks belong in this class.
  *
  *
