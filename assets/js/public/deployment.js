@@ -1,6 +1,6 @@
 /* NeoWeaver — Deployment connector (campaign ↔ world)
  * Config injected via wp_localize_script as window.twDeploymentCfg
- * v19: auto-scroll to #tw-deployment-root when hash present in URL
+ * v20: fix wp_user_id column name (was user_wp_id / creator_wp_id)
  */
 (function () {
     'use strict';
@@ -141,7 +141,7 @@
                     fetch(
                         cfg.url + 'rest/v1/cyber_campaign_worlds' +
                         '?select=campaign_id' +
-                        '&user_wp_id=eq.' + cfg.uid,
+                        '&wp_user_id=eq.' + cfg.uid,
                         { headers: h }
                     )
                 ]);
@@ -174,7 +174,7 @@
             }
         }
 
-        /* ── Submit: POST to cyber_campaign_worlds only ── */
+        /* ── Submit: POST to cyber_campaign_worlds ── */
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (isSubmitting) return;
@@ -184,9 +184,9 @@
             setLog('> System: Weaving Splot threads...');
 
             const payload = {
-                campaign_id:   selC.value,
-                world_id:      selW.value,
-                creator_wp_id: parseInt(cfg.uid, 10)
+                campaign_id: selC.value,
+                world_id:    selW.value,
+                wp_user_id:  parseInt(cfg.uid, 10)
             };
 
             const apiHeaders = {
