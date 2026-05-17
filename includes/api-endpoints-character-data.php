@@ -259,7 +259,7 @@ if ( $raw !== '' && null === $data && JSON_ERROR_NONE !== json_last_error() ) {
 
     return is_array( $data ) ? $data : array();
 }
-
+}
 if ( ! function_exists( 'nw_fetch_lookup_table' ) ) {
     function nw_fetch_lookup_table( string $table, string $select_cols, string $order = '', int $limit = 300, array $extra_filters = array(), int $ttl = 60 ) {
         $cache_key = 'nw_lookup_' . md5( wp_json_encode( array( $table, $select_cols, $order, $limit, $extra_filters ) ) );
