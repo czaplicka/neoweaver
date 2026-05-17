@@ -352,7 +352,7 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 			return false;
 		}
 
-		return $result['ok'] ?? false;
+		return is_wp_error($result) ?? false;
 	}
 }
 
