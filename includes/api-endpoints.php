@@ -170,10 +170,49 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		return new WP_Error( 'missing_race_class', 'Race and class are required.', [ 'status' => 400 ] );
 	}
 
-	$attr_body   = max( 1, min( 5, (int) ( $request->get_param( 'attr_body' )   ?? 3 ) ) );
-	$attr_reflex = max( 1, min( 5, (int) ( $request->get_param( 'attr_reflex' ) ?? 3 ) ) );
-	$attr_mind   = max( 1, min( 5, (int) ( $request->get_param( 'attr_mind' )   ?? 3 ) ) );
-	$attr_spirit = max( 1, min( 5, (int) ( $request->get_param( 'attr_spirit' ) ?? 3 ) ) );
+	// ---------------------------------------------------------------------------
+	// FIX #1: Require all four attribute keys to be explicitly present,
+	//         validate range 1–5 per attribute, validate total == 12.
+	// ---------------------------------------------------------------------------
+	$attr_keys = [ 'attr_body', 'attr_reflex', 'attr_mind', 'attr_spirit' ];
+
+	foreach ( $attr_keys as $key ) {
+		if ( null === $request->get_param( $key ) ) {
+			return new WP_Error(
+				'missing_attribute',
+				sprintf( 'Missing required attribute: %s', $key ),
+				[ 'status' => 400 ]
+			);
+		}
+	}
+
+	$attr_body   = (int) $request->get_param( 'attr_body' );
+	$attr_reflex = (int) $request->get_param( 'attr_reflex' );
+	$attr_mind   = (int) $request->get_param( 'attr_mind' );
+	$attr_spirit = (int) $request->get_param( 'attr_spirit' );
+
+	foreach (
+		[ 'attr_body' => $attr_body, 'attr_reflex' => $attr_reflex, 'attr_mind' => $attr_mind, 'attr_spirit' => $attr_spirit ]
+		as $key => $val
+	) {
+		if ( $val < 1 || $val > 5 ) {
+			return new WP_Error(
+				'attribute_out_of_range',
+				sprintf( 'Attribute %s must be between 1 and 5, got %d.', $key, $val ),
+				[ 'status' => 400 ]
+			);
+		}
+	}
+
+	$attr_total = $attr_body + $attr_reflex + $attr_mind + $attr_spirit;
+	if ( 12 !== $attr_total ) {
+		return new WP_Error(
+			'invalid_attributes',
+			sprintf( 'Attribute total must equal 12, got %d.', $attr_total ),
+			[ 'status' => 400 ]
+		);
+	}
+	// ---------------------------------------------------------------------------
 
 	$node_id_raw = $request->get_param( 'node_id' );
 	$node_id     = $node_id_raw ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $node_id_raw ) : null;
@@ -202,21 +241,38 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		return new WP_Error( 'creation_failed', 'Character creation failed. Check server logs.', [ 'status' => 500 ] );
 	}
 
+	// ---------------------------------------------------------------------------
+	// FIX #4: Avatar upload — restrict MIME types and file size (max 2 MB).
+	// ---------------------------------------------------------------------------
 	if ( ! empty( $_FILES['avatar']['tmp_name'] ) ) {
-		if ( ! function_exists( 'wp_handle_upload' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-		}
-		$upload = wp_handle_upload( $_FILES['avatar'], [ 'test_form' => false ] );
-		if ( ! empty( $upload['url'] ) ) {
-			$patch_url = add_query_arg( [ 'id' => 'eq.' . $agent_id ], $base . 'cyber_characters' );
-			wp_remote_request( $patch_url, [
-				'method'  => 'PATCH',
-				'headers' => nw_supabase_headers(),
-				'body'    => wp_json_encode( [ 'avatar' => $upload['url'] ] ),
-				'timeout' => 10,
+		if ( isset( $_FILES['avatar']['size'] ) && $_FILES['avatar']['size'] > 2 * MB_IN_BYTES ) {
+			error_log( 'TW_ENDPOINT_CHARACTER: avatar upload skipped — file exceeds 2 MB' );
+		} else {
+			if ( ! function_exists( 'wp_handle_upload' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/file.php';
+			}
+			$upload = wp_handle_upload( $_FILES['avatar'], [
+				'test_form' => false,
+				'mimes'     => [
+					'jpg|jpeg|jpe' => 'image/jpeg',
+					'png'          => 'image/png',
+					'webp'         => 'image/webp',
+				],
 			] );
+			if ( ! empty( $upload['url'] ) ) {
+				$patch_url = add_query_arg( [ 'id' => 'eq.' . $agent_id ], $base . 'cyber_characters' );
+				wp_remote_request( $patch_url, [
+					'method'  => 'PATCH',
+					'headers' => nw_supabase_headers(),
+					'body'    => wp_json_encode( [ 'avatar' => $upload['url'] ] ),
+					'timeout' => 10,
+				] );
+			} elseif ( ! empty( $upload['error'] ) ) {
+				error_log( 'TW_ENDPOINT_CHARACTER: avatar upload error — ' . $upload['error'] );
+			}
 		}
 	}
+	// ---------------------------------------------------------------------------
 
 	error_log( 'TW_ENDPOINT_CHARACTER: SUCCESS agent_id=' . $agent_id );
 
@@ -293,7 +349,7 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
 //
 // Logic:
 //   1. Pause any other active session the user has (one active at a time).
-//   2. If a paused session exists for this campaign, resume it (status → active).
+//   2. If a paused session exists for this campaign, resume it (status -> active).
 //   3. Otherwise create a new session row.
 //
 // Session state lives entirely in cyber_game_sessions.status:
@@ -399,10 +455,11 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 	// Step 3 — no paused session found; create a brand-new one.
 	// ------------------------------------------------------------------
 
-	// Fetch campaign to get linked world + character.
+	// FIX #3: Added wp_user_id ownership check to campaign lookup.
 	$query_url = add_query_arg( [
-		'id'     => 'eq.' . $campaign_id,
-		'select' => 'cyber_campaign_worlds(world_id),cyber_campaign_characters(character_id)',
+		'id'         => 'eq.' . $campaign_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'cyber_campaign_worlds(world_id),cyber_campaign_characters(character_id)',
 	], $base . 'cyber_campaign' );
 
 	$resp = wp_remote_get( $query_url, [ 'headers' => nw_supabase_headers(), 'timeout' => 10 ] );
@@ -509,6 +566,12 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
  */
 function neoweaver_end_game_session( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_END_GAME_SESSION: START (REST API)' );
+
+	// FIX #2: Added missing nonce verification (was absent in original).
+	$nonce = $request->get_param( 'security' ) ?? '';
+	if ( ! wp_verify_nonce( $nonce, 'tw_game_nonce' ) ) {
+		return new WP_Error( 'nonce_failed', 'Nonce check failed.', [ 'status' => 403 ] );
+	}
 
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
