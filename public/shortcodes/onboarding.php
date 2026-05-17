@@ -21,7 +21,6 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 				return '';
 			}
 
-			// Nie pokazuj, jeśli użytkownik już zamknął onboarding.
 			if (
 				function_exists( 'tw_get_user_setting' ) &&
 				tw_get_user_setting( $wp_user_id, 'onboarding_dismissed' ) === '1'
