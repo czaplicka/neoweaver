@@ -84,7 +84,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<div class="tw-onboarding-slider__body">
 								<strong>Create a Node</strong>
 								<p>Generate a world to save</p>
-								<a href="<?php echo esc_url( site_url( '/new-node' ) ); ?>">Open node creator</a>
+								<a href="<?php echo esc_url( site_url( '/new-node' ) ); ?>">create new world Node</a>
 							</div>
 						</li>
 
@@ -93,7 +93,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<div class="tw-onboarding-slider__body">
 								<strong>Create an Agent</strong>
 								<p>Bind your Operator to an Agent</p>
-								<a href="<?php echo esc_url( site_url( '/new-agent' ) ); ?>">Open agent creator</a>
+								<a href="<?php echo esc_url( site_url( '/new-agent' ) ); ?>">Agent dossier</a>
 							</div>
 						</li>
 
@@ -102,7 +102,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<div class="tw-onboarding-slider__body">
 								<strong>Create a Deployment</strong>
 								<p>Launch campaign inside a Node</p>
-								<a href="<?php echo esc_url( site_url( '/new-deployment' ) ); ?>">Open deployment creator</a>
+								<a href="<?php echo esc_url( site_url( '/new-deployment' ) ); ?>">brief Deployment</a>
 							</div>
 						</li>
 
@@ -110,10 +110,10 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 							<span class="tw-onboarding-slider__status" aria-hidden="true"></span>
 							<div class="tw-onboarding-slider__body">
 								<strong>Enter the Terminal</strong>
-								<p>Launch a session | join a team</p>
+								<p>Launch a session | Go to team lobby</p>
 								<div class="tw-onboarding-slider__actions">
 									<a href="<?php echo esc_url( site_url( '/terminal/' ) ); ?>">Open terminal</a> //
-									<a href="<?php echo esc_url( site_url( '/join-terminal/' ) ); ?>">Join team</a>
+									<a href="<?php echo esc_url( site_url( '/join-terminal/' ) ); ?>">Join a team</a>
 								</div>
 							</div>
 						</li>
