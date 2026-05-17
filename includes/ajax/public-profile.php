@@ -41,28 +41,27 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 		}
 
 		$result = tw_supabase_request(
-			'PATCH',
-			'cyber_characters',
-			array(
-				'id'         => 'eq.' . $char_id,
-				'wp_user_id' => 'eq.' . $wp_user_id,
-			),
-			array(
-				'is_public' => $is_public,
-			)
-		);
+	'PATCH',
+	'cyber_characters',
+	array(
+		'id'         => 'eq.' . $char_id,
+		'wp_user_id' => 'eq.' . $wp_user_id,
+	),
+	array(
+		'is_public' => $is_public,
+	)
+);
 
-		if ( empty( $result['ok'] ) ) {
-			wp_send_json_error(
-				array(
-					'message' => 'Database Error',
-					'result'  => $result,
-				),
-				500
-			);
-			return;
-		}
-
+if ( is_wp_error( $result ) ) {
+	wp_send_json_error(
+		array(
+			'message' => 'Database Error',
+			'error'   => $result->get_error_message(),
+		),
+		500
+	);
+	return;
+}
 		wp_send_json_success(
 			array(
 				'char_id'   => $char_id,
