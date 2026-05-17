@@ -175,79 +175,89 @@ if ( ! function_exists( 'nw_resolve_backstory_tag_ids' ) ) {
 }
 if ( ! function_exists( 'nw_supabase_request' ) ) {
     function nw_supabase_request( string $method, string $table, array $query = array(), $body = null, bool $return_representation = false ) {
-
-        if ( ! function_exists( 'tw_supabase_rest_base' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-            return new WP_Error( 'config_missing', 'Supabase REST configuration missing.', array( 'status' => 500 ) );
-        }
-
-        $base = tw_supabase_rest_base();
-        if ( empty( $base ) ) {
-            return new WP_Error( 'config_missing', 'Supabase REST URL is empty.', array( 'status' => 500 ) );
-        }
-
-        $url = trailingslashit( $base ) . ltrim( $table, '/' );
-
-        if ( ! empty( $query ) ) {
-            $url = add_query_arg( $query, $url );
-        }
-
-        error_log( 'NW SUPABASE REQUEST: ' . $method . ' ' . $url );
-        if ( ! empty( $query ) ) {
-            error_log( 'NW SUPABASE QUERY ARGS: ' . wp_json_encode( $query ) );
-        }
-
-        $headers = array(
-            'apikey'        => tw_supabase_anon_key(),
-            'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
-        );
-
-        if ( $return_representation ) {
-            $headers['Prefer'] = 'return=representation';
-        }
-
-        $method = strtoupper( $method );
-
-        $args = array(
-            'method'    => $method,
-            'headers'   => $headers,
-            'timeout'   => 30,
-            'sslverify' => true,
-        );
-
-        if ( in_array( $method, array( 'POST', 'PATCH' ), true ) ) {
-            $headers['Content-Type'] = 'application/json';
-            $args['headers']         = $headers;
-        }
-
-        if ( null !== $body ) {
-            $args['body'] = wp_json_encode( $body );
-            error_log( 'NW SUPABASE BODY: ' . wp_json_encode( $body ) );
-        }
-
-        $response = wp_remote_request( $url, $args );
-
-        if ( is_wp_error( $response ) ) {
-            error_log( 'NW SUPABASE WP ERROR: ' . $response->get_error_message() );
-            return $response;
-        }
-
-        $code = (int) wp_remote_retrieve_response_code( $response );
-        $raw  = wp_remote_retrieve_body( $response );
-        $data = $raw ? json_decode( $raw, true ) : array();
-
-        error_log( 'NW SUPABASE RESPONSE CODE: ' . $code );
-        error_log( 'NW SUPABASE RESPONSE RAW: ' . $raw );
-
-        if ( $code < 200 || $code >= 300 ) {
-            return new WP_Error(
-                'supabase_http_error',
-                is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'Supabase request failed.',
-                array( 'status' => $code, 'body' => $data )
-            );
-        }
-
-        return is_array( $data ) ? $data : array();
+    if ( ! function_exists( 'tw_supabase_rest_base' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+        return new WP_Error( 'config_missing', 'Supabase REST configuration missing.', array( 'status' => 500 ) );
     }
+
+    $base = tw_supabase_rest_base();
+    if ( empty( $base ) ) {
+        return new WP_Error( 'config_missing', 'Supabase REST URL is empty.', array( 'status' => 500 ) );
+    }
+
+    $url = trailingslashit( $base ) . ltrim( $table, '/' );
+    if ( ! empty( $query ) ) {
+        $url = add_query_arg( $query, $url );
+    }
+
+    error_log( 'NW SUPABASE REQUEST ' . $method . ' ' . $url );
+    if ( ! empty( $query ) ) {
+        error_log( 'NW SUPABASE QUERY ARGS ' . wp_json_encode( $query ) );
+    }
+
+    $method = strtoupper( $method );
+
+    $headers = array(
+        'apikey'        => tw_supabase_anon_key(),
+        'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+        'Accept'        => 'application/json',
+    );
+
+    if ( $return_representation ) {
+        $headers['Prefer'] = 'return=representation';
+    }
+
+    if ( in_array( $method, array( 'POST', 'PATCH', 'PUT' ), true ) ) {
+        $headers['Content-Type'] = 'application/json';
+    }
+
+    $args = array(
+        'method'    => $method,
+        'headers'   => $headers,
+        'timeout'   => 30,
+        'sslverify' => true,
+    );
+
+    if ( null !== $body ) {
+        $args['body'] = wp_json_encode( $body );
+        error_log( 'NW SUPABASE BODY ' . wp_json_encode( $body ) );
+    }
+
+    $response = wp_remote_request( $url, $args );
+
+    if ( is_wp_error( $response ) ) {
+        error_log( 'NW SUPABASE WP ERROR ' . $response->get_error_message() );
+        return $response;
+    }
+
+    $code = (int) wp_remote_retrieve_response_code( $response );
+    $raw  = wp_remote_retrieve_body( $response );
+    $data = $raw !== '' ? json_decode( $raw, true ) : array();
+if ( $raw !== '' && null === $data && JSON_ERROR_NONE !== json_last_error() ) {
+    error_log( 'NW SUPABASE JSON ERROR ' . json_last_error_msg() );
+    return new WP_Error(
+        'supabase_invalid_json',
+        'Supabase returned an invalid JSON response.',
+        array(
+            'status' => 502,
+            'raw'    => $raw,
+        )
+    );
+}
+    error_log( 'NW SUPABASE RESPONSE CODE ' . $code );
+    error_log( 'NW SUPABASE RESPONSE RAW ' . $raw );
+
+    if ( $code < 200 || $code >= 300 ) {
+        return new WP_Error(
+            'supabase_http_error',
+            is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'Supabase request failed.',
+            array(
+                'status' => $code,
+                'body'   => $data,
+            )
+        );
+    }
+
+    return is_array( $data ) ? $data : array();
 }
 
 if ( ! function_exists( 'nw_fetch_lookup_table' ) ) {
