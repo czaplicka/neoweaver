@@ -1,10 +1,10 @@
 /**
  * campaign-creator.js  — 8-step Deployment wizard
  *
- * Agent eligibility rule:
- *   An agent belongs to exactly one world (cyber_characters.world_id).
- *   They may be in many campaigns, but only within that same world.
- *   → When a world is selected, show only agents whose world_id matches.
+ * Agent eligibility rule (Step 7):
+ *   Bound agents:  character → cyber_campaign_characters → cyber_campaign
+ *                  → cyber_campaign_worlds → selected world_id
+ *   Free agents:   characters with NO entry in cyber_campaign_characters at all.
  */
 ( function () {
 	'use strict';
@@ -276,74 +276,141 @@
 				} );
 		}
 
-		// ── loadAgents ────────────────────────────────────────────────────────
-// Rule: show agents whose world_id matches the selected world
-//       OR whose world_id is null (unassigned — free to join any world).
-function loadAgents( worldId ) {
-    const grid = document.getElementById( 'tw-camp-agent-grid' );
-    const hint = document.getElementById( 'tw-agent-hint' );
-    if ( ! grid ) return;
+		// ── loadAgents ────────────────────────────────────────────────────────────────
+		// Logic:
+		//   1. Find all campaigns linked to the selected world (cyber_campaign_worlds)
+		//   2. Find characters assigned to those campaigns (cyber_campaign_characters)
+		//      → these are "bound to this world" agents
+		//   3. Find characters with NO entry in cyber_campaign_characters at all
+		//      → these are "free agents" (no campaign = no world)
+		//   4. Display both groups; exclude dead agents from the user's own characters
 
-    // No world selected yet — prompt the user.
-    if ( ! worldId ) {
-        grid.innerHTML = '';
-        if ( hint ) {
-            hint.style.display = '';
-            hint.textContent   = '← Select a Node first to see its available agents.';
-        }
-        return;
-    }
+		function loadAgents( worldId ) {
+			const grid = document.getElementById( 'tw-camp-agent-grid' );
+			const hint = document.getElementById( 'tw-agent-hint' );
+			if ( ! grid ) return;
 
-    if ( hint ) hint.style.display = 'none';
-    grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
+			if ( ! worldId ) {
+				grid.innerHTML = '';
+				if ( hint ) {
+					hint.style.display = '';
+					hint.textContent   = '← Select a Node first to see its available agents.';
+				}
+				return;
+			}
 
-    // Supabase OR filter: world_id matches selected world OR world_id is null.
-    const orFilter = 'or=(world_id.eq.' + worldId + ',world_id.is.null)';
-    const selectFields = 'id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)';
-    let url = sbBase + 'cyber_characters'
-        + '?select=' + encodeURIComponent( selectFields )
-        + '&' + orFilter
-        + '&status=neq.STATUS_DEAD'
-        + '&order=name.asc';
-    if ( userId ) url += '&wp_user_id=eq.' + userId;
+			if ( hint ) hint.style.display = 'none';
+			grid.innerHTML = '<div class="tw-loading-state"><span class="tw-loading-dot"></span>FETCHING AGENTS…</div>';
 
-    fetch( url, {
-        headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey },
-    } )
-        .then( r => r.json() )
-        .then( function ( rows ) {
-            grid.innerHTML = '';
-            if ( ! rows || ! rows.length ) {
-                grid.innerHTML =
-                    '<p class="tw-error-msg">No agents found in this Node. ' +
-                    '<a href="/new-agent/" class="tw-link">Create one first →</a></p>';
-                return;
-            }
-            rows.forEach( function ( row ) {
-                const className = ( row.cyber_classes && row.cyber_classes.name ) || '—';
-                const raceName  = ( row.cyber_races  && row.cyber_races.name  ) || '—';
-                // Badge for unassigned agents
-                const badge = row.world_id === null
-                    ? ' <span class="tw-badge-free">FREE AGENT</span>'
-                    : '';
-                const card = makeCard(
-                    row.id, row.name, raceName + ' · ' + className, '🕵️',
-                    formState.character_id ? formState.character_id.id : null,
-                    function ( id, name ) { formState.character_id = { id, name }; setStatus( '', false ); }
-                );
-                // Append badge to card name if unassigned
-                if ( row.world_id === null ) {
-                    const strong = card.querySelector( 'strong' );
-                    if ( strong ) strong.insertAdjacentHTML( 'afterend', badge );
-                }
-                grid.appendChild( card );
-            } );
-        } )
-        .catch( function ( err ) {
-            console.error( 'NeoWeaver: loadAgents error', err );
-            grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>';
-        } );
-}
+			// Step 1: get campaign IDs linked to this world
+			const worldCampaignsUrl = sbBase + 'cyber_campaign_worlds'
+				+ '?select=campaign_id'
+				+ '&world_id=eq.' + encodeURIComponent( worldId );
+
+			// Step 2: get ALL character IDs that have ANY campaign assignment
+			//         (to know who is a "free agent" — not in any campaign)
+			const allAssignedUrl = sbBase + 'cyber_campaign_characters'
+				+ '?select=character_id,campaign_id';
+
+			// Step 3: get all user's active characters with class/race info
+			let allCharsUrl = sbBase + 'cyber_characters'
+				+ '?select=id,name,class_id,race_id,status,cyber_classes(name),cyber_races(name)'
+				+ '&status=neq.STATUS_DEAD'
+				+ '&order=name.asc';
+			if ( userId ) allCharsUrl += '&wp_user_id=eq.' + userId;
+
+			Promise.all( [
+				fetch( worldCampaignsUrl, { headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey } } ).then( r => r.json() ),
+				fetch( allAssignedUrl,    { headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey } } ).then( r => r.json() ),
+				fetch( allCharsUrl,       { headers: { 'apikey': sbKey, 'Authorization': 'Bearer ' + sbKey } } ).then( r => r.json() ),
+			] )
+			.then( function ( [ worldCampaigns, allAssigned, allChars ] ) {
+
+				// campaign IDs belonging to this world
+				const worldCampaignIds = new Set(
+					( worldCampaigns || [] ).map( r => r.campaign_id )
+				);
+
+				// character IDs that are assigned to a campaign in THIS world
+				const boundCharIds = new Set(
+					( allAssigned || [] )
+						.filter( r => worldCampaignIds.has( r.campaign_id ) )
+						.map( r => r.character_id )
+				);
+
+				// character IDs that have ANY campaign assignment (regardless of world)
+				const anyAssignedCharIds = new Set(
+					( allAssigned || [] ).map( r => r.character_id )
+				);
+
+				// Split characters into two groups
+				const boundAgents = [];
+				const freeAgents  = [];
+
+				( allChars || [] ).forEach( function ( char ) {
+					if ( boundCharIds.has( char.id ) ) {
+						boundAgents.push( char );
+					} else if ( ! anyAssignedCharIds.has( char.id ) ) {
+						// Not in ANY campaign → true free agent
+						freeAgents.push( char );
+					}
+					// If assigned to campaigns in other worlds → don't show
+					// (game rule: one character plays in only one world)
+				} );
+
+				grid.innerHTML = '';
+
+				if ( ! boundAgents.length && ! freeAgents.length ) {
+					grid.innerHTML =
+						'<p class="tw-error-msg">No agents available for this Node. ' +
+						'<a href="/new-agent/" class="tw-link">Create a Field Agent first →</a></p>';
+					return;
+				}
+
+				function renderAgentCard( row, badge ) {
+					const className = ( row.cyber_classes && row.cyber_classes.name ) || '—';
+					const raceName  = ( row.cyber_races   && row.cyber_races.name   ) || '—';
+					const card = makeCard(
+						row.id,
+						row.name,
+						raceName + ' · ' + className,
+						'🕵️',
+						formState.character_id ? formState.character_id.id : null,
+						function ( id, name ) { formState.character_id = { id, name }; setStatus( '', false ); }
+					);
+					if ( badge ) {
+						const strong = card.querySelector( 'strong' );
+						if ( strong ) strong.insertAdjacentHTML( 'afterend', badge );
+					}
+					grid.appendChild( card );
+				}
+
+				// ── Group header: bound to this world ─────────────────────────
+				if ( boundAgents.length ) {
+					const header = document.createElement( 'p' );
+					header.className = 'tw-agents-group-label';
+					header.textContent = '// ASSIGNED TO THIS NODE';
+					grid.appendChild( header );
+					boundAgents.forEach( row => renderAgentCard( row, null ) );
+				}
+
+				// ── Group header: free agents ──────────────────────────────────
+				if ( freeAgents.length ) {
+					const header = document.createElement( 'p' );
+					header.className = 'tw-agents-group-label tw-agents-group-label--free';
+					header.textContent = '// FREE AGENTS — no active deployment';
+					grid.appendChild( header );
+					freeAgents.forEach( row =>
+						renderAgentCard( row, ' <span class="tw-badge-free">FREE</span>' )
+					);
+				}
+			} )
+			.catch( function ( err ) {
+				console.error( 'NeoWeaver: loadAgents error', err );
+				grid.innerHTML = '<p class="tw-error-msg">Failed to load agents.</p>';
+			} );
+		}
+
 
 		function populateSummary() {
 			function set( field, val ) {
