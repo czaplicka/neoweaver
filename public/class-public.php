@@ -209,7 +209,7 @@ class Neoweaver_Public {
 	// =========================================================================
 
 	public function render_tag_update_popup(): void {
-		if ( ! is_page( 2857 ) ) {
+if ( ! is_page_template( 'templates/adventure.php' ) ) {
 			return;
 		}
 		?>
