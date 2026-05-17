@@ -23,7 +23,6 @@
     border-radius: 12px;
     min-height: 800px;
     overflow: visible;
-    overflow-x: clip;
     box-sizing: border-box;
 }
 
