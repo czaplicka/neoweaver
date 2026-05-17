@@ -577,7 +577,7 @@ class NW_Deck_Admin {
 			[ 'Range' => '0-199' ]
 		);
 
-		if ( ! $result['ok'] ) {
+		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result['error'] ?? 'Failed to load deck.' );
 			return;
 		}
@@ -605,7 +605,7 @@ class NW_Deck_Admin {
 			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=*'
 		);
 
-		if ( ! $result['ok'] ) {
+		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result['error'] ?? 'Failed to fetch card.' );
 			return;
 		}
@@ -696,7 +696,7 @@ class NW_Deck_Admin {
 			);
 		}
 
-		if ( ! $result['ok'] ) {
+		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result['error'] ?? 'Save failed.' );
 			return;
 		}
@@ -727,7 +727,7 @@ class NW_Deck_Admin {
 			[ 'is_active' => $state ]
 		);
 
-		if ( ! $result['ok'] ) {
+		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result['error'] ?? 'Toggle failed.' );
 			return;
 		}
@@ -755,7 +755,7 @@ class NW_Deck_Admin {
 			'cyber_deck?id=eq.' . rawurlencode( $id )
 		);
 
-		if ( ! $result['ok'] ) {
+		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result['error'] ?? 'Delete failed.' );
 			return;
 		}
