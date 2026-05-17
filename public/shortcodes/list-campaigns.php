@@ -33,12 +33,15 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
         );
 wp_localize_script(
     'list-campaigns-script',
-    'twCampaignConfig',
+    'twCampaignData',                // ← ta sama nazwa obiektu co w JS
     [
-        'security'        => wp_create_nonce( 'tw_game_nonce' ),
-        'restNonce'       => wp_create_nonce( 'wp_rest' ),
-        'sessionStartUrl' => get_rest_url( null, 'neoweaver/v1/session/start' ),
-        'sessionEndUrl'   => get_rest_url( null, 'neoweaver/v1/session/end' ),
+        'nonce'       => wp_create_nonce( 'tw_game_nonce' ),   // JS czyta .nonce
+        'restNonce'   => wp_create_nonce( 'wp_rest' ),          // JS czyta .restNonce
+        'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ), // JS czyta .sessionUrl
+        // pozostałe klucze których JS używa dalej:
+        'terminalUrl' => home_url( '/game/' ),
+        'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
+        'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
     ]
 );
         $user_id = get_current_user_id();
