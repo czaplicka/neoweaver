@@ -739,3 +739,14 @@
     vertical-align: middle;
     margin-left: 4px;
 }
+.tw-agents-group-label {
+    font-family: 'Chakra Petch', monospace;
+    font-size: 0.75rem;
+    color: var(--neon-green, #adff00);
+    letter-spacing: 0.1em;
+    margin: 16px 0 8px;
+    grid-column: 1 / -1;
+}
+.tw-agents-group-label--free {
+    color: var(--color-text-muted, #888);
+}
