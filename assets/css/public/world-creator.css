@@ -21,9 +21,10 @@
     box-shadow: 0 0 40px rgba(0,0,0,0.9), inset 0 0 100px rgba(0,0,0,0.6);
     padding: 60px;
     border-radius: 12px;
-    min-height: 800px;
+    min-height: calc(100vh - 200px);
     overflow: visible;
     box-sizing: border-box;
+    padding-bottom: 80px
 }
 
 /* SCANLINES */
@@ -157,7 +158,7 @@ h2 {
 /* --- ANIMACJE KROKÓW --- */
 .tw-step { display: none; opacity: 0; }
 .tw-step.active {
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; flex: 1; min-height: 0;
     animation: glitchFadeIn 0.5s cubic-bezier(0.25,0.46,0.45,0.94) both;
 }
 @keyframes glitchFadeIn {
@@ -188,6 +189,7 @@ input[type="text"]:focus, textarea:focus {
 /* --- NAV BUTTONS --- */
 .tw-nav-row {
     display: flex;
+    flex-grow: 1;
     justify-content: space-between;
     margin-top: 50px;
     border-top: 1px solid rgba(255,255,255,0.1);
