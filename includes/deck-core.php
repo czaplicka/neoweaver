@@ -5,7 +5,7 @@ add_action( 'wp_enqueue_scripts', function () {
     }
     wp_enqueue_script(
         'nw-deck-core',
-        NEOWEAVER_PLUGIN_URL . 'assets/js/deck-core.js',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/public/deck-core.js',
         [ 'jquery' ],
         NEOWEAVER_VERSION,
         true
