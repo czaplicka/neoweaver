@@ -158,13 +158,31 @@ function tw_get_scenarios_ajax() {
     error_log( 'tw_get_scenarios_ajax: campaign URL = ' . $campaign_url );
 
     $campaigns = $supa_get( $campaign_url, 'campaign' );
-    if ( $campaigns === null || empty( $campaigns ) || ! is_array( $campaigns ) ) {
-        // wp_send_json_error already called inside $supa_get if null.
-        if ( ! empty( $campaigns ) || $campaigns === [] ) {
-            wp_send_json_error( [ 'message' => 'Campaign not found' ] );
-        }
-        return;
-    }
+
+if ( null === $campaigns ) {
+    // Błąd został już odesłany w $supa_get().
+    return;
+}
+
+if ( ! is_array( $campaigns ) ) {
+    wp_send_json_error(
+        [
+            'message' => 'Invalid campaign response',
+        ]
+    );
+    return;
+}
+
+if ( [] === $campaigns ) {
+    wp_send_json_error(
+        [
+            'message' => 'Campaign not found',
+        ]
+    );
+    return;
+}
+
+$campaign = $campaigns[0];
 
     $campaign       = $campaigns[0];
     $world_type     = isset( $campaign['world_type'] ) ? (int) $campaign['world_type'] : 1;
