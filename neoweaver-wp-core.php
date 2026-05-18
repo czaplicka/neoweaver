@@ -390,6 +390,17 @@ final class NeoWeaver_Core {
 			wp_enqueue_script( $handle, $js_url . $file, $deps, $ver, true );
 		}
 
+		$adventure_script = NEOWEAVER_PLUGIN_DIR . 'assets/js/adventure.js';
+		if ( file_exists( $adventure_script ) ) {
+			wp_enqueue_script(
+				'tw-adventure',
+				NEOWEAVER_PLUGIN_URL . 'assets/js/adventure.js',
+				[],
+				(string) filemtime( $adventure_script ),
+				true
+			);
+		}
+
 		$uploads = wp_upload_dir();
 
 		wp_localize_script(
@@ -404,7 +415,20 @@ final class NeoWeaver_Core {
 	}
 
 	public static function enqueue_agents_list_assets(): void {
-		if ( is_admin() ) {
+		if ( is_admin() || ! is_singular() ) {
+			return;
+		}
+
+		global $post;
+
+		if ( ! $post instanceof WP_Post ) {
+			return;
+		}
+
+		// IMPORTANT:
+		// Replace 'tw_characters_list' with the real shortcode used by the agents list page,
+		// if your project uses a different shortcode name.
+		if ( ! has_shortcode( $post->post_content, 'tw_characters_list' ) ) {
 			return;
 		}
 
@@ -455,18 +479,7 @@ final class NeoWeaver_Core {
 			true
 		);
 	}
-function neoweaver_enqueue_adventure_scripts() {
-    if (!is_page_template('adventure.php')) return;
 
-    wp_enqueue_script(
-        'tw-adventure',
-        NEOWEAVER_PLUGIN_URL . 'assets/js/adventure.js',
-        [],
-        NEOWEAVER_VERSION,
-        true // ← ładuj w footerze (WAŻNE!)
-    );
-}
-add_action('wp_enqueue_scripts', 'neoweaver_enqueue_adventure_scripts');
 	// ── Supabase frontend bootstrap ───────────────────────────────────────
 
 	public static function print_supabase_bootstrap(): void {
