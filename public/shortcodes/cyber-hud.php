@@ -27,9 +27,9 @@ function display_cyber_hud() {
 	}
 
 $js_rel  = 'assets/js/public/cyber-hud.js';
-$js_path = NEOWEAVER_DIR . $js_rel;
-$js_url  = NEOWEAVER_URL . $js_rel;
-$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
+$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION;
 
 	wp_enqueue_script(
 		'neoweaver-cyber-hud',
