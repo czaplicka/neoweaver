@@ -14,7 +14,7 @@ add_action( 'wp_enqueue_scripts', function () {
 
     wp_enqueue_script(
         'nw-map',
-        NEOWEAVER_PLUGIN_URL . 'assets/js/map.js',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/public/map.js',
         [ 'jquery', 'neoweaver-header-node', 'd3js' ], // d3js jako dependency
         NEOWEAVER_VERSION,
         true
