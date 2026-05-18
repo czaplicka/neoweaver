@@ -1,14 +1,15 @@
 .achievements-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
     max-width: 1200px;
     margin: 24px auto;
+    padding: 0;
 }
 
 @media (max-width: 980px) {
     .achievements-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -20,6 +21,8 @@
 
     .ach-card,
     .ach-card.ach-shape-hex,
+    .ach-card.ach-shape-shield,
+    .ach-card.ach-shape-banner,
     .ach-card.scope-character {
         clip-path: none;
         border-radius: 16px;
@@ -36,7 +39,7 @@
     position: relative;
     overflow: hidden;
     min-height: 190px;
-    padding: 18px 16px 16px;
+    padding: 18px 16px 18px;
     border: 1px solid var(--card-border);
     border-radius: 18px;
     background:
@@ -51,6 +54,7 @@
     justify-content: flex-start;
     gap: 12px;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    isolation: isolate;
 }
 
 .ach-card::before {
@@ -61,6 +65,7 @@
         linear-gradient(130deg, rgba(173,255,0,0.12), transparent 28%),
         linear-gradient(320deg, rgba(255,255,255,0.04), transparent 30%);
     pointer-events: none;
+    z-index: 0;
 }
 
 .ach-card::after {
@@ -79,6 +84,7 @@
         rgba(255,255,255,0.08) 100%
     );
     box-shadow: 0 0 14px rgba(173,255,0,0.35);
+    z-index: 1;
 }
 
 .ach-card:hover {
@@ -90,7 +96,7 @@
         0 0 34px rgba(173,255,0,0.24);
 }
 
-/* ACCOUNT = diament / hex */
+/* Shape variants */
 .ach-card.ach-shape-hex {
     clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
     border-radius: 0;
@@ -98,7 +104,17 @@
     padding-right: 22px;
 }
 
-/* CHARACTER = prostokąt */
+.ach-card.ach-shape-shield {
+    clip-path: polygon(0 0, 100% 0, 100% 76%, 50% 100%, 0 76%);
+    border-radius: 0;
+}
+
+.ach-card.ach-shape-banner {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 86%, 0 100%);
+    border-radius: 0;
+}
+
+/* Character scope */
 .ach-card.scope-character {
     clip-path: none;
     border-radius: 18px;
@@ -109,6 +125,14 @@
         0 0 0 1px rgba(120,210,255,0.08) inset,
         0 12px 32px rgba(0,0,0,0.36),
         0 0 22px rgba(120,210,255,0.14);
+}
+
+.ach-card.scope-character:hover {
+    border-color: rgba(120, 210, 255, 0.5);
+    box-shadow:
+        0 0 0 1px rgba(120,210,255,0.10) inset,
+        0 16px 38px rgba(0,0,0,0.42),
+        0 0 30px rgba(120,210,255,0.20);
 }
 
 .ach-card.scope-character .ach-badge {
@@ -124,6 +148,50 @@
     box-shadow: inset 0 0 18px rgba(120,210,255,0.08);
 }
 
+.ach-top-row,
+.ach-icon,
+.ach-title,
+.ach-desc,
+.ach-progress,
+.ach-date {
+    position: relative;
+    z-index: 2;
+}
+
+.ach-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.65);
+}
+
+.ach-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(173,255,0,0.4);
+    background: rgba(173,255,0,0.12);
+    color: #adff00;
+    white-space: nowrap;
+}
+
+.ach-percent {
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+.ach-percent-done {
+    color: #adff00;
+    font-weight: 600;
+}
+
 .ach-icon {
     width: 52px;
     height: 52px;
@@ -135,9 +203,13 @@
     border: 1px solid rgba(173,255,0,0.24);
     color: #adff00;
     box-shadow: inset 0 0 18px rgba(173,255,0,0.08);
+    margin-bottom: 2px;
+    flex-shrink: 0;
 }
 
-.ach-icon svg {
+.ach-icon svg,
+.ach-icon i,
+.ach-icon [data-lucide] {
     width: 24px;
     height: 24px;
     stroke-width: 1.9;
@@ -150,13 +222,17 @@
     line-height: 1.2;
     color: #f5f7fb;
     letter-spacing: 0.02em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .ach-desc {
     font-size: 0.85rem;
-    line-height: 1.4;
+    line-height: 1.45;
     color: rgba(255,255,255,0.78);
-    margin-top: 4px;
+    margin-top: 2px;
     max-width: 30em;
 }
 
@@ -167,10 +243,17 @@
     color: rgba(255,255,255,0.72);
 }
 
+.ach-date {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.56);
+    margin-top: auto;
+}
+
 .ach-card.status-hidden {
-    opacity: 0.78;
+    opacity: 0.82;
     border-color: rgba(255,255,255,0.1);
     backdrop-filter: blur(3px);
+    filter: saturate(0.9);
 }
 
 .ach-card.status-hidden::before {
@@ -196,12 +279,14 @@
     color: rgba(255,255,255,0.7);
 }
 
-.ach-card.status-hidden .ach-icon svg {
+.ach-card.status-hidden .ach-icon svg,
+.ach-card.status-hidden .ach-icon i,
+.ach-card.status-hidden .ach-icon [data-lucide] {
     opacity: 0.9;
 }
 
 .ach-card.status-locked {
-    filter: saturate(0.9);
+    filter: saturate(0.92);
 }
 
 .ach-card.status-unlocked {
@@ -217,33 +302,12 @@
     border-color: rgba(173,255,0,0.36);
 }
 
-.ach-top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    font-family: "Chakra Petch", sans-serif;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: rgba(255,255,255,0.65);
-}
-
-.ach-badge {
-    padding: 3px 8px;
-    border-radius: 999px;
-    border: 1px solid rgba(173,255,0,0.4);
-    background: rgba(173,255,0,0.12);
-    color: #adff00;
-}
-
-.ach-percent {
-    opacity: 0.8;
-}
-
-.ach-percent-done {
-    color: #adff00;
-    font-weight: 600;
+.ach-card.ach-legacy::before {
+    background:
+        linear-gradient(130deg, rgba(173,255,0,0.10), transparent 28%),
+        linear-gradient(320deg, rgba(255,255,255,0.04), transparent 30%),
+        linear-gradient(135deg, transparent 45%, rgba(255,255,255,0.12) 48%, transparent 50%),
+        linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.08) 42%, transparent 45%);
 }
 
 .ach-filter-form {
@@ -271,4 +335,11 @@
     border-radius: 12px;
     padding: 10px 12px;
     font-family: "Chakra Petch", sans-serif;
+    outline: none;
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.ach-filter-form select:focus {
+    border-color: rgba(173,255,0,0.55);
+    box-shadow: 0 0 0 3px rgba(173,255,0,0.12);
 }
