@@ -86,6 +86,7 @@ final class NeoWeaver_Core {
 			'includes/classes/class-loader.php',
 			'includes/classes/class-agents-repository.php',
 			'includes/classes/class-agents-list.php',
+			'includes/classes/class-agents-creator.php',
 			'includes/classes/class-deployments-creator.php',
 			'includes/classes/class-nodes-creator.php',
 
