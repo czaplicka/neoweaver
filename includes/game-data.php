@@ -1,29 +1,62 @@
 <?php
-// BUG-FIX: File was missing the PHP opening tag entirely — PHP parsed it
-// as plain text so none of the functions below were ever defined, causing
-// get_user_game_data_from_supabase() and tw_get_current_character_id() to
-// silently not exist at runtime.
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+    exit;
+}
+
+/**
+ * Per-request in-memory memoization cache.
+ * Żyje tylko przez czas życia jednego PHP request — 0 kosztu dla prywatności danych.
+ */
+$GLOBALS['_tw_game_data_memo'] = [];
+
+/**
+ * Transient TTL w sekundach.
+ * 60s = sensowny kompromis między świeżością a liczbą zapytań do Supabase.
+ * Zmień na niższą wartość jeśli game state zmienia się bardzo szybko.
+ */
+define( 'TW_GAME_DATA_TTL', 60 );
+
+/**
+ * Klucz transient — per user, by avoid cross-user leaks.
+ */
+function tw_game_data_transient_key( int $wp_user_id ): string {
+    return 'tw_gd_' . $wp_user_id;
+}
+
+/**
+ * Unieważnia cache dla użytkownika — wywołaj to przy:
+ * - zmianie sesji (nowa kampania, zmiana postaci)
+ * - zakończeniu sesji
+ * - zmianie lokalizacji / scenario
+ */
+function tw_invalidate_game_data_cache( int $wp_user_id ): void {
+    // 1. Usuń memo
+    unset( $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] );
+
+    // 2. Usuń transient
+    delete_transient( tw_game_data_transient_key( $wp_user_id ) );
 }
 
 /**
  * Agregacja danych o sesji, postaci i świecie z Supabase.
  *
- * BUG-FIX: All IDs from cyber_game_sessions were coerced with (int), but
- * session.id, campaign_id, character_id, world_id, and scenario_id are all
- * UUID strings in Supabase. Casting them to int collapses every UUID to 0,
- * breaking every downstream Supabase query that filters on those values.
+ * Warstwa 1 — per-request memoization ($GLOBALS):
+ *   Jeśli ta sama funkcja jest wywoływana wielokrotnie w tym samym PHP request
+ *   (np. przez tw_get_current_character_id() i potem przez AJAX handler),
+ *   zwraca wynik z pamięci bez żadnego query.
  *
- * Fix: IDs are now stored as raw strings sanitized with
- * preg_replace('/[^a-zA-Z0-9\-]/', '', ...) — safe for both UUID v4 and
- * any legacy integer IDs. The defaults array is also changed from 0 to ''
- * so callers can correctly detect "no ID" with empty() instead of !$id.
+ * Warstwa 2 — WordPress Transients (domyślnie WP Object Cache lub DB):
+ *   TTL = TW_GAME_DATA_TTL sekund. Przy Redis/Memcached — ultra-szybkie.
+ *   Przy braku zewnętrznego cache — zapis w wp_options, nadal ~10x szybszy
+ *   niż 3 round-tripy do Supabase.
  *
- * location_id is a regular integer FK — it keeps (int) casting.
+ * Warstwa 3 — Supabase query (tylko gdy cache miss).
+ *
+ * INVALIDATION: wywołaj tw_invalidate_game_data_cache($wp_user_id) przy
+ * każdej zmianie stanu sesji (nowa kampania, teleport, koniec sesji).
  */
 if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
-    function get_user_game_data_from_supabase( $wp_user_id ) {
+    function get_user_game_data_from_supabase( int $wp_user_id ): array {
         $defaults = [
             'active_session_id'   => '',
             'active_campaign_id'  => '',
@@ -42,12 +75,28 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             return $defaults;
         }
 
-        // Helper: UUID-safe ID sanitization — never use (int) on a UUID.
-        $sanitize_id = function ( $raw ): string {
-            return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw );
+        // ── Warstwa 1: per-request memo ─────────────────────────────────────
+        if ( isset( $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] ) ) {
+            return $GLOBALS['_tw_game_data_memo'][ $wp_user_id ];
+        }
+
+        // ── Warstwa 2: WordPress Transient ──────────────────────────────────
+        $cache_key = tw_game_data_transient_key( $wp_user_id );
+        $cached    = get_transient( $cache_key );
+
+        if ( false !== $cached && is_array( $cached ) ) {
+            // Zapisz też do memo, żeby kolejne wywołania w tym requescie
+            // nie trafiały nawet do transient lookup.
+            $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $cached;
+            return $cached;
+        }
+
+        // ── Warstwa 3: Supabase query ────────────────────────────────────────
+        $sanitize_id = static function ( $raw ): string {
+            return preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $raw );
         };
 
-        // 1. Aktywna sesja (cyber_game_sessions)
+        // 1. Aktywna sesja
         $sessions = tw_supabase_get(
             'cyber_game_sessions',
             [
@@ -60,22 +109,23 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         );
 
         if ( ! is_array( $sessions ) || empty( $sessions ) || ! isset( $sessions[0] ) || ! is_array( $sessions[0] ) ) {
+            // Cache też empty result — żeby heartbeat przy braku sesji
+            // nie odpytywał Supabase co request. Krótszy TTL: 15s.
+            set_transient( $cache_key, $defaults, 15 );
+            $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $defaults;
             return $defaults;
         }
 
         $session = $sessions[0];
 
-        // UUID columns — sanitize as strings, never cast to int.
-        $defaults['active_session_id']   = isset( $session['id'] )           ? $sanitize_id( $session['id'] )           : '';
-        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )  ? $sanitize_id( $session['campaign_id'] )  : '';
-        $defaults['active_character_id'] = isset( $session['character_id'] ) ? $sanitize_id( $session['character_id'] ) : '';
-        $defaults['active_world_id']     = isset( $session['world_id'] )     ? $sanitize_id( $session['world_id'] )     : '';
-        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? $sanitize_id( $session['scenario_id'] ) : '';
+        $defaults['active_session_id']   = isset( $session['id'] )            ? $sanitize_id( $session['id'] )           : '';
+        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )   ? $sanitize_id( $session['campaign_id'] )  : '';
+        $defaults['active_character_id'] = isset( $session['character_id'] )  ? $sanitize_id( $session['character_id'] ) : '';
+        $defaults['active_world_id']     = isset( $session['world_id'] )      ? $sanitize_id( $session['world_id'] )     : '';
+        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? $sanitize_id( $session['scenario_id'] )  : '';
+        $defaults['active_location_id']  = isset( $session['location_id'] )   ? (int) $session['location_id']            : 0;
 
-        // location_id is an integer FK — (int) is correct here.
-        $defaults['active_location_id']  = isset( $session['location_id'] ) ? (int) $session['location_id'] : 0;
-
-        // 2. Postać + TAGI
+        // 2. Postać + tagi (tylko gdy mamy character_id)
         if ( $defaults['active_character_id'] ) {
             $tags_data = tw_supabase_get(
                 'cyber_character_complete_tags',
@@ -98,7 +148,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             }
         }
 
-        // 3. Kampania (cyber_campaign)
+        // 3. Kampania (tylko gdy mamy campaign_id)
         if ( $defaults['active_campaign_id'] ) {
             $campaigns = tw_supabase_get(
                 'cyber_campaign',
@@ -114,13 +164,18 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             }
         }
 
+        // Zapisz do Transient i memo
+        set_transient( $cache_key, $defaults, TW_GAME_DATA_TTL );
+        $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $defaults;
+
         return $defaults;
     }
 }
 
 /**
- * Skrót – pobiera active_character_id dla aktualnego użytkownika.
- * Returns the UUID string (or empty string if not found).
+ * Skrót — pobiera active_character_id dla aktualnego użytkownika.
+ * Dzięki memo w get_user_game_data_from_supabase() nie dodaje żadnego
+ * Supabase query jeśli funkcja była już wywołana wcześniej w tym request.
  */
 if ( ! function_exists( 'tw_get_current_character_id' ) ) {
     function tw_get_current_character_id(): string {
@@ -130,9 +185,6 @@ if ( ! function_exists( 'tw_get_current_character_id' ) ) {
         }
 
         $game_data = get_user_game_data_from_supabase( $wp_user_id );
-        if ( ! is_array( $game_data ) ) {
-            return '';
-        }
 
         return (string) ( $game_data['active_character_id'] ?? '' );
     }
