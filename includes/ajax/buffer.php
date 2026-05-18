@@ -67,7 +67,7 @@ if ( ! function_exists( 'cyber_call_rpc' ) ) {
 		] );
 
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW cyber_call_rpc error [' . $function_name . ']: ' . $response->get_error_message() );
+			error_log( 'TW cyber_call_ error [' . $function_name . ']: ' . $response->get_error_message() );
 			return null;
 		}
 
@@ -132,23 +132,70 @@ if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 add_action( 'wp_ajax_save_cyber_deck_rpc', 'handle_save_cyber_deck_rpc' );
 
 function handle_save_cyber_deck_rpc(): void {
-	check_ajax_referer( 'cyber_deck_nonce', 'nonce' );
+    check_ajax_referer( 'cyber_deck_nonce', 'nonce' );
 
-	$user_id      = get_current_user_id();
-	$character_id = get_cyber_character_id_by_wp_id( $user_id );
-	$active_ids   = json_decode( stripslashes( $_POST['active_ids'] ?? '[]' ), true );
+    $user_id      = get_current_user_id();
+    $character_id = get_cyber_character_id_by_wp_id( $user_id );
+    $active_ids   = json_decode( stripslashes( $_POST['active_ids'] ?? '[]' ), true );
 
-	if ( ! $character_id || ! is_array( $active_ids ) ) {
-		wp_send_json_error( 'Invalid character or data.' );
-		return;
-	}
+    if ( ! $character_id || ! is_array( $active_ids ) ) {
+        wp_send_json_error( 'Invalid character or data.' );
+        return;
+    }
 
-	$result = cyber_call_rpc( 'cyber_sync_deck', [
-		'p_character_id' => $character_id,
-		'p_active_ids'   => $active_ids,
-	] );
+    // Sanitize: odrzuć wszystko, co nie wygląda jak UUID
+    $sanitized_ids = array_values( array_filter(
+        array_map( 'sanitize_text_field', $active_ids ),
+        fn( $id ) => (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $id
+        )
+    ) );
 
-	wp_send_json_success( $result );
+    if ( empty( $sanitized_ids ) && ! empty( $active_ids ) ) {
+        wp_send_json_error( 'Invalid card IDs.' );
+        return;
+    }
+
+    // ✅ Ownership check: pobierz z Supabase karty tej postaci
+    if ( ! empty( $sanitized_ids ) ) {
+        $in_filter   = implode( ',', array_map( fn( $id ) => 'eq.' . $id, $sanitized_ids ) );
+        $owned_cards = tw_supabase_get(
+            'cyber_character_deck_cards',   // <-- nazwa twojej tabeli z kartami decku
+            [
+                'character_id' => 'eq.' . $character_id,
+                'id'           => 'in.(' . implode( ',', $sanitized_ids ) . ')',
+                'select'       => 'id',
+            ]
+        );
+
+        $owned_ids = array_column( $owned_cards ?? [], 'id' );
+
+        // Odrzuć karty, których postać nie posiada
+        $verified_ids = array_values(
+            array_filter( $sanitized_ids, fn( $id ) => in_array( $id, $owned_ids, true ) )
+        );
+
+        if ( count( $verified_ids ) !== count( $sanitized_ids ) ) {
+            // Loguj próbę ataku
+            error_log( sprintf(
+                'NeoWeaver security: user %d tried to sync unowned card IDs for character %s.',
+                $user_id,
+                $character_id
+            ) );
+            wp_send_json_error( 'One or more cards do not belong to this character.' );
+            return;
+        }
+    } else {
+        $verified_ids = [];
+    }
+
+    $result = cyber_call_rpc( 'cyber_sync_deck', [
+        'p_character_id' => $character_id,
+        'p_active_ids'   => $verified_ids,
+    ] );
+
+    wp_send_json_success( $result );
 }
 
 // ─── 2. USE CARD & DRAW NEW ────────────────────────────────────────────────────────────
