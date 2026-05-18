@@ -3,7 +3,7 @@
  *
  * Covers: CSS variables, body reset, keyframe animations,
  * .neoweave-terminal container, inner terminal elements,
- * site header and footer.
+ * site header, footer, and HUD overlay.
  *
  * Enqueue via Neoweaver_Public::enqueue_styles().
  *
@@ -14,13 +14,31 @@
    1. FOUNDATION & VARIABLES
    ========================================================================== */
 :root {
-    --neo-bg:         #020508;
-    --neo-accent:     #adff00;
-    --neo-border:     rgba(173, 255, 0, 0.3);
-    --neo-text-main:  #c8ffd0;
-    --neo-text-dim:   #6fb37a;
-    --neo-error:      #ff0000;
-    --font-terminal:  'Chakra Petch', sans-serif;
+    /* --- Core palette --- */
+    --neo-bg:             #020508;
+    --neo-accent:         #adff00;
+    --neo-border:         rgba(173, 255, 0, 0.3);
+    --neo-text-main:      #c8ffd0;
+    --neo-text-dim:       #6fb37a;
+    --neo-error:          #ff0000;
+
+    /* --- Monitor / HUD palette --- */
+    --neo-monitor:        #00d2ff;
+    --neo-monitor-glow:   rgba(0, 210, 255, 0.6);
+    --neo-monitor-border: rgba(0, 210, 255, 0.25);
+
+    /* --- Surfaces --- */
+    --neo-surface-hud:    rgba(3, 7, 18, 0.12);
+    --neo-surface-hud-open: rgba(3, 7, 18, 0.28);
+    --neo-surface-col:    rgba(15, 23, 42, 0.12);
+
+    /* --- Typography --- */
+    --font-terminal:      'Chakra Petch', sans-serif;
+
+    /* --- Motion --- */
+    --transition-smooth:  0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-hud:     0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --blur-hud:           12px;
 }
 
 *  { box-sizing: border-box; }
@@ -69,6 +87,11 @@ body {
     100% { content: "█▒▒▒▒▒▒▒▒▒▒▒▒▒▒  2%"; }
 }
 
+@keyframes neon-pulse {
+    0%, 100% { text-shadow: 0 0 8px  var(--neo-monitor-glow); }
+    50%       { text-shadow: 0 0 20px var(--neo-monitor-glow), 0 0 30px var(--neo-monitor-glow); }
+}
+
 /* ==========================================================================
    3. MAIN TERMINAL CONTAINER
    ========================================================================== */
@@ -79,14 +102,15 @@ body {
     border:      2px solid var(--neo-accent);
     position:    relative;
     overflow:    hidden;
-    box-shadow:  0 0 30px rgba(173, 255, 0, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+    box-shadow:  0 0 30px rgba(173, 255, 0, 0.1),
+                 inset 0 0 20px rgba(0, 0, 0, 0.5);
     line-height: 1.6;
     margin:      40px auto;
     max-width:   900px;
     animation:   monitor-flicker 0.15s infinite;
 }
 
-/* Scanlines overlay */
+/* Scanlines overlay — shared pattern used by .neoweave-terminal and .cyber-hud-wrapper */
 .neoweave-terminal::before {
     content:    " ";
     display:    block;
@@ -129,7 +153,7 @@ body {
     animation:  power-blink 0.8s step-end infinite;
 }
 
-/* Progress bars */
+/* --- Progress bars --- */
 .loading-bar-container,
 .entropy-container {
     border:     1px solid var(--neo-border);
@@ -148,12 +172,12 @@ body {
     animation: entropy-loop 5s steps(20) infinite;
 }
 
-/* Tag pill */
+/* --- Tag pill --- */
 .neoweave-tag {
-    color:      var(--neo-accent);
-    background: rgba(173, 255, 0, 0.1);
-    padding:    2px 6px;
-    border:     1px solid var(--neo-border);
+    color:       var(--neo-accent);
+    background:  rgba(173, 255, 0, 0.1);
+    padding:     2px 6px;
+    border:      1px solid var(--neo-border);
     font-weight: bold;
 }
 
@@ -193,4 +217,227 @@ body {
 .footer-col a:hover {
     color:       #fff;
     text-shadow: 0 0 10px var(--neo-accent);
+}
+
+/* ==========================================================================
+   6. HUD OVERLAY  (.cyber-hud-wrapper)
+   ========================================================================== */
+
+/* 6a. Pointer-events fix — HUD nie blokuje kliknięć pod spodem */
+#hud-wrapper {
+    pointer-events: none;
+}
+#hud-wrapper > * {
+    pointer-events: all;
+}
+
+/* 6b. HUD Wrapper */
+.cyber-hud-wrapper {
+    position:   fixed;
+    top:        0;
+    left:       0;
+    width:      100%;
+    z-index:    100001;
+    max-height: 40px;
+    overflow:   hidden;
+    font-family: var(--font-terminal);
+
+    background:            var(--neo-surface-hud);
+    backdrop-filter:       blur(var(--blur-hud)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-hud)) saturate(180%);
+
+    border-bottom: 1px solid var(--neo-monitor-border);
+    box-shadow:
+        inset 0 0 20px rgba(0, 210, 255, 0.1),
+        0 4px 24px rgba(0, 0, 0, 0.7),
+        0 0 24px rgba(0, 210, 255, 0.15);
+
+    transition: all var(--transition-hud);
+}
+
+.cyber-hud-wrapper.is-open {
+    max-height:    550px;
+    background:    var(--neo-surface-hud-open);
+    border-color:  rgba(0, 210, 255, 0.45);
+    box-shadow:
+        inset 0 0 40px rgba(0, 210, 255, 0.15),
+        0 8px 40px rgba(0, 0, 0, 0.8);
+}
+
+/* 6c. Status bar */
+.status-dots-row {
+    height:     40px;
+    display:    flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:    0 30px;
+    cursor:     pointer;
+    background:
+        radial-gradient(circle at   0% 50%, rgba(0, 210, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 100% 50%, rgba(0, 210, 255, 0.10) 0%, transparent 40%);
+}
+
+.hud-status-label {
+    font-size:      10px;
+    font-weight:    700;
+    color:          var(--neo-monitor);
+    text-shadow:    0 0 20px var(--neo-monitor-glow);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+/* 6d. HUD grid */
+.cyber-hud-grid {
+    display:        flex;
+    overflow-x:     auto;
+    padding:        24px 28px 20px;
+    gap:            18px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--neo-monitor) transparent;
+}
+
+/* 6e. HUD columns */
+.hud-column {
+    min-width:      200px;
+    flex:           1;
+    padding:        18px 16px;
+    border-radius:  12px;
+    background:     var(--neo-surface-col);
+    backdrop-filter: blur(10px) saturate(200%);
+    border:         1px solid rgba(0, 210, 255, 0.2);
+    box-shadow:
+        inset 0 0 12px rgba(255, 255, 255, 0.05),
+        0 4px 20px rgba(0, 0, 0, 0.6);
+    transition:     all var(--transition-smooth);
+}
+
+.hud-column:hover {
+    background:   rgba(15, 23, 42, 0.25);
+    border-color: rgba(0, 210, 255, 0.5);
+    transform:    translateY(-3px) scale(1.02);
+    box-shadow:
+        inset 0 0 20px rgba(255, 255, 255, 0.08),
+        0 12px 40px rgba(0, 210, 255, 0.2);
+}
+
+/* 6f. Labels & numbers */
+.hud-labels {
+    display:        flex;
+    justify-content: space-between;
+    align-items:    flex-end;
+    margin-bottom:  12px;
+    font-size:      9px;
+    color:          #a1a1aa;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-shadow:    0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.val-num {
+    font-size:   24px;
+    font-weight: 800;
+    line-height: 1;
+    color:       #fff;
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+}
+
+/* 6g. Progress bars */
+.hud-bar-container {
+    height:        5px;
+    background:    rgba(15, 23, 42, 0.6);
+    margin-bottom: 14px;
+    position:      relative;
+    border-radius: 999px;
+    overflow:      hidden;
+}
+
+.hud-bar-fill {
+    height:        100%;
+    position:      absolute;
+    border-radius: 999px;
+    box-shadow:    0 0 16px rgba(255, 255, 255, 0.25);
+    transition:
+        width      1s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.4s ease;
+}
+
+/* 6h. Scanlines (HUD) */
+.scanlines {
+    position: absolute;
+    inset:    0;
+    background:
+        repeating-linear-gradient(
+            0deg,
+            transparent            0px,
+            rgba(255, 255, 255, 0.04) 1px,
+            transparent            2px
+        ),
+        linear-gradient(90deg,
+            rgba(0, 210, 255, 0.1) 0%,
+            transparent           50%,
+            rgba(0, 210, 255, 0.1) 100%
+        );
+    background-size: 100% 100%, 8px 100%;
+    z-index:         5;
+    pointer-events:  none;
+}
+
+/* 6i. Center line */
+.center-line {
+    position:   absolute;
+    left:       50%;
+    top:        0;
+    width:      1px;
+    height:     100%;
+    background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    z-index:    10;
+    transform:  translateX(-50%);
+}
+
+/* 6j. Tag cloud */
+.tag-cloud {
+    display:        flex;
+    flex-direction: column;
+    gap:            6px;
+    min-height:     45px;
+}
+
+.tag-item {
+    font-size:      9px;
+    font-weight:    700;
+    color:          #f4f4f5;
+    padding:        5px 12px;
+    border-radius:  20px;
+    border:         1px solid rgba(0, 210, 255, 0.3);
+    background:     rgba(0, 210, 255, 0.08);
+    backdrop-filter: blur(6px);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition:     all 0.25s ease;
+}
+
+.tag-item:hover {
+    background: rgba(0, 210, 255, 0.15);
+    box-shadow: 0 0 12px rgba(0, 210, 255, 0.4);
+}
+
+/* 6k. HUD footer trigger */
+.hud-close-trigger {
+    text-align:     center;
+    padding:        16px;
+    font-size:      10px;
+    color:          #8b949e;
+    letter-spacing: 4px;
+    cursor:         pointer;
+    border-top:     1px solid rgba(0, 210, 255, 0.2);
+    backdrop-filter: blur(8px);
+    transition:     all 0.3s ease;
+}
+
+.hud-close-trigger:hover {
+    color:          var(--neo-monitor);
+    letter-spacing: 6px;
+    background:     rgba(0, 210, 255, 0.12);
+    box-shadow:     inset 0 0 20px rgba(0, 210, 255, 0.2);
+    animation:      neon-pulse 1.5s infinite;
 }
