@@ -109,7 +109,7 @@ class Neoweaver_Deployments_Creator {
 
 		$code = wp_remote_retrieve_response_code( $res );
 		// Supabase returns 201 for a successful INSERT with return=representation.
-		if ( $code !== 201 ) {
+		if ( ! in_array( (int) $code, array( 200, 201 ), true ) ) {
 			error_log( 'TW Deployments POST HTTP ' . $code . ' [' . $url . ']: ' . wp_remote_retrieve_body( $res ) );
 			return null;
 		}
