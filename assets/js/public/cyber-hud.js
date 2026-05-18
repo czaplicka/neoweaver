@@ -12,6 +12,11 @@
 
 	const ALERT_PRIORITY = ['#ff0033', '#ff8800', '#ffd700', '#cc00ff', '#adff00', '#0055ff', '#6699ff'];
 
+	let hudRealtimeChannel = null;
+	let hudBindingKey = '';
+	let hudInitDone = false;
+	let hudRefreshPromise = null;
+
 	function toggleHud() {
 		const wrapper = document.getElementById('hud-wrapper');
 		const triggerText = document.getElementById('hud-trigger-text');
@@ -35,19 +40,26 @@
 			.replace(/'/g, '&#39;');
 	}
 
-	async function supaFetch(path) {
-		const supaUrl = window.twCyberHud?.supabaseUrl || '';
-		const supaKey = window.twCyberHud?.supabaseKey || '';
+	function getHudConfig() {
+		return {
+			supabaseUrl: window.twCyberHud?.supabaseUrl || '',
+			supabaseKey: window.twCyberHud?.supabaseKey || '',
+			currentUserId: window.twCyberHud?.currentUserId || 0
+		};
+	}
 
-		if (!supaUrl || !supaKey) {
+	async function supaFetch(path) {
+		const cfg = getHudConfig();
+
+		if (!cfg.supabaseUrl || !cfg.supabaseKey) {
 			console.error('HUD config missing');
 			return [];
 		}
 
-		const res = await fetch(supaUrl + path, {
+		const res = await fetch(cfg.supabaseUrl + path, {
 			headers: {
-				apikey: supaKey,
-				Authorization: 'Bearer ' + supaKey
+				apikey: cfg.supabaseKey,
+				Authorization: 'Bearer ' + cfg.supabaseKey
 			}
 		});
 
@@ -122,38 +134,77 @@
 		}
 	}
 
+	function applyAlertState(activeAlerts) {
+		const topAlert = ALERT_PRIORITY.find(function (c) {
+			return activeAlerts.includes(c);
+		}) || null;
+
+		const globalAlert = document.getElementById('hud-global-alert');
+		if (!globalAlert) {
+			return;
+		}
+
+		if (topAlert) {
+			document.body.classList.add('global-glitch-active');
+			globalAlert.style.setProperty('--alert-c', topAlert);
+			globalAlert.classList.add('is-visible');
+		} else {
+			document.body.classList.remove('global-glitch-active');
+			globalAlert.classList.remove('is-visible');
+		}
+	}
+
+	async function fetchHudContext() {
+		const cfg = getHudConfig();
+
+		if (!cfg.currentUserId) {
+			return null;
+		}
+
+		const sessArr = await supaFetch(
+			`/cyber_game_sessions?wp_user_id=eq.${cfg.currentUserId}&order=created_at.desc&limit=1`
+		);
+
+		if (!sessArr?.length) {
+			return null;
+		}
+
+		const session = sessArr[0];
+		const worldId = session.world_id || null;
+		const locationId = session.location_id || null;
+		const characterId = session.character_id || null;
+
+		const safeCharId =
+			characterId &&
+			typeof characterId === 'string' &&
+			characterId.trim() !== '' &&
+			characterId !== 'null';
+
+		return {
+			session,
+			worldId,
+			locationId,
+			characterId,
+			safeCharId
+		};
+	}
+
 	async function updateHUD() {
 		try {
-			const currentUserId = window.twCyberHud?.currentUserId || 0;
-			if (!currentUserId) {
-				return;
+			const context = await fetchHudContext();
+			if (!context || !context.worldId) {
+				return null;
 			}
 
-			const sessArr = await supaFetch(
-				`/cyber_game_sessions?wp_user_id=eq.${currentUserId}&order=created_at.desc&limit=1`
-			);
-
-			if (!sessArr?.length) {
-				return;
-			}
-
-			const session = sessArr[0];
-			const worldId = session.world_id;
-			const locationId = session.location_id;
-			const characterId = session.character_id;
 			const activeAlerts = [];
 
-			const safeCharId =
-				characterId &&
-				typeof characterId === 'string' &&
-				characterId.trim() !== '' &&
-				characterId !== 'null';
-
 			const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
-				supaFetch(`/cyber_world_hud_stats?world_id=eq.${worldId}`),
-				supaFetch(`/cyber_location_hud_stats?world_id=eq.${worldId}&location_id=eq.${locationId}`),
-				safeCharId
-					? supaFetch(`/cyber_reputation?character_id=eq.${characterId}&order=updated_at.desc&limit=1`)
+				supaFetch(`/cyber_world_hud_stats?world_id=eq.${context.worldId}`),
+				context.locationId
+					? supaFetch(`/cyber_location_hud_stats?world_id=eq.${context.worldId}&location_id=eq.${context.locationId}`)
+					: Promise.resolve([]),
+				context.safeCharId
+					? supaFetch(`/cyber_reputation?character_id=eq.${context.characterId}&order=updated_at.desc&limit=1`)
 					: Promise.resolve([])
 			]);
 
@@ -189,24 +240,111 @@
 				updateRow('rep_gold_thief', rep.gold_vs_thief, null, true, activeAlerts);
 			}
 
-			const topAlert = ALERT_PRIORITY.find(function (c) {
-				return activeAlerts.includes(c);
-			}) || null;
+			applyAlertState(activeAlerts);
 
-			const globalAlert = document.getElementById('hud-global-alert');
-			if (globalAlert) {
-				if (topAlert) {
-					document.body.classList.add('global-glitch-active');
-					globalAlert.style.setProperty('--alert-c', topAlert);
-					globalAlert.classList.add('is-visible');
-				} else {
-					document.body.classList.remove('global-glitch-active');
-					globalAlert.classList.remove('is-visible');
-				}
-			}
+			return context;
 		} catch (e) {
 			console.error('HUD update error:', e);
+			return null;
 		}
+	}
+
+	function requestHudRefresh() {
+		if (hudRefreshPromise) {
+			return hudRefreshPromise;
+		}
+
+		hudRefreshPromise = updateHUD().finally(function () {
+			hudRefreshPromise = null;
+		});
+
+		return hudRefreshPromise;
+	}
+
+	function teardownHudRealtime() {
+		if (hudRealtimeChannel && window.twSupabase?.removeChannel) {
+			window.twSupabase.removeChannel(hudRealtimeChannel);
+		}
+
+		hudRealtimeChannel = null;
+		hudBindingKey = '';
+	}
+
+	function makeBindingKey(context) {
+		return [
+			context.worldId || '',
+			context.locationId || '',
+			context.safeCharId ? context.characterId : ''
+		].join('|');
+	}
+
+	function bindHudRealtimeForContext(context) {
+		const supabase = window.twSupabase;
+
+		if (!supabase || !supabase.channel || !context || !context.worldId) {
+			return;
+		}
+
+		const newKey = makeBindingKey(context);
+		if (hudBindingKey === newKey && hudRealtimeChannel) {
+			return;
+		}
+
+		teardownHudRealtime();
+
+		const channel = supabase.channel(`hud:${newKey}`);
+
+		channel.on(
+			'postgres_changes',
+			{
+				event: '*',
+				schema: 'public',
+				table: 'cyber_world_hud_stats',
+				filter: `world_id=eq.${context.worldId}`
+			},
+			function () {
+				requestHudRefresh();
+			}
+		);
+
+		if (context.locationId) {
+			channel.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'cyber_location_hud_stats',
+					filter: `location_id=eq.${context.locationId}`
+				},
+				function () {
+					requestHudRefresh();
+				}
+			);
+		}
+
+		if (context.safeCharId) {
+			channel.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'cyber_reputation',
+					filter: `character_id=eq.${context.characterId}`
+				},
+				function () {
+					requestHudRefresh();
+				}
+			);
+		}
+
+		channel.subscribe(function (status) {
+			if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+				console.warn('HUD realtime channel status:', status);
+			}
+		});
+
+		hudRealtimeChannel = channel;
+		hudBindingKey = newKey;
 	}
 
 	function bindHudToggles() {
@@ -220,14 +358,31 @@
 		});
 	}
 
+	async function initHudRealtimeFlow() {
+		const context = await requestHudRefresh();
+		if (context) {
+			bindHudRealtimeForContext(context);
+		}
+	}
+
+	function initHud() {
+		if (hudInitDone) {
+			return;
+		}
+
+		hudInitDone = true;
+		bindHudToggles();
+		initHudRealtimeFlow();
+	}
+
 	window.toggleHud = toggleHud;
-	window.updateCyberHud = updateHUD;
+	window.updateCyberHud = requestHudRefresh;
 
 	document.addEventListener('DOMContentLoaded', function () {
-		bindHudToggles();
-		updateHUD();
+		initHud();
 	});
 
-	document.addEventListener('twGameStateHydrated', updateHUD);
-	setInterval(updateHUD, 5000);
+	document.addEventListener('twGameStateHydrated', function () {
+		initHudRealtimeFlow();
+	});
 })();
