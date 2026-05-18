@@ -26,7 +26,11 @@
   /* Avatary */
   --av-size: clamp(48px, 5.5vw, 56px);
 }
-
+.tw-adventure-page header,
+	.tw-adventure-page .site-header,
+	.tw-adventure-page #masthead {
+		display: none !important;
+	}
 /* 3. RESET */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
