@@ -26,13 +26,10 @@ function display_cyber_hud() {
 		return '';
 	}
 
-	$plugin_url = plugin_dir_url( __FILE__ );
-	$plugin_dir = plugin_dir_path( __FILE__ );
-
-	$js_rel  = 'cyber-hud.js';
-	$js_path = $plugin_dir . $js_rel;
-	$js_url  = $plugin_url . $js_rel;
-	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+$js_rel  = 'assets/js/public/cyber-hud.js';
+$js_path = NEOWEAVER_DIR . $js_rel;
+$js_url  = NEOWEAVER_URL . $js_rel;
+$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
 
 	wp_enqueue_script(
 		'neoweaver-cyber-hud',
