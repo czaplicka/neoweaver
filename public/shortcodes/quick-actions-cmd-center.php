@@ -1,356 +1,51 @@
 <?php
-/**
- * TALE WEAVER – Quick Actions CMD_CENTER v2.2
- * Renders the Glass Terminal quick-actions bar only on the adventure page template.
- *
- * BUG FIX (v2.2): The bare `if ( is_page_template(...) )` at the top level of
- * the file caused a "Function is_singular was called incorrectly" notice on
- * every page load.  When WordPress requires this file during plugins_loaded the
- * call executes immediately — before the main query has run — so the conditional
- * tag always returns false and triggers _doing_it_wrong().
- *
- * Fix: wrap the <script> output in a wp_footer action (priority 46, after all
- * other game-page scripts).  is_page_template() is safe inside wp_footer
- * because the main query is resolved long before wp_footer fires.
- * This matches the pattern used by char-panel.php, chat-realtime.php,
- * scenarios-loader.php, deck-core.php, skills-loader.php, etc.
- *
- * Tables used:
- *   cyber_quick_actions  – global actions (display_order, label, template, category, required_tag/s, is_permanent)
- *   cyber_combos         – combo actions
- *   cyber_user_actions   – per-character custom actions (character_id, label, template, category)
- *
- * Changelog v2.2:
- *   - BUG FIX: moved is_page_template() check inside wp_footer hook (was at file-include time)
- *
- * Changelog v2.1:
- *   - Fix: currentCharId now resolved lazily so gameState has time to hydrate
- *   - Fix: innerHTML += loop replaced with DocumentFragment to prevent XSS and listener loss
- *   - Fix: handleQuickActionClick dispatches input+change events for framework reactivity
- *   - Fix: twLoadQuickActions now respects the active currentFilter
- *   - Fix: required_tags empty-string edge case no longer hides permanent-like actions
- *   - Fix: renderQuickActionsUI restores the active class on filter buttons after refresh
- *   - Fix: resize listener registered once via a flag; won't stack on re-init
- *   - Fix: Supabase fallback corrected to lowercase createClient global
- *   - Opt: tag lookup uses a Set for O(1) membership test
- *   - Opt: twLoadQuickActions debounced (200 ms)
- *   - Opt: DOM references cached after first lookup
- *   - Opt: render functions wrapped in individual try/catch so one failure can't block the other
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'wp_footer', function () {
-	// Safe here: wp_footer fires after the main query has run.
+add_action( 'wp_enqueue_scripts', 'tw_enqueue_quick_actions_cmd_center_assets', 46 );
+
+function tw_enqueue_quick_actions_cmd_center_assets() {
+	if ( is_admin() ) {
+		return;
+	}
+
 	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
-	?>
-<script>
-(function($) {
-    'use strict';
 
-    // ── STATE ─────────────────────────────────────────────────────────────────
+	$plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' )
+		? NEOWEAVER_PLUGIN_URL
+		: plugin_dir_url( dirname( __FILE__, 2 ) );
 
-    let allActions    = [];
-    let combos        = [];
-    let userActions   = [];
-    let currentFilter = 'ALL';
-    let deleteMode    = false;
-    let playerTagSet  = new Set();   // O(1) lookups vs Array.includes
-    let resizeRegistered = false;    // guard against stacking resize listeners
+	$plugin_dir = defined( 'NEOWEAVER_PLUGIN_DIR' )
+		? NEOWEAVER_PLUGIN_DIR
+		: plugin_dir_path( dirname( __FILE__, 2 ) );
 
-    // ── LAZY HELPERS ──────────────────────────────────────────────────────────
+	$js_rel  = 'assets/js/public/quick-actions-cmd-center.js';
+	$js_path = trailingslashit( $plugin_dir ) . $js_rel;
+	$js_url  = trailingslashit( $plugin_url ) . $js_rel;
+	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '2.2.0';
 
-    function getCharId() {
-        return window.gameState?.activeCharacterId
-            || localStorage.getItem('activeCharId')
-            || null;
-    }
+	wp_enqueue_script(
+		'tw-quick-actions-cmd-center',
+		$js_url,
+		array( 'jquery' ),
+		$js_ver,
+		true
+	);
 
-    function getSupabase() {
-        if (window.twSupabase) return window.twSupabase;
-        if (typeof window.supabase?.createClient === 'function') {
-            window.twSupabase = window.supabase.createClient(
-                window.twGlobals?.supabaseUrl || '<?php echo esc_js( trailingslashit( tw_supabase_url() ) ); ?>',
-                window.twGlobals?.anonKey     || '<?php echo esc_js( tw_supabase_anon_key() ); ?>'
-            );
-            return window.twSupabase;
-        }
-        return null;
-    }
+	$config = array(
+		'supabaseUrl' => trailingslashit( tw_supabase_url() ),
+		'anonKey'     => tw_supabase_anon_key(),
+		'searchDebounce' => 200,
+		'confirmDeleteCustomAction' => 'Delete custom action?',
+		'requiredFieldsMessage'     => 'Label and Prompt are required!',
+	);
 
-    // ── CACHED DOM REFS ───────────────────────────────────────────────────────
-
-    let _bar  = null;
-    let _list = null;
-
-    function getBar()  { return _bar  || (_bar  = document.getElementById('quick-actions-bar')); }
-    function getList() { return _list || (_list = document.getElementById('user-actions-list')); }
-
-    // ── DATA LOADING ──────────────────────────────────────────────────────────
-
-    async function loadAllData() {
-        const sb     = getSupabase();
-        const charId = getCharId();
-        if (!sb || !charId) return;
-
-        try {
-            const [{ data: actions }, { data: cmb }, { data: ua }] = await Promise.all([
-                sb.from('cyber_quick_actions').select('*').order('display_order'),
-                sb.from('cyber_combos').select('*'),
-                sb.from('cyber_user_actions').select('*').eq('character_id', charId)
-            ]);
-            allActions  = actions || [];
-            combos      = cmb     || [];
-            userActions = ua      || [];
-        } catch (e) {
-            console.error('QA Load Error:', e);
-            return;
-        }
-
-        try { renderQuickActionsUI([...allActions, ...combos]); }
-        catch (e) { console.error('QA Render Error (main):', e); }
-
-        try { renderUserActions(); }
-        catch (e) { console.error('QA Render Error (user actions):', e); }
-    }
-
-    // ── AVAILABILITY CHECK ────────────────────────────────────────────────────
-
-    function isActionAvailable(action) {
-        if (action.is_permanent) return true;
-
-        const reqTags = (
-            action.required_tags
-                ? action.required_tags.split(',')
-                : action.required_tag
-                    ? [action.required_tag]
-                    : []
-        ).map(t => t.trim()).filter(Boolean);
-
-        if (!reqTags.length) return true;
-        return reqTags.some(tag => playerTagSet.has(tag));
-    }
-
-    // ── RENDER: MAIN ACTIONS ──────────────────────────────────────────────────
-
-    function renderQuickActionsUI(actions) {
-        const bar = getBar();
-        if (!bar) return;
-
-        const available = (actions || [])
-            .filter(isActionAvailable)
-            .filter(a => currentFilter === 'ALL'
-                || (a.category || '').toLowerCase() === currentFilter.toLowerCase()
-            );
-
-        const fragment = document.createDocumentFragment();
-        available.forEach(action => {
-            const btn      = document.createElement('button');
-            const category = (action.category
-                || (action.type === 'Combo' ? 'combo' : 'universal')
-            ).toLowerCase();
-            btn.className = `qa-btn qa-${category}`;
-            btn.innerHTML = `<span class="qa-label">${escapeHtml(action.label)}</span>`;
-            btn.addEventListener('click', () => handleQuickActionClick(action.template));
-            fragment.appendChild(btn);
-        });
-
-        bar.innerHTML = '';
-        bar.appendChild(fragment);
-
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.classList.toggle(
-                'active',
-                (btn.dataset.filter || btn.textContent.trim()) === currentFilter
-            );
-        });
-    }
-
-    // ── RENDER: USER ACTIONS ──────────────────────────────────────────────────
-
-    function renderUserActions() {
-        const list = getList();
-        if (!list) return;
-
-        const fragment = document.createDocumentFragment();
-        (userActions || []).forEach(action => {
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'display:flex;gap:6px;align-items:center;';
-
-            const btn      = document.createElement('button');
-            const category = (action.category || 'universal').toLowerCase();
-            btn.className  = `qa-btn qa-${category}`;
-            btn.innerHTML  = `<span class="qa-label">${escapeHtml(action.label)}</span>`;
-            btn.addEventListener('click', () => handleQuickActionClick(action.template));
-            wrapper.appendChild(btn);
-
-            if (deleteMode) {
-                const del   = document.createElement('button');
-                del.className   = 'qa-delete';
-                del.title       = 'Delete';
-                del.textContent = '[X]';
-                del.addEventListener('click', () => deleteUserAction(action.id));
-                wrapper.appendChild(del);
-            }
-
-            fragment.appendChild(wrapper);
-        });
-
-        list.innerHTML = '';
-        list.appendChild(fragment);
-    }
-
-    // ── ACTION CLICK ──────────────────────────────────────────────────────────
-
-    window.handleQuickActionClick = function(template) {
-        const input =
-            window.gameState?.userInput ||
-            document.querySelector('#chat-input-field');
-        if (!input) return;
-
-        const text = (template || '').replace(
-            /\[WeaponTag\]/g,
-            window.twCurrentWeaponTag || '#Unarmed'
-        );
-        input.value = text;
-        input.dispatchEvent(new Event('input',  { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        input.focus();
-
-        const start = text.indexOf('[');
-        const end   = text.indexOf(']', start);
-        if (start !== -1 && end > start) {
-            input.setSelectionRange(start, end + 1);
-        }
-    };
-
-    // ── PUBLIC API ────────────────────────────────────────────────────────────
-
-    window.refreshQuickActions = async function() {
-        await loadAllData();
-    };
-
-    window.twUpdatePlayerTags = function(tags) {
-        playerTagSet = new Set(
-            Array.isArray(tags) ? tags.map(t => t.trim()).filter(Boolean) : []
-        );
-        try { renderQuickActionsUI([...allActions, ...combos]); }
-        catch (e) { console.error('QA Tag-refresh Error:', e); }
-    };
-
-    // ── UI CONTROLS ──────────────────────────────────────────────────────────
-
-    window.toggleQAManager = function() {
-        const panel  = document.getElementById('qa-manager-panel');
-        const toggle = document.getElementById('qa-manager-toggle');
-        if (!panel || !toggle) return;
-
-        const isHidden = panel.style.display === 'none' || !panel.style.display;
-        panel.style.display = isHidden ? 'block' : 'none';
-        toggle.textContent  = isHidden ? '[-] CMD_CENTER' : '[+] CMD_CENTER';
-    };
-
-    window.toggleDeleteMode = function() {
-        deleteMode = !deleteMode;
-        const btn = document.getElementById('toggle-delete-mode-btn');
-        if (btn) btn.textContent = deleteMode ? '[✓] DEL_MODE' : '[x] DEL_MODE';
-        renderUserActions();
-    };
-
-    window.setQAFilter = function(filter, ev) {
-        currentFilter = filter;
-        const event = ev || window.event;
-        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-        if (event?.target?.classList) event.target.classList.add('active');
-        renderQuickActionsUI([...allActions, ...combos]);
-    };
-
-    let _searchTimer = null;
-    window.twLoadQuickActions = function() {
-        clearTimeout(_searchTimer);
-        _searchTimer = setTimeout(() => {
-            const input  = document.getElementById('qa-search-input');
-            const search = (input?.value || '').toLowerCase();
-
-            const filtered = [...allActions, ...combos].filter(a =>
-                (a.label    || '').toLowerCase().includes(search) ||
-                (a.template || '').toLowerCase().includes(search)
-            );
-            renderQuickActionsUI(filtered);
-        }, 200);
-    };
-
-    window.saveCustomAction = async function() {
-        const label    = document.getElementById('custom-label')?.value    || '';
-        const template = document.getElementById('custom-template')?.value || '';
-        const category = document.getElementById('custom-category')?.value || 'universal';
-
-        if (!label || !template) { alert('Label and Prompt are required!'); return; }
-
-        const sb     = getSupabase();
-        const charId = getCharId();
-        if (!sb || !charId) return;
-
-        const { error } = await sb.from('cyber_user_actions').insert({
-            character_id: charId,
-            label,
-            template,
-            category
-        });
-
-        if (!error) {
-            const labelEl    = document.getElementById('custom-label');
-            const templateEl = document.getElementById('custom-template');
-            if (labelEl)    labelEl.value    = '';
-            if (templateEl) templateEl.value = '';
-            await loadAllData();
-        } else {
-            console.error('Save custom action error:', error);
-        }
-    };
-
-    window.deleteUserAction = async function(id) {
-        const sb = getSupabase();
-        if (!sb || !id) return;
-        if (!confirm('Delete custom action?')) return;
-
-        const { error } = await sb.from('cyber_user_actions').delete().eq('id', id);
-        if (!error) await loadAllData();
-        else        console.error('Delete user action error:', error);
-    };
-
-    // ── UTILITIES ─────────────────────────────────────────────────────────────
-
-    function escapeHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // ── INIT ──────────────────────────────────────────────────────────────────
-
-    $(document).ready(function() {
-        loadAllData();
-
-        if (!resizeRegistered) {
-            resizeRegistered = true;
-            const bar      = getBar();
-            const applyWrap = () => {
-                if (bar) bar.style.flexWrap = $(window).width() < 768 ? 'wrap' : 'nowrap';
-            };
-            applyWrap();
-            $(window).on('resize.qaResize', applyWrap);
-        }
-    });
-
-})(jQuery);
-</script>
-	<?php
-}, 46 );
+	wp_add_inline_script(
+		'tw-quick-actions-cmd-center',
+		'window.twQuickActionsData = ' . wp_json_encode( $config ) . ';',
+		'before'
+	);
+}
