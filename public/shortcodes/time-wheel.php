@@ -19,35 +19,31 @@
 add_action( 'wp_enqueue_scripts', 'neoweaver_register_time_wheel_assets' );
 
 function neoweaver_register_time_wheel_assets(): void {
-    $plugin_url = plugin_dir_url( __FILE__ );
-    $plugin_dir = plugin_dir_path( __FILE__ );
-
-    // --- CSS ---
     $css_rel  = 'assets/css/public/time-wheel.css';
-    $css_path = $plugin_dir . $css_rel;
-    $css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.0';
+    $css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
+    $css_url  = NEOWEAVER_PLUGIN_URL . $css_rel;
+    $css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION;
 
     wp_register_style(
         'neoweaver-time-wheel',
-        $plugin_url . $css_rel,
+        $css_url,
         array(),
         $css_ver
     );
 
-    // --- JS ---
     $js_rel  = 'assets/js/public/time-wheel.js';
-    $js_path = $plugin_dir . $js_rel;
-    $js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+    $js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+    $js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
+    $js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION;
 
     wp_register_script(
         'neoweaver-time-wheel',
-        $plugin_url . $js_rel,
-        array(),   // no jQuery dependency
+        $js_url,
+        array(),
         $js_ver,
-        true       // footer
+        true
     );
 }
-
 /* ==========================================================================
    2. SHORTCODE  [tw_time_wheel]
    ========================================================================== */
