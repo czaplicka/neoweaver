@@ -50,6 +50,7 @@ final class NeoWeaver_Core {
 		$files = [
 			// includes
 			'includes/trait-transient-cache.php',
+			'includes/adventure-data.php',
 			'includes/api-endpoints-character-data.php',
 			'includes/api-endpoints.php',
 			'includes/char-panel.php',
@@ -454,7 +455,18 @@ final class NeoWeaver_Core {
 			true
 		);
 	}
+function neoweaver_enqueue_adventure_scripts() {
+    if (!is_page_template('adventure.php')) return;
 
+    wp_enqueue_script(
+        'tw-adventure',
+        NEOWEAVER_PLUGIN_URL . 'assets/js/adventure.js',
+        [],
+        NEOWEAVER_VERSION,
+        true // ← ładuj w footerze (WAŻNE!)
+    );
+}
+add_action('wp_enqueue_scripts', 'neoweaver_enqueue_adventure_scripts');
 	// ── Supabase frontend bootstrap ───────────────────────────────────────
 
 	public static function print_supabase_bootstrap(): void {
