@@ -719,11 +719,15 @@ function neoweave_launch_campaign() {
 		],
 		'body'    => wp_json_encode( $sessions_payload ),
 	] );
-
+error_log('NW SESSION PAYLOAD ' . wp_json_encode($sessions_payload));
+error_log('NW SESSION INSERT CODE ' . wp_remote_retrieve_response_code($session_res));
+error_log('NW SESSION INSERT BODY ' . wp_remote_retrieve_body($session_res));
 	if ( is_wp_error( $session_res ) || wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
 		wp_send_json_error( [ 'message' => 'session_insert_error' ] );
 		return;
 	}
-
+if ( is_wp_error( $session_res ) ) {
+    error_log('NW SESSION INSERT WP ERROR ' . $session_res->get_error_message());
+}
 	wp_send_json_success( [ 'message' => 'launched' ] );
 }
