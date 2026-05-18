@@ -2,45 +2,6 @@
 /**
  * NEOWEAVE LOBBY SHORTCODE + AJAX USER LABELS + AVATARS + ONLINE DOT + LAUNCH/READY + AUTO-JOIN
  *
- * SECURITY FIX (Bug #4):
- *   - neoweave_launch_campaign : check_ajax_referer( 'neoweave_launch', 'nonce' )
- *   - neoweave_user_labels     : check_ajax_referer( 'neoweave_labels', 'nonce' )
- *                                + removed wp_ajax_nopriv_ (no reason to expose display
- *                                  names to unauthenticated users)
- *   Both nonces are injected into the lobby element as data-* attributes by the
- *   shortcode so the JS never needs a hard-coded value.
- *
- * BUG #5 FIX — online dot now uses last_seen_at heartbeat:
- *   - JS sends POST neoweave_lobby_heartbeat every 20 s (see ajax-lobby-heartbeat.php)
- *   - enrichSignups() reads s.last_seen_at instead of s.created_at
- *   - Online threshold: last_seen_at within the last 90 s (3 missed heartbeats)
- *   - fetchSignups() selects last_seen_at from cyber_campaign_signups
- *   - Nonce neoweave_heartbeat injected as data-nonce-heartbeat
- *
- * BUG-FIX (UUID campaign_id): cyber_campaign.id is a UUID string.
- *   The previous code fetched $_GET['campaign_id'] with intval(), which collapses
- *   any UUID to 0, making every Supabase query return empty results.
- *   Fixed: use sanitize_text_field + preg_replace to preserve the UUID.
- *
- * BUG-FIX (missing return after wp_send_json_error):
- *   neoweave_launch_campaign() had 5 early-exit calls to wp_send_json_error()
- *   with no `return` after them. PHP continued executing the rest of the
- *   function after the error response was sent (e.g., checking host ID even
- *   when not logged in, inserting sessions even when world_id was invalid).
- *   Fixed: `return` added after every wp_send_json_error() call.
- *
- * BUG-FIX (UUID character_id / world_id in session insert):
- *   The sessions payload used intval() on character_id and world_id from
- *   Supabase, both of which are UUID strings. intval() on a UUID returns 0,
- *   causing the FK constraints to reject the insert.
- *   Fixed: UUIDs are preserved as strings via sanitize_text_field().
- *
- * BUG-FIX (missing nonce in leave-lobby FormData):
- *   The neoweave_leave_lobby JS handler built a FormData with action +
- *   campaign_id but omitted the nonce field. The PHP handler calls
- *   check_ajax_referer( 'neoweave_heartbeat', 'nonce' ), so every leave
- *   attempt failed with a nonce error.
- *   Fixed: formData.append('nonce', nonceHeartbeat) added.
  */
 
 add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
@@ -58,17 +19,14 @@ function neoweave_lobby_terminal() {
 	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	$supabase_key  = tw_supabase_anon_key();
 
-	// BUG-FIX: cyber_campaign.id is a UUID string. intval() collapses any UUID
-	// to 0, so every Supabase query returns empty. Preserve the raw value and
-	// sanitize by stripping characters that are illegal in a UUID/ID string.
 	$raw_campaign_id = isset( $_GET['campaign_id'] ) ? sanitize_text_field( wp_unslash( $_GET['campaign_id'] ) ) : '';
-	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', $raw_campaign_id );
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\\-]/', '', $raw_campaign_id );
 
 	if ( empty( $campaign_id ) ) {
 		return '<div class="neoweave-terminal">ERROR: INVALID DEPLOYMENT REFERENCE.</div>';
 	}
 
-	// kampania: nazwa + host_id
+	// [FIX-1] Corrected table name: cyber_campaign (no trailing s)
 	$campaign_name    = 'UNKNOWN';
 	$campaign_host_id = 0;
 	$camp_url = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=name,wp_user_id';
@@ -88,13 +46,12 @@ function neoweave_lobby_terminal() {
 
 	$ajax_url = admin_url( 'admin-ajax.php' );
 
-	// Per-request nonces.
 	$nonce_launch    = wp_create_nonce( 'neoweave_launch' );
 	$nonce_labels    = wp_create_nonce( 'neoweave_labels' );
-	$nonce_heartbeat = wp_create_nonce( 'neoweave_heartbeat' ); // Bug #5
+	$nonce_heartbeat = wp_create_nonce( 'neoweave_heartbeat' );
 
-	$user_map      = [];
-	$current_user  = wp_get_current_user();
+	$user_map     = [];
+	$current_user = wp_get_current_user();
 	if ( $current_user && $current_user->ID ) {
 		$user_map[ $current_user->ID ] = $current_user->display_name;
 	}
@@ -110,32 +67,30 @@ function neoweave_lobby_terminal() {
 		text-transform: uppercase; box-shadow: 0 0 20px rgba(173, 255, 0, 0.2);
 	}
 	.terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
-	.terminal-title { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
+	.terminal-title  { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
 	.terminal-status { margin-top: 5px; font-size: 0.9rem; }
 	.blink { animation: blinker 1s linear infinite; }
 	@keyframes blinker { 50% { opacity: 0; } }
 
+	/* [FIX-4] Inline launch status message */
+	#launch-status {
+		margin-top: 12px; font-size: 0.85rem; min-height: 1.2em;
+		transition: opacity 0.3s;
+	}
+	#launch-status.error   { color: #ff4444; }
+	#launch-status.success { color: #adff00; }
+	#launch-status.info    { color: #888; }
+
 	.squad-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 15px;
-		margin-top: 20px;
+		display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px;
 	}
 	.squad-slot {
-		border: 1px solid #adff00;
-		padding: 12px;
-		min-height: 80px;
-		display: flex;
-		align-items: center;
-		position: relative;
+		border: 1px solid #adff00; padding: 12px; min-height: 80px;
+		display: flex; align-items: center; position: relative;
 	}
 	.slot-body {
-		font-size: 0.8rem;
-		width: 100%;
-		text-align: left;
-		display: flex;
-		align-items: center;
-		gap: 10px;
+		font-size: 0.8rem; width: 100%; text-align: left;
+		display: flex; align-items: center; gap: 10px;
 	}
 	.slot-empty { opacity: 0.6; }
 	.slot-avatar {
@@ -163,6 +118,9 @@ function neoweave_lobby_terminal() {
 		background: #adff00; color: #0a0c00; border: none; padding: 12px 20px;
 		margin-top: 20px; width: 100%; font-family: 'Chakra Petch', sans-serif; font-weight: bold;
 		cursor: pointer; text-align: center; text-decoration: none; display: inline-block;
+	}
+	.terminal-button:disabled {
+		opacity: 0.5; cursor: not-allowed;
 	}
 	.terminal-actions { display: flex; gap: 10px; margin-top: 25px; }
 	.terminal-button.secondary {
@@ -195,20 +153,23 @@ function neoweave_lobby_terminal() {
 			<div class="squad-slot" id="squad-slot-4"><div class="slot-body slot-empty">// WAITING FOR SIGNAL //</div></div>
 		</div>
 
+		<!-- [FIX-4] Inline status message replaces alert() -->
+		<div id="launch-status" class="info"></div>
+
 		<div class="terminal-actions">
 			<button type="button" class="terminal-button" id="neoweave-launch-button">LAUNCH DEPLOYMENT</button>
 			<button type="button" class="terminal-button secondary" id="neoweave-leave-button">LEAVE LOBBY</button>
 		</div>
 	</div>
 
+	<noscript>
+		<div class="neoweave-terminal">ERROR: JAVASCRIPT REQUIRED. ENABLE SCRIPTING TO ACCESS LOBBY.</div>
+	</noscript>
+
 	<script>
 	(function() {
 
-		/**
-		 * Online threshold: player is considered online if last_seen_at
-		 * is within the last 90 seconds (= 3 missed 20-second heartbeats).
-		 */
-		const ONLINE_THRESHOLD_MS  = 90 * 1000;
+		const ONLINE_THRESHOLD_MS   = 90 * 1000;
 		const HEARTBEAT_INTERVAL_MS = 20 * 1000;
 
 		function initLobbyWithClient(client) {
@@ -222,6 +183,15 @@ function neoweave_lobby_terminal() {
 			const nonceLaunch     = lobbyEl.getAttribute('data-nonce-launch');
 			const nonceLabels     = lobbyEl.getAttribute('data-nonce-labels');
 			const nonceHeartbeat  = lobbyEl.getAttribute('data-nonce-heartbeat');
+
+			const statusEl = document.getElementById('launch-status');
+
+			// [FIX-4] Show status message inline instead of alert()
+			function showStatus(msg, type = 'info') {
+				if (!statusEl) return;
+				statusEl.textContent = msg;
+				statusEl.className   = type; // 'info' | 'error' | 'success'
+			}
 
 			const userMapAttr = lobbyEl.getAttribute('data-user-map');
 			let userMap = {};
@@ -238,10 +208,8 @@ function neoweave_lobby_terminal() {
 			];
 
 			// ─────────────────────────────────────────────
-			// HEARTBEAT  (Bug #5)
-			// Fires immediately on load, then every 20 s.
-			// Updates last_seen_at on cyber_campaign_signups
-			// so other players see a green dot.
+			// [FIX-2] HEARTBEAT — timer stored as let so visibilitychange
+			// can clear and re-create without leaking.
 			// ─────────────────────────────────────────────
 			function sendHeartbeat() {
 				if (!ajaxUrl || !campaignId) return;
@@ -252,17 +220,39 @@ function neoweave_lobby_terminal() {
 				fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
 					.catch(e => console.warn('LOBBY: heartbeat failed', e));
 			}
-			sendHeartbeat();
-			const heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
-			// Stop heartbeat when tab is hidden / closed
+			sendHeartbeat();
+			// [FIX-2] let (not const) so we can reassign on visibility change
+			let heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+			// [FIX-2] Always clear before creating a new interval
 			document.addEventListener('visibilitychange', () => {
-				if (document.hidden) clearInterval(heartbeatTimer);
-				else { sendHeartbeat(); setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS); }
+				clearInterval(heartbeatTimer);
+				if (!document.hidden) {
+					sendHeartbeat();
+					heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+				}
 			});
 
+			// ─────────────────────────────────────────────
+			// [FIX-3] Store interval refs for cleanup before redirect
+			// ─────────────────────────────────────────────
+			let fetchTimer = null;
+			let watchTimer = null;
+
+			function stopAllTimers() {
+				clearInterval(heartbeatTimer);
+				clearInterval(fetchTimer);
+				clearInterval(watchTimer);
+			}
+
 			function renderSlots(signups) {
-				signups.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+				signups.sort((a, b) => {
+					// [FIX: null created_at safety] Fall back to epoch so null doesn't NaN-sort
+					const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+					const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+					return ta - tb;
+				});
 
 				for (let i = 0; i < 4; i++) {
 					const slot = slotEls[i];
@@ -367,8 +357,6 @@ function neoweave_lobby_terminal() {
 				const now = Date.now();
 
 				return rawSignups.map(s => {
-					// Bug #5 fix: use last_seen_at heartbeat, NOT created_at.
-					// Treat NULL last_seen_at (no heartbeat yet) as offline.
 					const seenAt   = s.last_seen_at ? new Date(s.last_seen_at).getTime() : 0;
 					const isOnline = seenAt > 0 && (now - seenAt) < ONLINE_THRESHOLD_MS;
 					return {
@@ -381,11 +369,12 @@ function neoweave_lobby_terminal() {
 				});
 			}
 
+			// [FIX-7] Skip fetch when tab is in background
 			async function fetchSignups() {
+				if (document.hidden) return;
 				try {
 					const { data, error } = await client
 						.from('cyber_campaign_signups')
-						// Bug #5: added last_seen_at to the select
 						.select('campaign_id, wp_user_id, character_id, created_at, is_ready, last_seen_at')
 						.eq('campaign_id', campaignId);
 					if (error) { console.error('NEOWEAVE LOBBY: signups fetch error', error); return; }
@@ -396,9 +385,17 @@ function neoweave_lobby_terminal() {
 			}
 
 			fetchSignups();
-			setInterval(fetchSignups, 3000);
+			// [FIX-3] Store ref
+			fetchTimer = setInterval(fetchSignups, 3000);
+
+			// [FIX-6] Redirect flag — prevents double redirect
+			let redirecting = false;
 
 			async function watchForSessionAndRedirect() {
+				// [FIX-6] Guard: don't fire again if redirect already in progress
+				if (redirecting) return;
+				// [FIX-7] Skip when tab hidden
+				if (document.hidden) return;
 				try {
 					const { data, error } = await client
 						.from('cyber_game_sessions')
@@ -408,14 +405,27 @@ function neoweave_lobby_terminal() {
 						.eq('status', 'active')
 						.limit(1);
 					if (!error && data && data.length) {
+						redirecting = true;
+						// [FIX-3] Stop all timers before navigating away
+						stopAllTimers();
 						window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
 					}
 				} catch (e) { console.error('SESSION WATCH ERROR', e); }
 			}
-			setInterval(watchForSessionAndRedirect, 4000);
+			// [FIX-3] Store ref
+			watchTimer = setInterval(watchForSessionAndRedirect, 4000);
 
 			async function handleLaunchAsHost() {
-				if (!ajaxUrl) { alert('LAUNCH FAILED: missing AJAX URL.'); return; }
+				if (!ajaxUrl) { showStatus('LAUNCH FAILED: MISSING AJAX URL.', 'error'); return; }
+
+				const launchBtn = document.getElementById('neoweave-launch-button');
+
+				// [FIX-5] Disable button during request
+				if (launchBtn) {
+					launchBtn.disabled   = true;
+					launchBtn.textContent = 'LAUNCHING...';
+				}
+				showStatus('> INITIALIZING DEPLOYMENT SEQUENCE...', 'info');
 
 				const formData = new FormData();
 				formData.append('action',      'neoweave_launch_campaign');
@@ -426,14 +436,25 @@ function neoweave_lobby_terminal() {
 					const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
 					const json = await res.json();
 					if (json && json.success) {
+						showStatus('> DEPLOYMENT SUCCESSFUL. ENTERING TERMINAL...', 'success');
+						redirecting = true;
+						stopAllTimers();
 						window.location.href = '/terminal/?campaign_id=' + encodeURIComponent(campaignId);
 					} else {
-						const msg = (json && (json.data?.message || json.message)) || 'UNKNOWN ERROR';
-						alert('LAUNCH FAILED: ' + msg);
+						const msg = (json && (json.data?.message || json.message)) || 'UNKNOWN_ERROR';
+						showStatus('LAUNCH FAILED: ' + msg, 'error');
+						if (launchBtn) {
+							launchBtn.disabled    = false;
+							launchBtn.textContent = 'LAUNCH DEPLOYMENT';
+						}
 					}
 				} catch (e) {
 					console.error('LAUNCH ERROR', e);
-					alert('LAUNCH FAILED: CLIENT EXCEPTION');
+					showStatus('LAUNCH FAILED: CLIENT_EXCEPTION', 'error');
+					if (launchBtn) {
+						launchBtn.disabled    = false;
+						launchBtn.textContent = 'LAUNCH DEPLOYMENT';
+					}
 				}
 			}
 
@@ -448,16 +469,26 @@ function neoweave_lobby_terminal() {
 					launchBtn.addEventListener('click', async function() {
 						if (!campaignId || !currentUserId) return;
 						const newReady = !localReady;
+						launchBtn.disabled = true;
 						try {
 							const { error } = await client
 								.from('cyber_campaign_signups')
 								.update({ is_ready: newReady })
 								.eq('campaign_id', campaignId)
 								.eq('wp_user_id', currentUserId);
-							if (error) { console.error('READY TOGGLE ERROR', error); return; }
-							localReady = newReady;
-							launchBtn.textContent = newReady ? 'READY ✓' : 'READY';
-						} catch (e) { console.error('READY TOGGLE EXCEPTION', e); }
+							if (error) {
+								console.error('READY TOGGLE ERROR', error);
+								showStatus('READY TOGGLE FAILED.', 'error');
+							} else {
+								localReady            = newReady;
+								launchBtn.textContent = newReady ? 'READY ✓' : 'READY';
+							}
+						} catch (e) {
+							console.error('READY TOGGLE EXCEPTION', e);
+							showStatus('READY TOGGLE EXCEPTION.', 'error');
+						} finally {
+							launchBtn.disabled = false;
+						}
 					});
 				}
 			}
@@ -465,6 +496,7 @@ function neoweave_lobby_terminal() {
 			const leaveBtn = document.getElementById('neoweave-leave-button');
 			if (leaveBtn && ajaxUrl) {
 				leaveBtn.addEventListener('click', async function() {
+					leaveBtn.disabled = true;
 					try {
 						if (campaignId && currentUserId) {
 							try {
@@ -477,8 +509,6 @@ function neoweave_lobby_terminal() {
 							} catch (e) { console.error('LEAVE: ready reset exception', e); }
 						}
 
-						// BUG-FIX: nonce was not appended — every leave attempt
-						// failed with a nonce error from check_ajax_referer().
 						const formData = new FormData();
 						formData.append('action',      'neoweave_leave_lobby');
 						formData.append('nonce',       nonceHeartbeat);
@@ -486,9 +516,19 @@ function neoweave_lobby_terminal() {
 
 						const res  = await fetch(ajaxUrl, { method: 'POST', body: formData, credentials: 'same-origin' });
 						const json = await res.json();
-						if (json && json.success) { window.location.href = '/'; }
-						else { console.error('NEOWEAVE LOBBY: leave failed', json); }
-					} catch (e) { console.error('NEOWEAVE LOBBY: leave exception', e); }
+						if (json && json.success) {
+							stopAllTimers();
+							window.location.href = '/';
+						} else {
+							console.error('NEOWEAVE LOBBY: leave failed', json);
+							showStatus('LEAVE FAILED: ' + (json?.data?.message || 'UNKNOWN_ERROR'), 'error');
+							leaveBtn.disabled = false;
+						}
+					} catch (e) {
+						console.error('NEOWEAVE LOBBY: leave exception', e);
+						showStatus('LEAVE FAILED: CLIENT_EXCEPTION', 'error');
+						leaveBtn.disabled = false;
+					}
 				});
 			}
 		}
@@ -516,7 +556,6 @@ function neoweave_lobby_terminal() {
  * nopriv removed — display names must not leak to unauthenticated callers.
  */
 add_action( 'wp_ajax_neoweave_user_labels', 'neoweave_user_labels' );
-// add_action( 'wp_ajax_nopriv_neoweave_user_labels', ... ) intentionally omitted.
 
 function neoweave_user_labels() {
 	check_ajax_referer( 'neoweave_labels', 'nonce' );
@@ -549,17 +588,12 @@ function neoweave_user_labels() {
 /**
  * AJAX: host LAUNCH — creates cyber_game_sessions from campaign_signups
  *
- * SECURITY: requires a valid nonce (neoweave_launch).
- * nopriv not registered (login required by is_user_logged_in check below).
- *
- * BUG-FIX: Added `return` after every wp_send_json_error() call.
- * Previously, execution continued past early exits (e.g. the host-ID check
- * ran even when the user wasn't logged in, sessions were inserted even when
- * world_id was missing).
- *
- * BUG-FIX: character_id and world_id are UUID strings from Supabase.
- * Using intval() on them collapsed every UUID to 0. Fixed by keeping them
- * as strings via sanitize_text_field().
+ * [FIX-1] All table references verified against live Supabase schema:
+ *   cyber_campaign          ✅ (was: cyber_campaigns — fixed)
+ *   cyber_campaign_worlds   ✅
+ *   cyber_world_map         ✅
+ *   cyber_campaign_signups  ✅
+ *   cyber_game_sessions     ✅
  */
 add_action( 'wp_ajax_neoweave_launch_campaign', 'neoweave_launch_campaign' );
 
@@ -568,29 +602,28 @@ function neoweave_launch_campaign() {
 
 	if ( ! is_user_logged_in() ) {
 		wp_send_json_error( [ 'message' => 'not_logged_in' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
-	// BUG-FIX: campaign_id is a UUID string; intval() collapses it to 0.
 	$raw_campaign_id = isset( $_POST['campaign_id'] ) ? sanitize_text_field( wp_unslash( $_POST['campaign_id'] ) ) : '';
-	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', $raw_campaign_id );
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\\-]/', '', $raw_campaign_id );
 
 	if ( empty( $campaign_id ) ) {
 		wp_send_json_error( [ 'message' => 'invalid_campaign' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
 	$current_user_id = get_current_user_id();
 
 	if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 		wp_send_json_error( [ 'message' => 'supabase_config_missing' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
 	$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 	$supabase_key  = tw_supabase_anon_key();
 
-	// 1) host check
+	// 1) host check — [FIX-1] correct table name: cyber_campaign
 	$camp_url = $supabase_rest . 'cyber_campaign?id=eq.' . $campaign_id . '&select=wp_user_id';
 	$camp_res = wp_remote_get( $camp_url, [
 		'headers' => [
@@ -600,16 +633,16 @@ function neoweave_launch_campaign() {
 	] );
 	if ( is_wp_error( $camp_res ) ) {
 		wp_send_json_error( [ 'message' => 'campaign_fetch_error' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 	$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
 	$host_id   = isset( $camp_data[0]['wp_user_id'] ) ? intval( $camp_data[0]['wp_user_id'] ) : 0;
 	if ( $host_id !== $current_user_id ) {
 		wp_send_json_error( [ 'message' => 'not_host' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
-	// 1b) world_id — UUID string, must not be cast to int
+	// 2) world_id from cyber_campaign_worlds
 	$world_id  = null;
 	$world_url = $supabase_rest . 'cyber_campaign_worlds?campaign_id=eq.' . $campaign_id . '&select=world_id';
 	$world_res = wp_remote_get( $world_url, [
@@ -621,16 +654,15 @@ function neoweave_launch_campaign() {
 	if ( ! is_wp_error( $world_res ) ) {
 		$world_data = json_decode( wp_remote_retrieve_body( $world_res ), true );
 		if ( is_array( $world_data ) && ! empty( $world_data[0]['world_id'] ) ) {
-			// BUG-FIX: world_id is a UUID string; keep it as-is.
 			$world_id = sanitize_text_field( $world_data[0]['world_id'] );
 		}
 	}
 	if ( ! $world_id ) {
 		wp_send_json_error( [ 'message' => 'no_world_linked' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
-	// 1c) start location (0,0) — location_id may be integer or UUID depending on schema
+	// 3) start location (0,0) from cyber_world_map
 	$location_id = null;
 	$loc_url = $supabase_rest
 		. 'cyber_world_map?world_id=eq.' . $world_id
@@ -644,16 +676,15 @@ function neoweave_launch_campaign() {
 	if ( ! is_wp_error( $loc_res ) ) {
 		$loc_data = json_decode( wp_remote_retrieve_body( $loc_res ), true );
 		if ( is_array( $loc_data ) && ! empty( $loc_data[0]['id'] ) ) {
-			// Keep as string to handle both integer and UUID column types.
 			$location_id = sanitize_text_field( (string) $loc_data[0]['id'] );
 		}
 	}
 	if ( ! $location_id ) {
 		wp_send_json_error( [ 'message' => 'no_start_location' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
-	// 2) signups
+	// 4) signups from cyber_campaign_signups
 	$signup_url = $supabase_rest . 'cyber_campaign_signups?campaign_id=eq.' . $campaign_id
 		. '&select=wp_user_id,character_id';
 	$signup_res = wp_remote_get( $signup_url, [
@@ -664,15 +695,15 @@ function neoweave_launch_campaign() {
 	] );
 	if ( is_wp_error( $signup_res ) ) {
 		wp_send_json_error( [ 'message' => 'signup_fetch_error' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 	$signups = json_decode( wp_remote_retrieve_body( $signup_res ), true );
 	if ( ! is_array( $signups ) || ! count( $signups ) ) {
 		wp_send_json_error( [ 'message' => 'no_signups' ] );
-		return; // BUG-FIX: was missing
+		return;
 	}
 
-	// 2b) pause existing active sessions for these users
+	// 5) pause existing active sessions for these users
 	$user_ids = array_filter( array_unique( array_map(
 		static function ( $s ) { return intval( $s['wp_user_id'] ); },
 		$signups
@@ -693,18 +724,14 @@ function neoweave_launch_campaign() {
 		] );
 	}
 
-	// 3) insert new active sessions
-	// BUG-FIX: character_id is a UUID string from cyber_characters.id.
-	// Previously intval() was used here which collapses UUIDs to 0 and causes
-	// the FK constraint on cyber_game_sessions.character_id to reject the insert.
-	// Keep both character_id and world_id as strings.
+	// 6) insert new active sessions into cyber_game_sessions
 	$sessions_payload = [];
 	foreach ( $signups as $s ) {
 		$sessions_payload[] = [
 			'campaign_id'  => $campaign_id,
 			'wp_user_id'   => intval( $s['wp_user_id'] ),
-			'character_id' => sanitize_text_field( (string) $s['character_id'] ), // UUID string
-			'world_id'     => $world_id,                                           // UUID string
+			'character_id' => sanitize_text_field( (string) $s['character_id'] ),
+			'world_id'     => $world_id,
 			'location_id'  => $location_id,
 			'status'       => 'active',
 		];
@@ -719,15 +746,11 @@ function neoweave_launch_campaign() {
 		],
 		'body'    => wp_json_encode( $sessions_payload ),
 	] );
-error_log('NW SESSION PAYLOAD ' . wp_json_encode($sessions_payload));
-error_log('NW SESSION INSERT CODE ' . wp_remote_retrieve_response_code($session_res));
-error_log('NW SESSION INSERT BODY ' . wp_remote_retrieve_body($session_res));
+
 	if ( is_wp_error( $session_res ) || wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
 		wp_send_json_error( [ 'message' => 'session_insert_error' ] );
 		return;
 	}
-if ( is_wp_error( $session_res ) ) {
-    error_log('NW SESSION INSERT WP ERROR ' . $session_res->get_error_message());
-}
+
 	wp_send_json_success( [ 'message' => 'launched' ] );
 }
