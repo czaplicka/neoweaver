@@ -72,18 +72,17 @@ function tw_assign_quest_to_character( string $character_id, array $quest_data, 
 
 /**
  * Resolve a quest outcome: mark the active quest as completed or failed,
- * then emit the outcome tags into the AI chat as #Tag directives so the
- * Make.com tag-driven pipeline processes them.
+ * then emit the outcome tags into the AI chat as #Tag directives so the tag-driven pipeline processes them.
  *
  * BUG-FIX: The previous implementation PATCHed cyber_characters.tags directly
  * (a column that does not exist — tags live in cyber_character_complete_tags).
  * This violated the architectural rule that all Echo/tag mutations must go
- * through the Make.com tag-driven pipeline, not through direct DB writes.
+ * through the tag-driven pipeline, not through direct DB writes.
  *
  * Fix:
  *   - Step 5a (direct PATCH to cyber_characters.tags) is removed entirely.
  *   - Instead, the outcome tags are emitted as a structured log entry in
- *     cyber_active_quests.progress_data so Make.com can read and apply them
+ *     cyber_active_quests.progress_data so can read and apply them
  *     via the normal tag-injection flow.
  *   - Step 5b (quest status PATCH) is retained — it writes to the correct
  *     table (cyber_active_quests) and does not bypass the pipeline.
@@ -139,10 +138,10 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 	$new_status   = $is_success ? 'completed' : 'failed';
 
 	// 3. Mark quest as completed / failed and store the pending tags in
-	//    progress_data so the Make.com scenario can read and apply them
+	//    progress_data so the scenario can read and apply them
 	//    through the tag-driven pipeline.
 	//    Tags must NOT be written directly to cyber_characters — that column
-	//    does not exist and doing so would bypass Make.com entirely.
+	//    does not exist and doing so would bypass entirely.
 	wp_remote_request(
 		$base_url . 'cyber_active_quests?id=eq.' . rawrawurlencode( $active_quest_id ),
 		[
@@ -154,7 +153,7 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 					'resolved_at'  => gmdate( 'Y-m-d H:i:s' ),
 					'outcome'      => $new_status,
 					'pending_tags' => $new_tags,
-					// Make.com reads pending_tags from this field and injects
+					// reads pending_tags from this field and injects
 					// them into cyber_character_complete_tags via the standard
 					// tag-driven pipeline. No direct character PATCH needed here.
 				] ),
