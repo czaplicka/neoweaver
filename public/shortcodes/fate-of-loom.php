@@ -20,14 +20,11 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 		$uid = 'loom_' . uniqid();
 
 		wp_enqueue_script( 'chartjs' );
-
-		$plugin_url = plugin_dir_url( __FILE__ );
-		$plugin_dir = plugin_dir_path( __FILE__ );
-
-		$js_rel  = 'assets/js/public/fate-of-loom.js';
-		$js_path = $plugin_dir . $js_rel;
-		$js_url  = $plugin_url . $js_rel;
-		$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+		
+$js_rel  = 'assets/js/public/fate-of-loom.js';
+$js_path = NEOWEAVER_DIR . $js_rel;
+$js_url  = NEOWEAVER_URL . $js_rel;
+$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
 
 		wp_enqueue_script(
 			'tw-fate-of-loom',
