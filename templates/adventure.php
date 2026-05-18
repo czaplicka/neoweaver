@@ -2,8 +2,16 @@
 /**
  * Template Name: Adventure Template
  * Post Type: page
-* get_header();
 */
+add_filter(
+	'body_class',
+	function ( $classes ) {
+		$classes[] = 'tw-adventure-page';
+		return $classes;
+	}
+);
+get_header();
+
 // =========================================================================
 // DANE
 // =========================================================================
