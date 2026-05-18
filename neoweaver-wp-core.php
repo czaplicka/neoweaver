@@ -355,8 +355,8 @@ final class NeoWeaver_Core {
 			'neoweaver-tw-core'      => [ 'core.css', [], '1.0.0' ],
 			'neoweaver-tw-chat'      => [ 'chat.css', [ 'neoweaver-tw-core' ], '1.0.0' ],
 			'neoweaver-tw-deck'      => [ 'deck.css', [ 'neoweaver-tw-core' ], '1.0.0' ],
-			'neoweaver-terminal'     => [ 'neoweaver-terminal.css', [], NEOWEAVER_VERSION ],
-			'neoweaver-interference' => [ 'neoweaver-interference.css', [], NEOWEAVER_VERSION ],
+			'neoweaver-terminal'     => [ 'terminal.css', [], NEOWEAVER_VERSION ],
+			'neoweaver-interference' => [ 'interference.css', [], NEOWEAVER_VERSION ],
 			'world-news'             => [ 'world-news.css', [], NEOWEAVER_VERSION ],
 		];
 
@@ -380,7 +380,6 @@ final class NeoWeaver_Core {
 			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ], NEOWEAVER_VERSION ],
-			'nw-time-wheel'          => [ 'assets/js/public/time-wheel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [], '1.0.0' ],
 		];
 
