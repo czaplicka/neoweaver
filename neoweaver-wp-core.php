@@ -40,8 +40,6 @@ final class NeoWeaver_Core {
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_agents_list_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_character_profile_assets' ] );
-
-		add_action( 'wp_footer', [ __CLASS__, 'print_supabase_bootstrap' ], 5 );
 	}
 
 	// ── File loading ──────────────────────────────────────────────────────
@@ -105,7 +103,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/kingdom-info.php',
 			'public/shortcodes/library.php',
 			'public/shortcodes/list-campaigns.php',
-			'public/shortcodes/list-worlds.php',
+			// 'public/shortcodes/list-worlds.php',
 			'public/shortcodes/lobby.php',
 			'public/shortcodes/map.php',
 			'public/shortcodes/quests.php',
@@ -412,6 +410,36 @@ final class NeoWeaver_Core {
 				'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
 			]
 		);
+				if ( is_user_logged_in() && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
+			$url = tw_supabase_url();
+			$key = tw_supabase_anon_key();
+
+			if ( $url && $key ) {
+				$bootstrap_rel = 'assets/js/public/supabase-bootstrap.js';
+				$bootstrap_abs = NEOWEAVER_PLUGIN_DIR . $bootstrap_rel;
+
+				if ( file_exists( $bootstrap_abs ) ) {
+					wp_enqueue_script(
+						'neoweaver-supabase-bootstrap',
+						NEOWEAVER_PLUGIN_URL . $bootstrap_rel,
+						array(),
+						(string) filemtime( $bootstrap_abs ),
+						true
+					);
+
+					wp_add_inline_script(
+						'neoweaver-supabase-bootstrap',
+						'window.twSupabaseConfig = ' . wp_json_encode(
+							array(
+								'url' => $url,
+								'key' => $key,
+							)
+						) . ';',
+						'before'
+					);
+				}
+			}
+		}
 	}
 
 	public static function enqueue_agents_list_assets(): void {
@@ -479,36 +507,6 @@ final class NeoWeaver_Core {
 			true
 		);
 	}
-
-	// ── Supabase frontend bootstrap ───────────────────────────────────────
-
-	public static function print_supabase_bootstrap(): void {
-		if ( ! is_user_logged_in() || ! is_page_template( 'templates/adventure.php' ) ) {
-			return;
-		}
-
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-			return;
-		}
-
-		$url = tw_supabase_url();
-		$key = tw_supabase_anon_key();
-
-		if ( ! $url || ! $key ) {
-			return;
-		}
-		?>
-		<script>
-		if (!window.twSupabase && window.supabase) {
-			window.twSupabase = window.supabase.createClient(
-				<?php echo wp_json_encode( $url ); ?>,
-				<?php echo wp_json_encode( $key ); ?>
-			);
-		}
-		</script>
-		<?php
-	}
-}
 require_once plugin_dir_path( __FILE__ ) . 'includes/ai/class-neoweaver-gpt-engine.php';
 
 /**
@@ -586,13 +584,15 @@ add_action('wp_enqueue_scripts', 'neoweaver_enqueue_chat_assets');
 function neoweaver_enqueue_chat_assets(): void {
     if ( ! is_page_template( 'templates/adventure.php' ) ) { return; }
 
-    wp_enqueue_script(
-        'neoweaver-ai-chat',
-        plugin_dir_url(__FILE__) . 'assets/js/public/neoweaver-ai-chat.js',
-        ['jquery'],
-        '1.0.0',
-        true
-    );
+$chat_js = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/neoweaver-ai-chat.js';
+
+wp_enqueue_script(
+	'neoweaver-ai-chat',
+	NEOWEAVER_PLUGIN_URL . 'assets/js/public/neoweaver-ai-chat.js',
+	[ 'jquery' ],
+	file_exists( $chat_js ) ? (string) filemtime( $chat_js ) : NEOWEAVER_VERSION,
+	true
+);
 
     wp_localize_script('neoweaver-ai-chat', 'neoweaver_ajax', [
         'ajax_url' => admin_url('admin-ajax.php'),
