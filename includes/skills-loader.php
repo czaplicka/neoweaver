@@ -10,9 +10,9 @@ add_action( 'wp_enqueue_scripts', function () {
 
 	wp_enqueue_script(
 		'tw-skills-loader',
-		get_stylesheet_directory_uri() . '/assets/js/skills-loader.js',
+		get_stylesheet_directory_uri() . '/assets/js/public/skills-loader.js',
 		array(),
-		filemtime( get_stylesheet_directory() . '/assets/js/skills-loader.js' ),
+		filemtime( get_stylesheet_directory() . '/assets/js/public/skills-loader.js' ),
 		true
 	);
 }, 35 );
