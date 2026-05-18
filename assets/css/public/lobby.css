@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Share+Tech+Mono&display=swap');
+	.neoweave-terminal {
+		background-color: #0a0c00; color: #adff00; font-family: 'Share Tech Mono', monospace;
+		padding: 30px; border: 2px solid #adff00; position: relative; max-width: 700px; margin: 20px auto;
+		text-transform: uppercase; box-shadow: 0 0 20px rgba(173, 255, 0, 0.2);
+	}
+	.terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
+	.terminal-title  { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
+	.terminal-status { margin-top: 5px; font-size: 0.9rem; }
+	.blink { animation: blinker 1s linear infinite; }
+	@keyframes blinker { 50% { opacity: 0; } }
+
+	/* [FIX-4] Inline launch status message */
+	#launch-status {
+		margin-top: 12px; font-size: 0.85rem; min-height: 1.2em;
+		transition: opacity 0.3s;
+	}
+	#launch-status.error   { color: #ff4444; }
+	#launch-status.success { color: #adff00; }
+	#launch-status.info    { color: #888; }
+
+	.squad-grid {
+		display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px;
+	}
+	.squad-slot {
+		border: 1px solid #adff00; padding: 12px; min-height: 80px;
+		display: flex; align-items: center; position: relative;
+	}
+	.slot-body {
+		font-size: 0.8rem; width: 100%; text-align: left;
+		display: flex; align-items: center; gap: 10px;
+	}
+	.slot-empty { opacity: 0.6; }
+	.slot-avatar {
+		width: 60px; height: 60px; border-radius: 50%; border: 0px solid #adff00;
+		object-fit: cover; background: #050600; flex-shrink: 0;
+	}
+	.slot-avatar.placeholder {
+		display: flex; align-items: center; justify-content: center;
+		font-size: 0.5rem; color: #555;
+	}
+	.slot-text-block { display: flex; flex-direction: column; gap: 2px; }
+	.slot-text-line  { line-height: 1.2; }
+	.online-dot {
+		width: 8px; height: 8px; border-radius: 50%; background: #00ff55;
+		box-shadow: 0 0 6px #00ff55; margin-left: auto;
+		animation: onlinePulse 1.2s infinite; flex-shrink: 0;
+	}
+	.online-dot.offline { background: #444; box-shadow: none; animation: none; }
+	@keyframes onlinePulse {
+		0%   { transform: scale(1);   opacity: 1; }
+		50%  { transform: scale(1.4); opacity: 0.4; }
+		100% { transform: scale(1);   opacity: 1; }
+	}
+	.terminal-button {
+		background: #adff00; color: #0a0c00; border: none; padding: 12px 20px;
+		margin-top: 20px; width: 100%; font-family: 'Chakra Petch', sans-serif; font-weight: bold;
+		cursor: pointer; text-align: center; text-decoration: none; display: inline-block;
+	}
+	.terminal-button:disabled {
+		opacity: 0.5; cursor: not-allowed;
+	}
+	.terminal-actions { display: flex; gap: 10px; margin-top: 25px; }
+	.terminal-button.secondary {
+		background: #0a0c00; color: #adff00; border: 1px solid #adff00;
+	}
