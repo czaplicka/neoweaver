@@ -63,7 +63,7 @@ final class _Core {
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
 			'includes/shortcodes-tags.php',
-			'includes/skills-loader.php',
+			//'includes/skills-loader.php',
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 
