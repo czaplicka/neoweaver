@@ -1,85 +1,111 @@
 /**
  * Logika Kompasu - Tale Weaver
  */
-document.addEventListener('twGameStateHydrated', function() {
-    console.log('🧭 Game State ready, refreshing compass...');
-    refreshCompass();
-});
+(function () {
+	let compassLoaded = false;
 
-async function refreshCompass() {
-    const client = window.twSupabase;
-    const session_id = window.twGameState?.currentSessionId;
+	function onCompassReady() {
+		if (compassLoaded) return;
+		compassLoaded = true;
 
-    if (!client || !session_id) {
-        console.warn('Compass: Missing client or session ID');
-        return;
-    }
+		console.log('🧭 Game State ready, refreshing compass...');
+		refreshCompass();
+	}
 
-    try {
-        // 1. Pobierz location_id z aktywnej sesji
-        const { data: sessionData, error: sError } = await client
-            .from('cyber_game_sessions')
-            .select('location_id')
-            .eq('id', session_id)
-            .single();
+	async function refreshCompass() {
+		const client = window.twSupabase;
+		const locationId = window.twGameState?.currentLocationId;
 
-        if (sError || !sessionData?.location_id) {
-            document.getElementById('tw-current-loc-name').innerText = "Unknown Zone";
-            return;
-        }
+		if (!client || !locationId) {
+			const currentLabel = document.getElementById('tw-current-loc-name');
+			if (currentLabel) {
+				currentLabel.innerText = 'Awaiting sync...';
+			}
+			console.warn('Compass: Missing Supabase client or location ID');
+			return;
+		}
 
-        // 2. Pobierz detale lokacji i sąsiadów z widoku v_cyber_world_nodes
-        const { data: node, error: nError } = await client
-            .from('v_cyber_world_nodes')
-            .select('location_name, n_id, e_id, s_id, w_id')
-            .eq('id', sessionData.location_id)
-            .single();
+		try {
+			const { data: node, error: nError } = await client
+				.from('v_cyber_world_nodes')
+				.select('location_name, n_id, e_id, s_id, w_id')
+				.eq('id', locationId)
+				.single();
 
-        if (nError || !node) return;
+			if (nError || !node) {
+				console.error('Compass: Failed to fetch node', nError);
+				const currentLabel = document.getElementById('tw-current-loc-name');
+				if (currentLabel) {
+					currentLabel.innerText = 'Unknown Zone';
+				}
+				return;
+			}
 
-        // Ustaw nazwę aktualnej lokalizacji
-        document.getElementById('tw-current-loc-name').innerText = node.location_name;
+			const currentLabel = document.getElementById('tw-current-loc-name');
+			if (currentLabel) {
+				currentLabel.innerText = node.location_name;
+			}
 
-        // Przygotuj listę ID sąsiadów do pobrania ich nazw jednym zapytaniem (optymalizacja)
-        const neighborIds = [node.n_id, node.e_id, node.s_id, node.w_id].filter(id => id !== null);
-        
-        let neighborMap = {};
-        if (neighborIds.length > 0) {
-            const { data: names } = await client
-                .from('cyber_world_map')
-                .select('id, location_name, is_discovered')
-                .in('id', neighborIds);
-            
-            names.forEach(n => {
-                neighborMap[n.id] = n.is_discovered ? n.location_name : "???";
-            });
-        }
+			const neighborIds = [node.n_id, node.e_id, node.s_id, node.w_id].filter(function (id) {
+				return id !== null;
+			});
 
-        // 3. Mapowanie i aktualizacja komórek kompasu
-        const directions = [
-            { key: 'n', id: node.n_id },
-            { key: 'e', id: node.e_id },
-            { key: 's', id: node.s_id },
-            { key: 'w', id: node.w_id }
-        ];
+			let neighborMap = {};
 
-        directions.forEach(dir => {
-            const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
-            const label = cell.querySelector('.loc-name');
+			if (neighborIds.length > 0) {
+				const { data: names, error: namesError } = await client
+					.from('cyber_world_map')
+					.select('id, location_name, is_discovered')
+					.in('id', neighborIds);
 
-            if (dir.id && neighborMap[dir.id]) {
-                cell.classList.add('active');
-                label.innerText = neighborMap[dir.id];
-            } else {
-                cell.classList.remove('active');
-                label.innerText = "Block"; // Lub "Void" / "Wall"
-            }
-        });
+				if (namesError) {
+					console.error('Compass: Failed to fetch neighbour names', namesError);
+				} else if (Array.isArray(names)) {
+					names.forEach(function (n) {
+						neighborMap[n.id] = n.is_discovered ? n.location_name : '???';
+					});
+				}
+			}
 
-    } catch (err) {
-        console.error('Compass Error:', err);
-    }
-}
-document.addEventListener('DOMContentLoaded', function () {
-  setTimeout(refreshCompass, 1000);
-});
+			const directions = [
+				{ key: 'n', id: node.n_id },
+				{ key: 'e', id: node.e_id },
+				{ key: 's', id: node.s_id },
+				{ key: 'w', id: node.w_id }
+			];
+
+			directions.forEach(function (dir) {
+				const cell = document.querySelector(`.tw-compass-cell[data-dir="${dir.key}"]`);
+				if (!cell) return;
+
+				const label = cell.querySelector('.loc-name');
+				const name = dir.id ? neighborMap[dir.id] : null;
+
+				cell.classList.toggle('active', !!name && name !== '???');
+				cell.classList.toggle('undiscovered', !!name && name === '???');
+
+				if (label) {
+					label.innerText = name ?? 'Block';
+				}
+			});
+		} catch (err) {
+			console.error('Compass Error:', err);
+		}
+	}
+
+	window.twRefreshCompass = refreshCompass;
+
+	document.addEventListener('twGameStateHydrated', onCompassReady);
+
+	if (document.readyState === 'loading') {
+		document.addEventListener(
+			'DOMContentLoaded',
+			function () {
+				setTimeout(onCompassReady, 1500);
+			},
+			{ once: true }
+		);
+	} else {
+		setTimeout(onCompassReady, 1500);
+	}
+})();
