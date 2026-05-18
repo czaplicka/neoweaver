@@ -32,14 +32,20 @@ function tw_localize_deck_vars() {
         return;
     }
 
-    // campaign_id from query var or GET fallback.
-    // BUG-FIX: cyber_campaign.id is a UUID — do not cast with (int).
-    // Sanitize by stripping non-alphanumeric/hyphen characters instead.
-    $campaign_id_raw = get_query_var( 'campaign_id' );
-    if ( ! $campaign_id_raw && isset( $_GET['campaign_id'] ) ) {
+// campaign_id from query var or GET fallback.
+// cyber_campaign.id is a UUID — keep as string, sanitize by stripping non-alphanumeric/hyphen.
+$campaign_id_raw = get_query_var( 'campaign_id' );
+
+// Upewnij się, że query var jest niepustym stringiem.
+if ( ! is_string( $campaign_id_raw ) || $campaign_id_raw === '' ) {
+    if ( isset( $_GET['campaign_id'] ) && is_string( $_GET['campaign_id'] ) && $_GET['campaign_id'] !== '' ) {
         $campaign_id_raw = $_GET['campaign_id'];
+    } else {
+        $campaign_id_raw = '';
     }
-    $campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
+}
+
+$campaign_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $campaign_id_raw );
 
     // Auto-detect last campaign for this user if not provided.
     if ( ! $campaign_id && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
