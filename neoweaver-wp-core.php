@@ -509,43 +509,82 @@ final class NeoWeaver_Core {
 		<?php
 	}
 }
-require_once plugin_dir_path(__FILE__) . 'includes/ai/class-neoweaver-gpt-engine.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/ai/class-neoweaver-gpt-engine.php';
 
-// AJAX dla zalogowanych graczy
-add_action('wp_ajax_neoweaver_ai_chat', 'neoweaver_ajax_ai_chat');
+/**
+ * Check whether a character belongs to the current WordPress user.
+ */
+function neoweaver_user_owns_character( int $character_id, int $user_id ): bool {
+	global $wpdb;
+
+	if ( $character_id <= 0 || $user_id <= 0 ) {
+		return false;
+	}
+
+	$query = $wpdb->prepare(
+		'SELECT COUNT(1) FROM cybercharacters WHERE id = %d AND wpuserid = %d',
+		$character_id,
+		$user_id
+	);
+
+	$exists = (int) $wpdb->get_var( $query );
+
+	return $exists > 0;
+}
+
+add_action( 'wp_ajax_neoweaver_ai_chat', 'neoweaver_ajax_ai_chat' );
 
 function neoweaver_ajax_ai_chat(): void {
-    check_ajax_referer('neoweaver_chat', 'nonce');
+	check_ajax_referer( 'neoweaver_chat', 'nonce' );
 
-    $char_id    = sanitize_text_field($_POST['char_id']    ?? '');
-    $session_id = sanitize_text_field($_POST['session_id'] ?? '');
-    $message    = sanitize_textarea_field($_POST['message'] ?? '');
+	$user_id    = get_current_user_id();
+	$char_id    = absint( $_POST['char_id'] ?? 0 );
+	$session_id = sanitize_text_field( $_POST['session_id'] ?? '' );
+	$message    = sanitize_textarea_field( $_POST['message'] ?? '' );
 
-    if (!$char_id || !$message) {
-        wp_send_json_error(['message' => 'Brakuje wymaganych danych.'], 400);
-    }
+	if ( ! $user_id ) {
+		wp_send_json_error(
+			[ 'message' => 'User is not authenticated.' ],
+			401
+		);
+	}
 
-    // TODO: sprawdź czy char_id należy do current_user_id()
+	if ( ! $char_id || '' === $message ) {
+		wp_send_json_error(
+			[ 'message' => 'Missing required data.' ],
+			400
+		);
+	}
 
-    if (empty($session_id)) {
-        $session_id = wp_generate_uuid4();
-    }
+	if ( ! neoweaver_user_owns_character( $char_id, $user_id ) ) {
+		wp_send_json_error(
+			[ 'message' => 'You do not have access to this character.' ],
+			403
+		);
+	}
 
-    $engine = new NeoWeaver_GPT_Engine();
-    $result = $engine->process($char_id, $session_id, $message);
+	if ( empty( $session_id ) ) {
+		$session_id = wp_generate_uuid4();
+	}
 
-    if (isset($result['error'])) {
-        wp_send_json_error(['message' => $result['error']], 500);
-    }
+	$engine = new NeoWeaver_GPT_Engine();
+	$result = $engine->process( $char_id, $session_id, $message );
 
-    wp_send_json_success($result);
+	if ( isset( $result['error'] ) ) {
+		wp_send_json_error(
+			[ 'message' => $result['error'] ],
+			500
+		);
+	}
+
+	wp_send_json_success( $result );
 }
 
 // Enqueue skryptów
 add_action('wp_enqueue_scripts', 'neoweaver_enqueue_chat_assets');
 
 function neoweaver_enqueue_chat_assets(): void {
-    if ( ! is_page_template( 'templates/adventure.php' ) ) { return; // dostosuj warunek
+    if ( ! is_page_template( 'templates/adventure.php' ) ) { return; }
 
     wp_enqueue_script(
         'neoweaver-ai-chat',
