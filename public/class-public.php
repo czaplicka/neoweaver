@@ -1,29 +1,4 @@
 <?php
-/**
- * LAYOUT CONTRACT (mandatory for all current and future shortcodes):
- *   Every shortcode return value MUST be wrapped in:
- *     <div class="neoweaver-screen">…</div>
- *   The shared layout rules in assets/css/neoweaver-public.css rely on this
- *   wrapper to control z-index, margin and overflow relative to the theme's
- *   CTA section and footer.
- *
- * CSS SCOPING RULE:
- *   Every rule in the per-wizard CSS files MUST be scoped under both the
- *   shared wrapper AND the screen's unique root ID, e.g.:
- *     .neoweaver-screen #tw-char-creator .tw-screen-bezel { … }
- *   This prevents collisions between shortcodes that share generic class names.
- *
- * SEPARATION OF CONCERNS:
- *   - PHP methods prepare data and pass it to template partials via $tw_data.
- *   - HTML lives in templates/partials/*.php.
- *   - CSS lives in assets/css/public/ and is enqueued via wp_enqueue_style().
- *   - JS lives in assets/js/public/ and is enqueued via wp_enqueue_script().
- *   No inline <style> or <script> blocks belong in this class.
- *
- *
- * @package Neoweaver
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -32,13 +7,8 @@ if ( ! class_exists( 'Neoweaver_Public', false ) ) :
 
 class Neoweaver_Public {
 
-	/** @var Neoweaver_Agents_List */
 	protected Neoweaver_Agents_List $agents_list;
-
-	/** @var Neoweaver_Deployments_Creator */
 	protected Neoweaver_Deployments_Creator $deployments_creator;
-
-	/** @var Neoweaver_Nodes_Creator */
 	protected Neoweaver_Nodes_Creator $nodes_creator;
 
 	public function __construct(
@@ -57,44 +27,49 @@ class Neoweaver_Public {
 		add_shortcode( 'tw_active_node',                [ $this, 'shortcode_active_node' ] );
 
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_footer',          [ $this, 'enqueue_quick_actions_bridge' ] );
-		add_action( 'wp_footer',          [ $this, 'render_tag_update_popup' ] );
 	}
-
-	// =========================================================================
-	// ASSET REGISTRATION
-	// =========================================================================
 
 	public function enqueue_assets(): void {
 		if ( is_admin() ) {
 			return;
 		}
 
-		$url = NEOWEAVER_PLUGIN_URL;
+		$url = trailingslashit( NEOWEAVER_PLUGIN_URL );
+		$dir = trailingslashit( NEOWEAVER_PLUGIN_DIR );
 		$ver = NEOWEAVER_VERSION;
-		// ── Agents list ──────────────────────────────────────────────────────
+
 		Neoweaver_Agents_List::enqueue_assets();
 
-		// ── Character creator ──────────────────────────────────────────────
 		wp_localize_script(
 			'neoweaver-char-creator',
 			'twCharCreatorConfig',
 			[
-				'nonce'       => wp_create_nonce( 'neoweaver_nonce' ), // must match check_ajax_referer() in api-endpoints-character-data.php
+				'nonce'       => wp_create_nonce( 'neoweaver_nonce' ),
 				'ajax_url'    => admin_url( 'admin-ajax.php' ),
 				'restNonce'   => wp_create_nonce( 'wp_rest' ),
 				'restUrl'     => home_url( '/wp-json/neoweaver/v1/character/create' ),
 				'agentsUrl'   => home_url( '/agents/' ),
 				'restBase'    => home_url( '/wp-json/neoweaver/v1' ),
-				'supabaseUrl' => function_exists( 'tw_supabase_url' )      ? tw_supabase_url()      : '',
+				'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
 				'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 			]
 		);
-	}
 
-	// =========================================================================
-	// PRIVATE HELPERS
-	// =========================================================================
+		if ( is_page_template( 'templates/adventure.php' ) ) {
+			$script_rel  = 'assets/js/public/class-public.js';
+			$script_path = $dir . $script_rel;
+			$script_url  = $url . $script_rel;
+			$script_ver  = file_exists( $script_path ) ? (string) filemtime( $script_path ) : $ver;
+
+			wp_enqueue_script(
+				'neoweaver-public-runtime',
+				$script_url,
+				array(),
+				$script_ver,
+				true
+			);
+		}
+	}
 
 	private function screen( string $html ): string {
 		return '<div class="neoweaver-screen">' . $html . '</div>';
@@ -113,10 +88,6 @@ class Neoweaver_Public {
 		return ob_get_clean() ?: '';
 	}
 
-	// =========================================================================
-	// SHORTCODE: character list
-	// =========================================================================
-
 	public function shortcode_list_characters(): string {
 		if ( is_admin() ) {
 			return '';
@@ -128,20 +99,12 @@ class Neoweaver_Public {
 		return $this->screen( $this->agents_list->render_roster( $user_id ) );
 	}
 
-	// =========================================================================
-	// SHORTCODE: character creator
-	// =========================================================================
-
 	public function shortcode_character_creator(): string {
 		if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return $this->screen( '<!-- Neoweaver: shortcode-character-creator.php not loaded -->' );
 		}
 		return neoweaver_shortcode_character_creator();
 	}
-
-	// =========================================================================
-	// SHORTCODE: campaign / deployment creator
-	// =========================================================================
 
 	public function shortcode_campaign_creator(): string {
 		if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
@@ -150,10 +113,6 @@ class Neoweaver_Public {
 		return neoweaver_shortcode_campaign_creator();
 	}
 
-	// =========================================================================
-	// SHORTCODE: node / world creator
-	// =========================================================================
-
 	public function shortcode_world_creator(): string {
 		if ( ! function_exists( 'neoweaver_shortcode_world_creator' ) ) {
 			return $this->screen( '<!-- Neoweaver: shortcode-world-creator.php not loaded -->' );
@@ -161,92 +120,12 @@ class Neoweaver_Public {
 		return neoweaver_shortcode_world_creator();
 	}
 
-	// =========================================================================
-	// SHORTCODE: active node display
-	// =========================================================================
-
 	public function shortcode_active_node(): string {
 		if ( ! get_current_user_id() ) {
 			return '<span id="node-name-display">NO_UPLINK</span>';
 		}
 		return '<span id="node-name-display">LOADING_NODE...</span>';
 	}
-
-	// =========================================================================
-	// FOOTER SCRIPT: Quick Actions Bridge (game page only)
-	// =========================================================================
-
-	public function enqueue_quick_actions_bridge(): void {
-		if ( ! is_page_template( 'templates/adventure.php' ) ) {
-			return;
-		}
-		?>
-		<script>
-		(function () {
-			function updateQuickActionsFromHand(cards) {
-				var tags = (cards || []).flatMap(function (c) {
-					return (c.tags || '')
-						.split(',')
-						.map(function (t) { return t.trim(); })
-						.filter(Boolean);
-				});
-				if (typeof window.twUpdatePlayerTags === 'function') {
-					window.twUpdatePlayerTags(tags);
-				} else if (typeof console !== 'undefined') {
-					console.warn('twUpdatePlayerTags is not defined – quick actions bridge has nothing to call.');
-				}
-			}
-			window.twQuickActionsBridge = {
-				updateFromCards: updateQuickActionsFromHand,
-			};
-		})();
-		</script>
-		<?php
-	}
-
-	// =========================================================================
-	// FOOTER SCRIPT: Tag Update Popup (game page only)
-	// =========================================================================
-
-	public function render_tag_update_popup(): void {
-if ( ! is_page_template( 'templates/adventure.php' ) ) {
-			return;
-		}
-		?>
-		<script>
-		function showTagUpdate(tagName, isSuccess) {
-			isSuccess = (isSuccess !== false);
-			var popup = document.createElement('div');
-			popup.className = 'tag-update-popup' + (isSuccess ? '' : ' failure');
-
-			var labelSpan = document.createElement('span');
-			labelSpan.className = 'tag-label';
-			labelSpan.textContent = '// DATA SYNC: NEW ECHO TAG ACQUIRED';
-
-			var nameSpan = document.createElement('span');
-			nameSpan.className = 'tag-name';
-			nameSpan.textContent = tagName;
-
-			popup.appendChild(labelSpan);
-			popup.appendChild(nameSpan);
-			document.body.appendChild(popup);
-
-			if (window.jQuery) {
-				jQuery(popup).fadeIn(300).delay(3000).fadeOut(500, function () {
-					this.remove();
-				});
-			} else {
-				popup.style.opacity = '1';
-				setTimeout(function () {
-					popup.style.transition = 'opacity 0.5s';
-					popup.style.opacity = '0';
-					setTimeout(function () { popup.remove(); }, 500);
-				}, 3000);
-			}
-		}
-		</script>
-		<?php
-	}
 }
 
-endif; // class_exists( 'Neoweaver_Public' )
+endif;
