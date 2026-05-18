@@ -301,11 +301,7 @@ final class NeoWeaver_Core {
 			return;
 		}
 
-		$has_onboarding_shortcode =
-			has_shortcode( $post->post_content, 'tw_onboarding' ) ||
-			has_shortcode( $post->post_content, 'neoweaver_onboarding' );
-
-		if ( ! $has_onboarding_shortcode ) {
+		if ( ! has_shortcode( $post->post_content, 'tw_onboarding_slider' ) ) {
 			return;
 		}
 
