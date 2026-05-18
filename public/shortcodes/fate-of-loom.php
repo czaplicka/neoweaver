@@ -24,7 +24,7 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 		$plugin_url = plugin_dir_url( __FILE__ );
 		$plugin_dir = plugin_dir_path( __FILE__ );
 
-		$js_rel  = 'fate-of-loom.js';
+		$js_rel  = 'assets/js/public/fate-of-loom.js';
 		$js_path = $plugin_dir . $js_rel;
 		$js_url  = $plugin_url . $js_rel;
 		$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
