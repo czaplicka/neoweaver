@@ -36,6 +36,7 @@ final class NeoWeaver_Core {
 		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'register_admin_globals' ] );
 
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ] );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_onboarding_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_adventure_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_agents_list_assets' ] );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_character_profile_assets' ] );
@@ -133,6 +134,7 @@ final class NeoWeaver_Core {
 			}
 		}
 	}
+
 	/**
 	 * Load and instantiate admin classes.
 	 * Files are loaded here (inside plugins_loaded) so Supabase helpers
@@ -184,6 +186,7 @@ final class NeoWeaver_Core {
 	public static function filter_page_templates( array $templates ): array {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
 		$templates['templates/adventure.php']                = __( 'NeoWeaver Adventure', 'neoweaver' );
+
 		return $templates;
 	}
 
@@ -285,26 +288,61 @@ final class NeoWeaver_Core {
 			'4.5.1',
 			true
 		);
-wp_enqueue_script(
-	'neoweaver-onboarding',
-	$script_url,
-	array( 'jquery' ),
-	NEOWEAVER_VERSION,
-	true
-);
+	}
 
-wp_localize_script(
-	'neoweaver-onboarding',
-	'twOnboarding',
-	array(
-		'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-		'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
-	)
-);
-		wp_localize_script( 'tw-onboarding', 'twOnboarding', [
+	public static function enqueue_onboarding_assets(): void {
+		if ( is_admin() || ! is_singular() ) {
+			return;
+		}
+
+		global $post;
+
+		if ( ! $post instanceof WP_Post ) {
+			return;
+		}
+
+		$has_onboarding_shortcode =
+			has_shortcode( $post->post_content, 'tw_onboarding' ) ||
+			has_shortcode( $post->post_content, 'neoweaver_onboarding' );
+
+		if ( ! $has_onboarding_shortcode ) {
+			return;
+		}
+
+		$script_rel = 'assets/js/public/onboarding.js';
+		$script_abs = NEOWEAVER_PLUGIN_DIR . $script_rel;
+		$style_rel  = 'assets/css/public/onboarding.css';
+		$style_abs  = NEOWEAVER_PLUGIN_DIR . $style_rel;
+
+		if ( file_exists( $style_abs ) ) {
+			wp_enqueue_style(
+				'neoweaver-onboarding',
+				NEOWEAVER_PLUGIN_URL . $style_rel,
+				[ 'neoweaver-public' ],
+				(string) filemtime( $style_abs )
+			);
+		}
+
+		if ( ! file_exists( $script_abs ) ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'neoweaver-onboarding',
+			NEOWEAVER_PLUGIN_URL . $script_rel,
+			[ 'jquery' ],
+			(string) filemtime( $script_abs ),
+			true
+		);
+
+		wp_localize_script(
+			'neoweaver-onboarding',
+			'twOnboarding',
+			[
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'tw_user_setting' ),
-			] );
+				'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
+			]
+		);
 	}
 
 	public static function enqueue_adventure_assets(): void {
@@ -338,7 +376,7 @@ wp_localize_script(
 			file_exists( $char_panel_file ) ? (string) filemtime( $char_panel_file ) : NEOWEAVER_VERSION
 		);
 
-		$js_url = NEOWEAVER_PLUGIN_URL;
+		$js_url  = NEOWEAVER_PLUGIN_URL;
 		$scripts = [
 			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js', [], '1.0.0' ],
 			'neoweaver-interference' => [ 'assets/js/public/neoweave-interference.js', [ 'jquery' ], NEOWEAVER_VERSION ],
@@ -355,6 +393,7 @@ wp_localize_script(
 		}
 
 		$uploads = wp_upload_dir();
+
 		wp_localize_script(
 			'neoweaver-header-node',
 			'twNeoWeaverData',
