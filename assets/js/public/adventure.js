@@ -1,10 +1,7 @@
 (function () {
     'use strict';
 
-    // -------------------------------------------------------------------------
-    // FIX #3: Guard against DOMContentLoaded already having fired when this
-    // inline script runs (which is common for scripts at the bottom of body).
-    // -------------------------------------------------------------------------
+    // Guard against DOMContentLoaded already having fired
     function onDOMReady(fn) {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', fn, { once: true });
@@ -15,9 +12,6 @@
 
     // =========================================================================
     // SCENARIOS
-    // FIX #9: scenarios fetch now includes a nonce so the AJAX handler can
-    // verify the request via check_ajax_referer().
-    // PERF #12: limit=3 moved to the server-side AJAX handler; slice removed.
     // =========================================================================
     async function loadScenarios() {
         const shell = document.getElementById('adventure-shell');
@@ -30,7 +24,6 @@
         list.innerHTML = '<p class="empty-msg">Scanning network for missions...</p>';
         try {
             const campaignId = window.twGameState?.currentCampaignId || window.twAdventureData?.active_campaign_id;
-            console.log('🔍 Scenarios: Resolved campaignId:', campaignId);
             if (!campaignId) {
                 list.innerHTML = '<p class="empty-msg">No active campaign detected.</p>';
                 return;
@@ -38,7 +31,7 @@
             const formData = new URLSearchParams({
                 action:      'tw_get_scenarios_ajax',
                 campaign_id: campaignId,
-                nonce:       window.twAdventureData?.nonce ?? '', // FIX #9
+                nonce:       window.twAdventureData?.nonce ?? '',
             });
             const response = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
                 method:      'POST',
@@ -53,20 +46,17 @@
                 list.innerHTML = '<p class="empty-msg">No missions available for this campaign yet.</p>';
                 return;
             }
-            // PERF #12: server should now return max 3 — no client-side slice needed.
             const scenarios = json.data;
             if (!scenarios.length) {
                 list.innerHTML = '<p class="empty-msg">No missions available. Ask your GM to sync the campaign.</p>';
                 return;
             }
             list.innerHTML = '';
-            // XSS FIX: build cards via DOM API (textContent / setAttribute) instead
-            // of innerHTML interpolation so scenario data from the server can never
-            // inject arbitrary HTML or script into the page.
+
             scenarios.forEach((s) => {
                 const tags = (s.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
 
-                const card  = document.createElement('article');
+                const card = document.createElement('article');
                 card.className = 'deck-card scenario-card';
                 card.dataset.scenarioId = s.id;
 
@@ -154,17 +144,11 @@
 
     // =========================================================================
     // CHAT CHANNEL
-    // FIX #4 & #5: fetchChatChannelId now uses strict null/undefined check so
-    // a session ID of 0 is correctly detected as "no active session" and
-    // waitForChatChannel is only started after twGameState is fully hydrated.
-    // PERF #13: exponential backoff replaces fixed 2 s × 10 poll loop.
     // =========================================================================
     const playerChatEl = document.getElementById('player-chat');
 
     async function fetchChatChannelId() {
         const sessionId = window.twGameState?.currentSessionId;
-
-        // FIX #5: strict check — 0, null, and undefined all mean "no session".
         if (sessionId === null || sessionId === undefined || sessionId === 0) {
             console.warn('No valid currentSessionId – cannot resolve chat channel');
             return null;
@@ -193,7 +177,7 @@
         }
     }
 
-    // PERF #13: exponential backoff — starts at 1 s, caps at 8 s, max 6 tries.
+    // Exponential backoff — starts at 1s, caps at 8s, max 6 tries
     async function waitForChatChannel(maxTries = 6) {
         if (!playerChatEl) return;
         playerChatEl.innerHTML = '<p class="empty-msg">Channel syncing, please wait…</p>';
@@ -246,9 +230,6 @@
 
     // =========================================================================
     // HYDRATION
-    // FIX #3: Use onDOMReady to safely handle already-fired DOMContentLoaded.
-    // PERF #14: All three twGameStateHydrated consumers consolidated into one
-    // listener so initialisation order is explicit and handlers run in parallel.
     // =========================================================================
     function hydrateTwGameState() {
         if (!window.twAdventureData) {
@@ -266,13 +247,9 @@
         document.dispatchEvent(new Event('twGameStateHydrated'));
     }
 
-    // PERF #14: single consolidated listener replaces three separate handlers.
     document.addEventListener('twGameStateHydrated', function onGameStateReady() {
-        // Run all post-hydration tasks in parallel; failures are isolated.
         Promise.allSettled([
             loadScenarios(),
-            // FIX #4: waitForChatChannel is now called only after hydration,
-            // so twGameState.currentSessionId is guaranteed to be set.
             window.twGameState?.chatChannelId
                 ? Promise.resolve()
                 : waitForChatChannel(),
@@ -286,8 +263,7 @@
         });
     }, { once: true });
 
-    // Kick off hydration once the DOM is ready.
     onDOMReady(hydrateTwGameState);
 
-    console.log('🎮 Tale Weaver Scenarios Loader - Ready & Waiting');
+    console.log('🎮 NeoWeaver Adventure - Ready & Waiting');
 })();
