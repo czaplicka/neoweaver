@@ -286,14 +286,14 @@ final class NeoWeaver_Core {
 			true
 		);
 				wp_enqueue_style(
-			'neoweaver-onboarding',
+			'tw_onboarding_slider',
 			NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
 			[],
 			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/onboarding.css' )
 		);
 
 		wp_enqueue_script(
-			'neoweaver-onboarding',
+			'tw_onboarding_slider',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
 			[],
 			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/onboarding.js' ),
