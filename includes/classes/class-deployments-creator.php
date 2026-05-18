@@ -10,13 +10,13 @@
  * never outputs HTML, and knows nothing about the multi-step wizard UI.
  * Rendering lives in Neoweaver_Public::shortcode_campaign_creator().
  *
- * ARCHITECTURAL RULES (do not violate):\n *  - Never modify Node Entropy or any Agent Echo tag from here.\n *    All world-state changes must go through the Make.com tag pipeline.
+ * ARCHITECTURAL RULES (do not violate):\n *  - Never modify Node Entropy or any Agent Echo tag from here.\n *    All world-state changes must go through the tag pipeline.
  *  - Table names are fixed: cyber_campaign, cyber_campaign_worlds,
  *    cyber_campaign_characters. Do not alias or rename them.
  *  - Column names sent to Supabase must exactly match the existing schema
  *    (same as the JS payload in the original shortcode).
  *  - After a successful INSERT, fire the 'neoweaver_campaign_created'
- *    action hook so Make.com webhook dispatchers and other listeners can react.
+ *    action hook so webhook dispatchers and other listeners can react.
  *
  * HTTP pattern: identical to Neoweaver_Agents_Repository and
  * Neoweaver_Agents_Creator — same headers(), table_url(), get_json(),
@@ -366,7 +366,7 @@ class Neoweaver_Deployments_Creator {
 			$this->link_character( $campaign_id, $character_id, $creator_wp_id );
 		}
 
-		// 5. Fire action hook for Make.com dispatcher and other listeners.
+		// 5. Fire action hook for dispatcher and other listeners.
 		do_action( 'neoweaver_campaign_created', $campaign_id, $data );
 
 		return $campaign_id;
