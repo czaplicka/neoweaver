@@ -24,7 +24,7 @@ define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
 define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );
 define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 
-final class NeoWeaver_Core {
+final class _Core {
 
 	public static function init(): void {
 		self::load_files();
@@ -375,7 +375,7 @@ final class NeoWeaver_Core {
 		$js_url  = NEOWEAVER_PLUGIN_URL;
 		$scripts = [
 			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js', [], '1.0.0' ],
-			'neoweaver-interference' => [ 'assets/js/public/neoweave-interference.js', [ 'jquery' ], NEOWEAVER_VERSION ],
+			'neoweaver-interference' => [ 'assets/js/public/interference.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'world-news'             => [ 'assets/js/public/world-news.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
 			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js', [ 'jquery' ], NEOWEAVER_VERSION ],
