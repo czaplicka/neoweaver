@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * to include multiple times or alongside other plugins.
  *
  * Sections:
- *   1. tw_start_scenario_generation  — triggers Make.com webhook
+ *   1. tw_start_scenario_generation  — 
  *   2. tw_check_scenario_status      — polls session status
  *   3. tw_get_ai_message             — fetches latest GM/AI chat message
  *   4. tw_get_lore_tips              — returns random tips for weaving overlay
@@ -221,19 +221,27 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 	add_action( 'wp_ajax_tw_check_scenario_status',        'tw_check_scenario_status' );
 	add_action( 'wp_ajax_nopriv_tw_check_scenario_status', 'tw_check_scenario_status' );
 
-	function tw_check_scenario_status(): void {
-		$campaign_id = tw_sanitize_supabase_id( $_GET['campaign_id'] ?? '' );
+	function tw_check_scenario_status() {
+    $campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? $_GET['campaign_id'] ?? '' );
 
-		if ( ! $campaign_id ) {
-			wp_send_json_error( 'No campaign' );
-			return;
-		}
+    if ( empty( $campaign_id ) ) {
+        wp_send_json_error(
+            array(
+                'message' => 'Missing campaign_id',
+                'status'  => 'error',
+            ),
+            400
+        );
+    }
 
-		$status = tw_get_game_session_status( $campaign_id );
-		wp_send_json_success( [ 'status' => $status ?: 'generating' ] );
-	}
+    $status = tw_get_game_session_status( $campaign_id );
+
+    wp_send_json_success(
+        array(
+            'status' => $status ?: 'generating',
+        )
+    );
 }
-
 // ============================================================
 // 3. GET AI / GM MESSAGE
 // ============================================================
