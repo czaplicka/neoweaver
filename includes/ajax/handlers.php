@@ -6,45 +6,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * TALE WEAVER – CORE AJAX HANDLERS
  *
- * All handlers are guarded with !function_exists() so this file is safe
- * to include multiple times or alongside other plugins.
- *
- * Sections:
- *   1. tw_start_scenario_generation  — 
- *   2. tw_check_scenario_status      — polls session status
- *   3. tw_get_ai_message             — fetches latest GM/AI chat message
- *   4. tw_get_lore_tips              — returns random tips for weaving overlay
- *
- * Helpers (also guarded):
- *   tw_update_game_session_status()
- *   tw_get_game_session_status()
- *   tw_get_chat_channel_id_by_session()
- *
  * Supabase credentials are read from tw_supabase_url() / tw_supabase_anon_key()
- * (defined in wp-config via the Hostinger Supabase integration) rather than
- * bare TW_SUPABASE_* constants, keeping the same convention used everywhere
- * else in the plugin.
+ * (defined in wp-config via the Hostinger Supabase integration).
  */
 
 // ============================================================
-// INTERNAL HELPERS — declared first so AJAX handlers can call them
+// INTERNAL HELPERS
 // ============================================================
 
 if ( ! function_exists( 'tw_supa_url' ) ) {
-	function tw_supa_url( string $table, string $query = '' ): string {
-		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table;
-		return $query ? $base . '?' . $query : $base;
+	function tw_supa_url( string $table, array $args = array() ): string {
+		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . rawurlencode( $table );
+
+		if ( empty( $args ) ) {
+			return $base;
+		}
+
+		return add_query_arg( $args, $base );
 	}
 }
 
 if ( ! function_exists( 'tw_supa_headers' ) ) {
 	function tw_supa_headers(): array {
 		$key = tw_supabase_anon_key();
-		return [
+
+		return array(
 			'apikey'        => $key,
 			'Authorization' => 'Bearer ' . $key,
 			'Content-Type'  => 'application/json',
-		];
+		);
 	}
 }
 
@@ -61,24 +51,34 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 		}
 
 		$safe_campaign_id = tw_sanitize_supabase_id( $campaign_id );
+
 		if ( empty( $safe_campaign_id ) ) {
-			error_log( 'tw_update_game_session_status: invalid campaign_id: ' . $campaign_id );
+			error_log( 'tw_update_game_session_status: invalid campaign_id: ' . (string) $campaign_id );
 			return false;
 		}
 
-		$body = [ 'scenario_status' => $status, 'updated_at' => current_time( 'mysql' ) ];
+		$body = array(
+			'scenario_status' => $status,
+			'updated_at'      => current_time( 'mysql' ),
+		);
+
 		if ( $scenario_id ) {
 			$body['active_scenario_id'] = (int) $scenario_id;
 		}
 
 		$response = wp_remote_request(
-			tw_supa_url( 'cyber_game_sessions', 'campaign_id=eq.' . $safe_campaign_id ),
-			[
+			tw_supa_url(
+				'cyber_game_sessions',
+				array(
+					'campaign_id' => 'eq.' . $safe_campaign_id,
+				)
+			),
+			array(
 				'method'  => 'PATCH',
 				'headers' => tw_supa_headers(),
 				'body'    => wp_json_encode( $body ),
 				'timeout' => 10,
-			]
+			)
 		);
 
 		return ! is_wp_error( $response );
@@ -92,6 +92,7 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 		}
 
 		$safe_campaign_id = tw_sanitize_supabase_id( $campaign_id );
+
 		if ( empty( $safe_campaign_id ) ) {
 			return '';
 		}
@@ -99,9 +100,16 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 		$response = wp_remote_get(
 			tw_supa_url(
 				'cyber_game_sessions',
-				'campaign_id=eq.' . $safe_campaign_id . '&select=scenario_status&limit=1'
+				array(
+					'campaign_id' => 'eq.' . $safe_campaign_id,
+					'select'      => 'scenario_status',
+					'limit'       => 1,
+				)
 			),
-			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
+			array(
+				'headers' => tw_supa_headers(),
+				'timeout' => 10,
+			)
 		);
 
 		if ( is_wp_error( $response ) ) {
@@ -109,6 +117,7 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
 		return (string) ( $body[0]['scenario_status'] ?? '' );
 	}
 }
@@ -120,13 +129,24 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 		}
 
 		$safe_session_id = tw_sanitize_supabase_id( $session_id );
+
 		if ( empty( $safe_session_id ) ) {
 			return null;
 		}
 
 		$response = wp_remote_get(
-			tw_supa_url( 'cyber_game_sessions', 'id=eq.' . $safe_session_id . '&select=chat_channel_id&limit=1' ),
-			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
+			tw_supa_url(
+				'cyber_game_sessions',
+				array(
+					'id'     => 'eq.' . $safe_session_id,
+					'select' => 'chat_channel_id',
+					'limit'  => 1,
+				)
+			),
+			array(
+				'headers' => tw_supa_headers(),
+				'timeout' => 10,
+			)
 		);
 
 		if ( is_wp_error( $response ) ) {
@@ -136,7 +156,7 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		$raw  = $data[0]['chat_channel_id'] ?? null;
 
-		return $raw !== null ? (int) $raw : null;
+		return null !== $raw ? (int) $raw : null;
 	}
 }
 
@@ -146,20 +166,16 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 
 if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 
-	// BUG-FIX: was registered on both wp_ajax_ and wp_ajax_nopriv_ with no
-	// nonce check, so any unauthenticated visitor could fire the Make.com
-	// scenario-generation webhook with arbitrary IDs.
-	// Fixed: removed wp_ajax_nopriv_ registration and added check_ajax_referer().
 	add_action( 'wp_ajax_tw_start_scenario_generation', 'tw_start_scenario_generation' );
 
 	function tw_start_scenario_generation(): void {
-		// Nonce must be present and valid — rejects unauthenticated callers.
 		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Security check failed' );
 			return;
 		}
 
 		$wp_user_id = get_current_user_id();
+
 		if ( ! $wp_user_id ) {
 			wp_send_json_error( 'No WP user' );
 			return;
@@ -186,29 +202,22 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			return;
 		}
 
-		$chat_channel_id = tw_get_chat_channel_id_by_session( $session_id );
+		$updated = tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
 
-		tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
+		if ( ! $updated ) {
+			wp_send_json_error( 'Could not update session status' );
+			return;
+		}
 
-		$payload = [
-			'campaign_id'     => $campaign_id,
-			'scenario_id'     => $scenario_id,
-			'session_id'      => $session_id,
-			'user_id'         => $wp_user_id,
-			'char_id'         => tw_sanitize_supabase_id( $game_data['active_character_id'] ?? '' ),
-			'chat_channel_id' => $chat_channel_id,
-		];
-
-		wp_remote_post(
-			'https://hook.eu2.make.com/hdu559keqoa53zfa17r4uacuy0hykztn',
-			[
-				'headers' => [ 'Content-Type' => 'application/json' ],
-				'body'    => wp_json_encode( $payload ),
-				'timeout' => 15,
-			]
+		wp_send_json_success(
+			array(
+				'message'     => 'Scenario generation marked as started',
+				'status'      => 'generating',
+				'scenario_id' => $scenario_id,
+				'campaign_id' => $campaign_id,
+				'session_id'  => $session_id,
+			)
 		);
-
-		wp_send_json_success( 'Generation started' );
 	}
 }
 
@@ -218,46 +227,64 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 
 if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 
-	add_action( 'wp_ajax_tw_check_scenario_status',        'tw_check_scenario_status' );
-	add_action( 'wp_ajax_nopriv_tw_check_scenario_status', 'tw_check_scenario_status' );
+	add_action( 'wp_ajax_tw_check_scenario_status', 'tw_check_scenario_status' );
 
-	function tw_check_scenario_status() {
-    $campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? $_GET['campaign_id'] ?? '' );
+	function tw_check_scenario_status(): void {
+		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Security check failed',
+					'status'  => 'error',
+				),
+				403
+			);
+			return;
+		}
 
-    if ( empty( $campaign_id ) ) {
-        wp_send_json_error(
-            array(
-                'message' => 'Missing campaign_id',
-                'status'  => 'error',
-            ),
-            400
-        );
-    }
+		$campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? $_GET['campaign_id'] ?? '' );
 
-    $status = tw_get_game_session_status( $campaign_id );
+		if ( empty( $campaign_id ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Missing campaign_id',
+					'status'  => 'error',
+				),
+				400
+			);
+			return;
+		}
 
-    wp_send_json_success(
-        array(
-            'status' => $status ?: 'generating',
-        )
-    );
+		$status = tw_get_game_session_status( $campaign_id );
+
+		wp_send_json_success(
+			array(
+				'status' => $status ? $status : 'generating',
+			)
+		);
+	}
 }
+
 // ============================================================
 // 3. GET AI / GM MESSAGE
 // ============================================================
 
 if ( ! function_exists( 'tw_get_ai_message' ) ) {
 
-	add_action( 'wp_ajax_tw_get_ai_message',        'tw_get_ai_message' );
-	add_action( 'wp_ajax_nopriv_tw_get_ai_message', 'tw_get_ai_message' );
+	add_action( 'wp_ajax_tw_get_ai_message', 'tw_get_ai_message' );
 
 	function tw_get_ai_message(): void {
+		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+			wp_send_json_error( 'Security check failed' );
+			return;
+		}
+
 		if ( ! function_exists( 'tw_supabase_url' ) ) {
 			wp_send_json_error( 'Config missing' );
 			return;
 		}
 
 		$wp_user_id = get_current_user_id();
+
 		if ( ! $wp_user_id ) {
 			wp_send_json_error( 'No user logged in' );
 			return;
@@ -286,12 +313,17 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 		$response = wp_remote_get(
 			tw_supa_url(
 				'cyber_chat_messages',
-				'chat_channel_id=eq.' . $chat_channel_id
-				. '&sender_type=in.(AI,GM)'
-				. '&order=created_at.desc'
-				. '&limit=1'
+				array(
+					'chat_channel_id' => 'eq.' . $chat_channel_id,
+					'sender_type'     => 'in.(AI,GM)',
+					'order'           => 'created_at.desc',
+					'limit'           => 1,
+				)
 			),
-			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
+			array(
+				'headers' => tw_supa_headers(),
+				'timeout' => 10,
+			)
 		);
 
 		if ( is_wp_error( $response ) ) {
@@ -302,10 +334,15 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( ! empty( $data ) && isset( $data[0]['message'] ) ) {
-			wp_send_json_success( [ 'message' => $data[0]['message'] ] );
-		} else {
-			wp_send_json_error( 'No message yet' );
+			wp_send_json_success(
+				array(
+					'message' => $data[0]['message'],
+				)
+			);
+			return;
 		}
+
+		wp_send_json_error( 'No message yet' );
 	}
 }
 
@@ -315,7 +352,7 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 
 if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 
-	add_action( 'wp_ajax_tw_get_lore_tips',        'tw_get_lore_tips' );
+	add_action( 'wp_ajax_tw_get_lore_tips', 'tw_get_lore_tips' );
 	add_action( 'wp_ajax_nopriv_tw_get_lore_tips', 'tw_get_lore_tips' );
 
 	function tw_get_lore_tips(): void {
@@ -325,8 +362,18 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 		}
 
 		$response = wp_remote_get(
-			tw_supa_url( 'cyber_tips', 'select=tip&order=random()&limit=20' ),
-			[ 'headers' => tw_supa_headers(), 'timeout' => 10 ]
+			tw_supa_url(
+				'cyber_tips',
+				array(
+					'select' => 'tip',
+					'order'  => 'random()',
+					'limit'  => 20,
+				)
+			),
+			array(
+				'headers' => tw_supa_headers(),
+				'timeout' => 10,
+			)
 		);
 
 		if ( is_wp_error( $response ) ) {
@@ -334,7 +381,9 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 			return;
 		}
 
-		$tips = json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
+		$tips = json_decode( wp_remote_retrieve_body( $response ), true );
+		$tips = is_array( $tips ) ? $tips : array();
+
 		wp_send_json_success( array_column( $tips, 'tip' ) );
 	}
 }
