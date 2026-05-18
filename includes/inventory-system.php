@@ -375,7 +375,7 @@ function parseInventoryTags(text) {
 }
 
 window.handleLootAction = function (itemId, buttonElement) {
-    const webhookUrl = 'https://hook.eu2.make.com/7e7vk81sk2pgut86mk06waclqmoxxqgn';
+	?
     if (!buttonElement) return;
 
     const characterId = window.twAdventureData?.active_character_id
