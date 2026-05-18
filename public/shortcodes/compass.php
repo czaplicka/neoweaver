@@ -17,15 +17,15 @@ function tw_compass_render() {
 		return '';
 	}
 
-	$css_rel  = 'assets/css/neoweaver-compass.css';
-	$css_path = trailingslashit( plugin_dir_path( __FILE__ ) ) . '../' . $css_rel;
-	$css_url  = trailingslashit( plugin_dir_url( __FILE__ ) ) . '../' . $css_rel;
-	$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.0';
+	$css_rel  = 'assets/css/public/compass.css';
+	$css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
+	$css_url  = NEOWEAVER_PLUGIN_URL . $css_rel;
+	$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION;
 
 	$js_rel  = 'assets/js/public/compass.js';
-	$js_path = trailingslashit( plugin_dir_path( __FILE__ ) ) . '../' . $js_rel;
-	$js_url  = trailingslashit( plugin_dir_url( __FILE__ ) ) . '../' . $js_rel;
-	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+	$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+	$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
+	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION;
 
 	if ( ! wp_style_is( 'neoweaver-compass', 'enqueued' ) ) {
 		wp_enqueue_style(
