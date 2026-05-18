@@ -1,0 +1,47 @@
+#neoweave-join-terminal.neoweave-terminal {
+        background-color: #0a0c00; color: #adff00; font-family: 'Share Tech Mono', monospace;
+        padding: 30px; border: 2px solid #adff00; position: relative; max-width: 700px; margin: 20px auto;
+        text-transform: uppercase; box-shadow: 0 0 20px rgba(173, 255, 0, 0.2);
+    }
+    #neoweave-join-terminal .terminal-header { border-bottom: 1px solid #adff00; margin-bottom: 20px; padding-bottom: 10px; }
+    #neoweave-join-terminal .terminal-title { font-family: 'Chakra Petch', sans-serif; font-size: 1.2rem; font-weight: bold; }
+    #neoweave-join-terminal .terminal-status { margin-top: 5px; font-size: 0.9rem; }
+    #neoweave-join-terminal .blink { animation: nwjt-blinker 1s linear infinite; }
+    @keyframes nwjt-blinker { 50% { opacity: 0; } }
+    #neoweave-join-terminal .terminal-input { margin-top: 20px; }
+    #neoweave-join-terminal .terminal-input label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+    }
+    #neoweave-join-terminal .terminal-input input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        background: #0a0c00;
+        border: 1px solid #adff00;
+        color: #adff00;
+        font-family: 'Share Tech Mono', monospace;
+        text-transform: uppercase;
+    }
+    #neoweave-join-terminal .terminal-button {
+        background: #adff00; color: #0a0c00; border: none; padding: 12px 20px;
+        margin-top: 20px; width: 100%; font-family: 'Chakra Petch', sans-serif; font-weight: bold;
+        cursor: pointer; text-align: center; text-decoration: none; display: inline-block;
+    }
+    #neoweave-join-terminal .terminal-message {
+        margin-top: 15px;
+        font-size: 0.85rem;
+        min-height: 1.2em;
+    }
+    #neoweave-join-terminal .terminal-message.error { color: #ff5577; }
+    #neoweave-join-terminal .terminal-message.success { color: #adff00; }
+    /* OPT 3: select styles moved from inline attribute into scoped stylesheet. */
+    #neoweave-join-terminal .terminal-input select {
+        width: 100%;
+        padding: 10px;
+        background: #0a0c00;
+        border: 1px solid #adff00;
+        color: #adff00;
+        font-family: 'Share Tech Mono', monospace;
+        text-transform: uppercase;
+    }
