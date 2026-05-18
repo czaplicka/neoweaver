@@ -285,20 +285,22 @@ final class NeoWeaver_Core {
 			'4.5.1',
 			true
 		);
-				wp_enqueue_style(
-			'tw_onboarding_slider',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/public/onboarding.css',
-			[],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/onboarding.css' )
-		);
+wp_enqueue_script(
+	'neoweaver-onboarding',
+	$script_url,
+	array( 'jquery' ),
+	NEOWEAVER_VERSION,
+	true
+);
 
-		wp_enqueue_script(
-			'tw_onboarding_slider',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/public/onboarding.js',
-			[],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/onboarding.js' ),
-			true
-		);
+wp_localize_script(
+	'neoweaver-onboarding',
+	'twOnboarding',
+	array(
+		'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+		'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
+	)
+);
 		wp_localize_script( 'tw-onboarding', 'twOnboarding', [
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'tw_user_setting' ),
