@@ -1,0 +1,26 @@
+.id-chit-terminal {
+            background: #050505;
+            border: 1px solid #adff00;
+            padding: 8px;
+            font-family: 'Chakra Petch', sans-serif;
+            color: #adff00;
+            max-width: 250px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(173, 255, 0, 0.2);
+        }
+        .terminal-header { font-size: 0.6em; margin-bottom: 5px; opacity: 0.6; }
+        .id-grid { display: grid; gap: 4px; }
+        .id-label { font-size: 0.7em; color: rgba(173, 255, 0, 0.5); margin-right: 10px; }
+        .id-value { font-weight: bold; letter-spacing: 1px; }
+        
+        /* Statusy */
+        .status-wanted { color: #ff003c; text-shadow: 0 0 8px #ff003c; }
+        .status-citizen { color: #adff00; }
+        .status-service { color: #00e5ff; }
+        .status-foreigner { color: #e5e5e5; }
+
+        .id-flicker {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(173, 255, 0, 0.03) 2px);
+            pointer-events: none;
+        }
