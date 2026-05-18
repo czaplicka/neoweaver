@@ -9,7 +9,7 @@
 			window.twAdventureData.supabase_url = window.twCharacterCardData.supabaseUrl;
 		}
 
-		if (typeof window.twCharacterCardData?.activeCharacterId !== 'undefined') {
+		if (typeof window.twCharacterCardData?.activeCharacterId === 'string') {
 			window.twAdventureData.active_character_id = window.twCharacterCardData.activeCharacterId;
 		}
 	}
@@ -97,17 +97,9 @@
 			return;
 		}
 
-		const syncFill = charPanel.querySelector(
-			'.tw-progress-fill.sync-stable, .tw-progress-fill.sync-warning, .tw-progress-fill.sync-critical'
-		);
+		const syncValueRaw = charPanel.dataset.syncValue || '';
+		const syncValue = parseFloat(syncValueRaw);
 
-		if (!syncFill) {
-			clearGlitchIntervals();
-			resetPanelEffects(charPanel);
-			return;
-		}
-
-		const syncValue = parseFloat(syncFill.style.width);
 		if (Number.isNaN(syncValue)) {
 			clearGlitchIntervals();
 			resetPanelEffects(charPanel);
