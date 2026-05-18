@@ -1,4 +1,14 @@
 <?php
+function id_scripts() {
+	wp_enqueue_style(
+		'nw-admin-core',
+		NEOWEAVER_PLUGIN_URL . 'assets/css/public/active-id.css',
+		array( 'nw-font-chakra-petch' ),
+		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/active-id.css' )
+	);
+}
+add_action( 'admin_enqueue_scripts', 'id_scripts' );
+
 add_shortcode('ACTIVE_ID', function($atts) {
     // 1. Konfiguracja Supabase (pobierana z wp-config.php zgodnie z Twoim opisem)
     $supabase_url = SUPABASE_URL; 
@@ -69,35 +79,6 @@ add_shortcode('ACTIVE_ID', function($atts) {
         </div>
         <div class="id-flicker"></div>
     </div>
-
-    <style>
-        .id-chit-terminal {
-            background: #050505;
-            border: 1px solid #adff00;
-            padding: 8px;
-            font-family: 'Chakra Petch', sans-serif;
-            color: #adff00;
-            max-width: 250px;
-            position: relative;
-            box-shadow: 0 0 10px rgba(173, 255, 0, 0.2);
-        }
-        .terminal-header { font-size: 0.6em; margin-bottom: 5px; opacity: 0.6; }
-        .id-grid { display: grid; gap: 4px; }
-        .id-label { font-size: 0.7em; color: rgba(173, 255, 0, 0.5); margin-right: 10px; }
-        .id-value { font-weight: bold; letter-spacing: 1px; }
-        
-        /* Statusy */
-        .status-wanted { color: #ff003c; text-shadow: 0 0 8px #ff003c; }
-        .status-citizen { color: #adff00; }
-        .status-service { color: #00e5ff; }
-        .status-foreigner { color: #e5e5e5; }
-
-        .id-flicker {
-            position: absolute; top:0; left:0; width:100%; height:100%;
-            background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(173, 255, 0, 0.03) 2px);
-            pointer-events: none;
-        }
-    </style>
     <?php
     return ob_get_clean();
 });
