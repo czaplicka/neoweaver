@@ -24,7 +24,7 @@ define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
 define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );
 define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 
-final class _Core {
+final class NeoWeaver_Core {
 
 	public static function init(): void {
 		self::load_files();
@@ -63,7 +63,7 @@ final class _Core {
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
 			'includes/shortcodes-tags.php',
-			//'includes/skills-loader.php',
+			// 'includes/skills-loader.php',
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 
@@ -88,6 +88,9 @@ final class _Core {
 			'includes/classes/class-agents-creator.php',
 			'includes/classes/class-deployments-creator.php',
 			'includes/classes/class-nodes-creator.php',
+
+			// includes/ai
+			'includes/ai/class-neoweaver-gpt-engine.php',
 
 			// public
 			'public/class-public.php',
@@ -409,7 +412,8 @@ final class _Core {
 				'soundsUrl'   => trailingslashit( $uploads['baseurl'] ),
 			]
 		);
-				if ( is_user_logged_in() && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
+
+		if ( is_user_logged_in() && function_exists( 'tw_supabase_url' ) && function_exists( 'tw_supabase_anon_key' ) ) {
 			$url = tw_supabase_url();
 			$key = tw_supabase_anon_key();
 
@@ -421,7 +425,7 @@ final class _Core {
 					wp_enqueue_script(
 						'neoweaver-supabase-bootstrap',
 						NEOWEAVER_PLUGIN_URL . $bootstrap_rel,
-						array(),
+						[],
 						(string) filemtime( $bootstrap_abs ),
 						true
 					);
@@ -429,10 +433,10 @@ final class _Core {
 					wp_add_inline_script(
 						'neoweaver-supabase-bootstrap',
 						'window.twSupabaseConfig = ' . wp_json_encode(
-							array(
+							[
 								'url' => $url,
 								'key' => $key,
-							)
+							]
 						) . ';',
 						'before'
 					);
@@ -452,9 +456,6 @@ final class _Core {
 			return;
 		}
 
-		// IMPORTANT:
-		// Replace 'tw_characters_list' with the real shortcode used by the agents list page,
-		// if your project uses a different shortcode name.
 		if ( ! has_shortcode( $post->post_content, 'tw_characters_list' ) ) {
 			return;
 		}
@@ -506,7 +507,7 @@ final class _Core {
 			true
 		);
 	}
-require_once plugin_dir_path( __FILE__ ) . 'includes/ai/class-neoweaver-gpt-engine.php';
+}
 
 /**
  * Check whether a character belongs to the current WordPress user.
@@ -577,27 +578,32 @@ function neoweaver_ajax_ai_chat(): void {
 	wp_send_json_success( $result );
 }
 
-// Enqueue skryptów
-add_action('wp_enqueue_scripts', 'neoweaver_enqueue_chat_assets');
+add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_chat_assets' );
 
 function neoweaver_enqueue_chat_assets(): void {
-    if ( ! is_page_template( 'templates/adventure.php' ) ) { return; }
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
+		return;
+	}
 
-$chat_js = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/neoweaver-ai-chat.js';
+	$chat_js = NEOWEAVER_PLUGIN_DIR . 'assets/js/public/neoweaver-ai-chat.js';
 
-wp_enqueue_script(
-	'neoweaver-ai-chat',
-	NEOWEAVER_PLUGIN_URL . 'assets/js/public/neoweaver-ai-chat.js',
-	[ 'jquery' ],
-	file_exists( $chat_js ) ? (string) filemtime( $chat_js ) : NEOWEAVER_VERSION,
-	true
-);
+	wp_enqueue_script(
+		'neoweaver-ai-chat',
+		NEOWEAVER_PLUGIN_URL . 'assets/js/public/neoweaver-ai-chat.js',
+		[ 'jquery' ],
+		file_exists( $chat_js ) ? (string) filemtime( $chat_js ) : NEOWEAVER_VERSION,
+		true
+	);
 
-    wp_localize_script('neoweaver-ai-chat', 'neoweaver_ajax', [
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('neoweaver_chat'),
-        'is_admin' => current_user_can('manage_options'),
-    ]);
+	wp_localize_script(
+		'neoweaver-ai-chat',
+		'neoweaver_ajax',
+		[
+			'ajax_url' => admin_url( 'admin-ajax.php' ),
+			'nonce'    => wp_create_nonce( 'neoweaver_chat' ),
+			'is_admin' => current_user_can( 'manage_options' ),
+		]
+	);
 }
 
 NeoWeaver_Core::init();
