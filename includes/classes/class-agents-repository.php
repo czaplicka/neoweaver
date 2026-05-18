@@ -9,7 +9,7 @@
  * ARCHITECTURAL RULES (do not violate):
  *  - This class NEVER mutates game state. Pure read queries only.
  *    Entropy, Echo, HP, STATUS flags etc. must be changed via the
- *    Make.com tag-driven pipeline, never by direct REST writes here.
+ *     tag-driven pipeline, never by direct REST writes here.
  *  - Never resurrect an Agent whose status is STATUS_DEAD.
  *  - Never allow an Agent to be bound to a Node it was not created in
  *    (1 Agent = 1 Node invariant).
