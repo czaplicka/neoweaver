@@ -649,45 +649,54 @@ if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
     }
 }
 
-if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
-    function nw_find_tag_defs_by_ids( array $tag_ids ): array {
-        $tag_ids = array_values(
-            array_unique(
-                array_filter(
-                    array_map( 'nw_sanitize_int_id', $tag_ids )
-                )
-            )
-        );
+    if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
+	function nw_find_tag_defs_by_ids( array $tag_ids ) {
+		$tag_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'nw_sanitize_int_id', $tag_ids )
+				)
+			)
+		);
 
-        if ( empty( $tag_ids ) ) {
-            return array();
-        }
+		if ( empty( $tag_ids ) ) {
+			return array();
+		}
 
-        $rows_out = array();
+		$in_list = implode( ',', $tag_ids );
 
-        foreach ( $tag_ids as $tag_id ) {
-            $rows = nw_supabase_request(
-                'GET',
-                'cyber_character_tag_defs',
-                array(
-                    'select' => 'id,label,category,icon,color,description,source,gm',
-                    'id'     => 'eq.' . $tag_id,
-                    'limit'  => 1,
-                )
-            );
+		$rows = nw_supabase_request(
+			'GET',
+			'cyber_character_tag_defs',
+			array(
+				'select' => 'id,label,category,icon,color,description,source,gm',
+				'id'     => 'in.(' . $in_list . ')',
+				'limit'  => count( $tag_ids ),
+			)
+		);
 
-            error_log( 'NW TAG DEF eq test for ID ' . $tag_id . ': ' . wp_json_encode( $rows ) );
+		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+			return array();
+		}
 
-            if ( is_array( $rows ) && ! empty( $rows[0] ) ) {
-                $rows_out[] = $rows[0];
-            }
-        }
+		$rows_by_id = array();
+		foreach ( $rows as $row ) {
+			if ( isset( $row['id'] ) ) {
+				$rows_by_id[ (int) $row['id'] ] = $row;
+			}
+		}
 
-        return $rows_out;
-    }
+		$ordered = array();
+		foreach ( $tag_ids as $tag_id ) {
+			if ( isset( $rows_by_id[ $tag_id ] ) ) {
+				$ordered[] = $rows_by_id[ $tag_id ];
+			}
+		}
+
+		return $ordered;
+	}
 }
 
-if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
     if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
 	function nw_validate_backstory_tags( array $tag_ids ) {
 		error_log( 'NW BACKSTORY raw tag_ids ' . wp_json_encode( $tag_ids ) );
