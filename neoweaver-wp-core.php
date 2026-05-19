@@ -566,7 +566,7 @@ function neoweaver_ajax_ai_chat(): void {
 	}
 
 	$engine = new NeoWeaver_GPT_Engine();
-	$result = $engine->process( $char_id, $session_id, $message );
+	$engine->process($char_id, $message);
 
 	if ( isset( $result['error'] ) ) {
 		wp_send_json_error(
