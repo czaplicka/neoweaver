@@ -15,28 +15,43 @@ function id_scripts() {
 add_action( 'wp_enqueue_scripts', 'id_scripts' );
 
 add_shortcode( 'kingdom_info', function() {
-	global $wpdb;
-
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
 		return 'Zaloguj się.';
 	}
 
-	$query = "
-		SELECT 
-			kingdom_name, 
-			government_type,
-			political_climate, 
-			stability_score, 
-			population_alive,
-			territory_size
-		FROM public.view_kingdom_status vks
-		JOIN public.cyber_state_of_the_campaign s ON vks.kingdom_id = s.current_kingdom_id
-		WHERE s.wp_user_id = %d
-		LIMIT 1
-	";
+	// Pobierz dane Supabase z wp-config
+	$supabase_url = 'https://' . TW_SUPABASE_PROJECT_ID . '.supabase.co';
+$supabase_key = TW_SUPABASE_ANON_KEY;
 
-	$data = $wpdb->get_row( $wpdb->prepare( $query, $user_id ) );
+	if ( ! $supabase_url || ! $supabase_key ) {
+		return '<p style="color:#f00;">Brak konfiguracji Supabase.</p>';
+	}
+
+	// Wywołanie widoku przez REST API Supabase
+	$endpoint = trailingslashit( $supabase_url ) . 'rest/v1/rpc/get_kingdom_by_wp_user';
+
+	$response = wp_remote_post( $endpoint, array(
+		'headers' => array(
+			'apikey'        => $supabase_key,
+			'Authorization' => 'Bearer ' . $supabase_key,
+			'Content-Type'  => 'application/json',
+		),
+		'body'    => wp_json_encode( array( 'p_wp_user_id' => $user_id ) ),
+		'timeout' => 10,
+	) );
+
+	if ( is_wp_error( $response ) ) {
+		return '<p style="color:#f00;">Błąd połączenia z bazą danych.</p>';
+	}
+
+	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+	if ( empty( $body ) || ! is_array( $body ) ) {
+		return "<div class='kingdom-card' style='--status-color:#555; padding:20px; text-align:center;'><em style='color:#888;'>📡 Sygnał utracony: Brak danych o domenie...</em></div>";
+	}
+
+	$data = (object) $body[0];
 
 	if ( ! $data ) {
 		return "<div class='kingdom-card' style='--status-color:#555; padding:20px; text-align:center;'><em style='color:#888;'>📡 Sygnał utracony: Brak danych o domenie...</em></div>";
