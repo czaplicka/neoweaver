@@ -116,7 +116,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/campaign-creator.php',
 			'public/shortcodes/character-creator.php',
 			'public/shortcodes/character-echo.php',
-			'public/shortcodes/compas.php',
+			'public/shortcodes/compass.php',
 			'public/shortcodes/cyber-hud.php',
 			'public/shortcodes/deck-panel.php',
 			'public/shortcodes/fate-of-loom.php',
