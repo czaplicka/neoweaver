@@ -88,9 +88,14 @@ final class NeoWeaver_Core {
 			// 'includes/classes/class-agents-creator.php',
 			'includes/classes/class-deployments-creator.php',
 			'includes/classes/class-nodes-creator.php',
+			'includes/classes/class-nw-memory-parser.php';
+			'includes/classes/class-nw-chat-gpt.php';
+			'includes/classes/class-nw-chat-handler.php';
 
 			// includes/ai
 			'includes/ai/class-neoweaver-gpt-engine.php',
+			'includes/ai/class-neoweaver-intent-router.php',
+			'includes/ai/class-neoweaver-context-builder.php',
 
 			// public
 			'public/class-public.php',
@@ -535,5 +540,5 @@ function neoweaver_enqueue_chat_assets(): void {
     ]
 );
 }
-
+new NW_Chat_Handler();
 NeoWeaver_Core::init();
