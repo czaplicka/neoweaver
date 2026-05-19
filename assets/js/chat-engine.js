@@ -1,36 +1,56 @@
 /**
- * NEOWEAVER — CHAT ENGINE
+ * NEOWEAVER — CHAT ENGINE v2.0
  *
- * Jeden plik obsługuje:
- *   - Supabase Realtime (listener odpowiedzi GM)
- *   - Dispatcher (wysyłanie wiadomości do WP REST API)
- *   - Renderer (wyświetlanie wiadomości w czacie)
- *   - HUD updater (HP, MP, Gold, Entropy bez reload)
- *   - Tag parser (wyciąganie #TAGÓW z odpowiedzi GM)
+ * Jeden plik = jeden WebSocket. Łączy chat-gm-dispatcher.js + realtime listener.
  *
- * Wymagane dane z PHP (wp_localize_script lub data-* na #nw-chat):
- *   nwChat.supabaseUrl    — URL projektu Supabase
- *   nwChat.supabaseKey    — anon/publishable key
- *   nwChat.restUrl        — URL endpointu: /wp-json/neoweaver/v1/ai-chat
- *   nwChat.nonce          — wp_create_nonce('wp_rest')
- *   nwChat.sessionId      — UUID sesji
- *   nwChat.charId         — UUID postaci
- *   nwChat.channelId      — UUID kanału / rozmowy
+ * Architektura:
+ *   [gracz pisze] → sendMessage() → REST /neoweaver/v1/ai-chat → PHP (ai-engine)
+ *   PHP wywołuje GPT, przetwarza tagi, wysyła realtime.send()
+ *   Supabase Realtime push → renderMessage() + processTags() + updateHUD()
  *
- * Zależności: @supabase/supabase-js (CDN lub bundler)
+ * Wymaga w window.nwChat (wp_localize_script):
+ *   supabaseUrl   — URL projektu
+ *   supabaseKey   — anon/publishable key
+ *   restUrl       — /wp-json/neoweaver/v1/ai-chat
+ *   nonce         — wp_create_nonce('wp_rest')
+ *   sessionId     — UUID bieżącej sesji
+ *   charId        — UUID postaci
+ *   channelId     — UUID kanału czatu
+ *   campaignId    — UUID kampanii (opcjonalnie)
+ *
+ * Kompatybilność: Chrome 80+, Firefox 75+, Safari 13.1+
+ * Zależność: window.supabase (CDN @supabase/supabase-js v2)
  */
 
 ( function () {
 	'use strict';
 
 	// ============================================================
-	// KONFIGURACJA — dane z PHP
+	// KONFIGURACJA
 	// ============================================================
 
 	const cfg = window.nwChat || {};
 
+	// Fallback na starsze zmienne (chat-gm-dispatcher kompatybilność)
+	if ( ! cfg.charId && window.twAdventureData ) {
+		cfg.charId     = window.twAdventureData.active_character_id || window.twAdventureData.char_id || '';
+		cfg.sessionId  = window.twAdventureData.active_session_id   || '';
+		cfg.campaignId = window.twAdventureData.active_campaign_id  || '';
+	}
+	if ( ! cfg.nonce && window.twChatData ) {
+		cfg.nonce   = window.twChatData.nonce    || '';
+		cfg.restUrl = window.twChatData.ajax_url || '';
+	}
+	if ( ! cfg.channelId && window.activeChannelId ) {
+		cfg.channelId = window.activeChannelId;
+	}
+
 	if ( ! cfg.supabaseUrl || ! cfg.supabaseKey ) {
-		console.error( '[NW Chat] Brak nwChat.supabaseUrl / nwChat.supabaseKey' );
+		console.error( '[NW Chat] Brak nwChat.supabaseUrl / supabaseKey' );
+		return;
+	}
+	if ( ! cfg.restUrl ) {
+		console.error( '[NW Chat] Brak nwChat.restUrl' );
 		return;
 	}
 
@@ -38,13 +58,14 @@
 	// ELEMENTY DOM
 	// ============================================================
 
-	const chatEl    = document.getElementById( 'nw-chat-messages' );
-	const formEl    = document.getElementById( 'nw-chat-form' );
-	const inputEl   = document.getElementById( 'nw-chat-input' );
-	const sendBtn   = document.getElementById( 'nw-chat-send' );
+	// Obsługujemy oba zestawy ID: nowe (nw-*) i stare (chat-input, send-btn)
+	const chatEl  = document.getElementById( 'nw-chat-messages' ) || document.getElementById( 'chat-messages' );
+	const inputEl = document.getElementById( 'nw-chat-input' )    || document.getElementById( 'chat-input' );
+	const sendBtn = document.getElementById( 'nw-chat-send' )     || document.getElementById( 'send-btn' );
+	const formEl  = document.getElementById( 'nw-chat-form' );
 
-	if ( ! chatEl || ! formEl || ! inputEl ) {
-		console.error( '[NW Chat] Brakujące elementy DOM (#nw-chat-messages, #nw-chat-form, #nw-chat-input)' );
+	if ( ! chatEl || ! inputEl ) {
+		console.error( '[NW Chat] Brak elementów DOM czatu' );
 		return;
 	}
 
@@ -55,39 +76,48 @@
 	const { createClient } = window.supabase;
 	const sb = createClient( cfg.supabaseUrl, cfg.supabaseKey );
 
+	// Eksportuj dla innych modułów (kompatybilność z window.twSupabase)
+	if ( ! window.twSupabase ) { window.twSupabase = sb; }
+
 	// ============================================================
-	// REALTIME — jeden channel, wiele event listenerów
+	// REALTIME — jeden channel, wiele eventów
 	// ============================================================
 
-	const channelName = 'game:' + cfg.sessionId;
+	const channelName = 'game:' + ( cfg.sessionId || cfg.channelId || 'global' );
 
 	const realtimeChannel = sb.channel( channelName )
 
-		// Odpowiedź GM — narracja
+		// Odpowiedź GM — narracja + tagi
 		.on( 'broadcast', { event: 'gm_response' }, function ( payload ) {
 			const data = payload.payload || {};
-			renderMessage( 'gm', data.text || '' );
-			if ( data.tags && data.tags.length ) {
-				processTags( data.tags );
-			}
-			setInputEnabled( true );
+			if ( data.text ) { renderMessage( 'gm', data.text ); }
+			if ( data.tags && data.tags.length ) { processTags( data.tags ); }
+			setInputBusy( false );
 		} )
 
-		// Aktualizacja HUD (HP, MP, Gold, Entropy)
+		// Batch HUD update (hp, mp, gold, entropy, satiety, hydration)
 		.on( 'broadcast', { event: 'hud_update' }, function ( payload ) {
-			updateHUD( payload.payload || {} );
+			updateHUDBatch( payload.payload || {} );
 		} )
 
 		// Błąd po stronie PHP / GPT
 		.on( 'broadcast', { event: 'gm_error' }, function ( payload ) {
 			const data = payload.payload || {};
-			renderMessage( 'error', data.message || 'Wystąpił błąd. Spróbuj ponownie.' );
-			setInputEnabled( true );
+			showError( data.message || 'GM nie odpowiada — spróbuj ponownie.' );
+			setInputBusy( false );
+		} )
+
+		// Zmiana lokacji (push z serwera zamiast — lub obok — tagu #LOC)
+		.on( 'broadcast', { event: 'location_change' }, function ( payload ) {
+			const data = payload.payload || {};
+			document.dispatchEvent( new CustomEvent( 'twLocationChange', { detail: { locationId: data.location_id } } ) );
 		} )
 
 		.subscribe( function ( status ) {
 			if ( status === 'SUBSCRIBED' ) {
-				console.log( '[NW Chat] Realtime connected:', channelName );
+				console.log( '[NW Chat] Realtime ✔', channelName );
+				// Eksport dla innych modułów
+				window.chatSubscription = realtimeChannel;
 			}
 			if ( status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' ) {
 				console.warn( '[NW Chat] Realtime error:', status );
@@ -95,124 +125,187 @@
 		} );
 
 	// ============================================================
-	// DISPATCHER — wysyłanie wiadomości
+	// DISPATCHER — event listeners (form + stary send-btn)
 	// ============================================================
 
-	formEl.addEventListener( 'submit', function ( e ) {
-		e.preventDefault();
+	// Nowy formularz (nw-chat-form)
+	if ( formEl ) {
+		formEl.addEventListener( 'submit', function ( e ) {
+			e.preventDefault();
+			hanldeSubmit();
+		} );
+	}
+
+	// Stary przycisk send-btn (capture phase — przed starym handlerem chat-realtime)
+	if ( sendBtn && ! formEl ) {
+		document.addEventListener( 'click', function ( e ) {
+			if ( e.target && ( e.target.id === 'send-btn' || e.target.id === 'nw-chat-send' ) ) {
+				e.stopImmediatePropagation();
+				hanldeSubmit();
+			}
+		}, true );
+	}
+
+	// Enter w inpucie
+	inputEl.addEventListener( 'keydown', function ( e ) {
+		if ( e.key === 'Enter' && ! e.shiftKey ) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			hanldeSubmit();
+		}
+	}, true );
+
+	// Flaga żeby nie bindować dwa razy (kompatybilność z initGMDispatcher)
+	window._twGMDispatcherBound = true;
+
+	function hanldeSubmit() {
 		const text = inputEl.value.trim();
 		if ( ! text ) { return; }
 
+		// Optimistic UI: wyświetl wiadomość gracza natychmiast
 		renderMessage( 'player', text );
-		setInputEnabled( false );
+		setInputBusy( true );
 		inputEl.value = '';
+		if ( inputEl.style ) { inputEl.style.height = 'auto'; }
 
 		sendMessage( text );
-	} );
+	}
+
+	// ============================================================
+	// SEND — REST API call
+	// ============================================================
 
 	function sendMessage( text ) {
 		fetch( cfg.restUrl, {
-			method:  'POST',
+			method:      'POST',
+			credentials: 'same-origin',
 			headers: {
 				'Content-Type': 'application/json',
 				'X-WP-Nonce':   cfg.nonce,
 			},
 			body: JSON.stringify( {
-				message:    text,
-				session_id: cfg.sessionId,
-				char_id:    cfg.charId,
-				channel_id: cfg.channelId,
+				message:     text,
+				session_id:  cfg.sessionId  || '',
+				char_id:     cfg.charId     || '',
+				channel_id:  cfg.channelId  || '',
+				campaign_id: cfg.campaignId || '',
 			} ),
 		} )
 		.then( function ( res ) {
 			if ( ! res.ok ) {
-				// Błąd HTTP — re-enable od razu, bo Realtime push nie przyjdzie
-				res.json().then( function ( err ) {
-					renderMessage( 'error', err.message || 'Błąd serwera (' + res.status + ')' );
-					setInputEnabled( true );
-				} ).catch( function () {
-					renderMessage( 'error', 'Błąd serwera (' + res.status + ')' );
-					setInputEnabled( true );
-				} );
+				res.json()
+					.then( function ( err ) { showError( err.message || 'Błąd serwera (' + res.status + ')' ); } )
+					.catch( function () { showError( 'Błąd serwera (' + res.status + ')' ); } );
+				setInputBusy( false );
 			}
-			// Jeśli ok (202 processing) — czekamy na Realtime push
+			// Jeśli 202 — czekamy na Realtime push (input nadal zablokowany)
 		} )
 		.catch( function ( err ) {
 			console.error( '[NW Chat] Fetch error:', err );
-			renderMessage( 'error', 'Brak połączenia z serwerem.' );
-			setInputEnabled( true );
+			showError( 'Brak połączenia z serwerem.' );
+			setInputBusy( false );
 		} );
 	}
 
 	// ============================================================
-	// RENDERER — wyświetlanie wiadomości
+	// RENDERER
 	// ============================================================
 
+	/**
+	 * Wyświetla babelkę w czacie.
+	 * Kompatybilność: jeśli istnieje window.appendToPlayerChat (stary moduł),
+	 * używa go zamiast własnego renderera.
+	 *
+	 * @param {'player'|'gm'|'system'|'error'} role
+	 * @param {string} text
+	 */
 	function renderMessage( role, text ) {
 		if ( ! text ) { return; }
 
+		// Fallback do starego appendToPlayerChat jeśli istnieje
+		if ( typeof window.appendToPlayerChat === 'function' && ( role === 'gm' || role === 'player' ) ) {
+			window.appendToPlayerChat( text, role, { created_at: new Date().toISOString() } );
+			return;
+		}
+
 		const bubble = document.createElement( 'div' );
 		bubble.classList.add( 'nw-message', 'nw-message--' + role );
-		bubble.textContent = text;
 
 		if ( role === 'gm' ) {
 			const label = document.createElement( 'span' );
-			label.classList.add( 'nw-message__label' );
+			label.className = 'nw-message__label';
 			label.textContent = 'GM';
-			bubble.prepend( label );
+			bubble.appendChild( label );
 		}
+
+		const textNode = document.createElement( 'span' );
+		textNode.className = 'nw-message__text';
+		textNode.textContent = text;
+		bubble.appendChild( textNode );
 
 		chatEl.appendChild( bubble );
 		chatEl.scrollTop = chatEl.scrollHeight;
 	}
 
 	// ============================================================
-	// TAG PROCESSOR — aktualizacje stanu gry
+	// TAG PROCESSOR
 	// ============================================================
 
 	/**
-	 * Przetwarza tagi zwrócone przez tw_ai_gm() po stronie PHP.
-	 * Tagi są już wyciągnięte z tekstu przez PHP — tutaj tylko
-	 * aktualizujemy UI na podstawie ich listy.
+	 * Obsługuje tagi z tw_ai_gm() — PHP wyciął je z tekstu,
+	 * JS reaguje na nie aktualizacją UI.
+	 * Emituje CustomEvent 'twTagsReceived' dla innych modułów.
 	 *
-	 * @param {Array} tags  [ { tag: 'HP_CHANGE', val: '-5' }, ... ]
+	 * @param {Array<{tag:string, val:string|null}>} tags
 	 */
 	function processTags( tags ) {
+		// Emituj dla innych modułów (HUD, mapa, inventory)
+		document.dispatchEvent( new CustomEvent( 'twTagsReceived', {
+			detail: { tags: tags, charId: cfg.charId }
+		} ) );
+
 		tags.forEach( function ( item ) {
-			switch ( item.tag ) {
+			const tag = item.tag;
+			const val = item.val || null;
+
+			switch ( tag ) {
 
 				case 'HP_CHANGE':
-					updateHUDValue( 'hp', parseInt( item.val, 10 ), true );
+					updateHUDDelta( 'hp', parseInt( val, 10 ) );
 					break;
 
 				case 'MP_CHANGE':
-					updateHUDValue( 'mp', parseInt( item.val, 10 ), true );
+					updateHUDDelta( 'mp', parseInt( val, 10 ) );
 					break;
 
 				case 'GOLD_CHANGE':
-					updateHUDValue( 'gold', parseInt( item.val, 10 ), true );
+					updateHUDDelta( 'gold', parseInt( val, 10 ) );
 					break;
 
 				case 'ENTROPY_UP':
-					updateHUDValue( 'entropy', parseInt( item.val, 10 ), true );
-					break;
-
-				case 'LOC':
-					// Zmiana lokacji — możesz tu np. odświeżyć minimapy lub nazwę
-					document.dispatchEvent( new CustomEvent( 'nw:location_change', { detail: { location_id: item.val } } ) );
+					updateHUDDelta( 'entropy', parseInt( val, 10 ) );
 					break;
 
 				case 'STATUS_ADD':
-					document.dispatchEvent( new CustomEvent( 'nw:status_add', { detail: { status: item.val } } ) );
+					if ( val ) { addStatusBadge( val ); }
+					break;
+
+				case 'STATUS_REMOVE':
+					if ( val ) { removeStatusBadge( val ); }
+					break;
+
+				case 'LOC':
+					document.dispatchEvent( new CustomEvent( 'twLocationChange', { detail: { locationId: val } } ) );
 					break;
 
 				case 'SESSION_END':
-					setInputEnabled( false );
+					setInputBusy( true ); // permanentnie blokuje
 					renderMessage( 'system', 'Sesja zakończona.' );
+					document.dispatchEvent( new CustomEvent( 'twSessionEnd' ) );
 					break;
 
 				default:
-					// Nieznany tag — dispatch jako custom event dla innych modułów
+					// Nieznany tag — dispatch, inne moduły mogą obsłużyć
 					document.dispatchEvent( new CustomEvent( 'nw:tag', { detail: item } ) );
 			}
 		} );
@@ -223,43 +316,85 @@
 	// ============================================================
 
 	/**
-	 * Aktualizuje wartość w HUD.
-	 * @param {string}  key    'hp' | 'mp' | 'gold' | 'entropy'
-	 * @param {number}  value  Wartość bezwzględna lub delta
-	 * @param {boolean} isDelta  true = dodaj do aktualnej wartości
+	 * Delta update — dodaje wartość do aktualnej.
+	 * Szuka [data-hud="key"] i [data-nw-hud="key"].
 	 */
-	function updateHUDValue( key, value, isDelta ) {
-		const el = document.querySelector( '[data-nw-hud="' + key + '"]' );
+	function updateHUDDelta( key, delta ) {
+		if ( isNaN( delta ) ) { return; }
+		const el = document.querySelector( '[data-hud="' + key + '"]' )
+		       || document.querySelector( '[data-nw-hud="' + key + '"]' );
 		if ( ! el ) { return; }
-		if ( isDelta ) {
-			value = ( parseInt( el.textContent, 10 ) || 0 ) + value;
-		}
-		el.textContent = value;
+
+		const current = parseInt( el.dataset.current || el.textContent.replace( /[^\d-]/g, '' ), 10 ) || 0;
+		const newVal  = current + delta;
+
+		el.dataset.current = newVal;
+		if ( el.tagName === 'PROGRESS' ) { el.value = newVal; }
+		else { el.textContent = newVal; }
 	}
 
 	/**
-	 * Batch aktualizacja HUD (z Realtime hud_update).
-	 * @param {Object} data  { hp, maxhp, mp, gold, entropy, ... }
+	 * Absolute update — ustawia konkretną wartość (z hud_update broadcast).
 	 */
-	function updateHUD( data ) {
+	function updateHUDAbsolute( key, value ) {
+		const el = document.querySelector( '[data-hud="' + key + '"]' )
+		       || document.querySelector( '[data-nw-hud="' + key + '"]' );
+		if ( ! el ) { return; }
+		el.dataset.current = value;
+		if ( el.tagName === 'PROGRESS' ) { el.value = value; }
+		else { el.textContent = value; }
+	}
+
+	/**
+	 * Batch update z Realtime hud_update event.
+	 * @param {Object} data  { hp:X, maxhp:Y, mp:Z, gold:W, entropy:E }
+	 */
+	function updateHUDBatch( data ) {
 		Object.keys( data ).forEach( function ( key ) {
-			updateHUDValue( key, data[ key ], false );
+			updateHUDAbsolute( key, data[ key ] );
 		} );
+	}
+
+	// ============================================================
+	// STATUS BADGES
+	// ============================================================
+
+	function addStatusBadge( status ) {
+		const container = document.querySelector( '[data-hud="status-badges"]' );
+		if ( ! container ) { return; }
+		if ( container.querySelector( '[data-status="' + status + '"]' ) ) { return; } // już istnieje
+		const badge = document.createElement( 'span' );
+		badge.className  = 'tw-status-badge';
+		badge.dataset.status = status;
+		badge.textContent = status.toLowerCase().replace( /_/g, ' ' );
+		container.appendChild( badge );
+	}
+
+	function removeStatusBadge( status ) {
+		const badge = document.querySelector( '[data-status="' + status + '"]' );
+		if ( badge ) { badge.remove(); }
 	}
 
 	// ============================================================
 	// HELPERS
 	// ============================================================
 
-	function setInputEnabled( enabled ) {
-		inputEl.disabled = ! enabled;
-		if ( sendBtn ) { sendBtn.disabled = ! enabled; }
-		if ( enabled ) { inputEl.focus(); }
+	function setInputBusy( busy ) {
+		inputEl.disabled = busy;
+		if ( sendBtn ) { sendBtn.disabled = busy; }
+		if ( sendBtn ) { sendBtn.classList.toggle( 'is-loading', busy ); }
+		if ( ! busy ) { inputEl.focus(); }
 	}
 
-	// Cleanup przy zamknięciu strony
+	function showError( msg ) {
+		renderMessage( 'error', '⚠️ ' + msg );
+	}
+
+	// Cleanup
 	window.addEventListener( 'beforeunload', function () {
 		sb.removeChannel( realtimeChannel );
 	} );
+
+	console.log( '[NW Chat] chat-engine.js v2.0 loaded | channel:', channelName );
 
 } )();
