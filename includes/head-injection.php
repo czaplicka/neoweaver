@@ -13,7 +13,7 @@ if ( ! function_exists( 'tw_is_game_page' ) ) {
 			return true;
 		}
 
-		$game_slugs = array( 'game', 'play', 'legend', 'deployments', 'field-agents', 'nodes', 'inventory' );
+		$game_slugs = array( 'game', 'terminal', 'legend', 'deployments', 'agents', 'nodes', 'inventory' );
 		$slug       = get_post_field( 'post_name', get_queried_object_id() );
 
 		foreach ( $game_slugs as $prefix ) {
