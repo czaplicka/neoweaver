@@ -65,7 +65,8 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             'active_world_id'     => '',
             'active_location_id'  => 0,
             'char_name'           => 'Nieznany Bohater',
-            'char_class'          => '',
+            'char_class_id'       => '',
+            'char_race_id'        => '',
             'char_tags'           => [],
             'campaign_world_type' => 1,
             'wp_user_id'          => $wp_user_id,
@@ -85,8 +86,6 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         $cached    = get_transient( $cache_key );
 
         if ( false !== $cached && is_array( $cached ) ) {
-            // Zapisz też do memo, żeby kolejne wywołania w tym requescie
-            // nie trafiały nawet do transient lookup.
             $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $cached;
             return $cached;
         }
@@ -109,8 +108,6 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         );
 
         if ( ! is_array( $sessions ) || empty( $sessions ) || ! isset( $sessions[0] ) || ! is_array( $sessions[0] ) ) {
-            // Cache też empty result — żeby heartbeat przy braku sesji
-            // nie odpytywał Supabase co request. Krótszy TTL: 15s.
             set_transient( $cache_key, $defaults, 15 );
             $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $defaults;
             return $defaults;
@@ -133,18 +130,21 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             );
             $defaults['char_tags'] = is_array( $tags_data ) ? $tags_data : [];
 
+            // POPRAWKA: cyber_characters nie ma kolumn 'race' ani 'class'
+            // — poprawne nazwy to 'race_id' i 'class_id' (uuid)
             $chars = tw_supabase_get(
                 'cyber_characters',
                 [
                     'id'     => 'eq.' . $defaults['active_character_id'],
-                    'select' => 'name,class',
+                    'select' => 'name,class_id,race_id',
                     'limit'  => 1,
                 ]
             );
 
             if ( is_array( $chars ) && isset( $chars[0] ) && is_array( $chars[0] ) ) {
-                $defaults['char_name']  = $chars[0]['name'] ?? 'Bohater';
-                $defaults['char_class'] = $chars[0]['class'] ?? '';
+                $defaults['char_name']     = $chars[0]['name']     ?? 'Bohater';
+                $defaults['char_class_id'] = $chars[0]['class_id'] ?? '';
+                $defaults['char_race_id']  = $chars[0]['race_id']  ?? '';
             }
         }
 
@@ -174,8 +174,6 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
 /**
  * Skrót — pobiera active_character_id dla aktualnego użytkownika.
- * Dzięki memo w get_user_game_data_from_supabase() nie dodaje żadnego
- * Supabase query jeśli funkcja była już wywołana wcześniej w tym request.
  */
 if ( ! function_exists( 'tw_get_current_character_id' ) ) {
     function tw_get_current_character_id(): string {
