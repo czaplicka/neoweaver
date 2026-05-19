@@ -143,7 +143,7 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 	//    Tags must NOT be written directly to cyber_characters — that column
 	//    does not exist and doing so would bypass entirely.
 	wp_remote_request(
-		$base_url . 'cyber_active_quests?id=eq.' . rawrawurlencode( $active_quest_id ),
+		$base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id ),
 		[
 			'method'  => 'PATCH',
 			'headers' => $json_headers,
