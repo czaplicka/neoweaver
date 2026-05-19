@@ -22,8 +22,8 @@ if ( ! function_exists( 'tw_loom_of_fate_shortcode' ) ) {
 		wp_enqueue_script( 'chartjs' );
 		
 $js_rel  = 'assets/js/public/fate-of-loom.js';
-$js_path = NEOWEAVER_DIR . $js_rel;
-$js_url  = NEOWEAVER_URL . $js_rel;
+$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
 $js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
 
 		wp_enqueue_script(
