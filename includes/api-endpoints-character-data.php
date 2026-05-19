@@ -688,63 +688,63 @@ if ( ! function_exists( 'nw_find_tag_defs_by_ids' ) ) {
 }
 
 if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
-    function nw_validate_backstory_tags( array $tag_ids ) {
-        // DEBUG START
-        error_log( 'NW BACKSTORY: raw tag_ids = ' . wp_json_encode( $tag_ids ) );
-        // DEBUG END
+    if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
+	function nw_validate_backstory_tags( array $tag_ids ) {
+		error_log( 'NW BACKSTORY raw tag_ids ' . wp_json_encode( $tag_ids ) );
 
-        $requested = nw_resolve_backstory_tag_ids( $tag_ids );
+		$requested = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'nw_sanitize_int_id', $tag_ids )
+				)
+			)
+		);
 
-        // DEBUG: po resolverze (powinny być czyste ID)
-        error_log( 'NW BACKSTORY: requested (after resolve) = ' . wp_json_encode( $requested ) );
+		error_log( 'NW BACKSTORY requested sanitized IDs ' . wp_json_encode( $requested ) );
 
-        if ( empty( $requested ) ) {
-            error_log( 'NW BACKSTORY: requested is empty → backstory_tags_required' );
+		if ( empty( $requested ) ) {
+			error_log( 'NW BACKSTORY requested is empty -> backstory_tags_required' );
+			return new WP_Error(
+				'backstory_tags_required',
+				'Backstory tags are required.',
+				array( 'status' => 400 )
+			);
+		}
 
-            return new WP_Error(
-                'backstory_tags_required',
-                'Backstory tags are required.',
-                array( 'status' => 400 )
-            );
-        }
+		$defs = nw_find_tag_defs_by_ids( $requested );
 
-        $defs = nw_find_tag_defs_by_ids( $requested );
+		if ( is_wp_error( $defs ) ) {
+			error_log( 'NW BACKSTORY nw_find_tag_defs_by_ids returned WP_Error ' . $defs->get_error_message() );
+		} else {
+			error_log( 'NW BACKSTORY defs from Supabase ' . wp_json_encode( $defs ) );
+		}
 
-        // DEBUG: co przyszło z Supabase
-        if ( is_wp_error( $defs ) ) {
-            error_log( 'NW BACKSTORY: nw_find_tag_defs_by_ids returned WP_Error: ' . $defs->get_error_message() );
-        } else {
-            error_log( 'NW BACKSTORY: defs from Supabase = ' . wp_json_encode( $defs ) );
-        }
+		$found = array_map(
+			static function ( $row ) {
+				return isset( $row['id'] ) ? (int) $row['id'] : 0;
+			},
+			is_array( $defs ) ? $defs : array()
+		);
 
-        $found = array_map(
-            static function ( $row ) {
-                return isset( $row['id'] ) ? (int) $row['id'] : 0;
-            },
-            is_array( $defs ) ? $defs : array()
-        );
+		$missing = array_values( array_diff( $requested, $found ) );
 
-        $missing = array_values( array_diff( $requested, $found ) );
+		error_log( 'NW BACKSTORY found IDs ' . wp_json_encode( $found ) );
+		error_log( 'NW BACKSTORY missing IDs ' . wp_json_encode( $missing ) );
 
-        // DEBUG: jakie ID są uznane za brakujące
-        error_log( 'NW BACKSTORY: found IDs = ' . wp_json_encode( $found ) );
-        error_log( 'NW BACKSTORY: missing IDs = ' . wp_json_encode( $missing ) );
+		if ( ! empty( $missing ) ) {
+			return new WP_Error(
+				'invalid_backstory_tags',
+				'One or more backstory tag IDs do not exist.',
+				array(
+					'status'  => 400,
+					'missing' => $missing,
+				)
+			);
+		}
 
-        if ( ! empty( $missing ) ) {
-            return new WP_Error(
-                'invalid_backstory_tags',
-                'One or more backstory tag IDs do not exist.',
-                array(
-                    'status'  => 400,
-                    'missing' => $missing,
-                )
-            );
-        }
-
-        return true;
-    }
+		return true;
+	}
 }
-
 function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
     $race_id_input    = sanitize_text_field( $race_id_input );
     $subrace_id_input = sanitize_text_field( $subrace_id_input );
