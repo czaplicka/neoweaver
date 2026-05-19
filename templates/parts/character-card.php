@@ -40,6 +40,9 @@ wp_add_inline_script(
 	<button class="tw-nav-btn" data-tab="loom" title="Loom of Fate" type="button">
 		<span class="icon">🃏</span>
 	</button>
+		<button class="tw-nav-btn" data-tab="vechicles" title="Garage" type="button">
+		<span class="icon">C</span>
+	</button>
 </div>
 
 <div
@@ -362,10 +365,15 @@ wp_add_inline_script(
 
 			<div class="tw-tab-content" id="weavers">
 				<?php echo do_shortcode( '[tw_weaver_list]' ); ?>
+<?php echo do_shortcode( '[tw-character-card]' ); ?>
+
 			</div>
 
 			<div class="tw-tab-content" id="loom">
 				<?php echo do_shortcode( '[tw_loom_of_fate]' ); ?>
+			</div>
+			<div class="tw-tab-content" id="vechicles">
+				<?php echo do_shortcode( '[data-vehicle-panel-root]' ); ?>
 			</div>
 
 		</div>
