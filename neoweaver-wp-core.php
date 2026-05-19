@@ -68,6 +68,7 @@ final class NeoWeaver_Core {
 
 			// includes/ajax
 			'includes/ajax/buffer.php',
+			'includes/ajax/chat-gm.php',
 			'includes/ajax/deck-scenarios.php',
 			'includes/ajax/ensure-world-state.php',
 			'includes/ajax/get-char-state.php',
@@ -525,14 +526,14 @@ function neoweaver_enqueue_chat_assets(): void {
 	);
 
 	wp_localize_script(
-		'neoweaver-ai-chat',
-		'neoweaver_ajax',
-		[
-			'ajax_url' => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'neoweaver_chat' ),
-			'is_admin' => current_user_can( 'manage_options' ),
-		]
-	);
+    'neoweaver-ai-chat',
+    'neoweaver_ajax',
+    [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('neoweaver_chat'),
+        'is_admin' => current_user_can('manage_options'),
+    ]
+);
 }
 
 NeoWeaver_Core::init();
