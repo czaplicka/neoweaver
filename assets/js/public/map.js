@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function initActiveMap() {
-        const wpUserId = Number(<?php echo (int) $wp_user_id; ?>);
+        const wpUserId = Number(window.twMapData?.wpUserId || 0);
 
         const container = document.getElementById('tw-map-container');
         const svgDom = document.getElementById('cyber-map');
