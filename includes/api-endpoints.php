@@ -401,14 +401,28 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		'campaign_id' => 'neq.' . $campaign_id,
 	], $base . 'cyber_game_sessions' );
 
-	$pause_resp = wp_remote_request( $pause_url, [
-'method' => 'PATCH',
-'headers' => nw_supabase_headers(),
-'body' => wp_json_encode( [ 'status' => 'paused' ] ),
-'timeout' => 10,
+$pause_resp = wp_remote_request( $pause_url, [
+	'method'  => 'PATCH',
+	'headers' => nw_supabase_headers(),
+	'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
+	'timeout' => 10,
 ] );
-if ( is_wp_error( $pause_resp ) || wp_remote_retrieve_response_code( $pause_resp ) >= 300 ) {
-return new WP_Error( 'pause_failed', 'Could not pause existing session.', [ 'status' => 500 ] );
+
+// Best-effort only: log failure, but do not block starting a new session.
+if ( is_wp_error( $pause_resp ) ) {
+	error_log(
+		'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions failed — ' .
+		$pause_resp->get_error_message()
+	);
+} else {
+	$pause_code = wp_remote_retrieve_response_code( $pause_resp );
+
+	if ( $pause_code < 200 || $pause_code >= 300 ) {
+		error_log(
+			'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions HTTP ' .
+			$pause_code . ' — ' . wp_remote_retrieve_body( $pause_resp )
+		);
+	}
 }
 
 	// ------------------------------------------------------------------
