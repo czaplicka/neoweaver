@@ -1,0 +1,440 @@
+/* Tactical Left Panel — NeoWeaver
+   Art direction: tech-magic terminal HUD / CRT cyber overlay
+*/
+
+:root {
+	--tw-acid: #adff00;
+	--tw-acid-soft: rgba(173, 255, 0, 0.16);
+	--tw-acid-line: rgba(173, 255, 0, 0.38);
+	--tw-bg: rgba(8, 12, 10, 0.92);
+	--tw-bg-2: rgba(14, 20, 16, 0.94);
+	--tw-panel: rgba(16, 24, 19, 0.92);
+	--tw-panel-2: rgba(20, 30, 24, 0.96);
+	--tw-text: #e8ffd0;
+	--tw-text-dim: rgba(232, 255, 208, 0.72);
+	--tw-danger: #ff4d4d;
+	--tw-danger-soft: rgba(255, 77, 77, 0.18);
+	--tw-border: rgba(173, 255, 0, 0.24);
+	--tw-shadow: 0 0 0 1px rgba(173, 255, 0, 0.1), 0 0 24px rgba(173, 255, 0, 0.08);
+	--tw-radius: 18px;
+	--tw-radius-sm: 12px;
+	--tw-nav-size: 54px;
+}
+
+#tactical-status-bridge {
+	display: none !important;
+}
+
+.tw-side-nav.left-nav {
+	position: fixed;
+	left: 18px;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 10px 8px;
+	border: 1px solid var(--tw-border);
+	border-radius: 999px;
+	background:
+		linear-gradient(180deg, rgba(173, 255, 0, 0.08), rgba(173, 255, 0, 0.02)),
+		var(--tw-bg);
+	backdrop-filter: blur(10px);
+	box-shadow: var(--tw-shadow);
+}
+
+.tw-nav-btn-tactical {
+	width: var(--tw-nav-size);
+	height: var(--tw-nav-size);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid transparent;
+	border-radius: 50%;
+	background: rgba(173, 255, 0, 0.05);
+	color: var(--tw-acid);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.tw-nav-btn-tactical:hover,
+.tw-nav-btn-tactical:focus-visible {
+	transform: translateX(2px) scale(1.04);
+	border-color: var(--tw-acid-line);
+	background: rgba(173, 255, 0, 0.12);
+	box-shadow: 0 0 18px rgba(173, 255, 0, 0.18);
+	outline: none;
+}
+
+.tw-nav-btn-tactical.is-active {
+	background: rgba(173, 255, 0, 0.16);
+	border-color: var(--tw-acid);
+	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.2), 0 0 22px rgba(173, 255, 0, 0.16);
+}
+
+.tw-nav-btn-tactical .icon {
+	filter: drop-shadow(0 0 6px rgba(173, 255, 0, 0.2));
+}
+
+.tw-character-panel-container.left-panel {
+	position: relative;
+	width: min(420px, calc(100vw - 110px));
+	margin-left: 84px;
+	z-index: 20;
+}
+
+.tw-character-card.tactical-card.tw-tactical-card--full {
+	display: flex;
+	flex-direction: column;
+	min-height: 78vh;
+	max-height: 84vh;
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius);
+	background:
+		linear-gradient(180deg, rgba(173, 255, 0, 0.04) 0%, rgba(173, 255, 0, 0.01) 100%),
+		linear-gradient(180deg, rgba(10, 15, 12, 0.98), rgba(14, 20, 16, 0.96));
+	box-shadow: var(--tw-shadow);
+	backdrop-filter: blur(12px);
+	overflow: hidden;
+	position: relative;
+}
+
+.tw-character-card.tactical-card.tw-tactical-card--full::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(rgba(173, 255, 0, 0.03), rgba(173, 255, 0, 0.01)),
+		repeating-linear-gradient(
+			to bottom,
+			rgba(255, 255, 255, 0.02) 0,
+			rgba(255, 255, 255, 0.02) 1px,
+			transparent 1px,
+			transparent 4px
+		);
+	mix-blend-mode: screen;
+	opacity: 0.32;
+}
+
+.tw-char-header.tactical-header.tw-tactical-header--fixed {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	padding: 18px 18px 16px;
+	border-bottom: 1px solid rgba(173, 255, 0, 0.14);
+	background:
+		linear-gradient(180deg, rgba(173, 255, 0, 0.08), rgba(173, 255, 0, 0.01)),
+		var(--tw-bg-2);
+	backdrop-filter: blur(10px);
+}
+
+.tw-char-info {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.tw-lvl-frame {
+	display: inline-flex;
+	align-items: center;
+	width: fit-content;
+	padding: 5px 10px;
+	border: 1px solid var(--tw-acid-line);
+	border-radius: 999px;
+	background: rgba(173, 255, 0, 0.08);
+	color: var(--tw-acid);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.tw-lvl-frame.hp-red {
+	border-color: rgba(255, 77, 77, 0.45);
+	background: var(--tw-danger-soft);
+	color: #ff8b8b;
+	box-shadow: 0 0 14px rgba(255, 77, 77, 0.14);
+}
+
+.tw-lvl-frame.tactical-mode {
+	color: var(--tw-acid);
+}
+
+.tw-char-name {
+	margin: 0;
+	color: var(--tw-text);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: clamp(1.3rem, 1rem + 1vw, 1.8rem);
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	text-shadow: 0 0 12px rgba(173, 255, 0, 0.12);
+}
+
+.tw-char-class-line {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	color: var(--tw-text-dim);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 13px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.tw-char-class-line .highlight {
+	color: var(--tw-acid);
+	font-weight: 600;
+}
+
+.tw-divider {
+	opacity: 0.55;
+}
+
+.tw-panel-scroll-area.tw-panel-scroll-area--flex {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.tw-tab-content-tactical {
+	display: none;
+	flex-direction: column;
+	width: 100%;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(173, 255, 0, 0.28) transparent;
+}
+
+.tw-tab-content-tactical::-webkit-scrollbar {
+	width: 8px;
+}
+
+.tw-tab-content-tactical::-webkit-scrollbar-thumb {
+	background: rgba(173, 255, 0, 0.22);
+	border-radius: 999px;
+}
+
+.tw-tab-content-tactical--active {
+	display: flex;
+}
+
+.tw-tab-content-tactical--hidden {
+	display: none;
+}
+
+.tw-tab-content-tactical--padded {
+	padding: 16px;
+}
+
+.tw-map-wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 16px;
+}
+
+.tw-map-wrapper > * {
+	border: 1px solid rgba(173, 255, 0, 0.12);
+	border-radius: var(--tw-radius-sm);
+	background: rgba(173, 255, 0, 0.03);
+	overflow: hidden;
+}
+
+.tw-grid-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 14px;
+	padding: 10px 12px;
+	border: 1px solid rgba(173, 255, 0, 0.12);
+	border-radius: var(--tw-radius-sm);
+	background: rgba(173, 255, 0, 0.04);
+}
+
+.stat-label {
+	color: var(--tw-acid);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.tw-tactical-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.tw-grid-slot {
+	aspect-ratio: 1 / 1;
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid rgba(173, 255, 0, 0.16);
+	border-radius: 16px;
+	background:
+		linear-gradient(180deg, rgba(173, 255, 0, 0.05), rgba(173, 255, 0, 0.015)),
+		radial-gradient(circle at top, rgba(173, 255, 0, 0.05), transparent 62%),
+		var(--tw-panel);
+	box-shadow: inset 0 0 0 1px rgba(173, 255, 0, 0.03);
+	overflow: hidden;
+}
+
+.tw-grid-slot::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to right, transparent calc(50% - 0.5px), rgba(173, 255, 0, 0.05) 50%, transparent calc(50% + 0.5px)),
+		linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(173, 255, 0, 0.05) 50%, transparent calc(50% + 0.5px));
+	pointer-events: none;
+}
+
+.tw-grid-slot.occupied {
+	border-color: rgba(173, 255, 0, 0.28);
+	background:
+		linear-gradient(180deg, rgba(173, 255, 0, 0.07), rgba(173, 255, 0, 0.02)),
+		var(--tw-panel-2);
+}
+
+.slot-coord {
+	color: rgba(173, 255, 0, 0.42);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+}
+
+.tw-unit {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 68%;
+	height: 68%;
+	border: 1px solid rgba(173, 255, 0, 0.22);
+	border-radius: 14px;
+	background: rgba(10, 16, 10, 0.94);
+	box-shadow: 0 0 16px rgba(173, 255, 0, 0.08);
+}
+
+.tw-unit.green {
+	border-color: rgba(110, 255, 110, 0.28);
+	box-shadow: 0 0 14px rgba(110, 255, 110, 0.12);
+}
+
+.tw-unit.yellow {
+	border-color: rgba(255, 208, 0, 0.34);
+	box-shadow: 0 0 14px rgba(255, 208, 0, 0.12);
+}
+
+.tw-unit.orange {
+	border-color: rgba(255, 145, 0, 0.34);
+	box-shadow: 0 0 14px rgba(255, 145, 0, 0.12);
+}
+
+.tw-unit.red {
+	border-color: rgba(255, 77, 77, 0.38);
+	box-shadow: 0 0 16px rgba(255, 77, 77, 0.16);
+}
+
+.unit-icon {
+	font-size: clamp(1.4rem, 1rem + 1vw, 2rem);
+	line-height: 1;
+	filter: drop-shadow(0 0 8px rgba(173, 255, 0, 0.2));
+}
+
+.unit-effects-dots {
+	position: absolute;
+	right: 6px;
+	bottom: 6px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--tw-acid);
+	box-shadow:
+		0 0 0 2px rgba(10, 16, 10, 0.95),
+		0 0 12px rgba(173, 255, 0, 0.4);
+}
+
+.tw-gold-hud {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 14px;
+	padding: 10px 12px;
+	border: 1px solid rgba(173, 255, 0, 0.12);
+	border-radius: var(--tw-radius-sm);
+	background: rgba(173, 255, 0, 0.04);
+}
+
+.tw-gold-label {
+	color: var(--tw-acid);
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+#left-scanning-tab > *:not(.tw-gold-hud) {
+	border: 1px solid rgba(173, 255, 0, 0.12);
+	border-radius: var(--tw-radius-sm);
+	background: rgba(173, 255, 0, 0.03);
+	padding: 12px;
+}
+
+@media (max-width: 1024px) {
+	.tw-side-nav.left-nav {
+		left: 12px;
+	}
+
+	.tw-character-panel-container.left-panel {
+		width: min(380px, calc(100vw - 90px));
+		margin-left: 74px;
+	}
+}
+
+@media (max-width: 768px) {
+	.tw-side-nav.left-nav {
+		position: fixed;
+		left: 50%;
+		top: auto;
+		bottom: 14px;
+		transform: translateX(-50%);
+		flex-direction: row;
+		padding: 8px;
+	}
+
+	.tw-character-panel-container.left-panel {
+		width: calc(100vw - 24px);
+		margin: 0 auto;
+	}
+
+	.tw-character-card.tactical-card.tw-tactical-card--full {
+		min-height: 68vh;
+		max-height: 76vh;
+	}
+
+	.tw-tactical-grid {
+		gap: 10px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tw-nav-btn-tactical {
+		transition: none;
+	}
+}
