@@ -1,3 +1,9 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+exit;
+}
+
+if ( ! function_exists( 'tw_compass_render' ) ) {
 function tw_compass_render() {
 	$wp_user_id = get_current_user_id();
 
