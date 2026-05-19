@@ -1,9 +1,72 @@
 (function () {
-	function playEquipSound(url) {
-		if (!url || url === 'null') return;
+	function safeText(value, fallback = '') {
+		if (typeof value === 'string') {
+			const trimmed = value.trim();
+			return trimmed !== '' ? trimmed : fallback;
+		}
+
+		if (value === null || typeof value === 'undefined') {
+			return fallback;
+		}
+
+		return String(value);
+	}
+
+	function safeUrl(value, fallback = '') {
+		if (typeof value !== 'string') {
+			return fallback;
+		}
+
+		const trimmed = value.trim();
+		if (!trimmed) {
+			return fallback;
+		}
 
 		try {
-			const audio = new Audio(url);
+			const url = new URL(trimmed, window.location.origin);
+			if (url.protocol === 'http:' || url.protocol === 'https:') {
+				return url.href;
+			}
+		} catch (e) {
+			return fallback;
+		}
+
+		return fallback;
+	}
+
+	function buildItemTooltip(item, quantity) {
+		const name = safeText(item.name, 'Unnamed item').toUpperCase();
+		const rarity = item.rarity ? `[${safeText(item.rarity).toUpperCase()}]` : '[COMMON]';
+		const tags = Array.isArray(item.tags)
+			? item.tags.map(function (t) { return `#${safeText(t, '')}`; }).filter(Boolean).join(' ')
+			: '';
+		const description = safeText(item.description, 'No description available.');
+		const mass = Number(item.mass || 0);
+
+		let lines = [`${name} ${rarity}`];
+
+		if (typeof quantity !== 'undefined') {
+			lines.push(`Qty: ${quantity}`);
+		}
+
+		if (tags) {
+			lines.push(tags);
+		}
+
+		lines.push('');
+		lines.push(description);
+		lines.push('');
+		lines.push(`Mass: ${mass}kg`);
+
+		return lines.join('\n');
+	}
+
+	function playEquipSound(url) {
+		const safeSoundUrl = safeUrl(url, '');
+		if (!safeSoundUrl || safeSoundUrl === 'null') return;
+
+		try {
+			const audio = new Audio(safeSoundUrl);
 			audio.volume = 0.4;
 			audio.play();
 		} catch (e) {
@@ -60,7 +123,12 @@
 		listContainer.innerHTML = '';
 
 		if (!items || items.length === 0) {
-			listContainer.innerHTML = '<p style="opacity:0.3; font-size:0.7rem; padding:10px;">Empty...</p>';
+			const empty = document.createElement('p');
+			empty.style.opacity = '0.3';
+			empty.style.fontSize = '0.7rem';
+			empty.style.padding = '10px';
+			empty.textContent = 'Empty...';
+			listContainer.appendChild(empty);
 			return;
 		}
 
@@ -71,25 +139,31 @@
 			const card = document.createElement('div');
 			card.className = 'tw-item-card';
 			card.draggable = true;
-			card.dataset.inventoryId = entry.id;
-			card.dataset.itemSlot = it.slot || '';
-			card.dataset.soundUrl = it.sound_url || '';
+			card.dataset.inventoryId = safeText(entry.id, '');
+			card.dataset.itemSlot = safeText(it.slot, '');
+			card.dataset.soundUrl = safeUrl(it.sound_url, '');
 			card.style.cssText = 'background: rgba(255,255,255,0.05); margin-bottom: 2px; padding: 5px; cursor: grab;';
+			card.title = buildItemTooltip(it, entry.quantity);
 
-			const rarity = it.rarity ? `[${it.rarity.toUpperCase()}]` : '[COMMON]';
-			const tags = it.tags && Array.isArray(it.tags) ? it.tags.map(function (t) { return `#${t}`; }).join(' ') : '';
-			const description = it.description || 'No description available.';
-			const mass = it.mass || 0;
+			const nameWrap = document.createElement('span');
+			nameWrap.className = 'tw-item-name';
+			nameWrap.style.fontSize = '0.85rem';
 
-			card.title = `${it.name.toUpperCase()} ${rarity}\n${tags}\n\n${description}\n\nMass: ${mass}kg`;
+			const nameNode = document.createTextNode(safeText(it.name, 'Unnamed item'));
+			nameWrap.appendChild(nameNode);
 
-			card.innerHTML = `
-				<span class="tw-item-name" style="font-size: 0.85rem;">
-					${it.name}
-					<small style="opacity: 0.6;"> x${entry.quantity}</small>
-					<small style="float: right; color: #adff00;">${mass} kg</small>
-				</span>
-			`;
+			const qty = document.createElement('small');
+			qty.style.opacity = '0.6';
+			qty.textContent = ` x${Number(entry.quantity || 0)}`;
+
+			const mass = document.createElement('small');
+			mass.style.float = 'right';
+			mass.style.color = '#adff00';
+			mass.textContent = `${Number(it.mass || 0)} kg`;
+
+			nameWrap.appendChild(qty);
+			nameWrap.appendChild(mass);
+			card.appendChild(nameWrap);
 
 			listContainer.appendChild(card);
 		});
@@ -114,13 +188,13 @@
 
 			totalPower += item.power_value || 0;
 
-			let targetSlot = document.querySelector(`[data-slot="${entry.equipped_slot}"]`);
+			let targetSlot = document.querySelector(`[data-slot="${CSS.escape(safeText(entry.equipped_slot, ''))}"]`);
 
 			if (!targetSlot) {
 				targetSlot = Array.from(slots).find(function (s) {
 					return (
 						s.dataset.slot &&
-						s.dataset.slot.startsWith(item.slot) &&
+						s.dataset.slot.startsWith(safeText(item.slot, '')) &&
 						s.querySelector('.item-icon') &&
 						s.querySelector('.item-icon').innerHTML === ''
 					);
@@ -143,15 +217,13 @@
 		if (!iconContainer) return;
 
 		const img = document.createElement('img');
-		img.src = item.img_url || 'https://via.placeholder.com/50';
+		img.src = safeUrl(item.img_url, 'https://via.placeholder.com/50');
 		img.className = 'item-img-fluid';
 		img.draggable = true;
-		img.dataset.inventoryId = inventoryId;
-		img.dataset.itemSlot = item.slot || '';
-		img.dataset.soundUrl = item.sound_url || '';
-
-		const tags = item.tags && Array.isArray(item.tags) ? item.tags.map(function (t) { return `#${t}`; }).join(' ') : '';
-		img.title = `${item.name.toUpperCase()} [${item.rarity || 'Common'}]\n${tags}\n\n${item.description || ''}`;
+		img.dataset.inventoryId = safeText(inventoryId, '');
+		img.dataset.itemSlot = safeText(item.slot, '');
+		img.dataset.soundUrl = safeUrl(item.sound_url, '');
+		img.title = buildItemTooltip(item);
 
 		const colors = {
 			legendary: '#ff8000',
@@ -159,7 +231,7 @@
 			rare: '#0070dd'
 		};
 
-		const color = colors[(item.rarity || '').toLowerCase()] || 'rgba(173, 255, 0, 0.4)';
+		const color = colors[safeText(item.rarity, '').toLowerCase()] || 'rgba(173, 255, 0, 0.4)';
 
 		slotElement.style.borderColor = color;
 		slotElement.style.boxShadow = `inset 0 0 8px ${color}`;
@@ -252,8 +324,9 @@
 
 		window.tippy('.tw-item-card, .item-img-fluid', {
 			content(reference) {
-				return reference.getAttribute('title');
+				return reference.getAttribute('title') || '';
 			},
+			allowHTML: false,
 			theme: 'cyberpunk'
 		});
 	}
@@ -261,21 +334,52 @@
 	function parseInventoryTags(text) {
 		if (typeof text !== 'string') return text;
 
+		const container = document.createElement('div');
 		const itemRegex = /\[ITEM:(\d+)\]/g;
+		let lastIndex = 0;
+		let match;
 
-		return text.replace(itemRegex, function (match, itemId) {
-			const safeId = Number.parseInt(itemId, 10);
-			if (Number.isNaN(safeId)) return match;
+		while ((match = itemRegex.exec(text)) !== null) {
+			const before = text.slice(lastIndex, match.index);
+			if (before) {
+				container.appendChild(document.createTextNode(before));
+			}
 
-			return `
-				<button class="tw-loot-button"
-						data-item-id="${safeId}"
-						onclick="window.handleLootAction(${safeId}, this)">
-					<span class="tw-btn-text">TAKE ITEM</span>
-					<span class="tw-btn-id">#${safeId}</span>
-				</button>
-			`;
-		});
+			const safeId = Number.parseInt(match[1], 10);
+			if (Number.isNaN(safeId)) {
+				container.appendChild(document.createTextNode(match[0]));
+			} else {
+				const button = document.createElement('button');
+				button.className = 'tw-loot-button';
+				button.dataset.itemId = String(safeId);
+
+				const textSpan = document.createElement('span');
+				textSpan.className = 'tw-btn-text';
+				textSpan.textContent = 'TAKE ITEM';
+
+				const idSpan = document.createElement('span');
+				idSpan.className = 'tw-btn-id';
+				idSpan.textContent = `#${safeId}`;
+
+				button.appendChild(textSpan);
+				button.appendChild(idSpan);
+
+				button.addEventListener('click', function () {
+					window.handleLootAction(safeId, button);
+				});
+
+				container.appendChild(button);
+			}
+
+			lastIndex = itemRegex.lastIndex;
+		}
+
+		const after = text.slice(lastIndex);
+		if (after) {
+			container.appendChild(document.createTextNode(after));
+		}
+
+		return container.innerHTML;
 	}
 
 	window.handleLootAction = function (itemId, buttonElement) {
@@ -369,25 +473,30 @@
 
 		const errorDiv = document.createElement('div');
 		errorDiv.className = 'tw-terminal-error';
-		errorDiv.innerHTML = `
-			<div style="
-				background: rgba(20, 0, 0, 0.9);
-				color: #ff4444;
-				border: 1px solid #ff4444;
-				padding: 15px;
-				font-family: 'Chakra Petch', sans-serif;
-				position: fixed;
-				bottom: 10%;
-				left: 50%;
-				transform: translateX(-50%);
-				z-index: 10000;
-				box-shadow: 0 0 20px rgba(255, 68, 68, 0.3);
-				text-align: center;
-			">
-				<span style="color: #adff00;">[LOG_ERROR]</span><br>${narrativeError}
-			</div>
-		`;
 
+		const box = document.createElement('div');
+		box.style.background = 'rgba(20, 0, 0, 0.9)';
+		box.style.color = '#ff4444';
+		box.style.border = '1px solid #ff4444';
+		box.style.padding = '15px';
+		box.style.fontFamily = "'Chakra Petch', sans-serif";
+		box.style.position = 'fixed';
+		box.style.bottom = '10%';
+		box.style.left = '50%';
+		box.style.transform = 'translateX(-50%)';
+		box.style.zIndex = '10000';
+		box.style.boxShadow = '0 0 20px rgba(255, 68, 68, 0.3)';
+		box.style.textAlign = 'center';
+
+		const label = document.createElement('span');
+		label.style.color = '#adff00';
+		label.textContent = '[LOG_ERROR]';
+
+		box.appendChild(label);
+		box.appendChild(document.createElement('br'));
+		box.appendChild(document.createTextNode(narrativeError));
+
+		errorDiv.appendChild(box);
 		document.body.appendChild(errorDiv);
 
 		setTimeout(function () {
