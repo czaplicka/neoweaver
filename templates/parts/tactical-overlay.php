@@ -1,4 +1,7 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 /**
  * Tactical Left Panel (Battle Grid + Map + Scanner)
  * Expected variables in scope:
@@ -6,14 +9,45 @@
  * - $grid_map  (array<int, array>)  slots 1–9 => unit rows
  * - $has_enemy (bool)
  */
+if ( ! function_exists( 'nw_render_tactical_left_panel' ) ) {
+	function nw_render_tactical_left_panel( $map_data = array(), $grid_map = array(), $has_enemy = false ) {
+		if ( ! is_page_template( array( 'templates/adventure.php' ) ) ) {
+			return '';
+		}
 
-// FIX: Pre-sanitize and resolve values once, not inline repeatedly.
-$combat_active    = ! empty( $has_enemy );
-$header_css_class = $combat_active ? 'hp-red' : 'tactical-mode';
-$header_label     = $combat_active ? 'THREAT DETECTED' : 'SYSTEM: ACTIVE';
-$kingdom_name     = esc_html( $map_data['kingdom_name'] ?? 'Wilderness' );
-$location_name    = esc_html( $map_data['location_name'] ?? 'Unknown' );
-?>
+		$css_rel  = 'assets/css/public/panel-tactical-left.css';
+		$css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
+		$css_url  = NEOWEAVER_PLUGIN_URL . $css_rel;
+		$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.0';
+
+		$js_rel  = 'assets/js/public/panel-tactical-left.js';
+		$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+		$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
+		$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.0';
+
+		wp_enqueue_style(
+			'tactical-overlay',
+			$css_url,
+			array(),
+			$css_ver
+		);
+
+		wp_enqueue_script(
+			'tactical-overlay',
+			$js_url,
+			array(),
+			$js_ver,
+			true
+		);
+
+		$combat_active    = ! empty( $has_enemy );
+		$header_css_class = $combat_active ? 'hp-red' : 'tactical-mode';
+		$header_label     = $combat_active ? 'THREAT DETECTED' : 'SYSTEM: ACTIVE';
+		$kingdom_name     = esc_html( $map_data['kingdom_name'] ?? 'Wilderness' );
+		$location_name    = esc_html( $map_data['location_name'] ?? 'Unknown' );
+
+		ob_start();
+		?>
 
 <!-- Status bridge for JS — aria-hidden keeps it out of the a11y tree -->
 <div id="tactical-status-bridge"
