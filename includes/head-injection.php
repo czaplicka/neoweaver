@@ -4,9 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * tw_is_game_page() zachowana dla kompatybilności wstecznej.
- * Używana przez inne pliki pluginu do warunkowego ładowania
- * skryptów specyficznych dla adventure template.
+ * Zachowane dla kompatybilności wstecznej.
  */
 if ( ! function_exists( 'tw_is_game_page' ) ) {
 	function tw_is_game_page(): bool {
@@ -15,7 +13,7 @@ if ( ! function_exists( 'tw_is_game_page' ) ) {
 			return true;
 		}
 
-		$game_slugs = [ 'game', 'play', 'legend', 'deployments', 'field-agents', 'nodes', 'inventory' ];
+		$game_slugs = array( 'game', 'play', 'legend', 'deployments', 'field-agents', 'nodes', 'inventory' );
 		$slug       = get_post_field( 'post_name', get_queried_object_id() );
 
 		foreach ( $game_slugs as $prefix ) {
@@ -28,18 +26,8 @@ if ( ! function_exists( 'tw_is_game_page' ) ) {
 	}
 }
 
-
-/**
- * Wstrzykujemy globalnie (dla każdego zalogowanego użytkownika):
- * - Supabase JS CDN
- * - window.twAdventureData (dane gry + konfiguracja)
- * - window.twSupabase (klient Supabase gotowy do użycia)
- *
- * Dzięki temu shortcode'y, widgety i inne elementy pluginu
- * mogą używać Supabase na dowolnej stronie WordPressa.
- */
-if ( ! function_exists( 'tw_inject_global_data' ) ) {
-	function tw_inject_global_data() {
+if ( ! function_exists( 'tw_enqueue_global_game_data' ) ) {
+	function tw_enqueue_global_game_data(): void {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			return;
@@ -47,7 +35,6 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 
 		$gm_avatar_url = get_option( 'gm_avatar_url', '' );
 
-		// Transient cache (60 s) — działa też poza game page
 		$cache_key = 'tw_game_data_' . $user_id;
 		$game_data = get_transient( $cache_key );
 
@@ -55,53 +42,66 @@ if ( ! function_exists( 'tw_inject_global_data' ) ) {
 			if ( function_exists( 'get_user_game_data_from_supabase' ) ) {
 				$game_data = get_user_game_data_from_supabase( $user_id );
 			} else {
-				$game_data = [
+				$game_data = array(
 					'active_session_id'   => null,
 					'active_campaign_id'  => null,
 					'active_character_id' => null,
 					'active_scenario_id'  => null,
 					'char_name'           => 'Unknown',
 					'char_class'          => 'None',
-					'char_tags'           => [],
+					'char_tags'           => array(),
 					'campaign_world_type' => 1,
 					'wp_user_id'          => $user_id,
-				];
+				);
 			}
 
 			set_transient( $cache_key, $game_data, 60 );
 		}
 
-		$supabase_url = tw_supabase_url();
-		?>
-		<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-		<script id="tw-global-config">
-		window.twAdventureData = {
-			supabase_url: '<?php echo esc_js( $supabase_url ); ?>',
-			supabase_anon_key: '<?php echo esc_js( tw_supabase_anon_key() ); ?>',
-			active_session_id: <?php echo isset( $game_data['active_session_id'] ) ? wp_json_encode( $game_data['active_session_id'] ) : 'null'; ?>,
-			active_campaign_id: <?php echo isset( $game_data['active_campaign_id'] ) ? wp_json_encode( $game_data['active_campaign_id'] ) : 'null'; ?>,
-			active_character_id: <?php echo isset( $game_data['active_character_id'] ) ? wp_json_encode( $game_data['active_character_id'] ) : 'null'; ?>,
-			active_scenario_id: <?php echo isset( $game_data['active_scenario_id'] ) ? wp_json_encode( $game_data['active_scenario_id'] ) : 'null'; ?>,
-			char_name: '<?php echo isset( $game_data['char_name'] ) ? esc_js( $game_data['char_name'] ) : 'Unknown'; ?>',
-			char_class: '<?php echo isset( $game_data['char_class'] ) ? esc_js( $game_data['char_class'] ) : 'None'; ?>',
-			char_tags: <?php echo isset( $game_data['char_tags'] ) ? wp_json_encode( $game_data['char_tags'] ) : '[]'; ?>,
-			campaign_world_type: <?php echo isset( $game_data['campaign_world_type'] ) ? (int) $game_data['campaign_world_type'] : 1; ?>,
-			wp_user_id: <?php echo (int) $user_id; ?>,
-			ajax_url: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',
-			nonce: '<?php echo esc_js( wp_create_nonce( 'tw_nonce' ) ); ?>',
-			gm_avatar: '<?php echo esc_url( $gm_avatar_url ); ?>'
-		};
-		// Inicjalizacja klienta Supabase — dostępna globalnie na każdej stronie
-		if (window.supabase && !window.twSupabase) {
-			window.twSupabase = window.supabase.createClient(
-				window.twAdventureData.supabase_url,
-				window.twAdventureData.supabase_anon_key
-			);
-		}
-		console.log('🔗 twAdventureData injected (cached):', window.twAdventureData);
-		</script>
-		<?php
+		wp_enqueue_script(
+			'supabase-js',
+			'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+			array(),
+			null,
+			false
+		);
+
+		$file_rel  = 'assets/js/public/game-data.js';
+		$file_path = trailingslashit( NEOWEAVER_PLUGIN_DIR ) . $file_rel;
+		$file_url  = trailingslashit( NEOWEAVER_PLUGIN_URL ) . $file_rel;
+		$version   = file_exists( $file_path ) ? (string) filemtime( $file_path ) : NEOWEAVER_VERSION;
+
+		wp_enqueue_script(
+			'tw-gamedata',
+			$file_url,
+			array( 'supabase-js' ),
+			$version,
+			false
+		);
+
+		$config = array(
+			'supabase_url'        => tw_supabase_url(),
+			'supabase_anon_key'   => tw_supabase_anon_key(),
+			'active_session_id'   => $game_data['active_session_id'] ?? null,
+			'active_campaign_id'  => $game_data['active_campaign_id'] ?? null,
+			'active_character_id' => $game_data['active_character_id'] ?? null,
+			'active_scenario_id'  => $game_data['active_scenario_id'] ?? null,
+			'char_name'           => $game_data['char_name'] ?? 'Unknown',
+			'char_class'          => $game_data['char_class'] ?? 'None',
+			'char_tags'           => $game_data['char_tags'] ?? array(),
+			'campaign_world_type' => isset( $game_data['campaign_world_type'] ) ? (int) $game_data['campaign_world_type'] : 1,
+			'wp_user_id'          => (int) $user_id,
+			'ajax_url'            => admin_url( 'admin-ajax.php' ),
+			'nonce'               => wp_create_nonce( 'tw_nonce' ),
+			'gm_avatar'           => $gm_avatar_url,
+		);
+
+		wp_add_inline_script(
+			'tw-gamedata',
+			'window.twAdventureData = ' . wp_json_encode( $config ) . ';',
+			'before'
+		);
 	}
 
-	add_action( 'wp_head', 'tw_inject_global_data', 10 );
+	add_action( 'wp_enqueue_scripts', 'tw_enqueue_global_game_data', 10 );
 }
