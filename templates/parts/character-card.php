@@ -365,7 +365,6 @@ wp_add_inline_script(
 
 			<div class="tw-tab-content" id="weavers">
 				<?php echo do_shortcode( '[tw_weaver_list]' ); ?>
-<?php echo do_shortcode( '[tw-character-card]' ); ?>
 
 			</div>
 
@@ -373,7 +372,7 @@ wp_add_inline_script(
 				<?php echo do_shortcode( '[tw_loom_of_fate]' ); ?>
 			</div>
 			<div class="tw-tab-content" id="vechicles">
-				<?php echo do_shortcode( '[data-vehicle-panel-root]' ); ?>
+				<?php echo do_shortcode( '[neoweave_vehicle_panel]' ); ?>
 			</div>
 
 		</div>
