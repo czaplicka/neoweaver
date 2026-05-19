@@ -44,16 +44,17 @@ function tw_assign_quest_to_character( string $character_id, array $quest_data, 
 		] ),
 	];
 
-	$response = wp_remote_post( $endpoint_url, [
-		'method'  => 'POST',
-		'headers' => [
-			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . $anon_key,
-			'Content-Type'  => 'application/json',
-			'Prefer'        => 'return=representation',
-		],
-		'body'    => wp_json_encode( $payload ),
-	] );
+$response = wp_remote_post( $endpoint_url, [
+	'method'  => 'POST',
+	'headers' => [
+		'apikey'        => $anon_key,
+		'Authorization' => 'Bearer ' . $anon_key,
+		'Content-Type'  => 'application/json',
+		'Prefer'        => 'return=representation',
+	],
+	'body'    => wp_json_encode( $payload ),
+	'timeout' => 15,
+] );
 
 	if ( is_wp_error( $response ) ) {
 		error_log( '[NeoWeaver] tw_assign_quest_to_character error: ' . $response->get_error_message() );
