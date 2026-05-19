@@ -63,7 +63,6 @@ final class NeoWeaver_Core {
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
 			'includes/shortcodes-tags.php',
-			// 'includes/skills-loader.php',
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 
@@ -106,7 +105,6 @@ final class NeoWeaver_Core {
 			'public/shortcodes/kingdom-info.php',
 			'public/shortcodes/library.php',
 			'public/shortcodes/list-campaigns.php',
-			// 'public/shortcodes/list-worlds.php',
 			'public/shortcodes/lobby.php',
 			'public/shortcodes/map.php',
 			'public/shortcodes/quests.php',
@@ -507,75 +505,6 @@ final class NeoWeaver_Core {
 			true
 		);
 	}
-}
-
-/**
- * Check whether a character belongs to the current WordPress user.
- */
-function neoweaver_user_owns_character( int $character_id, int $user_id ): bool {
-	global $wpdb;
-
-	if ( $character_id <= 0 || $user_id <= 0 ) {
-		return false;
-	}
-
-	$query = $wpdb->prepare(
-		'SELECT COUNT(1) FROM cybercharacters WHERE id = %d AND wpuserid = %d',
-		$character_id,
-		$user_id
-	);
-
-	$exists = (int) $wpdb->get_var( $query );
-
-	return $exists > 0;
-}
-
-add_action( 'wp_ajax_neoweaver_ai_chat', 'neoweaver_ajax_ai_chat' );
-
-function neoweaver_ajax_ai_chat(): void {
-	check_ajax_referer( 'neoweaver_chat', 'nonce' );
-
-	$user_id    = get_current_user_id();
-	$char_id    = absint( $_POST['char_id'] ?? 0 );
-	$session_id = sanitize_text_field( $_POST['session_id'] ?? '' );
-	$message    = sanitize_textarea_field( $_POST['message'] ?? '' );
-
-	if ( ! $user_id ) {
-		wp_send_json_error(
-			[ 'message' => 'User is not authenticated.' ],
-			401
-		);
-	}
-
-	if ( ! $char_id || '' === $message ) {
-		wp_send_json_error(
-			[ 'message' => 'Missing required data.' ],
-			400
-		);
-	}
-
-	if ( ! neoweaver_user_owns_character( $char_id, $user_id ) ) {
-		wp_send_json_error(
-			[ 'message' => 'You do not have access to this character.' ],
-			403
-		);
-	}
-
-	if ( empty( $session_id ) ) {
-		$session_id = wp_generate_uuid4();
-	}
-
-	$engine = new NeoWeaver_GPT_Engine();
-	$result = $engine->process($char_id, $message);
-
-	if ( isset( $result['error'] ) ) {
-		wp_send_json_error(
-			[ 'message' => $result['error'] ],
-			500
-		);
-	}
-
-	wp_send_json_success( $result );
 }
 
 add_action( 'wp_enqueue_scripts', 'neoweaver_enqueue_chat_assets' );
