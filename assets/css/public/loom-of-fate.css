@@ -1,0 +1,90 @@
+.tw-loom-container {
+	position: relative;
+	width: 100%;
+	max-width: 420px;
+	margin: 0 auto;
+	padding: 20px;
+}
+
+.tw-loom-chart-wrapper {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	max-width: 360px;
+	margin: 0 auto;
+}
+
+.tw-loom-chart-wrapper canvas {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+}
+
+.tw-loom-label {
+	position: absolute;
+	z-index: 3;
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: #adff00;
+	pointer-events: none;
+	white-space: nowrap;
+}
+
+.tw-loom-label span {
+	display: inline-block;
+	margin-left: 6px;
+	color: #fff;
+}
+
+.tw-loom-label-brutality {
+	top: 8%;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.tw-loom-label-cunning {
+	top: 26%;
+	right: -8%;
+}
+
+.tw-loom-label-intellect {
+	bottom: 26%;
+	right: -10%;
+}
+
+.tw-loom-label-spirit {
+	bottom: 8%;
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.tw-loom-label-presence {
+	top: 50%;
+	left: -10%;
+	transform: translateY(-50%);
+}
+
+.tw-loom-archetype-container {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 4;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+	text-align: center;
+}
+
+.tw-loom-archetype-name {
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 18px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: #adff00;
+}
