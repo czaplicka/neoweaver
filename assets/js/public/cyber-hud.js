@@ -201,7 +201,7 @@
 			const [worldStatsArr, locStatsArr, repArr] = await Promise.all([
 				supaFetch(`/cyber_world_hud_stats?world_id=eq.${context.worldId}`),
 				context.locationId
-					? supaFetch(`/cyber_location_hud_stats?world_id=eq.${context.worldId}&location_id=eq.${context.locationId}`)
+					? supaFetch(`/cyber_location_stats?world_id=eq.${context.worldId}&location_id=eq.${context.locationId}`)
 					: Promise.resolve([]),
 				context.safeCharId
 					? supaFetch(`/cyber_reputation?character_id=eq.${context.characterId}&order=updated_at.desc&limit=1`)
