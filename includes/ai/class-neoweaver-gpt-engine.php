@@ -78,12 +78,12 @@ PROMPT;
             'max_output_tokens' => NEOWEAVER_TOKENS_GM,
             'temperature'       => 0.85,
             'store'             => true, // wymagane do previous_response_id
-            'tools'             => [
-                [
-                    'type'             => 'file_search',
-                    'vector_store_ids' => [ NEOWEAVER_VECTOR_STORE_ID ],
-                ],
-            ],
+            'tools' => defined('NEOWEAVER_VECTOR_STORE_ID') && NEOWEAVER_VECTOR_STORE_ID ? [
+    [
+        'type'             => 'file_search',
+        'vector_store_ids' => [ NEOWEAVER_VECTOR_STORE_ID ],
+    ],
+] : [],
         ];
 
         // Dołącz historię konwersacji jeśli istnieje
@@ -168,7 +168,7 @@ PROMPT;
         if (!empty($body)) {
             $args['body'] = json_encode($body);
         }
-        $response = wp_remote_request(tw_supabase_url() . $endpoint, $args);
+        $response = wp_remote_request(trailingslashit(tw_supabase_url()) . ltrim($endpoint, '/'), $args);
         if (is_wp_error($response)) {
             error_log('[NeoWeaver GPT] Supabase request failed: ' . $response->get_error_message());
             return null;
