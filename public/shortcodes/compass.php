@@ -1,14 +1,6 @@
-<?php
-/**
- * Shortcode: [tw_compass]
- * Renderuje interaktywny kompas pobierający dane z cyber_world_map.
- * Style i JS są enqueue'owane tylko wtedy, gdy shortcode jest renderowany.
- */
-
-add_shortcode( 'tw_compass', 'tw_compass_render' );
-
 function tw_compass_render() {
 	$wp_user_id = get_current_user_id();
+
 	if ( ! $wp_user_id ) {
 		return '';
 	}
@@ -27,6 +19,17 @@ function tw_compass_render() {
 	$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
 	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION;
 
+	$game_data = function_exists( 'get_user_game_data_from_supabase' )
+		? get_user_game_data_from_supabase( (int) $wp_user_id )
+		: array();
+
+	$script_deps = array();
+
+	// Jeśli tw-adventure istnieje, zachowaj kolejność ładowania.
+	if ( wp_script_is( 'tw-adventure', 'registered' ) || wp_script_is( 'tw-adventure', 'enqueued' ) ) {
+		$script_deps[] = 'tw-adventure';
+	}
+
 	if ( ! wp_style_is( 'neoweaver-compass', 'enqueued' ) ) {
 		wp_enqueue_style(
 			'neoweaver-compass',
@@ -36,24 +39,28 @@ function tw_compass_render() {
 		);
 	}
 
-if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
-	wp_enqueue_script(
-		'neoweaver-compass',
-		$js_url,
-		array( 'tw-adventure' ), // albo lepiej: handle skryptu, który tworzy window.twSupabase
-		$js_ver,
-		true
-	);
+	if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
+		wp_enqueue_script(
+			'neoweaver-compass',
+			$js_url,
+			$script_deps,
+			$js_ver,
+			true
+		);
 
-	wp_add_inline_script(
-		'neoweaver-compass',
-		'window.twCompassData = ' . wp_json_encode( array(
-			'wpUserId'        => (int) $wp_user_id,
-			'activeLocationId'=> (int) ( get_user_game_data_from_supabase( $wp_user_id )['active_location_id'] ?? 0 ),
-		) ) . ';',
-		'before'
-	);
-}
+		wp_add_inline_script(
+			'neoweaver-compass',
+			'window.twCompassData = ' . wp_json_encode(
+				array(
+					'wpUserId'         => (int) $wp_user_id,
+					'activeLocationId' => (int) ( $game_data['active_location_id'] ?? 0 ),
+					'activeWorldId'    => (string) ( $game_data['active_world_id'] ?? '' ),
+					'activeSessionId'  => (string) ( $game_data['active_session_id'] ?? '' ),
+				)
+			) . ';',
+			'before'
+		);
+	}
 
 	ob_start();
 	?>
@@ -86,5 +93,6 @@ if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
 		</div>
 	</div>
 	<?php
+
 	return ob_get_clean();
 }
