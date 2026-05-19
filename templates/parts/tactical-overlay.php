@@ -45,7 +45,7 @@ if ( ! function_exists( 'nw_render_tactical_left_panel' ) ) {
 		$header_label     = $combat_active ? 'THREAT DETECTED' : 'SYSTEM: ACTIVE';
 		$kingdom_name     = esc_html( $map_data['kingdom_name'] ?? 'Wilderness' );
 		$location_name    = esc_html( $map_data['location_name'] ?? 'Unknown' );
-	}
+		
 		ob_start();
 		?>
 
@@ -155,7 +155,10 @@ if ( ! function_exists( 'nw_render_tactical_left_panel' ) ) {
                 </div>
                 <?php echo do_shortcode( '[tw_local_scanner]' ); ?>
             </div>
-
         </div>
     </div>
 </div>
+<?php
+		return ob_get_clean();
+	}
+}
