@@ -427,3 +427,25 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 		}
 	}
 }
+/**
+ * Sprawdza czy postać należy do zalogowanego usera.
+ */
+if ( ! function_exists( 'tw_user_owns_character' ) ) {
+    function tw_user_owns_character( string $char_id, int $user_id ): bool {
+        if ( empty( $char_id ) || $user_id <= 0 ) {
+            return false;
+        }
+
+        $result = tw_supabase_get(
+            'cyber_characters',
+            [
+                'id'         => 'eq.' . $char_id,
+                'wp_user_id' => 'eq.' . $user_id,
+                'select'     => 'id',
+                'limit'      => 1,
+            ]
+        );
+
+        return ! is_wp_error( $result ) && ! empty( $result );
+    }
+}
