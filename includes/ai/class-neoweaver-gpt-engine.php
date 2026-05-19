@@ -11,13 +11,20 @@ require_once __DIR__ . '/class-neoweaver-context-builder.php';
  * Key differences vs old chat/completions:
  *  - Endpoint: /v1/responses
  *  - History:  previous_response_id (OpenAI stores context server-side, no local message array)
+ *              Session (last_response_id) stored in Supabase: cyber_chat_sessions
  *  - Lore:     file_search tool + Vector Store (no need to inject lore into every prompt)
  *  - Tokens:   input_tokens / output_tokens (not prompt_tokens / completion_tokens)
+ *
+ * wp-config.php constants used:
+ *  - NEOWEAVER_OPENAI_API_KEY   — klucz OpenAI
+ *  - NEOWEAVER_MODEL_GM         — model GM (gpt-4o)
+ *  - NEOWEAVER_MODEL_ROUTER     — model routera (gpt-4o-mini)
+ *  - NEOWEAVER_TOKENS_GM        — max output tokens dla GM (600)
+ *  - NEOWEAVER_VECTOR_STORE_ID  — ID Vector Store do file_search
+ *  - NEOWEAVER_SUPABASE_URL     — URL projektu Supabase
+ *  - NEOWEAVER_SUPABASE_KEY     — anon/service key Supabase
  */
 class NeoWeaver_GPT_Engine {
-
-    private const MAX_TOKENS = 600;
-    private const MODEL      = NEOWEAVER_OPENAI_MODEL; // defined in wp-config.php
 
     /**
      * Blok A — stały system prompt (cache'owany po stronie OpenAI).
@@ -59,21 +66,21 @@ PROMPT;
         // 3. Zbuduj wejście — stan gry + wiadomość gracza
         $input_message = "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}";
 
-        // 4. Pobierz ID poprzedniej odpowiedzi (zastępuje tablicę messages)
+        // 4. Pobierz ID poprzedniej odpowiedzi z Supabase (zastępuje tablicę messages)
         $previous_response_id = $this->get_previous_response_id($char_id);
 
         // 5. Wywołanie Responses API
         $request_body = [
-            'model'              => self::MODEL,
-            'instructions'       => self::SYSTEM_INSTRUCTIONS,
-            'input'              => $input_message,
-            'max_output_tokens'  => self::MAX_TOKENS,
-            'temperature'        => 0.85,
-            'store'              => true, // wymagane do previous_response_id
-            'tools'              => [
+            'model'             => NEOWEAVER_MODEL_GM,
+            'instructions'      => self::SYSTEM_INSTRUCTIONS,
+            'input'             => $input_message,
+            'max_output_tokens' => NEOWEAVER_TOKENS_GM,
+            'temperature'       => 0.85,
+            'store'             => true, // wymagane do previous_response_id
+            'tools'             => [
                 [
                     'type'             => 'file_search',
-                    'vector_store_ids' => [NEOWEAVER_VECTOR_STORE_ID],
+                    'vector_store_ids' => [ NEOWEAVER_VECTOR_STORE_ID ],
                 ],
             ],
         ];
@@ -85,7 +92,7 @@ PROMPT;
 
         $api_response = wp_remote_post('https://api.openai.com/v1/responses', [
             'headers' => [
-                'Authorization' => 'Bearer ' . NEOWEAVER_OPENAI_KEY,
+                'Authorization' => 'Bearer ' . NEOWEAVER_OPENAI_API_KEY,
                 'Content-Type'  => 'application/json',
             ],
             'body'    => json_encode($request_body),
@@ -116,12 +123,12 @@ PROMPT;
             }
         }
 
-        // Uwaga: Responses API używa input_tokens / output_tokens (nie prompt/completion)
+        // Responses API zwraca input_tokens / output_tokens (nie prompt/completion)
         $usage = $data['usage'] ?? [];
 
-        // 7. Zapisz nowe response_id (historia po stronie OpenAI)
+        // 7. Zapisz nowe response_id do Supabase (historia po stronie OpenAI)
         if ($response_id) {
-            $this->save_response_id($char_id, $response_id);
+            $this->save_response_id($char_id, $response_id, $ctx['world_id'] ?? null);
         }
 
         // 8. Loguj tokeny do Supabase
@@ -143,81 +150,81 @@ PROMPT;
     }
 
     // ============================================================
-    // Historia: zamiast lokalnej tablicy messages —
-    // przechowujemy JEDEN response_id per postać w WP DB.
-    // OpenAI odtwarza pełną historię po stronie serwera.
+    // Historia sesji — Supabase: cyber_chat_sessions
+    // Przechowujemy JEDEN response_id per postać.
+    // OpenAI odtwarza pełną historię rozmowy po swojej stronie.
     // ============================================================
-    private function get_previous_response_id(string $char_id): ?string {
-        global $wpdb;
-        return $wpdb->get_var($wpdb->prepare(
-            "SELECT last_response_id
-               FROM {$wpdb->prefix}neoweaver_chat_sessions
-              WHERE char_id = %s
-              LIMIT 1",
-            $char_id
-        ));
+
+    private function supabase_request(string $method, string $endpoint, array $body = [], array $extra_headers = []): array|null {
+        $args = [
+            'method'  => $method,
+            'headers' => array_merge([
+                'apikey'        => NEOWEAVER_SUPABASE_KEY,
+                'Authorization' => 'Bearer ' . NEOWEAVER_SUPABASE_KEY,
+                'Content-Type'  => 'application/json',
+            ], $extra_headers),
+            'timeout' => 10,
+        ];
+        if (!empty($body)) {
+            $args['body'] = json_encode($body);
+        }
+        $response = wp_remote_request(NEOWEAVER_SUPABASE_URL . $endpoint, $args);
+        if (is_wp_error($response)) return null;
+        $decoded = json_decode(wp_remote_retrieve_body($response), true);
+        return is_array($decoded) ? $decoded : null;
     }
 
-    private function save_response_id(string $char_id, string $response_id): void {
-        global $wpdb;
-        $table = $wpdb->prefix . 'neoweaver_chat_sessions';
+    private function get_previous_response_id(string $char_id): ?string {
+        $result = $this->supabase_request(
+            'GET',
+            '/rest/v1/cyber_chat_sessions?char_id=eq.' . urlencode($char_id) . '&select=last_response_id&limit=1'
+        );
+        return $result[0]['last_response_id'] ?? null;
+    }
 
-        $exists = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$table} WHERE char_id = %s", $char_id
-        ));
-
-        if ($exists) {
-            $wpdb->update(
-                $table,
-                ['last_response_id' => $response_id, 'updated_at' => current_time('mysql')],
-                ['char_id' => $char_id],
-                ['%s', '%s'],
-                ['%s']
-            );
-        } else {
-            $wpdb->insert($table, [
+    private function save_response_id(string $char_id, string $response_id, ?string $world_id): void {
+        $this->supabase_request(
+            'POST',
+            '/rest/v1/cyber_chat_sessions',
+            [
                 'char_id'          => $char_id,
                 'last_response_id' => $response_id,
-                'updated_at'       => current_time('mysql'),
-            ]);
-        }
+                'world_id'         => $world_id,
+                'updated_at'       => gmdate('c'),
+            ],
+            // UPSERT — aktualizuje jeśli char_id już istnieje (UNIQUE constraint)
+            ['Prefer' => 'resolution=merge-duplicates,return=minimal']
+        );
     }
 
     /**
      * Reset historii gracza (np. nowa sesja gry, śmierć postaci).
-     * Usuwa response_id — następna wiadomość zacznie nową rozmowę.
+     * Usuwa response_id — następna wiadomość zacznie nową rozmowę z AI.
      */
     public function reset_history(string $char_id): void {
-        global $wpdb;
-        $wpdb->delete(
-            $wpdb->prefix . 'neoweaver_chat_sessions',
-            ['char_id' => $char_id],
-            ['%s']
+        $this->supabase_request(
+            'DELETE',
+            '/rest/v1/cyber_chat_sessions?char_id=eq.' . urlencode($char_id)
         );
     }
 
     // ============================================================
     // Logowanie tokenów do Supabase (cyber_token_ledger)
-    // UWAGA: Responses API zwraca input_tokens/output_tokens
     // ============================================================
     private function log_tokens(string $char_id, ?string $world_id, array $usage, string $protocol): void {
-        wp_remote_post(NEOWEAVER_SUPABASE_URL . '/rest/v1/cyber_token_ledger', [
-            'headers' => [
-                'apikey'        => NEOWEAVER_SUPABASE_KEY,
-                'Authorization' => 'Bearer ' . NEOWEAVER_SUPABASE_KEY,
-                'Content-Type'  => 'application/json',
-                'Prefer'        => 'return=minimal',
-            ],
-            'body' => json_encode([
+        $this->supabase_request(
+            'POST',
+            '/rest/v1/cyber_token_ledger',
+            [
                 'char_id'           => $char_id,
                 'world_id'          => $world_id,
                 'prompt_tokens'     => $usage['input_tokens']  ?? 0,
                 'completion_tokens' => $usage['output_tokens'] ?? 0,
-                'model'             => self::MODEL,
+                'model'             => NEOWEAVER_MODEL_GM,
                 'protocol'          => $protocol,
-            ]),
-            'timeout' => 5,
-        ]);
+            ],
+            ['Prefer' => 'return=minimal']
+        );
     }
 
     // ============================================================
