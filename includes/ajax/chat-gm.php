@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   4. Context builder (tw_ai_build_context) → dane z Supabase
  *   5. Historia ostatnich N wiadomości z cyber_chat_messages
  *   6. GM call (tw_ai_gm) → narracja + tagi
- *   7. Zapis odpowiedzi GM do cyber_chat_messages
+ *   7. Zapis wiadomości gracza + odpowiedzi GM do cyber_chat_messages
  *   8. Zwrot JSON z tekstem i tagami do JS
  *
  * Akcja WordPress AJAX: tw_chat_gm
@@ -44,7 +44,7 @@ if ( ! function_exists( 'tw_ajax_chat_gm' ) ) {
 			return;
 		}
 
-		// Weryfikacja UUID (podstawowa)
+		// Weryfikacja UUID
 		$uuid_pattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 		if ( ! preg_match( $uuid_pattern, $char_id ) || ! preg_match( $uuid_pattern, $channel_id ) ) {
 			wp_send_json_error( [ 'message' => 'Invalid ID format' ], 400 );
@@ -52,21 +52,10 @@ if ( ! function_exists( 'tw_ajax_chat_gm' ) ) {
 		}
 
 		// Weryfikacja czy postać należy do zalogowanego usera
-// PRZED:
-$owner_check = tw_supabase_get(
-    'cyber_characters',
-    [ 'id' => 'eq.' . $char_id, 'wp_user_id' => 'eq.' . get_current_user_id(), 'select' => 'id', 'limit' => 1 ]
-);
-if ( is_wp_error( $owner_check ) || empty( $owner_check ) ) {
-    wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
-    return;
-}
-
-// PO:
-if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
-    wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
-    return;
-}
+		if ( ! function_exists( 'tw_user_owns_character' ) || ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
+			wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
+			return;
+		}
 
 		// --- 2. Router ---
 		$protocol = 'UNKNOWN';
@@ -89,7 +78,7 @@ if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
 				(int)( $char['satiety'] ?? 0 ),
 				(int)( $char['hydration'] ?? 0 )
 			);
-			// Zapis do czatu
+			tw_chat_save_message( $channel_id, $char_id, 'player', $user_message );
 			tw_chat_save_message( $channel_id, $char_id, 'gm', $meta_text );
 			wp_send_json_success( [ 'text' => $meta_text, 'tags' => [], 'protocol' => 'META' ] );
 			return;
@@ -106,14 +95,13 @@ if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
 		$history_rows = tw_supabase_get(
 			'cyber_chat_messages',
 			[
-				'channel_id'  => 'eq.' . $channel_id,
-				'select'      => 'content,message_type',
-				'order'       => 'created_at.desc',
-				'limit'       => 14,
+				'channel_id' => 'eq.' . $channel_id,
+				'select'     => 'content,message_type',
+				'order'      => 'created_at.desc',
+				'limit'      => 14,
 			]
 		);
 		if ( ! is_wp_error( $history_rows ) && ! empty( $history_rows ) ) {
-			// Odwracamy — Supabase zwrócił desc, OpenAI potrzebuje asc
 			$history_rows = array_reverse( $history_rows );
 			foreach ( $history_rows as $row ) {
 				$role      = ( $row['message_type'] === 'player' ) ? 'user' : 'assistant';
@@ -121,7 +109,10 @@ if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
 			}
 		}
 
-		// --- 6. GM Call ---
+		// --- 6. Zapis wiadomości gracza do Supabase ---
+		tw_chat_save_message( $channel_id, $char_id, 'player', $user_message );
+
+		// --- 7. GM Call ---
 		if ( ! function_exists( 'tw_ai_gm' ) ) {
 			wp_send_json_error( [ 'message' => 'AI engine unavailable' ], 503 );
 			return;
@@ -145,10 +136,10 @@ if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
 		$gm_text = $gm_result['text'];
 		$gm_tags = $gm_result['tags'];
 
-		// --- 7. Zapis odpowiedzi GM do Supabase ---
+		// --- 8. Zapis odpowiedzi GM do Supabase ---
 		tw_chat_save_message( $channel_id, $char_id, 'gm', $gm_text );
 
-		// --- 8. Zwrot JSON ---
+		// --- 9. Zwrot JSON ---
 		wp_send_json_success( [
 			'text'     => $gm_text,
 			'tags'     => $gm_tags,
@@ -158,8 +149,7 @@ if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
 }
 
 /**
- * Helper: zapisuje wiadomość GM do cyber_chat_messages przez Supabase.
- * Używa tw_supabase_request() z supabase-helpers.php.
+ * Helper: zapisuje wiadomość do cyber_chat_messages przez Supabase.
  */
 if ( ! function_exists( 'tw_chat_save_message' ) ) {
 	function tw_chat_save_message( string $channel_id, string $char_id, string $type, string $content ): void {
