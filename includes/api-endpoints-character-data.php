@@ -808,45 +808,69 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
 }
 
 if ( ! function_exists( 'nw_store_character_skills' ) ) {
-    function nw_store_character_skills( string $character_id, array $skills ) {
-        $character_id = sanitize_text_field( $character_id );
-        if ( '' === $character_id ) {
-            return new WP_Error( 'invalid_character', 'Invalid character ID for skills.', array( 'status' => 400 ) );
-        }
+	function nw_store_character_skills( string $character_id, array $skills ) {
+		$character_id = sanitize_text_field( $character_id );
+		if ( '' === $character_id ) {
+			return new WP_Error(
+				'invalid_character',
+				'Invalid character ID for skills.',
+				array( 'status' => 400 )
+			);
+		}
 
-        $skills = array_values(
-            array_unique(
-                array_filter(
-                    array_map(
-                        static function ( $id ) {
-                            return sanitize_text_field( (string) $id );
-                        },
-                        $skills
-                    )
-                )
-            )
-        );
+		$skills = array_values(
+			array_unique(
+				array_filter(
+					array_map(
+						static function ( $id ) {
+							return sanitize_text_field( (string) $id );
+						},
+						$skills
+					)
+				)
+			)
+		);
 
-        if ( empty( $skills ) ) {
-            return true;
-        }
+		if ( empty( $skills ) ) {
+			return true;
+		}
 
-        $payload = array();
-        foreach ( $skills as $skill_id ) {
-            $payload[] = array(
-                'character_id' => $character_id,
-                'skill_id'     => $skill_id,
-                'proficiency'  => 1,
-                'source'       => 'character_creator',
-            );
-        }
+		$payload = array();
+		foreach ( $skills as $skill_id ) {
+			$payload[] = array(
+				'character_id' => $character_id,
+				'skill_id'     => $skill_id,
+				'proficiency'  => 1,
+				'source'       => 'character_creator',
+			);
+		}
 
-        $result = nw_supabase_request( 'POST', 'cyber_character_skills', array(), $payload, false );
-        if ( is_wp_error( $result ) ) {
-            return $result;
-        }
-        return true;
-    }
+		$result = nw_supabase_request(
+			'POST',
+			'cyber_character_skills',
+			array(),
+			$payload,
+			true
+		);
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( ! is_array( $result ) || count( $result ) !== count( $payload ) ) {
+			return new WP_Error(
+				'skills_insert_incomplete',
+				'Character skills could not be fully saved.',
+				array(
+					'status'   => 500,
+					'expected' => count( $payload ),
+					'received' => is_array( $result ) ? count( $result ) : 0,
+				)
+			);
+		}
+
+		return true;
+	}
 }
 
 if ( ! function_exists( 'nw_store_character_backstory_tags' ) ) {
