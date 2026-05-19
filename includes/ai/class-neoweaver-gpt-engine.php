@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 require_once __DIR__ . '/class-neoweaver-intent-router.php';
 require_once __DIR__ . '/class-neoweaver-context-builder.php';
+require_once dirname(__DIR__) . '/supabase-config.php';
 
 /**
  * NeoWeaver GPT Engine
@@ -21,8 +22,8 @@ require_once __DIR__ . '/class-neoweaver-context-builder.php';
  *  - NEOWEAVER_MODEL_ROUTER     — model routera (gpt-4o-mini)
  *  - NEOWEAVER_TOKENS_GM        — max output tokens dla GM (600)
  *  - NEOWEAVER_VECTOR_STORE_ID  — ID Vector Store do file_search
- *  - NEOWEAVER_SUPABASE_URL     — URL projektu Supabase
- *  - NEOWEAVER_SUPABASE_KEY     — anon/service key Supabase
+ *  - TW_SUPABASE_PROJECT_ID     — ID projektu Supabase (przez tw_supabase_url())
+ *  - TW_SUPABASE_SERVICE_KEY    — service key Supabase (przez tw_supabase_service_key())
  */
 class NeoWeaver_GPT_Engine {
 
@@ -150,17 +151,16 @@ PROMPT;
     }
 
     // ============================================================
-    // Historia sesji — Supabase: cyber_chat_sessions
-    // Przechowujemy JEDEN response_id per postać.
-    // OpenAI odtwarza pełną historię rozmowy po swojej stronie.
+    // Pomocniczy helper Supabase REST — używa tw_supabase_url()
+    // i tw_supabase_service_key() z includes/supabase-config.php
     // ============================================================
 
     private function supabase_request(string $method, string $endpoint, array $body = [], array $extra_headers = []): array|null {
         $args = [
             'method'  => $method,
             'headers' => array_merge([
-                'apikey'        => NEOWEAVER_SUPABASE_KEY,
-                'Authorization' => 'Bearer ' . NEOWEAVER_SUPABASE_KEY,
+                'apikey'        => tw_supabase_service_key(),
+                'Authorization' => 'Bearer ' . tw_supabase_service_key(),
                 'Content-Type'  => 'application/json',
             ], $extra_headers),
             'timeout' => 10,
@@ -168,11 +168,20 @@ PROMPT;
         if (!empty($body)) {
             $args['body'] = json_encode($body);
         }
-        $response = wp_remote_request(NEOWEAVER_SUPABASE_URL . $endpoint, $args);
-        if (is_wp_error($response)) return null;
+        $response = wp_remote_request(tw_supabase_url() . $endpoint, $args);
+        if (is_wp_error($response)) {
+            error_log('[NeoWeaver GPT] Supabase request failed: ' . $response->get_error_message());
+            return null;
+        }
         $decoded = json_decode(wp_remote_retrieve_body($response), true);
         return is_array($decoded) ? $decoded : null;
     }
+
+    // ============================================================
+    // Historia sesji — Supabase: cyber_chat_sessions
+    // Przechowujemy JEDEN response_id per postać.
+    // OpenAI odtwarza pełną historię rozmowy po swojej stronie.
+    // ============================================================
 
     private function get_previous_response_id(string $char_id): ?string {
         $result = $this->supabase_request(
