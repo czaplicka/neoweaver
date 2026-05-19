@@ -52,14 +52,21 @@ if ( ! function_exists( 'tw_ajax_chat_gm' ) ) {
 		}
 
 		// Weryfikacja czy postać należy do zalogowanego usera
-		$owner_check = tw_supabase_get(
-			'cyber_characters',
-			[ 'id' => 'eq.' . $char_id, 'wp_user_id' => 'eq.' . get_current_user_id(), 'select' => 'id', 'limit' => 1 ]
-		);
-		if ( is_wp_error( $owner_check ) || empty( $owner_check ) ) {
-			wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
-			return;
-		}
+// PRZED:
+$owner_check = tw_supabase_get(
+    'cyber_characters',
+    [ 'id' => 'eq.' . $char_id, 'wp_user_id' => 'eq.' . get_current_user_id(), 'select' => 'id', 'limit' => 1 ]
+);
+if ( is_wp_error( $owner_check ) || empty( $owner_check ) ) {
+    wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
+    return;
+}
+
+// PO:
+if ( ! tw_user_owns_character( $char_id, get_current_user_id() ) ) {
+    wp_send_json_error( [ 'message' => 'Character not found or access denied' ], 403 );
+    return;
+}
 
 		// --- 2. Router ---
 		$protocol = 'UNKNOWN';
