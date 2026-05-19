@@ -18,6 +18,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   NEOWEAVER_MODEL_GM         — domyślnie 'gpt-4o'
  *   NEOWEAVER_TOKENS_ROUTER    — domyślnie 30
  *   NEOWEAVER_TOKENS_GM        — domyślnie 600
+ *
+ * Kompatybilność: PHP 7.4+
+ * Uwaga: union return types (array|WP_Error) wymagają PHP 8.0 — zastąpione
+ * przez @return PHPDoc i sprawdzenie is_wp_error() po stronie wywołującego.
  */
 
 // ============================================================
@@ -32,10 +36,18 @@ if ( ! defined( 'NEOWEAVER_TOKENS_GM' ) )      define( 'NEOWEAVER_TOKENS_GM',   
 // ============================================================
 // WEWNĘTRZNY HELPER HTTP → OpenAI
 // Zwraca: array z 'content' i 'usage' LUB WP_Error
+// Kompatybilność: PHP 7.4+ (brak union return type)
 // ============================================================
 
 if ( ! function_exists( 'tw_ai_call_openai' ) ) {
-	function tw_ai_call_openai( array $messages, string $model, int $max_tokens, float $temperature ): array|WP_Error {
+	/**
+	 * @param array  $messages
+	 * @param string $model
+	 * @param int    $max_tokens
+	 * @param float  $temperature
+	 * @return array|WP_Error  array('content'=>string, 'usage'=>array) lub WP_Error
+	 */
+	function tw_ai_call_openai( array $messages, string $model, int $max_tokens, float $temperature ) {
 		if ( ! defined( 'NEOWEAVER_OPENAI_API_KEY' ) || empty( NEOWEAVER_OPENAI_API_KEY ) ) {
 			return new WP_Error( 'tw_ai_no_key', 'Brak klucza NEOWEAVER_OPENAI_API_KEY w wp-config.php' );
 		}
@@ -66,13 +78,13 @@ if ( ! function_exists( 'tw_ai_call_openai' ) ) {
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( $code !== 200 ) {
-			$err = $body['error']['message'] ?? 'OpenAI HTTP ' . $code;
+			$err = isset( $body['error']['message'] ) ? $body['error']['message'] : 'OpenAI HTTP ' . $code;
 			error_log( 'TW tw_ai_call_openai HTTP ' . $code . ': ' . $err );
 			return new WP_Error( 'tw_ai_http_' . $code, $err );
 		}
 
-		$content = $body['choices'][0]['message']['content'] ?? '';
-		$usage   = $body['usage'] ?? [ 'prompt_tokens' => 0, 'completion_tokens' => 0 ];
+		$content = isset( $body['choices'][0]['message']['content'] ) ? $body['choices'][0]['message']['content'] : '';
+		$usage   = isset( $body['usage'] ) ? $body['usage'] : [ 'prompt_tokens' => 0, 'completion_tokens' => 0 ];
 
 		return [
 			'content' => trim( $content ),
@@ -91,11 +103,11 @@ if ( ! function_exists( 'tw_ai_log_tokens' ) ) {
 		string $model,
 		string $protocol,
 		int    $wp_user_id,
-		?string $char_id,
-		?string $session_id,
-		?string $campaign_id,
-		?string $channel_id
-	): void {
+		$char_id,
+		$session_id,
+		$campaign_id,
+		$channel_id
+	) {
 		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 			error_log( 'TW tw_ai_log_tokens: tw_supabase_rpc() niedostępne.' );
 			return;
@@ -108,8 +120,8 @@ if ( ! function_exists( 'tw_ai_log_tokens' ) ) {
 			'p_campaign_id'         => $campaign_id,
 			'p_channel_id'          => $channel_id,
 			'p_protocol'            => $protocol,
-			'p_prompt_tokens'       => (int) ( $usage['prompt_tokens'] ?? 0 ),
-			'p_completion_tokens'   => (int) ( $usage['completion_tokens'] ?? 0 ),
+			'p_prompt_tokens'       => (int) ( isset( $usage['prompt_tokens'] ) ? $usage['prompt_tokens'] : 0 ),
+			'p_completion_tokens'   => (int) ( isset( $usage['completion_tokens'] ) ? $usage['completion_tokens'] : 0 ),
 			'p_model'               => $model,
 		] );
 
@@ -129,7 +141,7 @@ if ( ! function_exists( 'tw_ai_log_tokens' ) ) {
 // ============================================================
 
 if ( ! function_exists( 'tw_ai_router' ) ) {
-	function tw_ai_router( string $message ): string {
+	function tw_ai_router( string $message ) {
 		$system_prompt = <<<PROMPT
 You are an intent classifier for a text RPG game. 
 Analyze the player's message and return ONLY one word from this list:
@@ -196,16 +208,17 @@ PROMPT;
 // @param string $message  Bieżąca wiadomość gracza
 // @param array  $ids      [ 'char_id', 'session_id', 'campaign_id', 'channel_id' ]
 //
-// @return array|WP_Error  [ 'text' => string, 'tags' => array ] LUB WP_Error
+// @return array|WP_Error  array('text'=>string, 'tags'=>array) lub WP_Error
+// Kompatybilność: PHP 7.4+ (brak union return type)
 // ============================================================
 
 if ( ! function_exists( 'tw_ai_gm' ) ) {
-	function tw_ai_gm( array $context, array $history, string $message, array $ids = [] ): array|WP_Error {
-		$char     = $context['char']     ?? [];
-		$location = $context['location'] ?? [];
-		$world    = $context['world']    ?? [];
-		$protocol = $context['protocol'] ?? 'UNKNOWN';
-		$extra    = $context['extra']    ?? '';
+	function tw_ai_gm( array $context, array $history, string $message, array $ids = [] ) {
+		$char     = isset( $context['char'] )     ? $context['char']     : [];
+		$location = isset( $context['location'] ) ? $context['location'] : [];
+		$world    = isset( $context['world'] )    ? $context['world']    : [];
+		$protocol = isset( $context['protocol'] ) ? $context['protocol'] : 'UNKNOWN';
+		$extra    = isset( $context['extra'] )    ? $context['extra']    : '';
 
 		// Blok A — tożsamość GM
 		$system_a = <<<PROMPT
@@ -220,30 +233,30 @@ Tags are parsed by the system — do not explain them to the player.
 PROMPT;
 
 		// Blok B — stan świata
-		$char_name = esc_html( $char['name'] ?? 'Agent' );
-		$hp        = (int) ( $char['currenthp'] ?? 0 );
-		$max_hp    = (int) ( $char['maxhp'] ?? 100 );
-		$mp        = (int) ( $char['mp'] ?? 0 );
-		$gold      = (int) ( $char['gold'] ?? 0 );
-		$loc_name  = esc_html( $location['locationname'] ?? 'Unknown' );
-		$loc_tags  = esc_html( $location['instancetags'] ?? '' );
-		$loc_prompt = esc_html( $location['aiprompt'] ?? '' );
-		$entropy   = (int) ( $world['entropy'] ?? 0 );
-		$w_tags    = esc_html( implode( ', ', array_filter( [
-			$world['globaltag1'] ?? '',
-			$world['globaltag2'] ?? '',
-			$world['globaltag3'] ?? '',
+		$char_name  = esc_html( isset( $char['name'] )              ? $char['name']              : 'Agent' );
+		$hp         = (int) ( isset( $char['currenthp'] )           ? $char['currenthp']         : 0 );
+		$max_hp     = (int) ( isset( $char['maxhp'] )               ? $char['maxhp']             : 100 );
+		$mp         = (int) ( isset( $char['mp'] )                  ? $char['mp']                : 0 );
+		$gold       = (int) ( isset( $char['gold'] )                ? $char['gold']              : 0 );
+		$loc_name   = esc_html( isset( $location['locationname'] )  ? $location['locationname']  : 'Unknown' );
+		$loc_tags   = esc_html( isset( $location['instancetags'] )  ? $location['instancetags']  : '' );
+		$loc_prompt = esc_html( isset( $location['aiprompt'] )      ? $location['aiprompt']      : '' );
+		$entropy    = (int) ( isset( $world['entropy'] )            ? $world['entropy']          : 0 );
+		$w_tags     = esc_html( implode( ', ', array_filter( [
+			isset( $world['globaltag1'] ) ? $world['globaltag1'] : '',
+			isset( $world['globaltag2'] ) ? $world['globaltag2'] : '',
+			isset( $world['globaltag3'] ) ? $world['globaltag3'] : '',
 		] ) ) );
 
-		$system_b = "WORLD STATE\n";
+		$system_b  = "WORLD STATE\n";
 		$system_b .= "Entropy: {$entropy}/100 | World tags: {$w_tags}\n";
 		$system_b .= "AGENT: {$char_name} | HP: {$hp}/{$max_hp} | MP: {$mp} | Gold: {$gold}\n";
 		$system_b .= "LOCATION: {$loc_name}\n";
-		if ( $loc_tags )   $system_b .= "Tags: {$loc_tags}\n";
-		if ( $loc_prompt ) $system_b .= "Context: {$loc_prompt}\n";
+		if ( $loc_tags )   { $system_b .= "Tags: {$loc_tags}\n"; }
+		if ( $loc_prompt ) { $system_b .= "Context: {$loc_prompt}\n"; }
 
 		// Blok C — dane protokołu
-		$system_c = "PROTOCOL: {$protocol}\n";
+		$system_c  = "PROTOCOL: {$protocol}\n";
 		if ( $extra ) {
 			$system_c .= $extra . "\n";
 		}
@@ -274,10 +287,10 @@ PROMPT;
 			NEOWEAVER_MODEL_GM,
 			$protocol,
 			get_current_user_id(),
-			$ids['char_id']     ?? null,
-			$ids['session_id']  ?? null,
-			$ids['campaign_id'] ?? null,
-			$ids['channel_id']  ?? null
+			isset( $ids['char_id'] )     ? $ids['char_id']     : null,
+			isset( $ids['session_id'] )  ? $ids['session_id']  : null,
+			isset( $ids['campaign_id'] ) ? $ids['campaign_id'] : null,
+			isset( $ids['channel_id'] )  ? $ids['channel_id']  : null
 		);
 
 		// Parser tagów
@@ -289,9 +302,9 @@ PROMPT;
 			function ( $m ) use ( &$tags ) {
 				$tags[] = [
 					'tag' => $m[1],
-					'val' => $m[2] ?? null,
+					'val' => isset( $m[2] ) ? $m[2] : null,
 				];
-				return ''; // usuwa tag z narracji
+				return '';
 			},
 			$raw_text
 		);
