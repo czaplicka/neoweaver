@@ -1,23 +1,32 @@
 <?php
 // ─── Enqueue map.js + D3 tylko na adventure template ─────────────────────────
 add_action( 'wp_enqueue_scripts', function () {
-    if ( ! is_page_template( 'templates/adventure.php' ) ) return;
+    if ( ! is_page_template( 'templates/adventure.php' ) ) {
+        return;
+    }
 
-    // D3.js z CDN — zarejestrowany przez WP, nie inline <script>
     wp_enqueue_script(
         'd3js',
         'https://d3js.org/d3.v7.min.js',
         [],
-        '7',
+        '7.9.0',
         true
     );
 
     wp_enqueue_script(
         'nw-map',
         NEOWEAVER_PLUGIN_URL . 'assets/js/public/map.js',
-        [ 'jquery', 'neoweaver-header-node', 'd3js' ], // d3js jako dependency
+        [ 'jquery', 'neoweaver-header-node', 'd3js' ],
         NEOWEAVER_VERSION,
         true
+    );
+
+    wp_add_inline_script(
+        'nw-map',
+        'window.twMapData = ' . wp_json_encode( [
+            'wpUserId' => (int) get_current_user_id(),
+        ] ) . ';',
+        'before'
     );
 } );
 
