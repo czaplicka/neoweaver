@@ -1,19 +1,19 @@
 <?php
 /**
  * adventure-data.php
- * Funkcje pomocnicze do pobierania i przygotowania danych dla szablonu Adventure.
- * Nie zawiera HTML, echo ani include — tylko czyste funkcje PHP zwracające tablice.
+ * Helper functions for fetching and preparing data for the Adventure template.
+ * No HTML, echo, or include — only pure PHP functions returning arrays.
  */
 
 /**
- * Sanityzacja UUID — nigdy nie używaj intval() na UUID.
+ * Sanitize UUID — never use intval() on UUID.
  */
 function tw_sanitize_uuid( string $raw ): string {
     return preg_replace( '/[^a-f0-9\-]/i', '', $raw );
 }
 
 /**
- * Domyślne wartości game_data gdy Supabase niedostępny.
+ * Default game_data values when Supabase is unavailable.
  */
 function tw_game_data_defaults(): array {
     return [
@@ -21,20 +21,45 @@ function tw_game_data_defaults(): array {
         'active_campaign_id'  => '',
         'active_character_id' => '',
         'active_world_id'     => '',
-        'active_location_id'  => 0,
+        'active_location_id'  => '',
         'char_name'           => 'Unknown',
         'char_tags'           => [],
     ];
 }
 
 /**
- * Pobiera i przygotowuje dane postaci do character-card.php.
- * Zwraca tablicę ze wszystkimi zmiennymi, które szablon potrzebuje.
+ * Normalize Supabase nested relation result.
+ * PostgREST sometimes returns one object, sometimes an array with one object.
+ */
+function tw_pick_relation_row( $value ): array {
+    if ( is_array( $value ) ) {
+        if ( isset( $value[0] ) && is_array( $value[0] ) ) {
+            return $value[0];
+        }
+
+        $is_assoc = array_keys( $value ) !== range( 0, count( $value ) - 1 );
+        if ( $is_assoc ) {
+            return $value;
+        }
+    }
+
+    return [];
+}
+
+/**
+ * Safely read numeric value.
+ */
+function tw_num( $value, $default = 0 ) {
+    return is_numeric( $value ) ? $value + 0 : $default;
+}
+
+/**
+ * Fetches and prepares character data for character-card.php.
+ * Returns an array with all variables required by the template.
  */
 function tw_prepare_character_data( array $game_data ): array {
     $char_id = tw_sanitize_uuid( $game_data['active_character_id'] ?? '' );
 
-    // Wartości domyślne
     $result = [
         'char_id'              => $char_id,
         'char_data'            => [],
@@ -62,120 +87,227 @@ function tw_prepare_character_data( array $game_data ): array {
         return $result;
     }
 
-    // 1. Core character row — name, race, class, bio, notes, gold, lvl, stats.
+    /**
+     * 1. Core character row.
+     * IMPORTANT:
+     * - race_id / class_id are correct column names
+     * - hp / mp here are treated as max values
+     */
     $char_rows = tw_supabase_get(
         'cyber_characters',
         [
             'id'     => 'eq.' . $char_id,
-            'select' => 'name,race,class,bio,notes,gold,lvl,body,mind,reflex,spirit,avatar',
+            'select' => 'id,name,race_id,class_id,bio,notes,gold,lvl,body,mind,reflex,spirit,avatar,hp,mp',
             'limit'  => 1,
         ]
     );
-    $result['char_data'] = ( is_array( $char_rows ) && isset( $char_rows[0] ) )
-        ? (array) $char_rows[0]
-        : [];
 
-    // 2. HUD state — HP, MP, satiety, hydration, rest, sync_rate.
+    if ( is_array( $char_rows ) && isset( $char_rows[0] ) && is_array( $char_rows[0] ) ) {
+        $result['char_data'] = (array) $char_rows[0];
+    }
+
+    $result['m_hp'] = max( 1, (int) tw_num( $result['char_data']['hp'] ?? 10, 10 ) );
+    $result['m_mp'] = max( 1, (int) tw_num( $result['char_data']['mp'] ?? 10, 10 ) );
+
+    /**
+     * 2. HUD state — current HP, MP, satiety, hydration, rest, sync_rate.
+     * IMPORTANT:
+     * - no hp_max / mp_max here
+     * - current values come from campaign state
+     */
     $hud_rows = tw_supabase_get(
         'cyber_state_of_the_campaign',
         [
             'character_id' => 'eq.' . $char_id,
-            'select'       => 'hp,hp_max,mp,mp_max,satiety,hydration,rest,sync_rate',
+            'select'       => 'hp,mp,satiety,hydration,rest,sync_rate',
             'limit'        => 1,
         ]
     );
-    if ( is_array( $hud_rows ) && isset( $hud_rows[0] ) ) {
+
+    if ( is_array( $hud_rows ) && isset( $hud_rows[0] ) && is_array( $hud_rows[0] ) ) {
         $h = (array) $hud_rows[0];
-        $result['c_hp']        = max( 0, (int) ( $h['hp']        ?? 10 ) );
-        $result['m_hp']        = max( 1, (int) ( $h['hp_max']    ?? 10 ) );
-        $result['c_mp']        = max( 0, (int) ( $h['mp']        ?? 10 ) );
-        $result['m_mp']        = max( 1, (int) ( $h['mp_max']    ?? 10 ) );
-        $result['c_satiety']   = max( 0, min( 100, (int) ( $h['satiety']   ?? 100 ) ) );
-        $result['c_hydration'] = max( 0, min( 100, (int) ( $h['hydration'] ?? 100 ) ) );
-        $result['c_rest']      = max( 0, min( 100, (int) ( $h['rest']      ?? 100 ) ) );
-        $result['sync_p']      = max( 0, min( 100, (int) ( $h['sync_rate'] ?? 100 ) ) );
+
+        $result['c_hp']        = max( 0, min( $result['m_hp'], (int) tw_num( $h['hp'] ?? $result['m_hp'], $result['m_hp'] ) ) );
+        $result['c_mp']        = max( 0, min( $result['m_mp'], (int) tw_num( $h['mp'] ?? $result['m_mp'], $result['m_mp'] ) ) );
+        $result['c_satiety']   = max( 0, min( 100, (int) tw_num( $h['satiety'] ?? 100, 100 ) ) );
+        $result['c_hydration'] = max( 0, min( 100, (int) tw_num( $h['hydration'] ?? 100, 100 ) ) );
+        $result['c_rest']      = max( 0, min( 100, (int) tw_num( $h['rest'] ?? 100, 100 ) ) );
+        $result['sync_p']      = max( 0, min( 100, (int) tw_num( $h['sync_rate'] ?? 100, 100 ) ) );
+    } else {
+        $result['c_hp'] = $result['m_hp'];
+        $result['c_mp'] = $result['m_mp'];
     }
 
-    // 3. Derived bar widths (clamped 0–100).
+    /**
+     * 3. Derived bar widths.
+     */
     $result['hp_p'] = $result['m_hp'] > 0
-        ? (int) min( 100, round( $result['c_hp'] / $result['m_hp'] * 100 ) )
+        ? (int) min( 100, round( ( $result['c_hp'] / $result['m_hp'] ) * 100 ) )
         : 0;
+
     $result['mp_p'] = $result['m_mp'] > 0
-        ? (int) min( 100, round( $result['c_mp'] / $result['m_mp'] * 100 ) )
+        ? (int) min( 100, round( ( $result['c_mp'] / $result['m_mp'] ) * 100 ) )
         : 0;
 
-    // 4. CSS class helpers.
-    if ( $result['hp_p'] > 50 )     { $result['hp_class'] = 'hp-green'; }
-    elseif ( $result['hp_p'] > 25 ) { $result['hp_class'] = 'hp-yellow'; }
-    else                            { $result['hp_class'] = 'hp-red'; }
+    /**
+     * 4. CSS class helpers.
+     */
+    if ( $result['hp_p'] > 50 ) {
+        $result['hp_class'] = 'hp-green';
+    } elseif ( $result['hp_p'] > 25 ) {
+        $result['hp_class'] = 'hp-yellow';
+    } else {
+        $result['hp_class'] = 'hp-red';
+    }
 
-    if ( $result['sync_p'] >= 80 )     { $result['sync_class'] = 'sync-stable'; }
-    elseif ( $result['sync_p'] >= 50 ) { $result['sync_class'] = 'sync-warning'; }
-    else                               { $result['sync_class'] = 'sync-critical'; }
+    if ( $result['sync_p'] >= 80 ) {
+        $result['sync_class'] = 'sync-stable';
+    } elseif ( $result['sync_p'] >= 50 ) {
+        $result['sync_class'] = 'sync-warning';
+    } else {
+        $result['sync_class'] = 'sync-critical';
+    }
 
-    // 5. Skills & abilities — join with cyber_actions_library for display info.
+    /**
+     * 5a. Skills.
+     * Based on schema: cyber_character_skills + cyber_skills.
+     */
     $skills_raw = tw_supabase_get(
         'cyber_character_skills',
         [
             'character_id' => 'eq.' . $char_id,
-            'select'       => 'id,skill_id,cyber_actions_library(name,description,cost)',
+            'select'       => 'id,skill_id,proficiency,source,cyber_skills(id,name,description,category,application,img_url,tags,linked_attributes)',
         ]
     );
+
     if ( is_array( $skills_raw ) ) {
         foreach ( $skills_raw as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+
+            $skill_info = tw_pick_relation_row( $row['cyber_skills'] ?? [] );
+
             $result['skills_and_abilities'][] = [
-                'id'   => $row['id']                    ?? null,
-                'info' => $row['cyber_actions_library'] ?? null,
+                'entry_type'   => 'skill',
+                'id'           => $row['id'] ?? null,
+                'skill_id'     => $row['skill_id'] ?? null,
+                'proficiency'  => (int) tw_num( $row['proficiency'] ?? 0, 0 ),
+                'source'       => $row['source'] ?? '',
+                'info'         => $skill_info,
             ];
         }
     }
 
-    // 6. Inventory — items with details.
+    /**
+     * 5b. Abilities.
+     * Based on schema: cyber_characterabilities + cyberabilities.
+     */
+    $abilities_raw = tw_supabase_get(
+        'cyber_characterabilities',
+        [
+            'characterid' => 'eq.' . $char_id,
+            'select'      => 'id,abilityid,source,cyberabilities(id,name,description,abilitytype,source,gmnotes,cost,imgurl,tags)',
+        ]
+    );
+
+    if ( is_array( $abilities_raw ) ) {
+        foreach ( $abilities_raw as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+
+            $ability_info = tw_pick_relation_row( $row['cyberabilities'] ?? [] );
+
+            $result['skills_and_abilities'][] = [
+                'entry_type'   => 'ability',
+                'id'           => $row['id'] ?? null,
+                'ability_id'   => $row['abilityid'] ?? null,
+                'source'       => $row['source'] ?? '',
+                'info'         => $ability_info,
+            ];
+        }
+    }
+
+    /**
+     * 6. Inventory.
+     * Based on schema:
+     * - cyber_character_inventory
+     * - cyber_items
+     * - column isequipped, not is_equipped
+     */
     $inv_raw = tw_supabase_get(
         'cyber_character_inventory',
         [
-            'character_id' => 'eq.' . $char_id,
-            'select'       => 'id,quantity,is_equipped,cyber_items(name,slot,mass,img_url)',
+            'characterid' => 'eq.' . $char_id,
+            'select'      => 'id,quantity,isequipped,equippedslot,customname,activeweaves,engravinglevel,factionalignment,totalslots,maxslots,usedslots,cyber_items(id,name,description,type,tags,slot,powervalue,imgurl,rarity,size,mass,stacklimit,iscontainer)',
         ]
     );
+
     if ( is_array( $inv_raw ) ) {
-        $total_mass = 0.0;
+        $total_mass  = 0.0;
+        $total_power = 0.0;
+
         foreach ( $inv_raw as $row ) {
-            $item_info = $row['cyber_items'] ?? null;
-            $result['inventory'][] = [
-                'id'          => $row['id']       ?? null,
-                'quantity'    => (int) ( $row['quantity']    ?? 1 ),
-                'is_equipped' => ! empty( $row['is_equipped'] ),
-                'info'        => $item_info,
-            ];
-            if ( $item_info && isset( $item_info['mass'] ) ) {
-                $total_mass += (float) $item_info['mass'] * (int) ( $row['quantity'] ?? 1 );
+            if ( ! is_array( $row ) ) {
+                continue;
             }
+
+            $item_info = tw_pick_relation_row( $row['cyber_items'] ?? [] );
+            $quantity  = max( 1, (int) tw_num( $row['quantity'] ?? 1, 1 ) );
+            $mass      = (float) tw_num( $item_info['mass'] ?? 0, 0 );
+            $power     = (float) tw_num( $item_info['powervalue'] ?? 0, 0 );
+
+            $result['inventory'][] = [
+                'id'               => $row['id'] ?? null,
+                'quantity'         => $quantity,
+                'is_equipped'      => ! empty( $row['isequipped'] ),
+                'equipped_slot'    => $row['equippedslot'] ?? '',
+                'custom_name'      => $row['customname'] ?? '',
+                'active_weaves'    => $row['activeweaves'] ?? [],
+                'engraving_level'  => (int) tw_num( $row['engravinglevel'] ?? 0, 0 ),
+                'faction_alignment'=> $row['factionalignment'] ?? '',
+                'total_slots'      => (int) tw_num( $row['totalslots'] ?? 1, 1 ),
+                'max_slots'        => (int) tw_num( $row['maxslots'] ?? 1, 1 ),
+                'used_slots'       => (int) tw_num( $row['usedslots'] ?? 0, 0 ),
+                'info'             => $item_info,
+            ];
+
+            $total_mass  += $mass * $quantity;
+            $total_power += $power * $quantity;
         }
-        $result['total_mass'] = round( $total_mass, 2 );
+
+        $result['total_mass']  = round( $total_mass, 2 );
+        $result['total_power'] = round( $total_power, 2 );
     }
 
-    // Mass limit: 30 + body * 4.
-    $result['mass_limit'] = 30 + (int) ( $result['char_data']['body'] ?? 0 ) * 4;
+    /**
+     * Mass limit: 30 + body * 4.
+     */
+    $result['mass_limit'] = 30 + ( (int) tw_num( $result['char_data']['body'] ?? 0, 0 ) * 4 );
 
-    // 7. Logs — most recent 20, newest first.
+    /**
+     * 7. Logs — newest first.
+     * Based on schema: cyber_logs(log, created_at, char_id, camp_id, ...)
+     */
     $logs_raw = tw_supabase_get(
-        'cyber_character_logs',
+        'cyber_logs',
         [
-            'character_id' => 'eq.' . $char_id,
-            'select'       => 'log,created_at',
-            'order'        => 'created_at.desc',
-            'limit'        => 20,
+            'char_id' => 'eq.' . $char_id,
+            'select'  => 'id,log,created_at,camp_id,session_id,scenario_id',
+            'order'   => 'created_at.desc',
+            'limit'   => 20,
         ]
     );
+
     $result['logs_data'] = is_array( $logs_raw ) ? $logs_raw : [];
 
     return $result;
 }
 
 /**
- * Pobiera i przygotowuje dane mapy taktycznej i siatki bitwy.
- * Zwraca tablicę gotową do wp_localize_script oraz do tactical-overlay.php.
+ * Fetches and prepares tactical map / battle-grid data.
+ * Returns an array ready for wp_localize_script and tactical-overlay.php.
  */
 function tw_prepare_tactical_data( array $game_data, int $userid ): array {
     $result = [
@@ -184,13 +316,13 @@ function tw_prepare_tactical_data( array $game_data, int $userid ): array {
         'grid_map'  => [],
     ];
 
-    $active_session_id = (int) ( $game_data['active_session_id'] ?? 0 );
+    $active_session_id = tw_sanitize_uuid( (string) ( $game_data['active_session_id'] ?? '' ) );
 
-    if ( $active_session_id <= 0 ) {
+    if ( ! $active_session_id ) {
         return $result;
     }
 
-    if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+    if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) || ! function_exists( 'tw_get_data' ) ) {
         return $result;
     }
 
@@ -204,13 +336,20 @@ function tw_prepare_tactical_data( array $game_data, int $userid ): array {
         'timeout' => 12,
     ];
 
-    // Mapa lokacji gracza.
+    /**
+     * Player map view.
+     * Kept as-is structurally, but with encoded values.
+     */
     $map_rows = tw_get_data(
-        $supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . $userid . '&limit=1',
+        $supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . rawurlencode( (string) $userid ) . '&limit=1',
         $auth_headers
     );
 
-    // Siatka bitwy — tylko slot_index jako klucz.
+    /**
+     * Battle grid.
+     * Schema names in your dump point to cyber_battle_grid with slot_index and unit_type.
+     * Session relation may differ per final view/table, so keep session_id only if that endpoint uses it.
+     */
     $grid_units = tw_get_data(
         $supabase_base . 'cyber_battle_grid'
             . '?select=*'
@@ -218,17 +357,23 @@ function tw_prepare_tactical_data( array $game_data, int $userid ): array {
         $auth_headers
     );
 
-    $result['map_data'] = $map_rows[0] ?? [];
+    $result['map_data'] = ( is_array( $map_rows ) && isset( $map_rows[0] ) && is_array( $map_rows[0] ) )
+        ? $map_rows[0]
+        : [];
 
     if ( is_array( $grid_units ) ) {
         foreach ( $grid_units as $u ) {
-            if ( is_array( $u ) && isset( $u['slot_index'], $u['unit_type'] ) ) {
-                $slot = (int) $u['slot_index'];
-                if ( $slot >= 1 && $slot <= 9 ) {
-                    $result['grid_map'][ $slot ] = $u;
-                    if ( $u['unit_type'] === 'enemy' || $u['unit_type'] === 'boss' ) {
-                        $result['has_enemy'] = true;
-                    }
+            if ( ! is_array( $u ) || ! isset( $u['slot_index'], $u['unit_type'] ) ) {
+                continue;
+            }
+
+            $slot = (int) $u['slot_index'];
+
+            if ( $slot >= 1 && $slot <= 9 ) {
+                $result['grid_map'][ $slot ] = $u;
+
+                if ( in_array( $u['unit_type'], [ 'enemy', 'boss' ], true ) ) {
+                    $result['has_enemy'] = true;
                 }
             }
         }
