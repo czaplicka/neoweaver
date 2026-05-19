@@ -332,55 +332,51 @@
 	}
 
 	function parseInventoryTags(text) {
-		if (typeof text !== 'string') return text;
+	if (typeof text !== 'string') return text;
 
-		const container = document.createElement('div');
-		const itemRegex = /\[ITEM:(\d+)\]/g;
-		let lastIndex = 0;
-		let match;
+	const container = document.createElement('div');
+	const itemRegex = /\[ITEM:\s*([0-9a-fA-F-]{36})\s*\]/g;
+	let lastIndex = 0;
+	let match;
 
-		while ((match = itemRegex.exec(text)) !== null) {
-			const before = text.slice(lastIndex, match.index);
-			if (before) {
-				container.appendChild(document.createTextNode(before));
-			}
-
-			const safeId = Number.parseInt(match[1], 10);
-			if (Number.isNaN(safeId)) {
-				container.appendChild(document.createTextNode(match[0]));
-			} else {
-				const button = document.createElement('button');
-				button.className = 'tw-loot-button';
-				button.dataset.itemId = String(safeId);
-
-				const textSpan = document.createElement('span');
-				textSpan.className = 'tw-btn-text';
-				textSpan.textContent = 'TAKE ITEM';
-
-				const idSpan = document.createElement('span');
-				idSpan.className = 'tw-btn-id';
-				idSpan.textContent = `#${safeId}`;
-
-				button.appendChild(textSpan);
-				button.appendChild(idSpan);
-
-				button.addEventListener('click', function () {
-					window.handleLootAction(safeId, button);
-				});
-
-				container.appendChild(button);
-			}
-
-			lastIndex = itemRegex.lastIndex;
+	while ((match = itemRegex.exec(text)) !== null) {
+		const before = text.slice(lastIndex, match.index);
+		if (before) {
+			container.appendChild(document.createTextNode(before));
 		}
 
-		const after = text.slice(lastIndex);
-		if (after) {
-			container.appendChild(document.createTextNode(after));
-		}
+		const itemId = String(match[1] || '').trim().toLowerCase();
 
-		return container.innerHTML;
+		const button = document.createElement('button');
+		button.className = 'tw-loot-button';
+		button.dataset.itemId = itemId;
+
+		const textSpan = document.createElement('span');
+		textSpan.className = 'tw-btn-text';
+		textSpan.textContent = 'TAKE ITEM';
+
+		const idSpan = document.createElement('span');
+		idSpan.className = 'tw-btn-id';
+		idSpan.textContent = `#${itemId.slice(0, 8)}`;
+
+		button.appendChild(textSpan);
+		button.appendChild(idSpan);
+
+		button.addEventListener('click', function () {
+			window.handleLootAction(itemId, button);
+		});
+
+		container.appendChild(button);
+		lastIndex = itemRegex.lastIndex;
 	}
+
+	const after = text.slice(lastIndex);
+	if (after) {
+		container.appendChild(document.createTextNode(after));
+	}
+
+	return container.innerHTML;
+}
 
 	window.handleLootAction = function (itemId, buttonElement) {
 		if (!buttonElement) return;
