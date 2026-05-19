@@ -316,81 +316,77 @@ function tw_prepare_character_data( array $game_data ): array {
 	}
 
 	/**
-	 * 6. Inventory.
-	 * Template expects:
-	 * - is_equipped
-	 * - quantity
-	 * - info[name|slot|mass]
-	 */
-	$inv_raw = tw_supabase_get(
-		'cyber_character_inventory',
-		[
-			'characterid' => 'eq.' . $char_id,
-			'select'      => 'id,quantity,isequipped,equippedslot,customname,activeweaves,engravinglevel,factionalignment,totalslots,maxslots,usedslots,itemid',
-		]
-	);
+ * 6. Inventory.
+ */
+$inv_raw = tw_supabase_get(
+    'cyber_character_inventory',
+    [
+        'character_id' => 'eq.' . $char_id,
+        'select'       => 'id,quantity,is_equipped,equipped_slot,custom_name,active_weaves,engraving_level,faction_alignment,total_slots,max_slots,used_slots,item_id',
+    ]
+);
 
-	if ( is_array( $inv_raw ) ) {
-		$total_mass  = 0.0;
-		$total_power = 0.0;
+if ( is_array( $inv_raw ) ) {
+    $total_mass  = 0.0;
+    $total_power = 0.0;
 
-		foreach ( $inv_raw as $row ) {
-			if ( ! is_array( $row ) ) {
-				continue;
-			}
+    foreach ( $inv_raw as $row ) {
+        if ( ! is_array( $row ) ) {
+            continue;
+        }
 
-			$item_id = $row['itemid'] ?? null;
-			$item    = [];
+        $item_id = $row['item_id'] ?? null;
+        $item    = [];
 
-			if ( $item_id ) {
-				$item_rows = tw_supabase_get(
-					'cyber_items',
-					[
-						'id'     => 'eq.' . $item_id,
-						'select' => 'id,name,description,type,tags,slot,powervalue,imgurl,rarity,size,mass,stacklimit,iscontainer',
-						'limit'  => 1,
-					]
-				);
+        if ( $item_id ) {
+            $item_rows = tw_supabase_get(
+                'cyber_items',
+                [
+                    'id'     => 'eq.' . $item_id,
+                    'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
+                    'limit'  => 1,
+                ]
+            );
 
-				if ( is_array( $item_rows ) && isset( $item_rows[0] ) && is_array( $item_rows[0] ) ) {
-					$item = $item_rows[0];
-				}
-			}
+            if ( is_array( $item_rows ) && isset( $item_rows[0] ) && is_array( $item_rows[0] ) ) {
+                $item = $item_rows[0];
+            }
+        }
 
-			$quantity = max( 1, (int) tw_num( $row['quantity'] ?? 1, 1 ) );
-			$mass     = (float) tw_num( $item['mass'] ?? 0, 0 );
-			$power    = (float) tw_num( $item['powervalue'] ?? 0, 0 );
+        $quantity = max( 1, (int) tw_num( $row['quantity'] ?? 1, 1 ) );
+        $mass     = (float) tw_num( $item['mass'] ?? 0, 0 );
+        $power    = (float) tw_num( $item['power_value'] ?? 0, 0 );
 
-			$result['inventory'][] = [
-				'id'            => $row['id'] ?? null,
-				'quantity'      => $quantity,
-				'is_equipped'   => ! empty( $row['isequipped'] ),
-				'equipped_slot' => (string) ( $row['equippedslot'] ?? '' ),
-				'custom_name'   => (string) ( $row['customname'] ?? '' ),
-				'info'          => [
-					'id'          => $item['id'] ?? null,
-					'name'        => (string) ( $item['name'] ?? '' ),
-					'description' => (string) ( $item['description'] ?? '' ),
-					'type'        => (string) ( $item['type'] ?? '' ),
-					'tags'        => $item['tags'] ?? [],
-					'slot'        => (string) ( $item['slot'] ?? '' ),
-					'powervalue'  => tw_num( $item['powervalue'] ?? 0, 0 ),
-					'imgurl'      => (string) ( $item['imgurl'] ?? '' ),
-					'rarity'      => (string) ( $item['rarity'] ?? '' ),
-					'size'        => (string) ( $item['size'] ?? '' ),
-					'mass'        => tw_num( $item['mass'] ?? 0, 0 ),
-					'stacklimit'  => (int) tw_num( $item['stacklimit'] ?? 1, 1 ),
-					'iscontainer' => ! empty( $item['iscontainer'] ),
-				],
-			];
+        $result['inventory'][] = [
+            'id'            => $row['id'] ?? null,
+            'quantity'      => $quantity,
+            'is_equipped'   => ! empty( $row['is_equipped'] ),
+            'equipped_slot' => (string) ( $row['equipped_slot'] ?? '' ),
+            'custom_name'   => (string) ( $row['custom_name'] ?? '' ),
+            'info'          => [
+                'id'          => $item['id'] ?? null,
+                'name'        => (string) ( $item['name'] ?? '' ),
+                'description' => (string) ( $item['description'] ?? '' ),
+                'type'        => (string) ( $item['type'] ?? '' ),
+                'tags'        => $item['tags'] ?? [],
+                'slot'        => (string) ( $item['slot'] ?? '' ),
+                'powervalue'  => tw_num( $item['power_value'] ?? 0, 0 ),
+                'imgurl'      => (string) ( $item['img_url'] ?? '' ),
+                'rarity'      => (string) ( $item['rarity'] ?? '' ),
+                'size'        => (string) ( $item['size'] ?? '' ),
+                'mass'        => tw_num( $item['mass'] ?? 0, 0 ),
+                'stacklimit'  => (int) tw_num( $item['stack_limit'] ?? 1, 1 ),
+                'iscontainer' => ! empty( $item['is_container'] ),
+            ],
+        ];
 
-			$total_mass  += $mass * $quantity;
-			$total_power += $power * $quantity;
-		}
+        $total_mass  += $mass * $quantity;
+        $total_power += $power * $quantity;
+    }
 
-		$result['total_mass']  = round( $total_mass, 2 );
-		$result['total_power'] = round( $total_power, 2 );
-	}
+    $result['total_mass']  = round( $total_mass, 2 );
+    $result['total_power'] = round( $total_power, 2 );
+}
 
 	/**
 	 * Mass limit: 30 + BODY * 4.
