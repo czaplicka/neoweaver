@@ -36,15 +36,24 @@ function tw_compass_render() {
 		);
 	}
 
-	if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
-		wp_enqueue_script(
-			'neoweaver-compass',
-			$js_url,
-			array(),
-			$js_ver,
-			true
-		);
-	}
+if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
+	wp_enqueue_script(
+		'neoweaver-compass',
+		$js_url,
+		array( 'tw-adventure' ), // albo lepiej: handle skryptu, który tworzy window.twSupabase
+		$js_ver,
+		true
+	);
+
+	wp_add_inline_script(
+		'neoweaver-compass',
+		'window.twCompassData = ' . wp_json_encode( array(
+			'wpUserId'        => (int) $wp_user_id,
+			'activeLocationId'=> (int) ( get_user_game_data_from_supabase( $wp_user_id )['active_location_id'] ?? 0 ),
+		) ) . ';',
+		'before'
+	);
+}
 
 	ob_start();
 	?>
