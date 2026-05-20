@@ -252,23 +252,33 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			return;
 		}
 
-		$updated = tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
+$updated = tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
 
-		if ( ! $updated ) {
-			wp_send_json_error( 'Could not update session status', 500 );
-			return;
-		}
+if ( ! $updated ) {
+	wp_send_json_error( 'Could not update session status', 500 );
+	return;
+}
 
-		wp_send_json_success(
-			array(
-				'message'     => 'Scenario generation marked as started',
-				'status'      => 'generating',
-				'scenario_id' => $scenario_id,
-				'campaign_id' => $campaign_id,
-				'session_id'  => $session_id,
-			)
-		);
-	}
+if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+	tw_invalidate_game_data_cache( $wp_user_id );
+}
+
+do_action( 'tw_session_state_changed', $wp_user_id, array(
+	'session_id'  => $session_id,
+	'campaign_id' => $campaign_id,
+	'scenario_id' => $scenario_id,
+	'status'      => 'generating',
+) );
+
+wp_send_json_success(
+	array(
+		'message'     => 'Scenario generation marked as started',
+		'status'      => 'generating',
+		'scenario_id' => $scenario_id,
+		'campaign_id' => $campaign_id,
+		'session_id'  => $session_id,
+	)
+);
 }
 
 // ============================================================
