@@ -49,6 +49,7 @@ final class NeoWeaver_Core {
 			'includes/assets/active-id.php',
 			'includes/assets/campaign-creator.php',
 			'includes/assets/public-character-profile.php',
+			'includes/assets/public-runtime.php',
 			
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
