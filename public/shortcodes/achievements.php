@@ -95,29 +95,6 @@ if ( ! function_exists( 'render_player_achievements' ) ) {
 			return '<p>' . esc_html__( 'You must be logged in to view achievements.', 'neoweaver' ) . '</p>';
 		}
 
-		wp_enqueue_style(
-			'neoweaver-achievements',
-			trailingslashit( NW_PLUGIN_URL ) . 'assets/css/public/achievements.css',
-			array(),
-			defined( 'NW_VERSION' ) ? NW_VERSION : '1.0.0'
-		);
-
-		wp_enqueue_script(
-			'lucide',
-			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
-			array(),
-			'0.468.0',
-			true
-		);
-
-		wp_enqueue_script(
-			'achievements-script',
-			trailingslashit( NW_PLUGIN_URL ) . 'assets/js/public/achievements.js',
-			array( 'jquery', 'lucide' ),
-			defined( 'NW_VERSION' ) ? NW_VERSION : '1.0.0',
-			true
-		);
-
 		$a = shortcode_atts(
 			array(
 				'type'    => 'all',
