@@ -183,7 +183,6 @@ class NW_Abilities_Admin {
 
 		$record_id      = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 		$name           = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$title          = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
 		$description    = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
 		$ability_type   = sanitize_text_field( wp_unslash( $_POST['ability_type'] ?? 'active' ) );
 		$cost_type      = sanitize_text_field( wp_unslash( $_POST['cost_type'] ?? 'none' ) );
@@ -198,19 +197,10 @@ class NW_Abilities_Admin {
 		$source         = sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) );
 		$gm_notes       = sanitize_textarea_field( wp_unslash( $_POST['gm_notes'] ?? '' ) );
 
-		if ( empty( $name ) && empty( $title ) ) {
-			wp_send_json_error( 'Name or Title is required.' );
-			return;
-		}
-
 		if ( empty( $name ) ) {
-			$name = $title;
-		}
-
-		if ( empty( $title ) ) {
-			$title = $name;
-		}
-
+    wp_send_json_error( 'Name is required.' );
+    return;
+}
 		if ( ! in_array( $ability_type, self::ABILITY_TYPES, true ) ) {
 			$ability_type = 'active';
 		}
@@ -225,7 +215,6 @@ class NW_Abilities_Admin {
 
 		$payload = [
 			'name'           => $name,
-			'title'          => $title,
 			'description'    => $description ?: null,
 			'ability_type'   => $ability_type,
 			'source'         => $source ?: null,
