@@ -2,295 +2,396 @@
 /**
  * NeoWeave - AJAX & RPC Buffer Handlers
  *
- * BUG-FIX: The entire file previously used undefined SUPABASE_URL / SUPABASE_KEY
- * constants (these are never defined in wp-config.php — only the tw_supabase_url()
- * / tw_supabase_anon_key() helpers exist). Every request therefore fatalled with
- * "Use of undefined constant SUPABASE_URL".
- *
- * Additional fixes applied:
- *   - cyber_call_rpc() and cyber_update_supabase_location() now use wp_remote_*
- *     instead of raw curl, matching the project-wide HTTP pattern.
- *   - Missing ABSPATH guard added.
- *   - handle_use_buffer_card() had no nonce check and no ownership validation;
- *     any logged-in player could discard another character's card by supplying
- *     a known instance_id. Nonce + character ownership check added.
- *   - Missing return after wp_send_json_error() calls added.
- *   - handle_foundry_upgrade(): null-safe $data guard added before keyed access.
+ * Uses Supabase helpers from includes/supabase-config.php and
+ * includes/supabase-helpers.php.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Helper: resolve character_id from WP user ──────────────────────────────────────────────
-
+/**
+ * Helper: resolve active character_id from WP user.
+ */
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
 		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 			return '';
 		}
+
 		$game_data = get_user_game_data_from_supabase( $wp_user_id );
+
 		return (string) ( $game_data['active_character_id'] ?? '' );
 	}
 }
 
-// ─── Helper: call a Supabase RPC function ────────────────────────────────────────────
+/**
+ * Helper: strict UUID validator.
+ */
+if ( ! function_exists( 'cyber_is_valid_uuid' ) ) {
+	function cyber_is_valid_uuid( string $value ): bool {
+		return (bool) preg_match(
+			'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+			$value
+		);
+	}
+}
 
+/**
+ * Helper: call a Supabase RPC function via wp_remote_post().
+ */
 if ( ! function_exists( 'cyber_call_rpc' ) ) {
-	/**
-	 * Call a Supabase RPC function via wp_remote_post().
-	 *
-	 * BUG-FIX: was using curl with undefined SUPABASE_URL / SUPABASE_KEY.
-	 * Now uses tw_supabase_url() / tw_supabase_anon_key() and wp_remote_post().
-	 *
-	 * @param string $function_name  RPC function name (no prefix).
-	 * @param array  $params         JSON-encodable parameters.
-	 * @return array|null            Decoded response array, or null on error.
-	 */
 	function cyber_call_rpc( string $function_name, array $params = [] ): ?array {
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			error_log( 'TW cyber_call_rpc: Supabase helpers not available.' );
 			return null;
 		}
 
-		$key      = tw_supabase_anon_key();
-		$endpoint = trailingslashit( tw_supabase_url() ) . 'rest/v1/rpc/' . $function_name;
+		$key          = tw_supabase_anon_key();
+		$supabase_url = tw_supabase_url();
 
-		$response = wp_remote_post( $endpoint, [
-			'headers' => [
-				'Content-Type'  => 'application/json',
-				'apikey'        => $key,
-				'Authorization' => 'Bearer ' . $key,
-			],
-			'body'    => wp_json_encode( $params ),
-			'timeout' => 20,
-		] );
+		if ( empty( $key ) || empty( $supabase_url ) ) {
+			error_log( 'TW cyber_call_rpc: Missing Supabase URL or key.' );
+			return null;
+		}
+
+		$endpoint = trailingslashit( $supabase_url ) . 'rest/v1/rpc/' . rawurlencode( $function_name );
+
+		$response = wp_remote_post(
+			$endpoint,
+			[
+				'headers' => [
+					'Content-Type'  => 'application/json',
+					'apikey'        => $key,
+					'Authorization' => 'Bearer ' . $key,
+				],
+				'body'    => wp_json_encode( $params ),
+				'timeout' => 20,
+			]
+		);
 
 		if ( is_wp_error( $response ) ) {
-			error_log( 'TW cyber_call_ error [' . $function_name . ']: ' . $response->get_error_message() );
+			error_log( 'TW cyber_call_rpc error [' . $function_name . ']: ' . $response->get_error_message() );
 			return null;
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+
 		if ( $code < 200 || $code >= 300 ) {
-			error_log( 'TW cyber_call_rpc HTTP ' . $code . ' [' . $function_name . ']: ' . wp_remote_retrieve_body( $response ) );
+			error_log( 'TW cyber_call_rpc HTTP ' . $code . ' [' . $function_name . ']: ' . $body );
 			return null;
 		}
 
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		return is_array( $data ) ? $data : null;
+		if ( '' === $body ) {
+			return [];
+		}
+
+		$data = json_decode( $body, true );
+
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
+			error_log( 'TW cyber_call_rpc JSON error [' . $function_name . ']: ' . json_last_error_msg() );
+			return null;
+		}
+
+		return is_array( $data ) ? $data : [];
 	}
 }
 
-// ─── Helper: PATCH a card's location in cyber_character_buffer ───────────────────────
-
+/**
+ * Helper: PATCH a card location in cyber_character_buffer.
+ */
 if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
-	/**
-	 * Update the location field of a buffer card row.
-	 *
-	 * BUG-FIX: was using curl with undefined SUPABASE_URL / SUPABASE_KEY.
-	 * Now uses tw_supabase_url() / tw_supabase_anon_key() and wp_remote_request().
-	 *
-	 * @param string $instance_id  UUID of the cyber_character_buffer row.
-	 * @param string $location     New location value (e.g. 'discard', 'hand').
-	 * @return bool  true on success, false on failure.
-	 */
 	function cyber_update_supabase_location( string $instance_id, string $location ): bool {
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			error_log( 'TW cyber_update_supabase_location: Supabase helpers not available.' );
 			return false;
 		}
 
-		$key      = tw_supabase_anon_key();
-		$endpoint = trailingslashit( tw_supabase_url() )
-			. 'rest/v1/cyber_character_buffer?id=eq.'
-			. preg_replace( '/[^a-zA-Z0-9\-]/', '', $instance_id );
+		if ( ! cyber_is_valid_uuid( $instance_id ) ) {
+			error_log( 'TW cyber_update_supabase_location: Invalid UUID.' );
+			return false;
+		}
 
-		$response = wp_remote_request( $endpoint, [
-			'method'  => 'PATCH',
-			'headers' => [
-				'Content-Type'  => 'application/json',
-				'apikey'        => $key,
-				'Authorization' => 'Bearer ' . $key,
-				'Prefer'        => 'return=minimal',
-			],
-			'body'    => wp_json_encode( [ 'location' => sanitize_text_field( $location ) ] ),
-			'timeout' => 10,
-		] );
+		$key          = tw_supabase_anon_key();
+		$supabase_url = tw_supabase_url();
+
+		if ( empty( $key ) || empty( $supabase_url ) ) {
+			error_log( 'TW cyber_update_supabase_location: Missing Supabase URL or key.' );
+			return false;
+		}
+
+		$endpoint = trailingslashit( $supabase_url ) . 'rest/v1/cyber_character_buffer?id=eq.' . rawurlencode( $instance_id );
+
+		$response = wp_remote_request(
+			$endpoint,
+			[
+				'method'  => 'PATCH',
+				'headers' => [
+					'Content-Type'  => 'application/json',
+					'apikey'        => $key,
+					'Authorization' => 'Bearer ' . $key,
+					'Prefer'        => 'return=minimal',
+				],
+				'body'    => wp_json_encode(
+					[
+						'location' => sanitize_text_field( $location ),
+					]
+				),
+				'timeout' => 10,
+			]
+		);
 
 		if ( is_wp_error( $response ) ) {
 			error_log( 'TW cyber_update_supabase_location error: ' . $response->get_error_message() );
 			return false;
 		}
 
-		return wp_remote_retrieve_response_code( $response ) < 300;
+		$code = wp_remote_retrieve_response_code( $response );
+
+		if ( $code < 200 || $code >= 300 ) {
+			error_log( 'TW cyber_update_supabase_location HTTP ' . $code . ': ' . wp_remote_retrieve_body( $response ) );
+			return false;
+		}
+
+		return true;
 	}
 }
 
-// ─── 1. DECK BUILDER SYNC ─────────────────────────────────────────────────────────────
-
+/**
+ * AJAX: save active deck via RPC.
+ */
 add_action( 'wp_ajax_save_cyber_deck_rpc', 'handle_save_cyber_deck_rpc' );
 
-function handle_save_cyber_deck_rpc(): void {
-    check_ajax_referer( 'cyber_deck_nonce', 'nonce' );
+if ( ! function_exists( 'handle_save_cyber_deck_rpc' ) ) {
+	function handle_save_cyber_deck_rpc(): void {
+		check_ajax_referer( 'cyber_deck_nonce', 'nonce' );
 
-    $user_id      = get_current_user_id();
-    $character_id = get_cyber_character_id_by_wp_id( $user_id );
-    $active_ids   = json_decode( stripslashes( $_POST['active_ids'] ?? '[]' ), true );
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error( [ 'message' => 'Not logged in.' ], 401 );
+			return;
+		}
 
-    if ( ! $character_id || ! is_array( $active_ids ) ) {
-        wp_send_json_error( 'Invalid character or data.' );
-        return;
-    }
+		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		if ( ! cyber_is_valid_uuid( $character_id ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid or missing active character.' ], 400 );
+			return;
+		}
 
-    // Sanitize: odrzuć wszystko, co nie wygląda jak UUID
-    $sanitized_ids = array_values( array_filter(
-        array_map( 'sanitize_text_field', $active_ids ),
-        fn( $id ) => (bool) preg_match(
-            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-            $id
-        )
-    ) );
+		$raw_active_ids = wp_unslash( $_POST['active_ids'] ?? '[]' );
+		$active_ids     = json_decode( $raw_active_ids, true );
 
-    if ( empty( $sanitized_ids ) && ! empty( $active_ids ) ) {
-        wp_send_json_error( 'Invalid card IDs.' );
-        return;
-    }
+		if ( ! is_array( $active_ids ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid deck payload.' ], 400 );
+			return;
+		}
 
-    // ✅ Ownership check: pobierz z Supabase karty tej postaci
-    if ( ! empty( $sanitized_ids ) ) {
-        $in_filter   = implode( ',', array_map( fn( $id ) => 'eq.' . $id, $sanitized_ids ) );
-        $owned_cards = tw_supabase_get(
-            'cyber_character_deck_cards',   // <-- nazwa twojej tabeli z kartami decku
-            [
-                'character_id' => 'eq.' . $character_id,
-                'id'           => 'in.(' . implode( ',', $sanitized_ids ) . ')',
-                'select'       => 'id',
-            ]
-        );
+		$sanitized_ids = array_values(
+			array_filter(
+				array_map(
+					static function ( $id ): string {
+						return sanitize_text_field( (string) $id );
+					},
+					$active_ids
+				),
+				'cyber_is_valid_uuid'
+			)
+		);
 
-        $owned_ids = array_column( $owned_cards ?? [], 'id' );
+		if ( empty( $sanitized_ids ) && ! empty( $active_ids ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid card IDs.' ], 400 );
+			return;
+		}
 
-        // Odrzuć karty, których postać nie posiada
-        $verified_ids = array_values(
-            array_filter( $sanitized_ids, fn( $id ) => in_array( $id, $owned_ids, true ) )
-        );
+		if ( ! empty( $sanitized_ids ) ) {
+			$owned_cards = tw_supabase_get(
+				'cyber_character_deck_cards',
+				[
+					'character_id' => 'eq.' . $character_id,
+					'id'           => 'in.(' . implode( ',', $sanitized_ids ) . ')',
+					'select'       => 'id',
+				]
+			);
 
-        if ( count( $verified_ids ) !== count( $sanitized_ids ) ) {
-            // Loguj próbę ataku
-            error_log( sprintf(
-                'NeoWeaver security: user %d tried to sync unowned card IDs for character %s.',
-                $user_id,
-                $character_id
-            ) );
-            wp_send_json_error( 'One or more cards do not belong to this character.' );
-            return;
-        }
-    } else {
-        $verified_ids = [];
-    }
+			if ( is_wp_error( $owned_cards ) ) {
+				wp_send_json_error( [ 'message' => 'Unable to verify deck ownership.' ], 502 );
+				return;
+			}
 
-    $result = cyber_call_rpc( 'cyber_sync_deck', [
-        'p_character_id' => $character_id,
-        'p_active_ids'   => $verified_ids,
-    ] );
+			$owned_ids = array_column( is_array( $owned_cards ) ? $owned_cards : [], 'id' );
 
-    wp_send_json_success( $result );
+			$verified_ids = array_values(
+				array_filter(
+					$sanitized_ids,
+					static function ( string $id ) use ( $owned_ids ): bool {
+						return in_array( $id, $owned_ids, true );
+					}
+				)
+			);
+
+			if ( count( $verified_ids ) !== count( $sanitized_ids ) ) {
+				error_log(
+					sprintf(
+						'NeoWeaver security: user %d tried to sync unowned card IDs for character %s.',
+						$user_id,
+						$character_id
+					)
+				);
+
+				wp_send_json_error( [ 'message' => 'One or more cards do not belong to this character.' ], 403 );
+				return;
+			}
+		} else {
+			$verified_ids = [];
+		}
+
+		$result = cyber_call_rpc(
+			'cyber_sync_deck',
+			[
+				'p_character_id' => $character_id,
+				'p_active_ids'   => $verified_ids,
+			]
+		);
+
+		if ( null === $result ) {
+			wp_send_json_error( [ 'message' => 'Deck sync failed.' ], 502 );
+			return;
+		}
+
+		wp_send_json_success( $result );
+	}
 }
 
-// ─── 2. USE CARD & DRAW NEW ────────────────────────────────────────────────────────────
-
+/**
+ * AJAX: use a buffer card and draw a new one.
+ */
 add_action( 'wp_ajax_use_buffer_card', 'handle_use_buffer_card' );
 
-function handle_use_buffer_card(): void {
-	// BUG-FIX: no nonce check in original — any logged-in user could discard
-	// any card by sending a known instance_id. Nonce enforced here.
-	check_ajax_referer( 'use_card_nonce', 'nonce' );
+if ( ! function_exists( 'handle_use_buffer_card' ) ) {
+	function handle_use_buffer_card(): void {
+		check_ajax_referer( 'use_card_nonce', 'nonce' );
 
-	$user_id      = get_current_user_id();
-	$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error( [ 'message' => 'Not logged in.' ], 401 );
+			return;
+		}
 
-	if ( ! $character_id ) {
-		wp_send_json_error( 'No active character found.' );
-		return;
-	}
+		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		if ( ! cyber_is_valid_uuid( $character_id ) ) {
+			wp_send_json_error( [ 'message' => 'No active character found.' ], 400 );
+			return;
+		}
 
-	$instance_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['instance_id'] ?? '' ) );
+		$instance_id = sanitize_text_field( (string) ( $_POST['instance_id'] ?? '' ) );
+		if ( ! cyber_is_valid_uuid( $instance_id ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid instance_id.' ], 400 );
+			return;
+		}
 
-	if ( ! $instance_id ) {
-		wp_send_json_error( 'Invalid instance_id.' );
-		return;
-	}
+		$ownership = tw_supabase_get(
+			'cyber_character_buffer',
+			[
+				'id'           => 'eq.' . $instance_id,
+				'character_id' => 'eq.' . $character_id,
+				'select'       => 'id',
+				'limit'        => 1,
+			]
+		);
 
-	// Ownership check: confirm the buffer card belongs to this character.
-	$ownership = tw_supabase_get(
-		'cyber_character_buffer',
-		[
-			'id'           => 'eq.' . $instance_id,
-			'character_id' => 'eq.' . $character_id,
-			'select'       => 'id',
-			'limit'        => 1,
-		]
-	);
+		if ( is_wp_error( $ownership ) ) {
+			wp_send_json_error( [ 'message' => 'Unable to verify card ownership.' ], 502 );
+			return;
+		}
 
-	if ( empty( $ownership ) ) {
-		wp_send_json_error( 'Card not found or not owned by current character.' );
-		return;
-	}
+		if ( empty( $ownership ) ) {
+			wp_send_json_error( [ 'message' => 'Card not found or not owned by current character.' ], 403 );
+			return;
+		}
 
-	// Mark card as discarded, then draw a new one via RPC.
-	cyber_update_supabase_location( $instance_id, 'discard' );
+		$updated = cyber_update_supabase_location( $instance_id, 'discard' );
+		if ( ! $updated ) {
+			wp_send_json_error( [ 'message' => 'Failed to discard the card.' ], 502 );
+			return;
+		}
 
-	$new_card_data = cyber_call_rpc( 'cyber_sync_draw', [ 'p_character_id' => $character_id ] );
+		$new_card_data = cyber_call_rpc(
+			'cyber_sync_draw',
+			[
+				'p_character_id' => $character_id,
+			]
+		);
 
-	if ( ! empty( $new_card_data ) ) {
-		wp_send_json_success( $new_card_data[0] );
-	} else {
-		wp_send_json_error( 'No cards left to draw even after reshuffle.' );
+		if ( null === $new_card_data ) {
+			wp_send_json_error( [ 'message' => 'Draw RPC failed.' ], 502 );
+			return;
+		}
+
+		if ( ! empty( $new_card_data[0] ) ) {
+			wp_send_json_success( $new_card_data[0] );
+			return;
+		}
+
+		wp_send_json_error( [ 'message' => 'No cards left to draw even after reshuffle.' ], 404 );
 	}
 }
 
-// ─── 3. FOUNDRY UPGRADE ─────────────────────────────────────────────────────────────────
-
+/**
+ * AJAX: foundry upgrade.
+ */
 add_action( 'wp_ajax_foundry_upgrade', 'handle_foundry_upgrade' );
 
-function handle_foundry_upgrade(): void {
-	check_ajax_referer( 'foundry_nonce', 'nonce' );
+if ( ! function_exists( 'handle_foundry_upgrade' ) ) {
+	function handle_foundry_upgrade(): void {
+		check_ajax_referer( 'foundry_nonce', 'nonce' );
 
-	$user_id      = get_current_user_id();
-	$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error( [ 'message' => 'Not logged in.' ], 401 );
+			return;
+		}
 
-	if ( ! $character_id ) {
-		wp_send_json_error( 'Character not found.' );
-		return;
-	}
+		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		if ( ! cyber_is_valid_uuid( $character_id ) ) {
+			wp_send_json_error( [ 'message' => 'Character not found.' ], 400 );
+			return;
+		}
 
-	$instance_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['instance_id'] ?? '' ) );
+		$instance_id = sanitize_text_field( (string) ( $_POST['instance_id'] ?? '' ) );
+		if ( ! cyber_is_valid_uuid( $instance_id ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid instance_id.' ], 400 );
+			return;
+		}
 
-	if ( ! $instance_id ) {
-		wp_send_json_error( 'Invalid instance_id.' );
-		return;
-	}
+		$data = cyber_call_rpc(
+			'cyber_upgrade_buffer_card',
+			[
+				'p_character_id' => $character_id,
+				'p_instance_id'  => $instance_id,
+			]
+		);
 
-	$data = cyber_call_rpc( 'cyber_upgrade_buffer_card', [
-		'p_character_id' => $character_id,
-		'p_instance_id'  => $instance_id,
-	] );
+		if ( null === $data ) {
+			wp_send_json_error( [ 'message' => 'RPC call failed. Please try again.' ], 502 );
+			return;
+		}
 
-	// BUG-FIX: cyber_call_rpc() returns ?array (null on network/HTTP failure).
-	// Accessing $data['message'] on null triggers a PHP 8 notice and produces
-	// an unhelpful wp_send_json_error(null). Guard against null first.
-	if ( null === $data ) {
-		wp_send_json_error( array( 'message' => 'RPC call failed. Please try again.' ), 502 );
-		return;
-	}
+		if ( isset( $data['status'] ) && 'success' === $data['status'] ) {
+			wp_send_json_success(
+				[
+					'message'   => $data['message'] ?? 'Upgrade successful.',
+					'new_level' => $data['new_level'] ?? null,
+				]
+			);
+			return;
+		}
 
-	if ( isset( $data['status'] ) && 'success' === $data['status'] ) {
-		wp_send_json_success( [
-			'message'   => $data['message'],
-			'new_level' => $data['new_level'],
-		] );
-	} else {
-		wp_send_json_error( array( 'message' => $data['message'] ?? 'Upgrade failed.' ) );
+		wp_send_json_error(
+			[
+				'message' => $data['message'] ?? 'Upgrade failed.',
+			],
+			400
+		);
 	}
 }
