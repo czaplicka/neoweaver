@@ -211,7 +211,7 @@ final class NeoWeaver_Core {
 
 		new Neoweaver_Public( $list, $deployments_creator, $nodes_creator );
 	}
-
+}
 NeoWeaver_Core::init();
 if ( class_exists( 'NW_Chat_Handler' ) ) {
 	new NW_Chat_Handler();
