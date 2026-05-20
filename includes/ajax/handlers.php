@@ -113,12 +113,14 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return false;
+			return '';
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 
-		return ( $code >= 200 && $code < 300 );
+		if ( $code < 200 || $code >= 300 ) {
+			return '';
+		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
@@ -212,14 +214,15 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			wp_send_json_error( 'Could not update session status' );
 			return;
 		}
-		do_action( 'tw_session_state_changed', $wp_user_id, array(
-	'campaign_id' => $campaign_id,
-	'session_id'  => $session_id,
-	'scenario_id' => $scenario_id,
-	'status'      => 'generating',
-) );
 
-tw_invalidate_game_data_cache( $wp_user_id );
+		do_action( 'tw_session_state_changed', $wp_user_id, array(
+			'campaign_id' => $campaign_id,
+			'session_id'  => $session_id,
+			'scenario_id' => $scenario_id,
+			'status'      => 'generating',
+		) );
+
+		tw_invalidate_game_data_cache( $wp_user_id );
 
 		wp_send_json_success(
 			array(
