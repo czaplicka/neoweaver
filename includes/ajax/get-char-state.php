@@ -58,26 +58,33 @@ function tw_get_char_state() {
 		return;
 	}
 
-	$game_data    = get_user_game_data_from_supabase( $user_id );
-	$character_id = $game_data['active_character_id'] ?? '';
+$game_data    = get_user_game_data_from_supabase( $user_id );
+$character_id = $game_data['active_character_id'] ?? '';
+$campaign_id  = $game_data['active_campaign_id'] ?? '';
 
-	if ( empty( $character_id ) ) {
-		wp_send_json_error( 'No active character found' );
-		return;
-	}
+if ( empty( $character_id ) ) {
+	wp_send_json_error( 'No active character found' );
+	return;
+}
+
+if ( empty( $campaign_id ) ) {
+	wp_send_json_error( 'No active campaign found' );
+	return;
+}
 
 	$supabase_base = trailingslashit( $supabase_url ) . 'rest/v1/';
 
 	// 5. Query cyber_state_of_the_campaign by character_id (correct column).
-	$url = add_query_arg(
-		[
-			'character_id' => 'eq.' . $character_id,
-			'select'       => 'hp,mp',
-			'order'        => 'created_at.desc',
-			'limit'        => 1,
-		],
-		$supabase_base . 'cyber_state_of_the_campaign'
-	);
+$url = add_query_arg(
+	[
+		'character_id' => 'eq.' . $character_id,
+		'campaign_id'  => 'eq.' . $campaign_id,
+		'select'       => 'hp,mp',
+		'order'        => 'created_at.desc',
+		'limit'        => 1,
+	],
+	$supabase_base . 'cyber_state_of_the_campaign'
+);
 
 	$response = wp_remote_get( $url, [
 		'headers' => [
