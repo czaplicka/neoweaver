@@ -299,8 +299,7 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 				'cyber_tips',
 				array(
 					'select' => 'tip',
-					'order'  => 'random()',
-					'limit'  => 20,
+					'limit'  => 100,
 				)
 			),
 			array(
@@ -314,8 +313,20 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 			return;
 		}
 
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			wp_send_json_error( 'Supabase returned error' );
+			return;
+		}
+
 		$tips = json_decode( wp_remote_retrieve_body( $response ), true );
 		$tips = is_array( $tips ) ? $tips : array();
+
+		if ( ! empty( $tips ) ) {
+			shuffle( $tips );
+		}
+
+		$tips = array_slice( $tips, 0, 20 );
 
 		wp_send_json_success( array_column( $tips, 'tip' ) );
 	}
