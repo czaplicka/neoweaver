@@ -34,8 +34,6 @@ if ( ! function_exists( 'tw_register_buffer_assets' ) ) {
 			return;
 		}
 
-		wp_enqueue_script( 'chartjs' );
-
 		tw_enqueue_style_asset(
 			'neoweaver-buffer',
 			'assets/css/public/buffer.css'
@@ -44,7 +42,7 @@ if ( ! function_exists( 'tw_register_buffer_assets' ) ) {
 		tw_enqueue_script_asset(
 			'neoweaver-buffer',
 			'assets/js/public/buffer.js',
-			[ 'jquery' ],
+			[ 'jquery', 'chartjs' ],
 			true
 		);
 
