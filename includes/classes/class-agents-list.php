@@ -1,155 +1,48 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
-class Neoweaver_Agents_List {
+if ( ! class_exists( 'TW_Agents_List_Shortcode' ) ) {
 
-    private Neoweaver_Agents_Repository $repo;
+	class TW_Agents_List_Shortcode {
 
-    public function __construct( Neoweaver_Agents_Repository $repo ) {
-        $this->repo = $repo;
-    }
+		const SHORTCODE = 'tw_characters_list';
 
-    /**
-     * Enqueue CSS + JS for the agents list.
-     * Call this from your shortcode/page handler before render_roster().
-     */
-    public static function enqueue_assets(): void {
-        $base = plugin_dir_url( dirname( __DIR__ ) );
+		private static ?Neoweaver_Agents_List $service = null;
 
-        wp_enqueue_style(
-            'tw-agents-list',
-            $base . 'assets/css/public/agents-list.css',
-            [],
-            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/css/public/agents-list.css' )
-        );
+		public static function init(): void {
+			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
+		}
 
-        wp_enqueue_script(
-            'tw-agents-list',
-            $base . 'assets/js/public/agents-list.js',
-            [],
-            filemtime( plugin_dir_path( dirname( __DIR__ ) ) . 'assets/js/public/agents-list.js' ),
-            true  // load in footer
-        );
-        wp_localize_script( 'list-campaigns', 'twCampaignData', [
-    'nonce'       => wp_create_nonce( 'neoweaver_game' ),
-    'restNonce'   => wp_create_nonce( 'wp_rest' ),
-    'sessionUrl'  => rest_url( 'neoweaver/v1/session/start' ),
-    'terminalUrl' => home_url( '/terminal/' ),
-    'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
-    'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
-] );
-    }
+		protected static function get_service(): ?Neoweaver_Agents_List {
+			if ( self::$service instanceof Neoweaver_Agents_List ) {
+				return self::$service;
+			}
 
-    public function render_roster( int $wp_user_id ): string {
+			if ( ! class_exists( 'Neoweaver_Agents_Repository' ) || ! class_exists( 'Neoweaver_Agents_List' ) ) {
+				return null;
+			}
 
-        $supabase_url = function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '';
-        $anon_key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+			self::$service = new Neoweaver_Agents_List( new Neoweaver_Agents_Repository() );
 
-        if ( empty( $supabase_url ) || empty( $anon_key ) ) {
-            return '<p>System Error: Supabase configuration missing.</p>';
-        }
+			return self::$service;
+		}
 
-        $characters = $this->repo->get_for_wp_user( $wp_user_id );
+		public static function render_shortcode( $atts = [] ): string {
+			if ( ! is_user_logged_in() ) {
+				return '<p>Please log in to view your Field Agents.</p>';
+			}
 
-        if ( empty( $characters ) ) {
-            return '
-            <div class="tw-agents-empty">
-                <div class="tw-agents-empty-icon">⚠️</div>
-                <p class="tw-agents-empty-main">NO OPERATIVES DETECTED IN YOUR GRID.</p>
-                <small class="tw-agents-empty-sub">Initialize a new Field Agent to start the weaving process.</small>
-                <div class="tw-agents-empty-actions">
-                    <a href="/new-agent/" class="tw-btn-sync">NEW FIELD AGENT</a>
-                </div>
-            </div>';
-        }
+			$service = self::get_service();
 
-        ob_start();
-        ?>
-        <div class="tw-grid">
-            <?php foreach ( $characters as $char ) :
-                $avatar       = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
-                $camp_data    = isset( $char['cyber_campaign_characters'][0]['cyber_campaign'] ) ? $char['cyber_campaign_characters'][0]['cyber_campaign'] : null;
-                $camp_name    = isset( $camp_data['name'] ) ? $camp_data['name'] : 'Unassigned';
-                $world_name   = isset( $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ) ? $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] : 'Unknown World';
-                $is_public    = ! empty( $char['is_public'] );
-                $views        = isset( $char['view_count'] ) ? (int) $char['view_count'] : 0;
-                $char_id_safe = esc_attr( (string) $char['id'] );
-                $legend_url   = add_query_arg( 'char_id', $char_id_safe, home_url( '/legend/' ) );
-                $char_json    = wp_json_encode( $char );
-            ?>
-                <div class="tw-card">
-                    <div class="tw-top-meta" data-public-meta="<?php echo $char_id_safe; ?>">
-    <span class="tw-views-count" style="<?php echo $is_public ? '' : 'display:none;'; ?>">
-        Views: <span class="tw-views-number"><?php echo esc_html( $views ); ?></span>
-    </span>
-    <?php if ( $is_public ) : ?>
-        <a href="<?php echo esc_url( $legend_url ); ?>" class="tw-legend-link" target="_blank" rel="noopener noreferrer">
-            Agent public profile
-        </a>
-    <?php else : ?>
-        <a href="<?php echo esc_url( $legend_url ); ?>" class="tw-legend-link" 
-           target="_blank" rel="noopener noreferrer" 
-           data-legend-url="<?php echo esc_url( $legend_url ); ?>"
-           style="display:none;">
-            Agent public profile
-        </a>
-        <span class="tw-not-public">Not public</span>
-    <?php endif; ?>
-</div>
-                    <div class="tw-card-header">
-                        <img src="<?php echo esc_url( $avatar ); ?>" class="tw-avatar" alt="">
-                        <div>
-                            <div style="display:flex; align-items:center;">
-                                <span class="tw-lvl-badge">LVL <?php echo (int) $char['lvl']; ?></span>
-                                <h3 style="margin:0; font-size:16px;"><?php echo esc_html( $char['name'] ); ?></h3>
-                            </div>
-                            <small style="opacity:0.7;"><?php echo esc_html( $char['cyber_races']['name'] ?? 'Human' ); ?> // <?php echo esc_html( $char['cyber_classes']['name'] ?? 'Operative' ); ?></small>
-                            <div class="tw-campaign-info">
-                                📍 <?php echo esc_html( $camp_name ); ?><br>
-                                🌍 <?php echo esc_html( $world_name ); ?>
-                            </div>
-                            <div style="margin-top:8px; font-size:11px; color:#aaa;">
-                                <label class="tw-toggle-label">
-    <input type="checkbox" 
-           class="tw-toggle-public" 
-           data-char-id="<?php echo $char_id_safe; ?>"
-           data-legend-url="<?php echo esc_url( $legend_url ); ?>"
-           <?php checked( $is_public ); ?>>
-    <span>Public on /legend</span>
-</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="tw-card-actions">
-                        <button class="tw-btn" data-char="<?php echo esc_attr( $char_json ); ?>" onclick="twOpenModal(this)">
-                            Agent Dossier
-                        </button>
-                        <button class="tw-btn tw-btn-danger" onclick='twConfirmDeleteCharacter(<?php echo wp_json_encode( (string) $char['id'] ); ?>, this)'>
-                            Delete Operative
-                        </button>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
+			if ( ! $service ) {
+				return '<p>System Error: Agents module unavailable.</p>';
+			}
 
-        <div id="twCharModal" class="tw-modal">
-            <div class="tw-modal-content">
-                <span class="tw-close" onclick="twCloseModal()" role="button" aria-label="Close">&times;</span>
-                <div id="twModalBody"></div>
-            </div>
-        </div>
+			return $service->render_roster( get_current_user_id() );
+		}
+	}
 
-        <?php
-        return ob_get_clean();
-    }
-
-    public function get_roster( int $wp_user_id ): array { return []; }
-    public function get_selectable_agents( int $wp_user_id ): array { return []; }
-    public function get_agents_in_node( $node_id ): array { return []; }
-    public function get_data_ghosts_for_node( $node_id, int $wp_user_id ): array { return []; }
-    public function render_agent_select( int $wp_user_id ): string { return ''; }
-    public function render_active_agent_badge( int $wp_user_id ): string { return ''; }
-    public function to_api_payload( int $wp_user_id ): array { return []; }
+	TW_Agents_List_Shortcode::init();
 }
