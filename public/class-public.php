@@ -43,8 +43,6 @@ class Neoweaver_Public {
 		$url = trailingslashit( NEOWEAVER_PLUGIN_URL );
 		$dir = trailingslashit( NEOWEAVER_PLUGIN_DIR );
 
-		Neoweaver_Agents_List::enqueue_assets();
-
 		if ( wp_script_is( 'neoweaver-char-creator', 'registered' ) || wp_script_is( 'neoweaver-char-creator', 'enqueued' ) ) {
 			wp_localize_script(
 				'neoweaver-char-creator',
@@ -78,13 +76,7 @@ class Neoweaver_Public {
 	}
 
 	public static function enqueue_public_assets(): void {
-		wp_enqueue_script(
-			'nw-lucide-public',
-			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
-			[],
-			'0.468.0',
-			true
-		);
+
 
 		wp_enqueue_style(
 			'neoweaver-public',
