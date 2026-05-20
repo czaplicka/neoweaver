@@ -25,73 +25,6 @@ class Neoweaver_Public {
 		add_shortcode( 'tw_create_campaign',            [ $this, 'shortcode_campaign_creator' ] );
 		add_shortcode( 'tw_world_creator',              [ $this, 'shortcode_world_creator' ] );
 		add_shortcode( 'tw_active_node',                [ $this, 'shortcode_active_node' ] );
-
-		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-	}
-
-	private static function asset_version( string $absolute_path ): string {
-		return file_exists( $absolute_path )
-			? (string) filemtime( $absolute_path )
-			: NEOWEAVER_VERSION;
-	}
-
-	public function enqueue_assets(): void {
-		if ( is_admin() ) {
-			return;
-		}
-
-		$url = trailingslashit( NEOWEAVER_PLUGIN_URL );
-		$dir = trailingslashit( NEOWEAVER_PLUGIN_DIR );
-
-		if ( wp_script_is( 'neoweaver-char-creator', 'registered' ) || wp_script_is( 'neoweaver-char-creator', 'enqueued' ) ) {
-			wp_localize_script(
-				'neoweaver-char-creator',
-				'twCharCreatorConfig',
-				[
-					'nonce'       => wp_create_nonce( 'neoweaver_nonce' ),
-					'ajax_url'    => admin_url( 'admin-ajax.php' ),
-					'restNonce'   => wp_create_nonce( 'wp_rest' ),
-					'restUrl'     => home_url( '/wp-json/neoweaver/v1/character/create' ),
-					'agentsUrl'   => home_url( '/agents/' ),
-					'restBase'    => home_url( '/wp-json/neoweaver/v1' ),
-					'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
-					'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-				]
-			);
-		}
-
-		if ( is_page_template( 'templates/adventure.php' ) ) {
-			$script_rel  = 'assets/js/public/class-public.js';
-			$script_path = $dir . $script_rel;
-			$script_url  = $url . $script_rel;
-
-			wp_enqueue_script(
-				'neoweaver-public-runtime',
-				$script_url,
-				[],
-				self::asset_version( $script_path ),
-				true
-			);
-		}
-	}
-
-	public static function enqueue_public_assets(): void {
-
-
-		wp_enqueue_style(
-			'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/public/public.css',
-			[],
-			self::asset_version( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/public.css' )
-		);
-
-		wp_enqueue_script(
-			'neoweaver-public',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/public/public.js',
-			[ 'jquery', 'nw-lucide-public' ],
-			self::asset_version( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/public.js' ),
-			true
-		);
 	}
 
 	private function screen( string $html ): string {
@@ -122,6 +55,7 @@ class Neoweaver_Public {
 		}
 
 		$user_id = get_current_user_id();
+
 		if ( ! $user_id ) {
 			return $this->screen( '<p>Please log in.</p>' );
 		}
