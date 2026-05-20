@@ -40,7 +40,8 @@ if ( ! function_exists( 'tw_supa_headers' ) ) {
 
 if ( ! function_exists( 'tw_sanitize_supabase_id' ) ) {
 	function tw_sanitize_supabase_id( $raw_id ): string {
-		return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $raw_id );
+		$sanitized = preg_replace( '/[^a-fA-F0-9\\-]/', '', (string) $raw_id );
+		return strtolower( $sanitized );
 	}
 }
 
