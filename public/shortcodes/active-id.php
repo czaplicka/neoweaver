@@ -22,13 +22,14 @@ if ( ! function_exists( 'render_active_id_shortcode' ) ) {
 		}
 
 		$character_uuid = get_user_meta( $user_id, 'active_character_id', true );
-		if ( ! $character_uuid ) {
+
+		if ( empty( $character_uuid ) || ! wp_is_uuid( $character_uuid ) ) {
 			return 'NO_AGENT_CONNECTED';
 		}
 
 		$url = add_query_arg(
 			array(
-				'id'     => 'eq.' . $character_uuid,
+				'id'     => 'eq.' . rawurlencode( $character_uuid ),
 				'select' => 'world_credentials,current_location_id,cyber_locations(area_id,cyber_areas(kingdom_id,cyber_kingdoms(name)))',
 			),
 			trailingslashit( $supabase_url ) . 'rest/v1/cyber_characters'
@@ -55,7 +56,8 @@ if ( ! function_exists( 'render_active_id_shortcode' ) ) {
 		}
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( empty( $data ) || ! is_array( $data ) || empty( $data[0] ) ) {
+
+		if ( empty( $data ) || ! is_array( $data ) || empty( $data[0] ) || ! is_array( $data[0] ) ) {
 			return 'AGENT_NOT_FOUND';
 		}
 
@@ -66,12 +68,15 @@ if ( ! function_exists( 'render_active_id_shortcode' ) ) {
 		$kingdom  = is_array( $area ) ? ( $area['cyber_kingdoms'] ?? null ) : null;
 
 		$kingdom_id   = is_array( $area ) ? ( $area['kingdom_id'] ?? null ) : null;
-		$kingdom_name = is_array( $kingdom ) && ! empty( $kingdom['name'] ) ? $kingdom['name'] : 'UNKNOWN_NODE';
+		$kingdom_name = is_array( $kingdom ) && ! empty( $kingdom['name'] )
+			? (string) $kingdom['name']
+			: 'UNKNOWN_NODE';
 
 		$credentials = $char_data['world_credentials'] ?? array();
 		$credentials = is_array( $credentials ) ? $credentials : array();
 
 		$status = 'CITIZEN';
+
 		if ( $kingdom_id && isset( $credentials[ $kingdom_id ] ) ) {
 			$status = (string) $credentials[ $kingdom_id ];
 		}
@@ -80,11 +85,13 @@ if ( ! function_exists( 'render_active_id_shortcode' ) ) {
 		?>
 		<div id="neoweave-active-id" class="id-chit-terminal" data-kingdom="<?php echo esc_attr( (string) $kingdom_id ); ?>">
 			<div class="terminal-header">SCANNING_IDENTITY...</div>
+
 			<div class="id-grid">
 				<div class="id-row">
 					<span class="id-label">NODE:</span>
 					<span class="id-value"><?php echo esc_html( strtoupper( $kingdom_name ) ); ?></span>
 				</div>
+
 				<div class="id-row">
 					<span class="id-label">STATUS:</span>
 					<span class="id-value status-<?php echo esc_attr( strtolower( $status ) ); ?>">
@@ -92,6 +99,7 @@ if ( ! function_exists( 'render_active_id_shortcode' ) ) {
 					</span>
 				</div>
 			</div>
+
 			<div class="id-flicker"></div>
 		</div>
 		<?php
