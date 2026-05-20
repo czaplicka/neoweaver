@@ -103,9 +103,8 @@ function neoweaver_create_world( WP_REST_Request $request ) {
 		return new WP_Error( 'no_id', 'World created but no ID returned.', [ 'status' => 500 ] );
 	}
 
-	$safe_world_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id );
+	$safe_world_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $world_id );
 
-	// RPC seeding — fire-and-forget (non-fatal if they fail)
 	$rpc_base  = nw_supabase_base() . 'rpc/';
 	$rpc_hdrs  = nw_supabase_headers();
 	$world_arg = wp_json_encode( [ 'p_world_id' => $safe_world_id ] );
@@ -170,10 +169,6 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		return new WP_Error( 'missing_race_class', 'Race and class are required.', [ 'status' => 400 ] );
 	}
 
-	// ---------------------------------------------------------------------------
-	// FIX #1: Require all four attribute keys to be explicitly present,
-	//         validate range 1–5 per attribute, validate total == 12.
-	// ---------------------------------------------------------------------------
 	$attr_keys = [ 'attr_body', 'attr_reflex', 'attr_mind', 'attr_spirit' ];
 
 	foreach ( $attr_keys as $key ) {
@@ -212,10 +207,9 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 			[ 'status' => 400 ]
 		);
 	}
-	// ---------------------------------------------------------------------------
 
 	$node_id_raw = $request->get_param( 'node_id' );
-	$node_id     = $node_id_raw ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $node_id_raw ) : null;
+	$node_id     = $node_id_raw ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $node_id_raw ) : null;
 
 	if ( ! class_exists( 'Neoweaver_Agents_Creator' ) ) {
 		return new WP_Error( 'class_missing', 'Agents creator class not loaded.', [ 'status' => 500 ] );
@@ -241,9 +235,6 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		return new WP_Error( 'creation_failed', 'Character creation failed. Check server logs.', [ 'status' => 500 ] );
 	}
 
-	// ---------------------------------------------------------------------------
-	// FIX #4: Avatar upload — restrict MIME types and file size (max 2 MB).
-	// ---------------------------------------------------------------------------
 	if ( ! empty( $_FILES['avatar']['tmp_name'] ) ) {
 		if ( isset( $_FILES['avatar']['size'] ) && $_FILES['avatar']['size'] > 2 * MB_IN_BYTES ) {
 			error_log( 'TW_ENDPOINT_CHARACTER: avatar upload skipped — file exceeds 2 MB' );
@@ -272,7 +263,6 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 			}
 		}
 	}
-	// ---------------------------------------------------------------------------
 
 	error_log( 'TW_ENDPOINT_CHARACTER: SUCCESS agent_id=' . $agent_id );
 
@@ -301,7 +291,6 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
         return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
     }
 
-    // ✅ check PRZED tablicą
     $wp_user_id = get_current_user_id();
     if ( ! $wp_user_id ) {
         return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
@@ -314,7 +303,7 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
     $creator = new Neoweaver_Deployments_Creator();
 
     $data = [
-        'wp_user_id'  => $wp_user_id,   // ✅ zmienna, nie inline call
+        'wp_user_id'  => $wp_user_id,
         'name'        => sanitize_text_field( $request->get_param( 'name' )        ?? '' ),
         'game_mode'   => (int) ( $request->get_param( 'game_mode' )                ?? 1 ),
         'world_type'  => (int) ( $request->get_param( 'world_type' )               ?? 1 ),
@@ -330,8 +319,8 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
 
 	$world_id_raw     = $request->get_param( 'world_id' );
 	$character_id_raw = $request->get_param( 'character_id' );
-	$world_id         = $world_id_raw     ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id_raw )     : null;
-	$character_id     = $character_id_raw ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id_raw ) : null;
+	$world_id         = $world_id_raw     ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $world_id_raw )     : null;
+	$character_id     = $character_id_raw ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id_raw ) : null;
 
 	$campaign_id = $creator->create( $data, $world_id, $character_id );
 
@@ -352,15 +341,6 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
 
 // ===========================================================================
 // SESSION START ENDPOINT
-//
-// Logic:
-//   1. Pause any other active session the user has (one active at a time).
-//   2. If a paused session exists for this campaign, resume it (status -> active).
-//   3. Otherwise create a new session row.
-//
-// Session state lives entirely in cyber_game_sessions.status:
-//   'active' | 'paused' | 'finished'
-// No WP user meta is written or read.
 // ===========================================================================
 
 /**
@@ -380,7 +360,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 	}
 
 	$campaign_id_raw = $request->get_param( 'campaign_id' ) ?? '';
-	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $campaign_id_raw );
 	if ( ! $campaign_id ) {
 		return new WP_Error( 'missing_campaign', 'Missing campaign ID.', [ 'status' => 400 ] );
 	}
@@ -391,43 +371,28 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	// ------------------------------------------------------------------
-	// Step 1 — pause any currently active session for this user
-	//          (different campaign, so we just park it).
-	// ------------------------------------------------------------------
 	$pause_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'status'      => 'eq.active',
 		'campaign_id' => 'neq.' . $campaign_id,
 	], $base . 'cyber_game_sessions' );
 
-$pause_resp = wp_remote_request( $pause_url, [
-	'method'  => 'PATCH',
-	'headers' => nw_supabase_headers(),
-	'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
-	'timeout' => 10,
-] );
+	$pause_resp = wp_remote_request( $pause_url, [
+		'method'  => 'PATCH',
+		'headers' => nw_supabase_headers(),
+		'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
+		'timeout' => 10,
+	] );
 
-// Best-effort only: log failure, but do not block starting a new session.
-if ( is_wp_error( $pause_resp ) ) {
-	error_log(
-		'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions failed — ' .
-		$pause_resp->get_error_message()
-	);
-} else {
-	$pause_code = wp_remote_retrieve_response_code( $pause_resp );
-
-	if ( $pause_code < 200 || $pause_code >= 300 ) {
-		error_log(
-			'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions HTTP ' .
-			$pause_code . ' — ' . wp_remote_retrieve_body( $pause_resp )
-		);
+	if ( is_wp_error( $pause_resp ) ) {
+		error_log( 'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions failed — ' . $pause_resp->get_error_message() );
+	} else {
+		$pause_code = wp_remote_retrieve_response_code( $pause_resp );
+		if ( $pause_code < 200 || $pause_code >= 300 ) {
+			error_log( 'TW_ENDPOINT_START_GAME_SESSION: pause existing sessions HTTP ' . $pause_code . ' — ' . wp_remote_retrieve_body( $pause_resp ) );
+		}
 	}
-}
 
-	// ------------------------------------------------------------------
-	// Step 2 — check for a paused session for THIS campaign (resume it).
-	// ------------------------------------------------------------------
 	$resume_check_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'campaign_id' => 'eq.' . $campaign_id,
@@ -443,19 +408,39 @@ if ( is_wp_error( $pause_resp ) ) {
 		$paused_rows = json_decode( wp_remote_retrieve_body( $resume_resp ), true ) ?: [];
 
 		if ( ! empty( $paused_rows[0]['id'] ) ) {
-			$session_id        = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $paused_rows[0]['id'] );
-			$safe_character_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $paused_rows[0]['character_id'] ?? '' ) );
+			$session_id        = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $paused_rows[0]['id'] );
+			$safe_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $paused_rows[0]['character_id'] ?? '' ) );
 			$safe_world_id     = ! empty( $paused_rows[0]['world_id'] )
-				? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $paused_rows[0]['world_id'] )
+				? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $paused_rows[0]['world_id'] )
 				: null;
 
-			// Re-activate the paused session.
 			$reactivate_url = add_query_arg( [ 'id' => 'eq.' . $session_id ], $base . 'cyber_game_sessions' );
-			wp_remote_request( $reactivate_url, [
+			$reactivate_resp = wp_remote_request( $reactivate_url, [
 				'method'  => 'PATCH',
 				'headers' => nw_supabase_headers(),
 				'body'    => wp_json_encode( [ 'status' => 'active' ] ),
 				'timeout' => 10,
+			] );
+
+			if ( is_wp_error( $reactivate_resp ) ) {
+				return new WP_Error( 'reactivate_failed', 'Failed to reactivate paused session.', [ 'status' => 500 ] );
+			}
+
+			$reactivate_code = wp_remote_retrieve_response_code( $reactivate_resp );
+			if ( $reactivate_code < 200 || $reactivate_code >= 300 ) {
+				return new WP_Error( 'reactivate_failed', 'Supabase failed to reactivate paused session. HTTP ' . $reactivate_code, [ 'status' => $reactivate_code ] );
+			}
+
+			if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+				tw_invalidate_game_data_cache( $user_id );
+			}
+
+			do_action( 'tw_session_started', $user_id, [
+				'session_id'   => $session_id,
+				'campaign_id'  => $campaign_id,
+				'character_id' => $safe_character_id,
+				'world_id'     => $safe_world_id,
+				'resumed'      => true,
 			] );
 
 			error_log( 'TW_ENDPOINT_START_GAME_SESSION: RESUMED session_id=' . $session_id );
@@ -474,11 +459,6 @@ if ( is_wp_error( $pause_resp ) ) {
 		}
 	}
 
-	// ------------------------------------------------------------------
-	// Step 3 — no paused session found; create a brand-new one.
-	// ------------------------------------------------------------------
-
-	// FIX #3: Added wp_user_id ownership check to campaign lookup.
 	$query_url = add_query_arg( [
 		'id'         => 'eq.' . $campaign_id,
 		'wp_user_id' => 'eq.' . $user_id,
@@ -508,10 +488,9 @@ if ( is_wp_error( $pause_resp ) ) {
 		return new WP_Error( 'no_character', 'No character linked to this campaign.', [ 'status' => 400 ] );
 	}
 
-	$safe_world_id     = $world_id     ? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $world_id )     : null;
-	$safe_character_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $character_id );
+	$safe_world_id     = $world_id ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $world_id ) : null;
+	$safe_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id );
 
-	// Resolve start location (0,0) in the world.
 	$start_location_id = null;
 	if ( $safe_world_id ) {
 		$loc_url  = add_query_arg( [
@@ -560,7 +539,20 @@ if ( is_wp_error( $pause_resp ) ) {
 		return new WP_Error( 'no_session_id', 'Session created but no ID returned.', [ 'status' => 500 ] );
 	}
 
-	$session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $session_data[0]['id'] );
+	$session_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $session_data[0]['id'] );
+
+	if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+		tw_invalidate_game_data_cache( $user_id );
+	}
+
+	do_action( 'tw_session_started', $user_id, [
+		'session_id'   => $session_id,
+		'campaign_id'  => $campaign_id,
+		'character_id' => $safe_character_id,
+		'world_id'     => $safe_world_id,
+		'location_id'  => $start_location_id,
+		'resumed'      => false,
+	] );
 
 	error_log( 'TW_ENDPOINT_START_GAME_SESSION: SUCCESS session_id=' . $session_id );
 
@@ -579,9 +571,6 @@ if ( is_wp_error( $pause_resp ) ) {
 
 // ===========================================================================
 // SESSION END ENDPOINT
-//
-// Finds the active session for this user + campaign directly from Supabase.
-// No WP user meta involved.
 // ===========================================================================
 
 /**
@@ -590,7 +579,6 @@ if ( is_wp_error( $pause_resp ) ) {
 function neoweaver_end_game_session( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_END_GAME_SESSION: START (REST API)' );
 
-	// FIX #2: Added missing nonce verification (was absent in original).
 	$nonce = $request->get_param( 'security' ) ?? '';
 	if ( ! wp_verify_nonce( $nonce, 'tw_game_nonce' ) ) {
 		return new WP_Error( 'nonce_failed', 'Nonce check failed.', [ 'status' => 403 ] );
@@ -601,9 +589,8 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'unauthorized', 'You are not logged in.', [ 'status' => 401 ] );
 	}
 
-	// campaign_id tells us exactly which active session to close.
 	$campaign_id_raw = $request->get_param( 'campaign_id' ) ?? '';
-	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
+	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $campaign_id_raw );
 	if ( ! $campaign_id ) {
 		return new WP_Error( 'missing_campaign', 'Missing campaign ID.', [ 'status' => 400 ] );
 	}
@@ -614,7 +601,6 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	// Look up the active session for this user + campaign.
 	$lookup_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'campaign_id' => 'eq.' . $campaign_id,
@@ -639,9 +625,8 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'no_session', 'No active session found for this campaign.', [ 'status' => 404 ] );
 	}
 
-	$safe_session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $rows[0]['id'] );
+	$safe_session_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $rows[0]['id'] );
 
-	// Mark session as finished.
 	$patch_url = add_query_arg( [ 'id' => 'eq.' . $safe_session_id ], $base . 'cyber_game_sessions' );
 
 	$response = wp_remote_request( $patch_url, [
@@ -659,6 +644,15 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'patch_failed', 'Supabase returned HTTP ' . $code, [ 'status' => $code ] );
 	}
 
+	if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+		tw_invalidate_game_data_cache( $user_id );
+	}
+
+	do_action( 'tw_session_ended', $user_id, [
+		'session_id'  => $safe_session_id,
+		'campaign_id' => $campaign_id,
+	] );
+
 	error_log( 'TW_ENDPOINT_END_GAME_SESSION: SUCCESS session_id=' . $safe_session_id );
 
 	return rest_ensure_response( [
@@ -671,12 +665,7 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 	] );
 }
 
-// ===========================================================================
-// ROUTE REGISTRATION
-// ===========================================================================
-
 add_action( 'rest_api_init', function () {
-
 	register_rest_route( 'neoweaver/v1', '/world/create', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_create_world',
@@ -706,5 +695,4 @@ add_action( 'rest_api_init', function () {
 		'callback'            => 'neoweaver_end_game_session',
 		'permission_callback' => 'neoweaver_user_can_play',
 	] );
-
 } );
