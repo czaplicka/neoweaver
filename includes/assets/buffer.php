@@ -3,8 +3,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-wp_enqueue_script( 'chartjs' );
-
 if ( ! function_exists( 'tw_is_buffer_context' ) ) {
 	/**
 	 * Detect whether current request needs buffer assets.
@@ -36,7 +34,7 @@ if ( ! function_exists( 'tw_register_buffer_assets' ) ) {
 			return;
 		}
 
-		tw_register_vendor_assets();
+		wp_enqueue_script( 'chartjs' );
 
 		tw_enqueue_style_asset(
 			'neoweaver-buffer',
@@ -67,5 +65,4 @@ if ( ! function_exists( 'tw_register_buffer_assets' ) ) {
 	}
 }
 
-add_action( 'wp_enqueue_scripts', 'tw_register_vendor_assets', 1 );
 add_action( 'wp_enqueue_scripts', 'tw_register_buffer_assets', 20 );
