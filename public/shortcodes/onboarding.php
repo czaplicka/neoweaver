@@ -1,5 +1,7 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
@@ -7,11 +9,40 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 		const SHORTCODE = 'tw_onboarding_slider';
 
-		public static function init() {
+		public static function init(): void {
 			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
+			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 		}
 
-		public static function render_shortcode( $atts = [] ) {
+		public static function enqueue_assets(): void {
+			if ( ! function_exists( 'tw_has_shortcode_on_current_page' ) || ! tw_has_shortcode_on_current_page( self::SHORTCODE ) ) {
+				return;
+			}
+
+			tw_enqueue_style_asset(
+				'neoweaver-onboarding',
+				'assets/css/public/onboarding.css',
+				[ 'neoweaver-public' ]
+			);
+
+			tw_enqueue_script_asset(
+				'neoweaver-onboarding',
+				'assets/js/public/onboarding.js',
+				[ 'jquery' ],
+				true
+			);
+
+			wp_localize_script(
+				'neoweaver-onboarding',
+				'twOnboarding',
+				[
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
+				]
+			);
+		}
+
+		public static function render_shortcode( $atts = [] ): string {
 			if ( ! is_user_logged_in() ) {
 				return '';
 			}
@@ -58,6 +89,7 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 					<span class="tw-onboarding-slider__toggle-text"></span>
 					<span class="tw-onboarding-slider__toggle-icon">&#9654;</span>
 				</button>
+
 				<aside id="tw-onboarding-slider-panel" class="tw-onboarding-slider__panel">
 					<button
 						type="button"
@@ -121,14 +153,15 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 				</aside>
 			</div>
 			<?php
-			return ob_get_clean();
+
+			return (string) ob_get_clean();
 		}
 
-		protected static function user_has_game_session( $wp_user_id ) {
+		protected static function user_has_game_session( int $wp_user_id ): bool {
 			$rows = tw_supabase_get(
 				'cyber_game_sessions',
 				[
-					'wp_user_id' => 'eq.' . intval( $wp_user_id ),
+					'wp_user_id' => 'eq.' . (int) $wp_user_id,
 					'select'     => 'id',
 					'limit'      => 1,
 				]
@@ -137,8 +170,8 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 			return ! empty( $rows );
 		}
 
-		protected static function get_user_progress( $wp_user_id ) {
-			$wp_user_id = intval( $wp_user_id );
+		protected static function get_user_progress( int $wp_user_id ): array {
+			$wp_user_id = (int) $wp_user_id;
 
 			$worlds = tw_supabase_get(
 				'cyber_worlds',
