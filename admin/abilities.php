@@ -409,7 +409,7 @@ class NW_Abilities_Admin {
 			<div class="nw-table-wrap">
 				<table class="nw-table">
 					<thead><tr>
-						<th>UUID / Title</th>
+						<th>UUID / Name</th>
 						<th>Type</th>
 						<th>Cost</th>
 						<th>Target</th>
@@ -440,10 +440,6 @@ class NW_Abilities_Admin {
 								<div class="nw-field">
 									<label>Name / slug <span class="nw-req">*</span></label>
 									<input type="text" id="nw-field-name" name="name" required placeholder="e.g. fireball">
-								</div>
-								<div class="nw-field">
-									<label>Title <span class="nw-req">*</span></label>
-									<input type="text" id="nw-field-title" name="title" required placeholder="e.g. Fireball">
 								</div>
 								<div class="nw-field nw-field-full">
 									<label>Description</label>
