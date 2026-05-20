@@ -52,7 +52,7 @@ final class NeoWeaver_Core {
 			'includes/api-endpoints-character-data.php',
 			'includes/api-endpoints.php',
 			'includes/char-panel.php',
-			'includes/chat-realtime.php',
+			// 'includes/chat-realtime.php',
 			'includes/checkout.php',
 			'includes/deck-core.php',
 			'includes/game-data.php',
