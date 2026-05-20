@@ -1,6 +1,6 @@
 <?php
 /**
- * Shortcode: [tw_create_campaign]  —  8-step Deployment creation wizard.
+ * Shortcode: [tw_create_campaign] — 8-step Deployment creation wizard.
  * @package Neoweaver
  */
 
@@ -13,54 +13,11 @@ if ( ! defined( 'NW_CAMPAIGN_CREATOR_CACHE_TTL' ) ) {
 }
 
 if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
-
 	function neoweaver_shortcode_campaign_creator(): string {
 		$user_id = get_current_user_id();
+
 		if ( ! $user_id ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
-		}
-
-			wp_enqueue_style(
-				'neoweaver-campaign-creator',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/public/campaign-creator.css',
-				[],
-				(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/public/campaign-creator.css' )
-			);
-
-			wp_enqueue_script(
-				'neoweaver-campaign-creator',
-				NEOWEAVER_PLUGIN_URL . 'assets/js/public/campaign-creator.js',
-				[],
-				(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/public/campaign-creator.js' ),
-				true
-			);
-
-		$nonce    = wp_create_nonce( 'tw_campaign_nonce' );
-		$rest_url = home_url( '/wp-json/neoweaver/v1/campaign/create' );
-
-		wp_localize_script(
-			'neoweaver-campaign-creator',
-			'twCampaignConfig',
-			[
-				'nonce'        => $nonce,
-				'restNonce'    => wp_create_nonce( 'wp_rest' ),
-				'restUrl'      => $rest_url,
-				'campaignsUrl' => home_url( '/deployments/' ),
-				'supabaseUrl'  => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
-				'supabaseKey'  => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-				'userId'       => $user_id,
-				'uploadsUrl'   => wp_upload_dir()['baseurl'],
-			]
-		);
-
-		$spinner_css = NEOWEAVER_PLUGIN_DIR . 'assets/css/public/node-spinner.css';
-		if ( file_exists( $spinner_css ) ) {
-			wp_enqueue_style(
-				'neoweaver-node-spinner',
-				NEOWEAVER_PLUGIN_URL . 'assets/css/public/node-spinner.css',
-				[],
-				(string) filemtime( $spinner_css )
-			);
 		}
 
 		$gm_styles = [
@@ -104,22 +61,20 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 		?>
 		<div id="tw-campaign-creator-wrapper" data-total-steps="<?php echo esc_attr( $total_steps ); ?>">
 
-			<!-- PROGRESS BAR -->
 			<div class="tw-progress-bar" aria-label="Deployment configuration progress">
 				<div class="tw-progress-header">
 					<span class="tw-progress-label">DEPLOYMENT_INIT<span class="tw-blink">_</span></span>
 					<span class="tw-progress-counter"><span id="tw-camp-step-current">1</span> / <?php echo esc_html( $total_steps ); ?></span>
 				</div>
 				<div class="tw-progress-track">
-					<div class="tw-progress-fill" id="tw-camp-progress-fill" style="width:<?php echo round( 100 / $total_steps ); ?>%"></div>
+					<div class="tw-progress-fill" id="tw-camp-progress-fill" style="width:<?php echo esc_attr( (string) round( 100 / $total_steps ) ); ?>%"></div>
 					<?php for ( $i = 1; $i <= $total_steps; $i++ ) : ?>
-						<span class="tw-progress-tick<?php echo $i === 1 ? ' active' : ''; ?>" data-tick="<?php echo esc_attr( $i ); ?>"></span>
+						<span class="tw-progress-tick<?php echo 1 === $i ? ' active' : ''; ?>" data-tick="<?php echo esc_attr( (string) $i ); ?>"></span>
 					<?php endfor; ?>
 				</div>
 				<div class="tw-progress-phase" id="tw-camp-progress-phase">DEPLOYMENT MATRIX</div>
 			</div>
 
-			<!-- STEP 1 -->
 			<div class="tw-step active" data-step="1" data-phase="DEPLOYMENT MATRIX">
 				<h2>// INITIALIZE DEPLOYMENT</h2>
 				<p class="tw-question-text">Define the operation before uplink synchronization.</p>
@@ -134,88 +89,111 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 				<div class="tw-nav-row"><span></span><button type="button" class="tw-btn-nav" id="tw-camp-step1-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 2 — GM Style -->
 			<div class="tw-step" data-step="2" data-phase="GM PROTOCOL" data-field="gm_style">
 				<h2>// GM PROTOCOL</h2>
 				<p class="tw-question-text">Select the AI Game Master's narrative lens for this deployment.</p>
 				<div class="tw-option-grid tw-option-grid--3">
-					<?php foreach ( $gm_styles as [ $val, $label, $desc, $emoji ] ) :
-						$id = 'tw-gm-' . esc_attr( $val ); ?>
-					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="gm_style" value="<?php echo esc_attr( $val ); ?>" />
-						<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo $emoji; ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
-					</label>
+					<?php foreach ( $gm_styles as $item ) : ?>
+						<?php
+						$val   = (string) $item[0];
+						$label = (string) $item[1];
+						$desc  = (string) $item[2];
+						$emoji = (string) $item[3];
+						$id    = 'tw-gm-' . sanitize_html_class( $val );
+						?>
+						<label class="tw-card-label" for="<?php echo esc_attr( $id ); ?>">
+							<input type="radio" id="<?php echo esc_attr( $id ); ?>" name="gm_style" value="<?php echo esc_attr( $val ); ?>" />
+							<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo esc_html( $emoji ); ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
+						</label>
 					<?php endforeach; ?>
 				</div>
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 3 — Game Mode (Solo / Team) -->
 			<div class="tw-step" data-step="3" data-phase="OPERATIVE MODE" data-field="game_mode">
 				<h2>// OPERATIVE MODE</h2>
 				<p class="tw-question-text">How many Operators will be synchronized to this deployment?</p>
-				<!-- 2 cards centred, equal width -->
 				<div class="tw-option-grid tw-option-grid--2 tw-option-grid--centered">
-					<?php foreach ( $game_modes as [ $val, $label, $desc, $emoji ] ) :
-						$id = 'tw-mode-' . esc_attr( $val ); ?>
-					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="game_mode" value="<?php echo esc_attr( $val ); ?>" />
-						<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo $emoji; ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
-					</label>
+					<?php foreach ( $game_modes as $item ) : ?>
+						<?php
+						$val   = (string) $item[0];
+						$label = (string) $item[1];
+						$desc  = (string) $item[2];
+						$emoji = (string) $item[3];
+						$id    = 'tw-mode-' . sanitize_html_class( $val );
+						?>
+						<label class="tw-card-label" for="<?php echo esc_attr( $id ); ?>">
+							<input type="radio" id="<?php echo esc_attr( $id ); ?>" name="game_mode" value="<?php echo esc_attr( $val ); ?>" />
+							<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo esc_html( $emoji ); ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
+						</label>
 					<?php endforeach; ?>
 				</div>
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 4 — Game Length -->
 			<div class="tw-step" data-step="4" data-phase="OPERATION SCOPE" data-field="game_length">
 				<h2>// OPERATION SCOPE</h2>
 				<p class="tw-question-text">Define the temporal arc of this deployment.</p>
 				<div class="tw-option-grid tw-option-grid--5">
-					<?php foreach ( $game_lengths as [ $val, $label, $desc, $emoji ] ) :
-						$id = 'tw-length-' . esc_attr( $val ); ?>
-					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="game_length" value="<?php echo esc_attr( $val ); ?>" />
-						<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo $emoji; ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
-					</label>
+					<?php foreach ( $game_lengths as $item ) : ?>
+						<?php
+						$val   = (string) $item[0];
+						$label = (string) $item[1];
+						$desc  = (string) $item[2];
+						$emoji = (string) $item[3];
+						$id    = 'tw-length-' . sanitize_html_class( $val );
+						?>
+						<label class="tw-card-label" for="<?php echo esc_attr( $id ); ?>">
+							<input type="radio" id="<?php echo esc_attr( $id ); ?>" name="game_length" value="<?php echo esc_attr( $val ); ?>" />
+							<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo esc_html( $emoji ); ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
+						</label>
 					<?php endforeach; ?>
 				</div>
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 5 — World Type -->
 			<div class="tw-step" data-step="5" data-phase="THREAT CALIBRATION" data-field="world_type">
 				<h2>// THREAT CALIBRATION</h2>
 				<p class="tw-question-text">Set the lethality and entropy pressure level for this deployment.</p>
 				<div class="tw-option-grid tw-option-grid--5">
-					<?php foreach ( $world_types as [ $val, $label, $desc, $emoji ] ) :
-						$id = 'tw-wtype-' . esc_attr( $val ); ?>
-					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="world_type" value="<?php echo esc_attr( $val ); ?>" />
-						<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo $emoji; ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
-					</label>
+					<?php foreach ( $world_types as $item ) : ?>
+						<?php
+						$val   = (string) $item[0];
+						$label = (string) $item[1];
+						$desc  = (string) $item[2];
+						$emoji = (string) $item[3];
+						$id    = 'tw-wtype-' . sanitize_html_class( $val );
+						?>
+						<label class="tw-card-label" for="<?php echo esc_attr( $id ); ?>">
+							<input type="radio" id="<?php echo esc_attr( $id ); ?>" name="world_type" value="<?php echo esc_attr( $val ); ?>" />
+							<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo esc_html( $emoji ); ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
+						</label>
 					<?php endforeach; ?>
 				</div>
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 6 — Priority -->
 			<div class="tw-step" data-step="6" data-phase="MISSION PRIORITY" data-field="priority">
 				<h2>// MISSION PRIORITY</h2>
 				<p class="tw-question-text">What drives this deployment? The GM will weight quests, rewards and encounters accordingly.</p>
 				<div class="tw-option-grid tw-option-grid--5">
-					<?php foreach ( $priorities as [ $val, $label, $desc, $emoji ] ) :
-						$id = 'tw-priority-' . esc_attr( $val ); ?>
-					<label class="tw-card-label" for="<?php echo $id; ?>">
-						<input type="radio" id="<?php echo $id; ?>" name="priority" value="<?php echo esc_attr( $val ); ?>" />
-						<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo $emoji; ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
-					</label>
+					<?php foreach ( $priorities as $item ) : ?>
+						<?php
+						$val   = (string) $item[0];
+						$label = (string) $item[1];
+						$desc  = (string) $item[2];
+						$emoji = (string) $item[3];
+						$id    = 'tw-priority-' . sanitize_html_class( $val );
+						?>
+						<label class="tw-card-label" for="<?php echo esc_attr( $id ); ?>">
+							<input type="radio" id="<?php echo esc_attr( $id ); ?>" name="priority" value="<?php echo esc_attr( $val ); ?>" />
+							<div class="tw-card-visual"><span class="tw-card-emoji"><?php echo esc_html( $emoji ); ?></span><strong><?php echo esc_html( $label ); ?></strong><span><?php echo esc_html( $desc ); ?></span></div>
+						</label>
 					<?php endforeach; ?>
 				</div>
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">NEXT &rarr;</button></div>
 			</div>
 
-			<!-- STEP 7 — Node & Agent Binding (both OPTIONAL) -->
 			<div class="tw-step" data-step="7" data-phase="NODE & AGENT BINDING" data-optional="true">
 				<h2>// NODE &amp; AGENT BINDING <span class="tw-optional-badge">OPTIONAL</span></h2>
 				<p class="tw-question-text">Bind a Node and assign a Field Agent — or skip both and configure later from your Campaign dashboard.</p>
@@ -238,7 +216,6 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">REVIEW &rarr;</button></div>
 			</div>
 
-			<!-- STEP 8 — Summary -->
 			<div class="tw-step tw-step--summary" data-step="8" data-phase="SYSTEM REVIEW">
 				<h2>// SYSTEM REVIEW</h2>
 				<p class="tw-question-text">Verify deployment parameters before uplink.</p>
@@ -253,49 +230,95 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 						[ 'THREAT_LVL',       'world_type',    5 ],
 						[ 'MISSION_PRIORITY', 'priority',      6 ],
 					];
-					foreach ( $rows as [ $key, $field, $goto ] ) : ?>
-					<div class="tw-summary-row">
-						<span class="tw-summary-key"><?php echo esc_html( $key ); ?></span>
-						<span class="tw-summary-val" id="tw-summary-<?php echo esc_attr( $field ); ?>">&mdash;</span>
-						<button type="button" class="tw-summary-edit" data-goto="<?php echo esc_attr( $goto ); ?>">[ EDIT ]</button>
-					</div>
+					foreach ( $rows as $row ) :
+						$key   = (string) $row[0];
+						$field = (string) $row[1];
+						$goto  = (int) $row[2];
+						?>
+						<div class="tw-summary-row">
+							<span class="tw-summary-key"><?php echo esc_html( $key ); ?></span>
+							<span class="tw-summary-val" id="tw-summary-<?php echo esc_attr( $field ); ?>">&mdash;</span>
+							<button type="button" class="tw-summary-edit" data-goto="<?php echo esc_attr( (string) $goto ); ?>">[ EDIT ]</button>
+						</div>
 					<?php endforeach; ?>
+
 					<div class="tw-summary-row">
 						<span class="tw-summary-key">NODE <span class="tw-optional-badge">OPTIONAL</span></span>
 						<span class="tw-summary-val" id="tw-summary-world_id">&mdash; (unbound)</span>
 						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
 					</div>
+
 					<div class="tw-summary-row">
 						<span class="tw-summary-key">AGENT <span class="tw-optional-badge">OPTIONAL</span></span>
 						<span class="tw-summary-val" id="tw-summary-character_id">&mdash; (unassigned)</span>
 						<button type="button" class="tw-summary-edit" data-goto="7">[ EDIT ]</button>
 					</div>
 				</div>
+
 				<div class="tw-nav-row">
 					<button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button>
 					<button type="button" class="tw-btn-nav tw-btn-deploy" id="tw-camp-submit">&#9658; UPLINK DEPLOYMENT</button>
 				</div>
+
 				<div class="tw-camp-status" aria-live="polite"></div>
 			</div>
 
-		</div><!-- /#tw-campaign-creator-wrapper -->
+		</div>
 		<?php
+
 		return '<div class="neoweaver-screen">' . ( ob_get_clean() ?: '' ) . '</div>';
 	}
 }
 
 if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
 	function neoweaver_campaign_creator_supabase_get( string $table, array $query_args, int $user_id = 0, int $ttl = 0 ): array {
-		$cache_key = ( $ttl > 0 && $user_id > 0 ) ? 'tw_sb_' . $user_id . '_' . md5( $table . serialize( $query_args ) ) : '';
-		if ( $cache_key ) { $cached = get_transient( $cache_key ); if ( $cached !== false ) return $cached; }
-		$anon_key = tw_supabase_anon_key();
+		$cache_key = '';
+
+		if ( $ttl > 0 && $user_id > 0 ) {
+			$cache_key = 'tw_sb_' . $user_id . '_' . md5( $table . wp_json_encode( $query_args ) );
+			$cached    = get_transient( $cache_key );
+
+			if ( false !== $cached && is_array( $cached ) ) {
+				return $cached;
+			}
+		}
+
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return [];
+		}
+
+		$supabase_url = tw_supabase_url();
+		$anon_key     = tw_supabase_anon_key();
+
+		if ( empty( $supabase_url ) || empty( $anon_key ) ) {
+			return [];
+		}
+
 		$response = wp_remote_get(
-			add_query_arg( $query_args, trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table ),
-			[ 'headers' => [ 'apikey' => $anon_key, 'Authorization' => 'Bearer ' . $anon_key ] ]
+			add_query_arg( $query_args, trailingslashit( $supabase_url ) . 'rest/v1/' . ltrim( $table, '/' ) ),
+			[
+				'headers' => [
+					'apikey'        => $anon_key,
+					'Authorization' => 'Bearer ' . $anon_key,
+					'Content-Type'  => 'application/json',
+				],
+				'timeout' => 15,
+			]
 		);
-		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) return [];
-		$rows = json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
-		if ( $cache_key ) set_transient( $cache_key, $rows, $ttl );
+
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			return [];
+		}
+
+		$rows = json_decode( wp_remote_retrieve_body( $response ), true );
+		$rows = is_array( $rows ) ? $rows : [];
+
+		if ( $cache_key ) {
+			set_transient( $cache_key, $rows, $ttl );
+		}
+
 		return $rows;
 	}
 }
+
+add_shortcode( 'tw_create_campaign', 'neoweaver_shortcode_campaign_creator' );
