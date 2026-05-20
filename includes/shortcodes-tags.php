@@ -23,11 +23,16 @@ if ( ! function_exists( 'tw_sanitize_supabase_table' ) ) {
 if ( ! function_exists( 'tw_supa_url' ) ) {
 	function tw_supa_url( string $table, array $args = array() ): string {
 		$safe_table = tw_sanitize_supabase_table( $table );
-		$base       = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $safe_table;
 
 		if ( empty( $safe_table ) ) {
 			return '';
 		}
+
+		if ( ! function_exists( 'tw_supabase_url' ) ) {
+			return '';
+		}
+
+		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $safe_table;
 
 		if ( empty( $args ) ) {
 			return $base;
@@ -39,7 +44,15 @@ if ( ! function_exists( 'tw_supa_url' ) ) {
 
 if ( ! function_exists( 'tw_supa_headers' ) ) {
 	function tw_supa_headers(): array {
+		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return array();
+		}
+
 		$key = tw_supabase_anon_key();
+
+		if ( empty( $key ) ) {
+			return array();
+		}
 
 		return array(
 			'apikey'        => $key,
@@ -69,7 +82,7 @@ if ( ! function_exists( 'tw_supa_response_ok' ) ) {
 
 if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 	function tw_update_game_session_status( $campaign_id, string $status, $scenario_id = 0 ): bool {
-		if ( ! function_exists( 'tw_supabase_url' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return false;
 		}
 
@@ -93,18 +106,24 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 
 		$body = array(
 			'scenario_status' => sanitize_text_field( $status ),
-			'updated_at'      => current_time( 'mysql' ),
+			'updated_at'      => gmdate( 'c' ),
 		);
 
 		if ( $scenario_id ) {
 			$body['active_scenario_id'] = (int) $scenario_id;
 		}
 
+		$headers = tw_supa_headers();
+
+		if ( empty( $headers ) ) {
+			return false;
+		}
+
 		$response = wp_remote_request(
 			$url,
 			array(
 				'method'  => 'PATCH',
-				'headers' => tw_supa_headers(),
+				'headers' => $headers,
 				'body'    => wp_json_encode( $body ),
 				'timeout' => 10,
 			)
@@ -116,7 +135,7 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 
 if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 	function tw_get_game_session_status( $campaign_id ): string {
-		if ( ! function_exists( 'tw_supabase_url' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return '';
 		}
 
@@ -139,10 +158,16 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 			return '';
 		}
 
+		$headers = tw_supa_headers();
+
+		if ( empty( $headers ) ) {
+			return '';
+		}
+
 		$response = wp_remote_get(
 			$url,
 			array(
-				'headers' => tw_supa_headers(),
+				'headers' => $headers,
 				'timeout' => 10,
 			)
 		);
@@ -153,7 +178,7 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( ! is_array( $body ) ) {
+		if ( ! is_array( $body ) || empty( $body[0] ) ) {
 			return '';
 		}
 
@@ -163,7 +188,7 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 
 if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 	function tw_get_chat_channel_id_by_session( $session_id ): ?int {
-		if ( ! function_exists( 'tw_supabase_url' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return null;
 		}
 
@@ -186,10 +211,16 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 			return null;
 		}
 
+		$headers = tw_supa_headers();
+
+		if ( empty( $headers ) ) {
+			return null;
+		}
+
 		$response = wp_remote_get(
 			$url,
 			array(
-				'headers' => tw_supa_headers(),
+				'headers' => $headers,
 				'timeout' => 10,
 			)
 		);
@@ -200,7 +231,7 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		if ( ! is_array( $data ) ) {
+		if ( ! is_array( $data ) || empty( $data[0] ) ) {
 			return null;
 		}
 
@@ -252,35 +283,40 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			return;
 		}
 
-$updated = tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
+		$updated = tw_update_game_session_status( $campaign_id, 'generating', $scenario_id );
 
-if ( ! $updated ) {
-	wp_send_json_error( 'Could not update session status', 500 );
-	return;
+		if ( ! $updated ) {
+			wp_send_json_error( 'Could not update session status', 500 );
+			return;
+		}
+
+		if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+			tw_invalidate_game_data_cache( $wp_user_id );
+		}
+
+		do_action(
+			'tw_session_state_changed',
+			$wp_user_id,
+			array(
+				'session_id'  => $session_id,
+				'campaign_id' => $campaign_id,
+				'scenario_id' => $scenario_id,
+				'status'      => 'generating',
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'message'     => 'Scenario generation marked as started',
+				'status'      => 'generating',
+				'scenario_id' => $scenario_id,
+				'campaign_id' => $campaign_id,
+				'session_id'  => $session_id,
+			)
+		);
+	}
 }
 
-if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
-	tw_invalidate_game_data_cache( $wp_user_id );
-}
-
-do_action( 'tw_session_state_changed', $wp_user_id, array(
-	'session_id'  => $session_id,
-	'campaign_id' => $campaign_id,
-	'scenario_id' => $scenario_id,
-	'status'      => 'generating',
-) );
-
-wp_send_json_success(
-	array(
-		'message'     => 'Scenario generation marked as started',
-		'status'      => 'generating',
-		'scenario_id' => $scenario_id,
-		'campaign_id' => $campaign_id,
-		'session_id'  => $session_id,
-	)
-);
-}
-}
 // ============================================================
 // 2. CHECK SCENARIO STATUS
 // ============================================================
@@ -338,7 +374,7 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 			return;
 		}
 
-		if ( ! function_exists( 'tw_supabase_url' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			wp_send_json_error( 'Config missing', 500 );
 			return;
 		}
@@ -373,7 +409,7 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 		$url = tw_supa_url(
 			'cyber_chat_messages',
 			array(
-				'chat_channel_id' => 'eq.' . $chat_channel_id,
+				'chat_channel_id' => 'eq.' . (int) $chat_channel_id,
 				'sender_type'     => 'in.(AI,GM)',
 				'order'           => 'created_at.desc',
 				'limit'           => 1,
@@ -385,10 +421,17 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 			return;
 		}
 
+		$headers = tw_supa_headers();
+
+		if ( empty( $headers ) ) {
+			wp_send_json_error( 'Config missing', 500 );
+			return;
+		}
+
 		$response = wp_remote_get(
 			$url,
 			array(
-				'headers' => tw_supa_headers(),
+				'headers' => $headers,
 				'timeout' => 10,
 			)
 		);
@@ -428,7 +471,7 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 	add_action( 'wp_ajax_nopriv_tw_get_lore_tips', 'tw_get_lore_tips' );
 
 	function tw_get_lore_tips(): void {
-		if ( ! function_exists( 'tw_supabase_url' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			wp_send_json_error( 'Config missing', 500 );
 			return;
 		}
@@ -437,8 +480,7 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 			'cyber_tips',
 			array(
 				'select' => 'tip',
-				'order'  => 'random()',
-				'limit'  => 20,
+				'limit'  => 50,
 			)
 		);
 
@@ -447,10 +489,17 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 			return;
 		}
 
+		$headers = tw_supa_headers();
+
+		if ( empty( $headers ) ) {
+			wp_send_json_error( 'Config missing', 500 );
+			return;
+		}
+
 		$response = wp_remote_get(
 			$url,
 			array(
-				'headers' => tw_supa_headers(),
+				'headers' => $headers,
 				'timeout' => 10,
 			)
 		);
@@ -463,12 +512,17 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 		$tips = json_decode( wp_remote_retrieve_body( $response ), true );
 		$tips = is_array( $tips ) ? $tips : array();
 
-		$tips = array_map(
-			static function ( $tip ) {
-				return sanitize_text_field( $tip );
-			},
-			array_column( $tips, 'tip' )
+		$tips = array_filter(
+			array_map(
+				static function ( $tip ) {
+					return sanitize_text_field( (string) $tip );
+				},
+				array_column( $tips, 'tip' )
+			)
 		);
+
+		shuffle( $tips );
+		$tips = array_slice( $tips, 0, 20 );
 
 		wp_send_json_success( $tips );
 	}
