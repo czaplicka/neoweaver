@@ -11,64 +11,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 add_action( 'wp_enqueue_scripts', 'tw_list_worlds_enqueue_assets' );
 
-function tw_list_worlds_enqueue_assets() {
-	if ( is_admin() ) {
+function tw_list_worlds_enqueue_assets(): void {
+	if ( ! tw_has_shortcode_on_current_page( 'tw_list_worlds' ) ) {
 		return;
 	}
 
-	if ( is_singular() ) {
-		global $post;
-		if ( empty( $post ) || false === strpos( $post->post_content, '[tw_list_worlds' ) ) {
-			return;
-		}
-	}
-
-	$plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' )
-		? NEOWEAVER_PLUGIN_URL
-		: plugin_dir_url( dirname( __FILE__, 2 ) );
-
-	$plugin_dir = defined( 'NEOWEAVER_PLUGIN_DIR' )
-		? NEOWEAVER_PLUGIN_DIR
-		: plugin_dir_path( dirname( __FILE__, 2 ) );
-
-	$css_rel  = 'assets/css/public/list-worlds.css';
-	$css_path = trailingslashit( $plugin_dir ) . $css_rel;
-	$css_url  = trailingslashit( $plugin_url ) . $css_rel;
-	$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : '1.0.1';
-
-	$js_rel  = 'assets/js/public/list-worlds.js';
-	$js_path = trailingslashit( $plugin_dir ) . $js_rel;
-	$js_url  = trailingslashit( $plugin_url ) . $js_rel;
-	$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : '1.0.1';
-
-	wp_enqueue_style(
+	tw_enqueue_style_asset(
 		'tw-list-worlds',
-		$css_url,
-		array(),
-		$css_ver
+		'assets/css/public/list-worlds.css'
 	);
 
-	wp_enqueue_script(
+	tw_enqueue_script_asset(
 		'tw-list-worlds',
-		$js_url,
-		array(),
-		$js_ver,
+		'assets/js/public/list-worlds.js',
+		[],
 		true
 	);
 
 	wp_localize_script(
 		'tw-list-worlds',
 		'twListWorldsData',
-		array(
-			'deleteConfirm' => 'This will erase the world from the grid (and all linked data via cascade). Proceed?',
+		[
+			'deleteConfirm'   => 'This will erase the world from the grid (and all linked data via cascade). Proceed?',
 			'supabaseOffline' => 'SUPABASE CLIENT OFFLINE. CANNOT ERASE WORLD.',
-			'deleteFailed' => 'Deletion failed:',
+			'deleteFailed'    => 'Deletion failed:',
 			'deleteException' => 'Deletion failed: client exception.',
-			'erasingLabel' => 'ERASING…',
-			'erasedLabel' => 'NODE ERASED',
-			'refreshDelayMs' => 20000,
-			'reloadDelayMs'  => 700,
-		)
+			'erasingLabel'    => 'ERASING…',
+			'erasedLabel'     => 'NODE ERASED',
+			'refreshDelayMs'  => 20000,
+			'reloadDelayMs'   => 700,
+		]
 	);
 }
 
