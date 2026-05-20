@@ -187,3 +187,29 @@ if ( ! function_exists( 'tw_get_current_character_id' ) ) {
         return (string) ( $game_data['active_character_id'] ?? '' );
     }
 }
+/**
+ * AUTO-INVALIDATION: podpina tw_invalidate_game_data_cache() do zdarzeń gry.
+ */
+
+// 1. Zmiana sesji — gdy gracz dołącza / opuszcza kampanię
+add_action( 'tw_session_started',   'tw_auto_invalidate_cache_hook' );
+add_action( 'tw_session_ended',     'tw_auto_invalidate_cache_hook' );
+
+// 2. Zmiana lokalizacji (teleport, przejście)
+add_action( 'tw_location_changed',  'tw_auto_invalidate_cache_hook' );
+
+// 3. Zmiana aktywnej postaci
+add_action( 'tw_character_changed', 'tw_auto_invalidate_cache_hook' );
+
+// 4. Dołączenie do kampanii
+add_action( 'tw_campaign_joined',   'tw_auto_invalidate_cache_hook' );
+
+/**
+ * Callback wspólny dla wszystkich hooków.
+ * Każdy hook musi przekazać wp_user_id jako pierwszy argument.
+ */
+function tw_auto_invalidate_cache_hook( int $wp_user_id ): void {
+    if ( $wp_user_id > 0 ) {
+        tw_invalidate_game_data_cache( $wp_user_id );
+    }
+}
