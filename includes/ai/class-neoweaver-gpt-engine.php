@@ -11,9 +11,6 @@ require_once dirname(__DIR__) . '/supabase-config.php';
  *
  * Key differences vs old chat/completions:
  *  - Endpoint: /v1/responses
- *  - History:  previous_response_id (OpenAI stores context server-side, no local message array)
- *              Session (last_response_id) stored in Supabase: cyber_chat_sessions
- *  - Lore:     file_search tool + Vector Store (no need to inject lore into every prompt)
  *  - Tokens:   input_tokens / output_tokens (not prompt_tokens / completion_tokens)
  *
  * wp-config.php constants used:
@@ -30,6 +27,7 @@ class NeoWeaver_GPT_Engine {
     /**
      * Blok A — stały system prompt (cache'owany po stronie OpenAI).
      * Parametr 'instructions' w Responses API.
+     * Czy my w ogóle tego potrzebujemy?
      */
     private const SYSTEM_INSTRUCTIONS = <<<PROMPT
 You are the AI Game Master of NeoWeave — a dark, narrative RPG.
