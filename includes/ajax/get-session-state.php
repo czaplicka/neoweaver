@@ -46,7 +46,17 @@ function tw_get_session_state_handler() {
 		wp_send_json_error( [ 'message' => 'Supabase error', 'error' => $resp->get_error_message() ] );
 		return;
 	}
+$current_user_id = get_current_user_id();
 
+if ( ! $current_user_id ) {
+	wp_send_json_error( [ 'message' => 'Unauthorized' ], 401 );
+	return;
+}
+
+if ( (int) $rows[0]['wp_user_id'] !== $current_user_id ) {
+	wp_send_json_error( [ 'message' => 'Forbidden' ], 403 );
+	return;
+}
 	$code = wp_remote_retrieve_response_code( $resp );
 	if ( $code < 200 || $code >= 300 ) {
 		wp_send_json_error( [ 'message' => 'Supabase HTTP ' . $code, 'body' => wp_remote_retrieve_body( $resp ) ] );
