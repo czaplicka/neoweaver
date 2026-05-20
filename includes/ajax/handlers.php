@@ -59,7 +59,7 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 
 		$body = array(
 			'scenario_status' => $status,
-			'updated_at'      => current_time( 'mysql' ),
+			'updated_at'      => gmdate('Y-m-d\TH:i:s\Z'),
 		);
 
 		if ( $scenario_id ) {
