@@ -16,7 +16,6 @@ jQuery(function ($) {
     var $deleteBtn = $('#nw-delete-btn');
     var $fieldId = $('#nw-field-id');
     var $fieldName = $('#nw-field-name');
-    var $fieldTitle = $('#nw-field-title');
     var $fieldDescription = $('#nw-field-description');
     var $fieldAbilityType = $('#nw-field-ability_type');
     var $fieldCostType = $('#nw-field-cost_type');
@@ -132,7 +131,6 @@ jQuery(function ($) {
         return {
             id: item.id || '',
             name: item.name || '',
-            title: item.title || '',
             description: item.description || '',
             ability_type: item.ability_type || 'active',
             cost_type: item.cost_type || 'none',
@@ -188,7 +186,6 @@ jQuery(function ($) {
         var html = data.map(function (a) {
             var safeUuid = esc(a.id);
             var safeName = esc(a.name || '—');
-            var safeTitle = esc(a.title || 'Untitled');
             var tc = typeClass[a.ability_type] || 'nw-type-active';
 
             var imgThumb = a.img_url
@@ -212,7 +209,6 @@ jQuery(function ($) {
                 +   '<td>'
                 +       imgThumb
                 +       '<div class="nw-ability-id">' + safeName + '</div>'
-                +       '<div class="nw-ability-title">' + safeTitle + '</div>'
                 +       '<div class="nw-ability-uuid" style="font-size:11px;opacity:.7;margin-top:4px;">' + safeUuid + '</div>'
                 +   '</td>'
                 +   '<td><span class="nw-type-badge ' + tc + '">' + esc(a.ability_type) + '</span></td>'
@@ -250,7 +246,6 @@ jQuery(function ($) {
                 var haystack = [
                     a.id,
                     a.name,
-                    a.title,
                     a.description,
                     a.source
                 ].join(' ').toLowerCase();
@@ -321,7 +316,6 @@ jQuery(function ($) {
 
         $fieldId.val('');
         $fieldName.val('');
-        $fieldTitle.val('');
         $fieldDescription.val('');
         $fieldAbilityType.val('active');
         $fieldCostType.val('none');
@@ -354,7 +348,6 @@ jQuery(function ($) {
 
             $fieldId.val(ability.id);
             $fieldName.val(ability.name);
-            $fieldTitle.val(ability.title);
             $fieldDescription.val(ability.description);
             $fieldAbilityType.val(ability.ability_type);
             $fieldCostType.val(ability.cost_type);
@@ -431,16 +424,10 @@ jQuery(function ($) {
 
     $saveBtn.on('click', function () {
         var uuid = String($fieldId.val() || '').trim();
-        var name = String($fieldName.val() || '').trim();
-        var title = String($fieldTitle.val() || '').trim();
+        var name = String($fieldName.val() || '').trim()
 
         if (!name) {
             notice('Name / slug is required.', 'error');
-            return;
-        }
-
-        if (!title) {
-            notice('Title is required.', 'error');
             return;
         }
 
@@ -453,7 +440,6 @@ jQuery(function ($) {
             nonce: nonce,
             id: uuid,
             name: name,
-            title: title,
             description: String($fieldDescription.val() || '').trim(),
             ability_type: String($fieldAbilityType.val() || 'active'),
             cost_type: String($fieldCostType.val() || 'none'),
