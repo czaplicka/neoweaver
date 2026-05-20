@@ -182,37 +182,41 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 
 if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 	function tw_rest_ai_build_context( $char_id ) {
-		if ( ! function_exists( 'tw_supabase_select_one' ) ) {
-			return new WP_Error( 'tw_ai_no_supabase', 'tw_supabase_select_one() niedostępne' );
-		}
+    if ( ! function_exists( 'tw_supabase_select_one' ) ) {
+        return new WP_Error( 'tw_ai_no_supabase', 'tw_supabase_select_one() niedostępne' );
+    }
 
-		$char = tw_supabase_select_one( 'cyber_characters', [ 'id' => $char_id ] );
-		if ( is_wp_error( $char ) || empty( $char ) ) {
-			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id );
-		}
+    $char = tw_supabase_select_one( 'cyber_characters', [ 'id' => $char_id ] );
+    if ( is_wp_error( $char ) || empty( $char ) ) {
+        return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id );
+    }
 
-		$location = [];
-		$world    = [];
+    $location = [];
+    $world    = [];
 
-		$location_id = isset( $char['locationid'] ) ? $char['locationid'] : null;
-		$world_id    = isset( $char['world_id'] )   ? $char['world_id']   : null;
+    // ← lokacja i świat z aktywnej sesji, nie z postaci
+    $wp_user_id = get_current_user_id();
+    if ( $wp_user_id && function_exists( 'get_user_game_data_from_supabase' ) ) {
+        $game_data   = get_user_game_data_from_supabase( $wp_user_id );
+        $location_id = $game_data['active_location_id'] ?? null;
+        $world_id    = $game_data['active_world_id']    ?? null;
+    }
 
-		if ( $location_id ) {
-			$loc = tw_supabase_select_one( 'cyber_worldmap', [ 'id' => $location_id ] );
-			if ( ! is_wp_error( $loc ) && $loc ) { $location = $loc; }
-		}
+    if ( ! empty( $location_id ) ) {
+        $loc = tw_supabase_select_one( 'cyber_world_map', [ 'id' => $location_id ] );
+        if ( ! is_wp_error( $loc ) && $loc ) { $location = $loc; }
+    }
 
-		if ( $world_id ) {
-			$w = tw_supabase_select_one( 'cyber_worlds', [ 'id' => $world_id ] );
-			if ( ! is_wp_error( $w ) && $w ) { $world = $w; }
-		}
+    if ( ! empty( $world_id ) ) {
+        $w = tw_supabase_select_one( 'cyber_worlds', [ 'id' => $world_id ] );
+        if ( ! is_wp_error( $w ) && $w ) { $world = $w; }
+    }
 
-		return [
-			'char'     => $char,
-			'location' => $location,
-			'world'    => $world,
-		];
-	}
+    return [
+        'char'     => $char,
+        'location' => $location,
+        'world'    => $world,
+    ];
 }
 
 // ============================================================
@@ -336,13 +340,23 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					break;
 
 				case 'LOC':
-					if ( $val ) {
-						tw_supabase_rpc( 'fn_move_character', [
-							'p_char_id'     => $char_id,
-							'p_location_id' => $val,
-						] );
-					}
-					break;
+    if ( $val ) {
+        tw_supabase_rpc( 'fn_move_character', [
+            'p_char_id'     => $char_id,
+            'p_location_id' => $val,
+        ] );
+
+        // ← DODAJ TO:
+        $wp_user_id = get_current_user_id();
+        if ( $wp_user_id && function_exists( 'tw_invalidate_game_data_cache' ) ) {
+            tw_invalidate_game_data_cache( $wp_user_id );
+        }
+        do_action( 'tw_location_changed', $wp_user_id, [
+            'char_id'     => $char_id,
+            'location_id' => $val,
+        ] );
+    }
+    break;
 
 				case 'ENTROPY_UP':
 					$delta    = (int) $val;
