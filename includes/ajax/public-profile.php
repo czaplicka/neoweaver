@@ -1,8 +1,4 @@
 <?php
-// ==========================================
-// AJAX – PUBLICZNY PROFIL POSTACI
-// ==========================================
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -22,48 +18,59 @@ if ( ! function_exists( 'tw_handle_toggle_char_public' ) ) {
 
 		if ( ! $wp_user_id ) {
 			wp_send_json_error(
-				array( 'message' => 'Unauthorized' ),
+				[
+					'message' => 'Unauthorized',
+				],
 				401
 			);
-			return;
 		}
 
 		if ( empty( $char_id ) || ! wp_is_uuid( $char_id ) ) {
 			wp_send_json_error(
-				array( 'message' => 'Invalid character ID' ),
+				[
+					'message' => 'Invalid character ID',
+				],
 				400
 			);
-			return;
+		}
+
+		if ( ! function_exists( 'tw_supabase_request' ) ) {
+			wp_send_json_error(
+				[
+					'message' => 'Supabase request helper unavailable',
+				],
+				500
+			);
 		}
 
 		$result = tw_supabase_request(
 			'PATCH',
 			'cyber_characters',
-			array(
+			[
 				'id'         => 'eq.' . $char_id,
-				'wp_user_id' => 'eq.' . $wp_user_id,
-			),
-			array(
+				'wp_user_id' => 'eq.' . (int) $wp_user_id,
+			],
+			[
 				'is_public' => $is_public,
-			)
+			]
 		);
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
-				array(
-					'message' => 'Database Error',
+				[
+					'message' => 'Database error',
 					'error'   => $result->get_error_message(),
-				),
+				],
 				500
 			);
-			return;
 		}
 
 		wp_send_json_success(
-			array(
+			[
 				'char_id'   => $char_id,
 				'is_public' => $is_public,
-			)
+				'message'   => 'Character visibility updated',
+			]
 		);
 	}
 }
