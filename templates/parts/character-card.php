@@ -3,16 +3,50 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$char_card_config = array(
-	'supabaseUrl'       => (string) tw_supabase_url(),
-	'activeCharacterId' => (string) $char_id,
+$args = wp_parse_args(
+	$args ?? array(),
+	array(
+		'char_id'              => '',
+		'char_data'            => array(),
+		'c_hp'                 => 0,
+		'm_hp'                 => 0,
+		'hp_class'             => '',
+		'c_mp'                 => 0,
+		'm_mp'                 => 0,
+		'mp_p'                 => 0,
+		'sync_p'               => 0,
+		'sync_class'           => '',
+		'c_satiety'            => 0,
+		'c_hydration'          => 0,
+		'c_rest'               => 0,
+		'skills_and_abilities' => array(),
+		'inventory'            => array(),
+		'logs_data'            => array(),
+		'total_mass'           => 0,
+		'mass_limit'           => 0,
+		'total_power'          => 0,
+	)
 );
 
-wp_add_inline_script(
-	'tw-character-card',
-	'window.twCharacterCardData = ' . wp_json_encode( $char_card_config ) . ';',
-	'before'
-);
+$char_id              = (string) $args['char_id'];
+$char_data            = is_array( $args['char_data'] ) ? $args['char_data'] : array();
+$c_hp                 = (int) $args['c_hp'];
+$m_hp                 = (int) $args['m_hp'];
+$hp_class             = (string) $args['hp_class'];
+$c_mp                 = (int) $args['c_mp'];
+$m_mp                 = (int) $args['m_mp'];
+$mp_p                 = (int) $args['mp_p'];
+$sync_p               = (int) $args['sync_p'];
+$sync_class           = (string) $args['sync_class'];
+$c_satiety            = (int) $args['c_satiety'];
+$c_hydration          = (int) $args['c_hydration'];
+$c_rest               = (int) $args['c_rest'];
+$skills_and_abilities = is_array( $args['skills_and_abilities'] ) ? $args['skills_and_abilities'] : array();
+$inventory            = is_array( $args['inventory'] ) ? $args['inventory'] : array();
+$logs_data            = is_array( $args['logs_data'] ) ? $args['logs_data'] : array();
+$total_mass           = $args['total_mass'];
+$mass_limit           = $args['mass_limit'];
+$total_power          = $args['total_power'];
 ?>
 
 <div class="tw-side-nav" id="twSideNav">
