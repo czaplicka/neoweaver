@@ -1,0 +1,63 @@
+.echo-stream-container {
+	border: 1px solid rgba(173, 255, 0, 0.2);
+	background: rgba(10, 16, 10, 0.72);
+	backdrop-filter: blur(8px);
+	border-radius: 16px;
+	padding: 16px;
+	color: #eaffc7;
+	font-family: "Chakra Petch", sans-serif;
+}
+
+.echo-title {
+	font-size: 14px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: #adff00;
+	margin-bottom: 12px;
+}
+
+.echo-list {
+	display: grid;
+	gap: 14px;
+}
+
+.echo-group {
+	display: grid;
+	gap: 8px;
+}
+
+.echo-group-title {
+	font-size: 12px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: rgba(234, 255, 199, 0.72);
+}
+
+.echo-group-items {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.echo-item {
+	--echo-tag-color: #00ffff;
+	display: inline-flex;
+	align-items: center;
+	min-height: 32px;
+	padding: 6px 10px;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--echo-tag-color) 45%, transparent);
+	background: color-mix(in srgb, var(--echo-tag-color) 12%, rgba(255, 255, 255, 0.02));
+	color: #f5ffe1;
+}
+
+.echo-item--empty {
+	opacity: 0.6;
+	border-style: dashed;
+}
+
+.echo-label {
+	font-size: 13px;
+	line-height: 1;
+	letter-spacing: 0.04em;
+}
