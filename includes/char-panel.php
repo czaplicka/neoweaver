@@ -3,6 +3,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * TALE WEAVER - CHARACTER PANEL LOGIC
+ * Ładuje się tylko na stronie gry (templates/adventure.php).
+ */
+
 add_action(
 	'wp_enqueue_scripts',
 	function () {
@@ -26,14 +31,14 @@ add_action(
 		$user_id   = get_current_user_id();
 		$game_data = function_exists( 'get_user_game_data_from_supabase' )
 			? get_user_game_data_from_supabase( $user_id )
-			: [];
+			: array();
 
-		$char_panel_data = [
+		$char_panel_data = array(
 			'supabaseUrl'       => function_exists( 'tw_supabase_url' ) ? (string) tw_supabase_url() : '',
 			'activeCharacterId' => (string) ( $game_data['active_character_id'] ?? '' ),
 			'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
 			'nonce'             => wp_create_nonce( 'tw_adventure_nonce' ),
-		];
+		);
 
 		wp_add_inline_script(
 			'tw-char-panel',
