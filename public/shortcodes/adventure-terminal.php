@@ -219,9 +219,31 @@ if ( wp_script_is( 'tw-adventure', 'enqueued' ) ) {
 			$character_card_path = NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php';
 			$tactical_overlay_path = NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php';
 
-			if ( file_exists( $character_card_path ) ) {
-				include $character_card_path;
-			}
+if ( file_exists( $character_card_path ) ) {
+	$args = array(
+		'char_id'              => (string) ( $game_data['active_character_id'] ?? '' ),
+		'char_data'            => $char['char_data'] ?? array(),
+		'c_hp'                 => (int) ( $char['c_hp'] ?? 0 ),
+		'm_hp'                 => (int) ( $char['m_hp'] ?? 0 ),
+		'hp_class'             => (string) ( $char['hp_class'] ?? '' ),
+		'c_mp'                 => (int) ( $char['c_mp'] ?? 0 ),
+		'm_mp'                 => (int) ( $char['m_mp'] ?? 0 ),
+		'mp_p'                 => (int) ( $char['mp_p'] ?? 0 ),
+		'sync_p'               => (int) ( $char['sync_p'] ?? 0 ),
+		'sync_class'           => (string) ( $char['sync_class'] ?? '' ),
+		'c_satiety'            => (int) ( $char['c_satiety'] ?? 0 ),
+		'c_hydration'          => (int) ( $char['c_hydration'] ?? 0 ),
+		'c_rest'               => (int) ( $char['c_rest'] ?? 0 ),
+		'skills_and_abilities' => $char['skills_and_abilities'] ?? array(),
+		'inventory'            => $char['inventory'] ?? array(),
+		'logs_data'            => $char['logs_data'] ?? array(),
+		'total_mass'           => $char['total_mass'] ?? 0,
+		'mass_limit'           => $char['mass_limit'] ?? 0,
+		'total_power'          => $char['total_power'] ?? 0,
+	);
+
+	include $character_card_path;
+}
 
 			if ( file_exists( $tactical_overlay_path ) ) {
 				include $tactical_overlay_path;
