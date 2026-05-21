@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! function_exists( 'tw_compass_render' ) ) {
-	function tw_compass_render() {
+	function tw_compass_render(): string {
 		$wp_user_id = get_current_user_id();
 
 		if ( ! $wp_user_id ) {
@@ -15,61 +15,13 @@ if ( ! function_exists( 'tw_compass_render' ) ) {
 			return '';
 		}
 
-		$css_rel  = 'assets/css/public/compass.css';
-		$css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
-		$css_url  = NEOWEAVER_PLUGIN_URL . $css_rel;
-		$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION;
-
-		$js_rel  = 'assets/js/public/compass.js';
-		$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
-		$js_url  = NEOWEAVER_PLUGIN_URL . $js_rel;
-		$js_ver  = file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION;
-
-		$game_data = function_exists( 'get_user_game_data_from_supabase' )
-			? get_user_game_data_from_supabase( (int) $wp_user_id )
-			: array();
-
-		$script_deps = array();
-
-		if ( wp_script_is( 'tw-adventure', 'registered' ) || wp_script_is( 'tw-adventure', 'enqueued' ) ) {
-			$script_deps[] = 'tw-adventure';
-		}
-
-		if ( ! wp_style_is( 'neoweaver-compass', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'neoweaver-compass',
-				$css_url,
-				array(),
-				$css_ver
-			);
-		}
-
-		if ( ! wp_script_is( 'neoweaver-compass', 'enqueued' ) ) {
-			wp_enqueue_script(
-				'neoweaver-compass',
-				$js_url,
-				$script_deps,
-				$js_ver,
-				true
-			);
-
-			wp_add_inline_script(
-				'neoweaver-compass',
-				'window.twCompassData = ' . wp_json_encode(
-					array(
-						'wpUserId'         => (int) $wp_user_id,
-						'activeLocationId' => (int) ( $game_data['active_location_id'] ?? 0 ),
-						'activeWorldId'    => (string) ( $game_data['active_world_id'] ?? '' ),
-						'activeSessionId'  => (string) ( $game_data['active_session_id'] ?? '' ),
-					)
-				) . ';',
-				'before'
-			);
+		if ( function_exists( 'tw_enqueue_compass_assets' ) ) {
+			tw_enqueue_compass_assets();
 		}
 
 		ob_start();
 		?>
-		<div id="tw-compass-container" class="tw-compass-wrapper">
+		<div id="tw-compass-container" class="tw-compass-wrapper" data-tw-compass="1">
 			<div class="tw-compass-grid">
 				<div class="tw-compass-cell tw-n" data-dir="n">
 					<span class="dir-label">N</span>
@@ -99,7 +51,7 @@ if ( ! function_exists( 'tw_compass_render' ) ) {
 		</div>
 		<?php
 
-		return ob_get_clean();
+		return (string) ob_get_clean();
 	}
 }
 
