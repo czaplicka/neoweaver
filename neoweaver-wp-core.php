@@ -32,13 +32,14 @@ final class NeoWeaver_Core {
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
 	}
 
-	// ── File loading ──────────────────────────────────────────────────────
+	// ── File loading ─────────────────────────────────────────────
 
 	private static function load_files(): void {
 		$files = [
 			// includes
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
+			'includes/supabase-auth.php',   // Auth bridge: WP ↔ Supabase JWT
 			
 			'includes/assets.php',
 			'includes/assets/vendors.php',
@@ -171,7 +172,7 @@ final class NeoWeaver_Core {
 		}
 	}
 
-	// ── Page templates ────────────────────────────────────────────────────
+	// ── Page templates ──────────────────────────────────────────
 
 	public static function register_page_templates(): void {
 		add_filter( 'theme_page_templates', [ __CLASS__, 'filter_page_templates' ] );
@@ -203,7 +204,7 @@ final class NeoWeaver_Core {
 		return $template;
 	}
 
-	// ── Game class bootstrap ──────────────────────────────────────────────
+	// ── Game class bootstrap ───────────────────────────────────────
 
 	public static function bootstrap_game_classes(): void {
 		$repo                = new Neoweaver_Agents_Repository();
