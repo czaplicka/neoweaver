@@ -5,14 +5,8 @@
  * Renders the ECHO STREAM panel: all tags attached to the active character,
  * grouped by source type (status / skill / ability / item / narrative).
  *
- * Rendered only on pages using templates/adventure.php.
- * Uses tw_supabase_url() / tw_supabase_anon_key() from wp-config.
- *
  * Supabase view: cyber_character_complete_tags
  * Required columns: character_id, label, color, source_type
- *
- * DB invariant: cyber_tags.label is stored WITHOUT '#' prefix.
- * Enforced via CHECK constraint: CHECK (label NOT LIKE '#%')
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,48 +14,72 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
-	function tw_character_echo_shortcode() {
-		// 1. Render only on the adventure/game page (Bug 5: template check, not hardcoded ID)
+	function tw_character_echo_shortcode(): string {
 		if ( ! is_page_template( 'templates/adventure.php' ) ) {
 			return '';
 		}
 
-		// 2. Resolve active character ID
-		$character_id = function_exists( 'tw_get_current_character_id' )
-			? tw_get_current_character_id()
-			: null;
+		if ( ! function_exists( 'tw_get_current_character_id' ) ) {
+			return '<div class="echo-stream-container">// ERROR: CHARACTER RESOLVER OFFLINE</div>';
+		}
 
-		if ( ! $character_id ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG OFFLINE</div>';
+		}
+
+		if ( function_exists( 'tw_enqueue_character_echo_assets' ) ) {
+			tw_enqueue_character_echo_assets();
+		}
+
+		$character_id = tw_get_current_character_id();
+
+		if ( empty( $character_id ) ) {
 			return '<div class="echo-stream-container">// ERROR: NO ACTIVE CHARACTER IN NEURAL LINK</div>';
 		}
 
-		// 3. Fetch from Supabase with 30s transient cache per character
-		$safe_id   = (int) $character_id;
-		$cache_key = 'tw_echo_tags_' . $safe_id;
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-_]/', '', (string) $character_id );
+
+		if ( empty( $safe_id ) ) {
+			return '<div class="echo-stream-container">// ERROR: INVALID CHARACTER IDENTIFIER</div>';
+		}
+
+		$cache_key = 'tw_echo_tags_' . md5( $safe_id );
 		$rows      = get_transient( $cache_key );
 
-		if ( $rows === false ) {
-			$endpoint = trailingslashit( tw_supabase_url() )
-				. 'rest/v1/cyber_character_complete_tags'
-				. '?character_id=eq.' . $safe_id
-				. '&select=label,color,source_type'; // Opt 1: fetch only used columns
+		if ( false === $rows ) {
+			$endpoint = add_query_arg(
+				[
+					'character_id' => 'eq.' . $safe_id,
+					'select'       => 'label,color,source_type',
+				],
+				trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_character_complete_tags'
+			);
 
 			$anon_key = tw_supabase_anon_key();
 
-			$response = wp_remote_get( $endpoint, [
-				'headers' => [
-					'apikey'        => $anon_key,
-					'Authorization' => 'Bearer ' . $anon_key,
-				],
-				'timeout' => 10,
-			] );
+			if ( empty( $anon_key ) ) {
+				return '<div class="echo-stream-container">// ERROR: SUPABASE KEY MISSING</div>';
+			}
+
+			$response = wp_remote_get(
+				$endpoint,
+				[
+					'headers' => [
+						'apikey'        => $anon_key,
+						'Authorization' => 'Bearer ' . $anon_key,
+						'Content-Type'  => 'application/json',
+					],
+					'timeout' => 10,
+				]
+			);
 
 			if ( is_wp_error( $response ) ) {
 				return '<div class="echo-stream-container">// ERROR: CONNECTION TIMEOUT</div>';
 			}
 
-			$code = wp_remote_retrieve_response_code( $response );
-			if ( $code !== 200 ) {
+			$code = (int) wp_remote_retrieve_response_code( $response );
+
+			if ( 200 !== $code ) {
 				error_log( 'TW Echo: Supabase HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $response ) );
 				return '<div class="echo-stream-container">// ERROR: DATA FEED UNAVAILABLE</div>';
 			}
@@ -75,54 +93,60 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			set_transient( $cache_key, $rows, 30 );
 		}
 
-		if ( empty( $rows ) ) {
-			return '<div class="echo-stream-container">// ECHO STREAM EMPTY: NO DATA DETECTED</div>';
-		}
-
-		// 4. Group tags by source type
 		$groups = [
 			'status'    => [ 'title' => 'SYSTEM STATUS', 'items' => [] ],
 			'skill'     => [ 'title' => 'NEURAL SKILLS', 'items' => [] ],
 			'ability'   => [ 'title' => 'AUGMENTATIONS', 'items' => [] ],
-			'item'      => [ 'title' => 'HARDWARE',      'items' => [] ],
-			'narrative' => [ 'title' => 'IDENTITY',      'items' => [] ],
+			'item'      => [ 'title' => 'HARDWARE', 'items' => [] ],
+			'narrative' => [ 'title' => 'IDENTITY', 'items' => [] ],
 		];
 
 		foreach ( $rows as $tag ) {
-			$st     = $tag['source_type'] ?? 'narrative';
-			$target = isset( $groups[ $st ] ) ? $st : 'narrative';
-			$color  = sanitize_hex_color( $tag['color'] ?? '' ) ?? '#00ffff';
+			$source_type = sanitize_key( $tag['source_type'] ?? 'narrative' );
+			$target      = isset( $groups[ $source_type ] ) ? $source_type : 'narrative';
 
-			// Opt 3: labels stored without '#' in DB — no ltrim round-trip needed
+			$raw_color = sanitize_hex_color( $tag['color'] ?? '' );
+			$color     = ! empty( $raw_color ) ? $raw_color : '#00ffff';
+
+			$label = sanitize_text_field( (string) ( $tag['label'] ?? '' ) );
+
+			if ( '' === $label ) {
+				continue;
+			}
+
 			$groups[ $target ]['items'][] = [
-				'label' => '#' . ( $tag['label'] ?? '' ),
+				'label' => '#' . ltrim( $label, '#' ),
 				'color' => $color,
 			];
 		}
 
-		// 5. Build HTML
-		// Opt 2: data-driven empty-state — no $has_any flag needed
-		$all_items = array_merge( ...array_column( $groups, 'items' ) );
+		$has_items = false;
+		foreach ( $groups as $group ) {
+			if ( ! empty( $group['items'] ) ) {
+				$has_items = true;
+				break;
+			}
+		}
 
 		ob_start();
 		?>
-		<div class="echo-stream-container">
+		<div class="echo-stream-container" data-tw-character-echo="1">
 			<div class="echo-title">ECHO STREAM</div>
 			<div class="echo-list">
-				<?php if ( empty( $all_items ) ) : ?>
-					<div class="echo-item" style="opacity: 0.5;">// NO ECHOES RECORDED</div>
+				<?php if ( ! $has_items ) : ?>
+					<div class="echo-item echo-item--empty">// NO ECHOES RECORDED</div>
 				<?php else : ?>
 					<?php foreach ( $groups as $group ) : ?>
-						<?php if ( empty( $group['items'] ) ) continue; ?>
+						<?php if ( empty( $group['items'] ) ) : ?>
+							<?php continue; ?>
+						<?php endif; ?>
+
 						<div class="echo-group">
 							<div class="echo-group-title"><?php echo esc_html( $group['title'] ); ?></div>
 							<div class="echo-group-items">
 								<?php foreach ( $group['items'] as $item ) : ?>
-									<div class="echo-item"
-									     style="--echo-tag-color: <?php echo esc_attr( $item['color'] ); ?>;">
-										<span class="echo-label">
-											<?php echo esc_html( $item['label'] ); ?>
-										</span>
+									<div class="echo-item" style="--echo-tag-color: <?php echo esc_attr( $item['color'] ); ?>;">
+										<span class="echo-label"><?php echo esc_html( $item['label'] ); ?></span>
 									</div>
 								<?php endforeach; ?>
 							</div>
@@ -132,7 +156,8 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			</div>
 		</div>
 		<?php
-		return ob_get_clean();
+
+		return (string) ob_get_clean();
 	}
 
 	add_shortcode( 'character_echo', 'tw_character_echo_shortcode' );
