@@ -5,8 +5,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! function_exists( 'tw_register_connect_character_campaign_assets' ) ) {
 	function tw_register_connect_character_campaign_assets(): void {
-		$css_handle = 'neoweaver-deployment';
-		$js_handle  = 'neoweaver-deployment';
+		$css_handle = 'neoweaver-connect-character-campaign';
+		$js_handle  = 'neoweaver-connect-character-campaign';
 
 		$css_rel = 'assets/css/public/deployment2.css';
 		$js_rel  = 'assets/js/public/deployment2.js';
@@ -35,8 +35,8 @@ if ( ! function_exists( 'tw_enqueue_connect_character_campaign_assets' ) ) {
 	function tw_enqueue_connect_character_campaign_assets(): void {
 		static $done = false;
 
-		wp_enqueue_style( 'neoweaver-deployment' );
-		wp_enqueue_script( 'neoweaver-deployment' );
+		wp_enqueue_style( 'neoweaver-connect-character-campaign' );
+		wp_enqueue_script( 'neoweaver-connect-character-campaign' );
 
 		if ( $done ) {
 			return;
@@ -57,7 +57,7 @@ if ( ! function_exists( 'tw_enqueue_connect_character_campaign_assets' ) ) {
 		];
 
 		wp_add_inline_script(
-			'neoweaver-deployment',
+			'neoweaver-connect-character-campaign',
 			'window.twDeploymentConfig = ' . wp_json_encode( $config ) . ';',
 			'before'
 		);
