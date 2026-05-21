@@ -52,7 +52,7 @@ final class NeoWeaver_Core {
 			'includes/assets/character-creator.php',
 			'includes/assets/character-echo.php',
 			'includes/assets/compass.php',
-			'includes/assets/connect-campaign-world.php.php',
+			'includes/assets/connect-campaign-world.php',
 			'includes/assets/connect-character-campaign.php',
 			'includes/assets/public-character-profile.php',
 			'includes/assets/public-runtime.php',
