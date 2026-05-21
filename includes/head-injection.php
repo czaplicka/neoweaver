@@ -59,6 +59,11 @@ if ( ! function_exists( 'tw_enqueue_global_game_data' ) ) {
 			set_transient( $cache_key, $game_data, 60 );
 		}
 
+		// --- Supabase JWT for authenticated requests ---
+		$supabase_token = function_exists( 'tw_supabase_get_current_user_token' )
+			? tw_supabase_get_current_user_token()
+			: null;
+
 		wp_enqueue_script(
 			'supabase-js',
 			'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
@@ -82,7 +87,10 @@ if ( ! function_exists( 'tw_enqueue_global_game_data' ) ) {
 
 		$config = array(
 			'supabase_url'        => tw_supabase_url(),
+			// supabase_anon_key kept for backward compat with any JS not yet migrated
 			'supabase_anon_key'   => tw_supabase_anon_key(),
+			// supabaseToken: use this in all new JS for authenticated requests
+			'supabaseToken'       => $supabase_token,
 			'active_session_id'   => $game_data['active_session_id'] ?? null,
 			'active_campaign_id'  => $game_data['active_campaign_id'] ?? null,
 			'active_character_id' => $game_data['active_character_id'] ?? null,
