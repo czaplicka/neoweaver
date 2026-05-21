@@ -29,10 +29,10 @@ if ( ! function_exists( 'tw_connect_campaign_world_render' ) ) {
 				<div class="tw-hero-content">
 					<div class="tw-hero-text">
 						<span class="tw-label-alt">MISSION PARAMETERS</span>
-						<h1>ANCHORING THE SPLOT</h1>
+						<h1>ANCHORING THE NODE</h1>
 						<p>
 							Field Agent, you are about to merge a narrative thread with a physical reality node.
-							This deployment will stabilize the local sector for multiplayer synchronization.
+							This deployment will stabilise the local sector for multiplayer synchronisation.
 						</p>
 					</div>
 
