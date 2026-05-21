@@ -50,6 +50,8 @@ final class NeoWeaver_Core {
 			'includes/assets/active-id.php',
 			'includes/assets/campaign-creator.php',
 			'includes/assets/character-creator.php',
+			'includes/assets/character-echo.php',
+			'includes/assets/compass.php',
 			'includes/assets/public-character-profile.php',
 			'includes/assets/public-runtime.php',
 			
