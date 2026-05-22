@@ -119,8 +119,7 @@ $total_power          = $args['total_power'];
 		<div class="tw-panel-scroll-area">
 
 			<div class="tw-tab-content active" id="status">
-				<div class="tw-bars-block">
-
+				<!-- <div class="tw-bars-block">
 					<div class="tw-stat-bar-container">
 						<div class="tw-stat-label main-label">
 							<span>HEALTH</span>
@@ -186,8 +185,8 @@ $total_power          = $args['total_power'];
 						</div>
 					</div>
 
-				</div>
-
+				</div> -->
+<?php echo do_shortcode( '[tw_vitalis_panel]' ); ?>
 				<div class="tw-accordion-group">
 					<details>
 						<summary>Attributes</summary>
