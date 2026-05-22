@@ -45,6 +45,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
 			'nw-game-data'           => [ 'assets/js/public/game-data.js', [] ],
+    'nw-chat-engine'         => [ 'assets/js/chat-engine.js', [] ],   
 		];
 
 		if ( is_user_logged_in() ) {
