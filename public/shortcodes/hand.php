@@ -1,69 +1,147 @@
 <?php
-function cyber_buffer_hand_shortcode() {
-    $user_id = get_current_user_id();
-    $character_id = get_cyber_character_id_by_wp_id($user_id); // Twoja funkcja mapująca ID
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-    if (!$character_id) return "<div class='terminal-error'>UPLINK LOST: Character not identified.</div>";
+if ( ! function_exists( 'cyber_buffer_hand_shortcode' ) ) {
+	function cyber_buffer_hand_shortcode(): string {
+		$user_id = get_current_user_id();
 
-    // Pobieramy dane kart o statusie 'hand' (z JOINem do tabeli cyber_buffer)
-    $hand_cards = fetch_cyber_hand_with_details($character_id);
+		if ( ! $user_id ) {
+			return '<div class="terminal-error">UPLINK LOST: User not authenticated.</div>';
+		}
 
-    ob_start();
-    ?>
-    <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
-    <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+		if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
+			return '<div class="terminal-error">UPLINK LOST: Character resolver unavailable.</div>';
+		}
 
-    <div class="buffer-wrapper">
-        <div class="swiper-container buffer-slider">
-            <div class="swiper-wrapper" id="buffer-hand-slots">
-                <?php foreach ($hand_cards as $card): ?>
-                    <div class="swiper-slide">
-                        <div class="cyber-card-css <?php echo strtolower($card->category); ?>" 
-                             onclick="zoomCard(this)"
-                             data-instance-id="<?php echo $card->instance_id; ?>">
-                            
-                            <div class="card-glitch-overlay"></div>
-                            
-                            <div class="card-header">
-                                <span class="card-cat"><?php echo strtoupper($card->category); ?></span>
-                                <span class="card-lvl">v.<?php echo $card->level; ?></span>
-                            </div>
+		if ( ! function_exists( 'fetch_cyber_hand_with_details' ) ) {
+			return '<div class="terminal-error">UPLINK LOST: Hand datastore unavailable.</div>';
+		}
 
-                            <div class="card-content">
-                                <h3 class="card-title"><?php echo $card->name; ?></h3>
-                                <p class="card-desc"><?php echo $card->description; ?></p>
-                            </div>
-<div class="buffer-hud">
-    <div class="hud-stat pile-count" title="Talia (Pile)">
-        <span class="hud-label">PILE</span>
-        <span id="count-pile" class="hud-value">--</span>
-    </div>
-    
-    <div class="buffer-slider-container"> ... </div>
+		$character_id = get_cyber_character_id_by_wp_id( $user_id );
 
-    <div class="hud-stat discard-count" title="Kosz (Discard)">
-        <span class="hud-label">DISCARD</span>
-        <span id="count-discard" class="hud-value">--</span>
-    </div>
-</div>
-                            <div class="card-footer">
-                                <button class="inject-btn" onclick="useBufferCard('<?php echo $card->instance_id; ?>', '<?php echo esc_js($card->name); ?>', event)">
-                                    INJECT PROTOCOL
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-            <div class="swiper-pagination"></div>
-        </div>
-    </div>
+		if ( empty( $character_id ) || ! is_scalar( $character_id ) ) {
+			return '<div class="terminal-error">UPLINK LOST: Character not identified.</div>';
+		}
 
-    <div id="card-zoom-overlay" onclick="closeZoom()">
-        <div id="zoom-content"></div>
-        <div class="zoom-hint">CLICK ANYWHERE TO CLOSE</div>
-    </div>
-    <?php
-    return ob_get_clean();
+		$hand_cards = fetch_cyber_hand_with_details( $character_id );
+
+		if ( is_wp_error( $hand_cards ) ) {
+			return '<div class="terminal-error">UPLINK LOST: Hand sync failed.</div>';
+		}
+
+		if ( ! is_array( $hand_cards ) ) {
+			$hand_cards = array();
+		}
+
+		$uid = 'buffer_hand_' . wp_generate_uuid4();
+
+		if ( function_exists( 'tw_enqueue_buffer_hand_assets' ) ) {
+			tw_enqueue_buffer_hand_assets(
+				array(
+					'characterId' => (string) $character_id,
+					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+					'nonce'       => wp_create_nonce( 'cyber_buffer_hand' ),
+					'selectors'   => array(
+						'overlay' => '#card-zoom-overlay-' . $uid,
+						'content' => '#zoom-content-' . $uid,
+					),
+				)
+			);
+		}
+
+		ob_start();
+		?>
+		<div
+			id="<?php echo esc_attr( $uid ); ?>"
+			class="buffer-wrapper"
+			data-buffer-hand-root="1"
+			data-character-id="<?php echo esc_attr( (string) $character_id ); ?>"
+		>
+			<div class="buffer-hud">
+				<div class="hud-stat pile-count" title="Pile">
+					<span class="hud-label">PILE</span>
+					<span id="count-pile-<?php echo esc_attr( $uid ); ?>" class="hud-value">--</span>
+				</div>
+
+				<div class="buffer-slider-container">
+					<div class="swiper buffer-slider">
+						<div class="swiper-wrapper" id="buffer-hand-slots-<?php echo esc_attr( $uid ); ?>">
+							<?php if ( ! empty( $hand_cards ) ) : ?>
+								<?php foreach ( $hand_cards as $card ) : ?>
+									<?php
+									$category    = isset( $card->category ) ? sanitize_html_class( strtolower( (string) $card->category ) ) : 'unknown';
+									$instance_id = isset( $card->instance_id ) ? (string) $card->instance_id : '';
+									$level       = isset( $card->level ) ? (int) $card->level : 0;
+									$name        = isset( $card->name ) ? (string) $card->name : '[UNKNOWN CARD]';
+									$description = isset( $card->description ) ? (string) $card->description : '';
+
+									if ( '' === $instance_id ) {
+										continue;
+									}
+									?>
+									<div class="swiper-slide">
+										<div
+											class="cyber-card-css <?php echo esc_attr( $category ); ?>"
+											data-action="zoom-card"
+											data-instance-id="<?php echo esc_attr( $instance_id ); ?>"
+										>
+											<div class="card-glitch-overlay"></div>
+
+											<div class="card-header">
+												<span class="card-cat"><?php echo esc_html( strtoupper( $category ) ); ?></span>
+												<span class="card-lvl">v.<?php echo esc_html( (string) $level ); ?></span>
+											</div>
+
+											<div class="card-content">
+												<h3 class="card-title"><?php echo esc_html( $name ); ?></h3>
+												<p class="card-desc"><?php echo esc_html( $description ); ?></p>
+											</div>
+
+											<div class="card-footer">
+												<button
+													class="inject-btn"
+													type="button"
+													data-action="use-buffer-card"
+													data-instance-id="<?php echo esc_attr( $instance_id ); ?>"
+													data-card-name="<?php echo esc_attr( $name ); ?>"
+												>
+													INJECT PROTOCOL
+												</button>
+											</div>
+										</div>
+									</div>
+								<?php endforeach; ?>
+							<?php else : ?>
+								<div class="swiper-slide">
+									<div class="terminal-error">BUFFER EMPTY: No cards in hand.</div>
+								</div>
+							<?php endif; ?>
+						</div>
+
+						<div class="swiper-pagination"></div>
+					</div>
+				</div>
+
+				<div class="hud-stat discard-count" title="Discard">
+					<span class="hud-label">DISCARD</span>
+					<span id="count-discard-<?php echo esc_attr( $uid ); ?>" class="hud-value">--</span>
+				</div>
+			</div>
+
+			<div
+				id="card-zoom-overlay-<?php echo esc_attr( $uid ); ?>"
+				class="card-zoom-overlay"
+				hidden
+				data-action="close-zoom"
+			>
+				<div id="zoom-content-<?php echo esc_attr( $uid ); ?>" class="zoom-content"></div>
+				<div class="zoom-hint">CLICK ANYWHERE TO CLOSE</div>
+			</div>
+		</div>
+		<?php
+
+		return ob_get_clean();
+	}
+
+	add_shortcode( 'cyber_buffer_hand', 'cyber_buffer_hand_shortcode' );
 }
-add_shortcode('cyber_buffer_hand', 'cyber_buffer_hand_shortcode');
