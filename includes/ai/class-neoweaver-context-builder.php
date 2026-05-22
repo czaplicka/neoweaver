@@ -1,211 +1,287 @@
 <?php
-if (!defined('ABSPATH')) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
+require_once dirname( __DIR__ ) . '/supabase-config.php';
+
+/**
+ * NeoWeaver Context Builder
+ *
+ * Buduje 3-blokowy kontekst promptu dla GM-a.
+ * Używana przez NeoWeaver_Claude_Engine::process().
+ *
+ * build( $char_id, $protocol ) zwraca:
+ *   [
+ *     'block_a'  => string,   // system instructions (archetype, reguły)
+ *     'block_b'  => string,   // stan gry (postać, lokacja, świat)
+ *     'block_c'  => string,   // dane specyficzne per protokół
+ *     'world_id' => string|null,
+ *   ]
+ *
+ * Uwaga: kolumna world FK w cyber_characters to "worldid" (bez podkreślnika).
+ * Jeśli zmienisz w Supabase na world_id — zaktualizuj get_core_context().
+ */
 class NeoWeaver_Context_Builder {
 
-    private string $supabase_url;
-    private string $supabase_key;
+	public function __construct() {
+		// Stałe pobierane przez helpery z supabase-config.php:
+		// tw_supabase_url(), tw_supabase_service_key()
+	}
 
-    public function __construct() {
-        $this->supabase_url = NEOWEAVER_SUPABASE_URL;
-        $this->supabase_key = NEOWEAVER_SUPABASE_KEY;
-    }
+	// ============================================================
+	// PUBLIC
+	// ============================================================
 
-    /**
-     * Zwraca array z 3 blokami promptu systemowego.
-     */
-    public function build(string $char_id, string $protocol): array {
-        $core    = $this->get_core_context($char_id);
-        $extra   = $this->get_protocol_context($char_id, $protocol, $core);
+	public function build( string $char_id, string $protocol ): array {
+		$safe_id = $this->sanitize_uuid( $char_id );
+		$core    = $this->get_core_context( $safe_id );
+		$extra   = $this->get_protocol_context( $safe_id, $protocol, $core );
 
-        return [
-            'block_a' => $this->build_block_a($core),
-            'block_b' => $this->build_block_b($core),
-            'block_c' => $this->build_block_c($protocol, $extra),
-            'world_id' => $core['world']['id'] ?? null,
-        ];
-    }
+		return [
+			'block_a'  => $this->build_block_a( $core ),
+			'block_b'  => $this->build_block_b( $core ),
+			'block_c'  => $this->build_block_c( $protocol, $extra ),
+			'world_id' => $core['world']['id'] ?? null,
+		];
+	}
 
-    // ------------------------------------------------
-    // CORE: dane zawsze potrzebne
-    // ------------------------------------------------
-    private function get_core_context(string $char_id): array {
-        $char = $this->query(
-            'cyber_characters',
-            "id=eq.{$char_id}&select=id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid"
-        )[0] ?? [];
+	// ============================================================
+	// CORE: dane zawsze potrzebne
+	// ============================================================
 
-        $location = [];
-        $world    = [];
+	private function get_core_context( string $char_id ): array {
+		$char = $this->query(
+			'cyber_characters',
+			'id=eq.' . $char_id . '&select=id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid,archetype&limit=1'
+		)[0] ?? [];
 
-        if (!empty($char['locationid'])) {
-            $location = $this->query(
-                'cyber_worldmap',
-                "id=eq.{$char['locationid']}&select=id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid"
-            )[0] ?? [];
-        }
+		$location = [];
+		$world    = [];
 
-        if (!empty($char['worldid'])) {
-            $world = $this->query(
-                'cyber_worlds',
-                "id=eq.{$char['worldid']}&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype"
-            )[0] ?? [];
-        }
+		if ( ! empty( $char['locationid'] ) ) {
+			$location = $this->query(
+				'cyber_worldmap',
+				'id=eq.' . $this->sanitize_uuid( $char['locationid'] ) . '&select=id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type&limit=1'
+			)[0] ?? [];
+		}
 
-        return compact('char', 'location', 'world');
-    }
+		if ( ! empty( $char['worldid'] ) ) {
+			$world = $this->query(
+				'cyber_worlds',
+				'id=eq.' . $this->sanitize_uuid( $char['worldid'] ) . '&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype&limit=1'
+			)[0] ?? [];
+		}
 
-    // ------------------------------------------------
-    // EXTRA: dane per protokół
-    // ------------------------------------------------
-    private function get_protocol_context(string $char_id, string $protocol, array $core): array {
-        $loc_id = $core['location']['id'] ?? null;
+		return compact( 'char', 'location', 'world' );
+	}
 
-        switch ($protocol) {
-            case 'COMBAT':
-                return [
-                    'monsters' => $this->query(
-                        'cyber_monsters',
-                        "locationid=eq.{$loc_id}&select=name,hp,attack,defense,tags&limit=3"
-                    ),
-                    'hand' => $this->query(
-                        'cyber_deck_state',
-                        "char_id=eq.{$char_id}&zone=eq.hand&select=card_id,card_name,card_type,effect_tags"
-                    ),
-                ];
+	// ============================================================
+	// EXTRA: dane per protokół
+	// ============================================================
 
-            case 'TRADE':
-                return [
-                    'npc_inventory' => $this->query(
-                        'cyber_npc_inventory',
-                        "locationid=eq.{$loc_id}&select=item_name,price,quantity&limit=10"
-                    ),
-                    'player_gold' => $core['char']['gold'] ?? 0,
-                ];
+	private function get_protocol_context( string $char_id, string $protocol, array $core ): array {
+		$loc_id   = isset( $core['location']['id'] ) ? $this->sanitize_uuid( $core['location']['id'] ) : '';
+		$world_id = isset( $core['world']['id'] )    ? $this->sanitize_uuid( $core['world']['id'] )    : '';
 
-            case 'TRAVEL':
-                $exits = [];
-                foreach (['nid','eid','sid','wid'] as $dir) {
-                    if (!empty($core['location'][$dir])) {
-                        $dest = $this->query(
-                            'cyber_worldmap',
-                            "id=eq.{$core['location'][$dir]}&select=id,locationname,threatlevel"
-                        )[0] ?? null;
-                        if ($dest) $exits[$dir] = $dest;
-                    }
-                }
-                return ['exits' => $exits];
+		switch ( $protocol ) {
 
-            case 'DIALOG':
-                return [
-                    'npcs' => $this->query(
-                        'cyber_npcs',
-                        "locationid=eq.{$loc_id}&select=name,role,ai_personality_prompt,relationship_tags&limit=3"
-                    ),
-                ];
+			case 'COMBAT':
+				return [
+					'monsters' => $this->query(
+						'cyber_monsters',
+						'locationid=eq.' . $loc_id . '&select=name,hp,attack,defense,tags&limit=3'
+					),
+					'hand' => $this->query(
+						'cyber_deck_state',
+						'char_id=eq.' . $char_id . '&zone=eq.hand&select=card_id,card_name,card_type,effect_tags'
+					),
+				];
 
-            case 'LORE':
-                return [
-                    'world_tags' => $this->query(
-                        'cyber_world_tags',
-                        "worldid=eq.{$core['world']['id']}&select=tag_name,tag_value&limit=10"
-                    ),
-                ];
+			case 'TRADE':
+				return [
+					'npc_inventory' => $this->query(
+						'cyber_npc_inventory',
+						'locationid=eq.' . $loc_id . '&select=item_name,price,quantity&limit=10'
+					),
+					'player_gold' => (int) ( $core['char']['gold'] ?? 0 ),
+				];
 
-            default:
-                return [];
-        }
-    }
+			case 'TRAVEL':
+				$exits   = [];
+				$dir_map = [ 'nid' => 'NORTH', 'eid' => 'EAST', 'sid' => 'SOUTH', 'wid' => 'WEST' ];
+				foreach ( $dir_map as $col => $label ) {
+					if ( ! empty( $core['location'][ $col ] ) ) {
+						$dest = $this->query(
+							'cyber_worldmap',
+							'id=eq.' . $this->sanitize_uuid( $core['location'][ $col ] ) . '&select=id,locationname,threatlevel,location_type&limit=1'
+						)[0] ?? null;
+						if ( $dest ) {
+							$exits[ $label ] = $dest;
+						}
+					}
+				}
+				return [ 'exits' => $exits ];
 
-    // ------------------------------------------------
-    // BLOKI PROMPTU
-    // ------------------------------------------------
-    private function build_block_a(array $core): string {
-        $archetype = $core['world']['archetype'] ?? 'EPIC';
-        return <<<PROMPT
-You are the AI Game Master of NeoWeave — a dark, narrative RPG.
-Archetype: {$archetype}
-Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.
-Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #loc:42, #STATUS_POISONED).
-Player does not see tags — they are parsed by the system. Never explain tags to the player.
-Language: respond in the same language the player uses.
-PROMPT;
-    }
+			case 'DIALOG':
+				return [
+					'npcs' => $this->query(
+						'cyber_npcs',
+						'locationid=eq.' . $loc_id . '&select=name,role,ai_personality_prompt,relationship_tags&limit=3'
+					),
+				];
 
-    private function build_block_b(array $core): string {
-        $c = $core['char'];
-        $l = $core['location'];
-        $w = $core['world'];
-        $tags = is_array($c['echo_tags'] ?? null) 
-            ? implode(', ', $c['echo_tags']) 
-            : ($c['echo_tags'] ?? 'none');
+			case 'LORE':
+				return [
+					'world_tags' => $this->query(
+						'cyber_world_tags',
+						'worldid=eq.' . $world_id . '&select=tag_name,tag_value&limit=10'
+					),
+				];
 
-        return <<<PROMPT
-WORLD: {$w['worldname']} | Entropy: {$w['entropy']}/100 | Difficulty: {$w['difficulty']}
-WORLD_TAGS: {$w['globaltag1']}, {$w['globaltag2']}, {$w['globaltag3']}
-AGENT: {$c['name']} | HP: {$c['currenthp']}/{$c['maxhp']} | MP: {$c['mp']} | Gold: {$c['gold']}
-BIOMETRICS: Satiety {$c['satiety']}% | Hydration {$c['hydration']}%
-ECHO: {$tags}
-LOCATION: {$l['locationname']} | Threat: {$l['threatlevel']} | Tags: {$l['instancetags']}
-GM_NOTE: {$l['aiprompt']}
-PROMPT;
-    }
+			case 'REST':
+				return [
+					'safe_zone'  => ! empty( $core['location']['instancetags'] ) && str_contains( $core['location']['instancetags'], 'safe' ),
+					'hp_missing' => max( 0, (int) ( $core['char']['maxhp'] ?? 100 ) - (int) ( $core['char']['currenthp'] ?? 0 ) ),
+				];
 
-    private function build_block_c(string $protocol, array $extra): string {
-        $lines = ["PROTOCOL: {$protocol}"];
+			case 'DECK':
+				return [
+					'deck_state' => $this->query(
+						'cyber_deck_state',
+						'char_id=eq.' . $char_id . '&select=zone,card_name,card_type&limit=30'
+					),
+				];
 
-        switch ($protocol) {
-            case 'TRAVEL':
-                foreach ($extra['exits'] ?? [] as $dir => $dest) {
-                    $dirName = ['nid'=>'NORTH','eid'=>'EAST','sid'=>'SOUTH','wid'=>'WEST'][$dir];
-                    $lines[] = "EXIT_{$dirName}: {$dest['locationname']} (id:{$dest['id']}, threat:{$dest['threatlevel']})";
-                }
-                break;
+			default:
+				return [];
+		}
+	}
 
-            case 'COMBAT':
-                foreach ($extra['monsters'] ?? [] as $m) {
-                    $lines[] = "ENEMY: {$m['name']} HP:{$m['hp']} ATK:{$m['attack']} DEF:{$m['defense']}";
-                }
-                $hand = array_column($extra['hand'] ?? [], 'card_name');
-                $lines[] = "PLAYER_HAND: " . implode(', ', $hand);
-                break;
+	// ============================================================
+	// BLOKI PROMPTU
+	// ============================================================
 
-            case 'TRADE':
-                $items = array_map(fn($i) => "{$i['item_name']}({$i['price']}g)", $extra['npc_inventory'] ?? []);
-                $lines[] = "SHOP: " . implode(', ', $items);
-                $lines[] = "PLAYER_GOLD: {$extra['player_gold']}";
-                break;
+	private function build_block_a( array $core ): string {
+		$archetype = esc_html( $core['world']['archetype'] ?? 'EPIC' );
+		return "You are the AI Game Master of NeoWeave — a dark, narrative RPG.\n"
+			. "Archetype: {$archetype}\n"
+			. "Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.\n"
+			. "Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #LOC:42, #STATUS_POISONED, #HP_CHANGE:-10, #GOLD_CHANGE:-5).\n"
+			. "Tags are parsed by the system — the player never sees them. Never explain tags to the player.\n"
+			. "Respond in the same language the player uses.";
+	}
 
-            case 'DIALOG':
-                foreach ($extra['npcs'] ?? [] as $npc) {
-                    $lines[] = "NPC: {$npc['name']} | Role: {$npc['role']} | Personality: {$npc['ai_personality_prompt']}";
-                }
-                break;
+	private function build_block_b( array $core ): string {
+		$c = $core['char'];
+		$l = $core['location'];
+		$w = $core['world'];
 
-            case 'LORE':
-                foreach ($extra['world_tags'] ?? [] as $t) {
-                    $lines[] = "LORE: {$t['tag_name']} = {$t['tag_value']}";
-                }
-                break;
-        }
+		// echo_tags może przyjść jako JSON string lub PHP array
+		$echo_tags_raw = $c['echo_tags'] ?? [];
+		if ( is_string( $echo_tags_raw ) ) {
+			$echo_tags_raw = json_decode( $echo_tags_raw, true ) ?? [];
+		}
+		$tags = is_array( $echo_tags_raw ) && ! empty( $echo_tags_raw ) ? implode( ', ', $echo_tags_raw ) : 'none';
 
-        return implode("\n", $lines);
-    }
+		return "WORLD: " . esc_html( $w['worldname'] ?? '' ) . " | Entropy: " . (int) ( $w['entropy'] ?? 0 ) . "/100 | Difficulty: " . esc_html( $w['difficulty'] ?? 'normal' ) . "\n"
+			. "WORLD_TAGS: " . esc_html( implode( ', ', array_filter( [ $w['globaltag1'] ?? '', $w['globaltag2'] ?? '', $w['globaltag3'] ?? '' ] ) ) ) . "\n"
+			. "AGENT: " . esc_html( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['currenthp'] ?? 0 ) . "/" . (int) ( $c['maxhp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
+			. "BIOMETRICS: Satiety " . (int) ( $c['satiety'] ?? 0 ) . "% | Hydration " . (int) ( $c['hydration'] ?? 0 ) . "%\n"
+			. "ECHO: " . esc_html( $tags ) . "\n"
+			. "LOCATION: " . esc_html( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . esc_html( $l['instancetags'] ?? '' ) . "\n"
+			. "GM_NOTE: " . esc_html( $l['aiprompt'] ?? '' );
+	}
 
-    // ------------------------------------------------
-    // HELPER: zapytanie do Supabase REST
-    // ------------------------------------------------
-    private function query(string $table, string $params): array {
-        $response = wp_remote_get("{$this->supabase_url}/rest/v1/{$table}?{$params}", [
-            'headers' => [
-                'apikey'        => $this->supabase_key,
-                'Authorization' => 'Bearer ' . $this->supabase_key,
-                'Content-Type'  => 'application/json',
-            ],
-            'timeout' => 8,
-        ]);
+	private function build_block_c( string $protocol, array $extra ): string {
+		$lines = [ "PROTOCOL: {$protocol}" ];
 
-        if (is_wp_error($response)) return [];
-        return json_decode(wp_remote_retrieve_body($response), true) ?? [];
-    }
+		switch ( $protocol ) {
+
+			case 'TRAVEL':
+				foreach ( $extra['exits'] ?? [] as $label => $dest ) {
+					$lines[] = "EXIT_{$label}: " . esc_html( $dest['locationname'] ) . " (id:{$dest['id']}, threat:{$dest['threatlevel']})";
+				}
+				break;
+
+			case 'COMBAT':
+				foreach ( $extra['monsters'] ?? [] as $m ) {
+					$lines[] = "ENEMY: " . esc_html( $m['name'] ) . " HP:{$m['hp']} ATK:{$m['attack']} DEF:{$m['defense']}";
+				}
+				$hand    = array_column( $extra['hand'] ?? [], 'card_name' );
+				$lines[] = "PLAYER_HAND: " . implode( ', ', array_map( 'esc_html', $hand ) );
+				break;
+
+			case 'TRADE':
+				$items   = array_map(
+					fn( $i ) => esc_html( $i['item_name'] ) . "(" . (int) $i['price'] . "g x" . (int) ( $i['quantity'] ?? 1 ) . ")",
+					$extra['npc_inventory'] ?? []
+				);
+				$lines[] = "SHOP: " . implode( ', ', $items );
+				$lines[] = "PLAYER_GOLD: " . (int) ( $extra['player_gold'] ?? 0 );
+				break;
+
+			case 'DIALOG':
+				foreach ( $extra['npcs'] ?? [] as $npc ) {
+					$personality = mb_substr( esc_html( $npc['ai_personality_prompt'] ?? '' ), 0, 200 );
+					$lines[]     = "NPC: " . esc_html( $npc['name'] ) . " | Role: " . esc_html( $npc['role'] ?? '' ) . " | Personality: {$personality}";
+				}
+				break;
+
+			case 'LORE':
+				foreach ( $extra['world_tags'] ?? [] as $t ) {
+					$lines[] = "LORE: " . esc_html( $t['tag_name'] ) . " = " . esc_html( $t['tag_value'] ?? '' );
+				}
+				break;
+
+			case 'REST':
+				$lines[] = "SAFE_ZONE: " . ( $extra['safe_zone'] ? 'yes' : 'no' );
+				$lines[] = "HP_MISSING: " . (int) ( $extra['hp_missing'] ?? 0 );
+				break;
+
+			case 'DECK':
+				$zones = [];
+				foreach ( $extra['deck_state'] ?? [] as $r ) {
+					$zone            = strtoupper( $r['zone'] ?? 'UNKNOWN' );
+					$zones[ $zone ][] = esc_html( $r['card_name'] ?? '?' );
+				}
+				foreach ( $zones as $zone => $cards ) {
+					$lines[] = "{$zone}: " . implode( ', ', $cards );
+				}
+				break;
+		}
+
+		return implode( "\n", $lines );
+	}
+
+	// ============================================================
+	// HELPER: zapytanie do Supabase REST
+	// ============================================================
+
+	private function query( string $table, string $params ): array {
+		$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table . '?' . $params;
+		$response = wp_remote_get( $url, [
+			'headers' => [
+				'apikey'        => tw_supabase_service_key(),
+				'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+				'Content-Type'  => 'application/json',
+			],
+			'timeout' => 8,
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			error_log( '[NeoWeaver ContextBuilder] Supabase error: ' . $response->get_error_message() );
+			return [];
+		}
+
+		return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
+	}
+
+	// ============================================================
+	// HELPER: sanitacja UUID
+	// ============================================================
+
+	private function sanitize_uuid( string $id ): string {
+		return preg_replace( '/[^a-f0-9\-]/', '', strtolower( $id ) );
+	}
 }
