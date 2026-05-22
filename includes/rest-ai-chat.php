@@ -76,7 +76,6 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		$channel_id  = $request->get_param( 'channel_id' );
 		$session_id  = $request->get_param( 'session_id' )  ?: null;
 		$campaign_id = $request->get_param( 'campaign_id' ) ?: null;
-		$wp_user_id  = get_current_user_id();
 
 		// --------------------------------------------------------
 		// 1. Pobierz kontekst z Supabase
@@ -100,10 +99,10 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		if ( ! function_exists( 'tw_ai_router' ) ) {
 			return tw_rest_ai_broadcast_error( $session_id, 'tw_ai_router() niedostępne' );
 		}
-		$protocol = tw_ai_router( $message );
+		$protocol            = tw_ai_router( $message );
 		$context['protocol'] = $protocol;
 
-		// Dodaj dane protokołu do kontekstu (TRAVEL, COMBAT, TRADE itp.)
+		// Dane dodatkowe per protokół (TRAVEL, COMBAT, TRADE itp.)
 		$context['extra'] = tw_rest_ai_protocol_extra( $protocol, $char_id, $context );
 
 		// --------------------------------------------------------
@@ -182,41 +181,47 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 
 if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 	function tw_rest_ai_build_context( $char_id ) {
-    if ( ! function_exists( 'tw_supabase_select_one' ) ) {
-        return new WP_Error( 'tw_ai_no_supabase', 'tw_supabase_select_one() niedostępne' );
-    }
+		if ( ! function_exists( 'tw_supabase_select_one' ) ) {
+			return new WP_Error( 'tw_ai_no_supabase', 'tw_supabase_select_one() niedostępne' );
+		}
 
-    $char = tw_supabase_select_one( 'cyber_characters', [ 'id' => $char_id ] );
-    if ( is_wp_error( $char ) || empty( $char ) ) {
-        return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id );
-    }
+		$char = tw_supabase_select_one( 'cyber_characters', [ 'id' => $char_id ] );
+		if ( is_wp_error( $char ) || empty( $char ) ) {
+			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id );
+		}
 
-    $location = [];
-    $world    = [];
+		$location    = [];
+		$world       = [];
+		$location_id = null;
+		$world_id    = null;
 
-    // ← lokacja i świat z aktywnej sesji, nie z postaci
-    $wp_user_id = get_current_user_id();
-    if ( $wp_user_id && function_exists( 'get_user_game_data_from_supabase' ) ) {
-        $game_data   = get_user_game_data_from_supabase( $wp_user_id );
-        $location_id = $game_data['active_location_id'] ?? null;
-        $world_id    = $game_data['active_world_id']    ?? null;
-    }
+		$wp_user_id = get_current_user_id();
+		if ( $wp_user_id && function_exists( 'get_user_game_data_from_supabase' ) ) {
+			$game_data   = get_user_game_data_from_supabase( $wp_user_id );
+			$location_id = $game_data['active_location_id'] ?? null;
+			$world_id    = $game_data['active_world_id']    ?? null;
+		}
 
-    if ( ! empty( $location_id ) ) {
-        $loc = tw_supabase_select_one( 'cyber_world_map', [ 'id' => $location_id ] );
-        if ( ! is_wp_error( $loc ) && $loc ) { $location = $loc; }
-    }
+		if ( ! empty( $location_id ) ) {
+			$loc = tw_supabase_select_one( 'cyber_world_map', [ 'id' => $location_id ] );
+			if ( ! is_wp_error( $loc ) && $loc ) {
+				$location = $loc;
+			}
+		}
 
-    if ( ! empty( $world_id ) ) {
-        $w = tw_supabase_select_one( 'cyber_worlds', [ 'id' => $world_id ] );
-        if ( ! is_wp_error( $w ) && $w ) { $world = $w; }
-    }
+		if ( ! empty( $world_id ) ) {
+			$w = tw_supabase_select_one( 'cyber_worlds', [ 'id' => $world_id ] );
+			if ( ! is_wp_error( $w ) && $w ) {
+				$world = $w;
+			}
+		}
 
-    return [
-        'char'     => $char,
-        'location' => $location,
-        'world'    => $world,
-    ];
+		return [
+			'char'     => $char,
+			'location' => $location,
+			'world'    => $world,
+		];
+	}
 }
 
 // ============================================================
@@ -225,7 +230,9 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 
 if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 	function tw_rest_ai_get_history( $channel_id ) {
-		if ( ! function_exists( 'tw_supabase_request' ) ) { return []; }
+		if ( ! function_exists( 'tw_supabase_request' ) ) {
+			return [];
+		}
 
 		$rows = tw_supabase_request(
 			'GET',
@@ -234,13 +241,16 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 				. '&select=message_type,content'
 		);
 
-		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) { return []; }
+		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+			return [];
+		}
 
-		// Odwróć kolejność (najstarsze pierwsze) i zmapuj na format OpenAI
+		// Odwróć kolejność (najstarsze pierwsze) i zmapuj na format messages
 		$rows    = array_reverse( $rows );
 		$history = [];
+
 		foreach ( $rows as $row ) {
-			$role = ( isset( $row['message_type'] ) && $row['message_type'] === 'player' ) ? 'user' : 'assistant';
+			$role      = ( isset( $row['message_type'] ) && $row['message_type'] === 'player' ) ? 'user' : 'assistant';
 			$history[] = [
 				'role'    => $role,
 				'content' => isset( $row['content'] ) ? $row['content'] : '',
@@ -293,7 +303,9 @@ if ( ! function_exists( 'tw_rest_ai_protocol_extra' ) ) {
 				break;
 
 			case 'REST':
-				$safe  = isset( $location['threatlevel'] ) ? ( (int) $location['threatlevel'] === 0 ? 'true' : 'false' ) : 'unknown';
+				$safe  = isset( $location['threatlevel'] )
+					? ( (int) $location['threatlevel'] === 0 ? 'true' : 'false' )
+					: 'unknown';
 				$extra = "LOCATION_SAFE: {$safe}";
 				break;
 
@@ -311,7 +323,9 @@ if ( ! function_exists( 'tw_rest_ai_protocol_extra' ) ) {
 
 if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 	function tw_rest_ai_apply_tags( $tags, $char_id, $context ) {
-		if ( ! function_exists( 'tw_supabase_rpc' ) ) { return; }
+		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
+			return;
+		}
 
 		foreach ( $tags as $item ) {
 			$tag = isset( $item['tag'] ) ? $item['tag'] : '';
@@ -340,23 +354,22 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					break;
 
 				case 'LOC':
-    if ( $val ) {
-        tw_supabase_rpc( 'fn_move_character', [
-            'p_char_id'     => $char_id,
-            'p_location_id' => $val,
-        ] );
+					if ( $val ) {
+						tw_supabase_rpc( 'fn_move_character', [
+							'p_char_id'     => $char_id,
+							'p_location_id' => $val,
+						] );
 
-        // ← DODAJ TO:
-        $wp_user_id = get_current_user_id();
-        if ( $wp_user_id && function_exists( 'tw_invalidate_game_data_cache' ) ) {
-            tw_invalidate_game_data_cache( $wp_user_id );
-        }
-        do_action( 'tw_location_changed', $wp_user_id, [
-            'char_id'     => $char_id,
-            'location_id' => $val,
-        ] );
-    }
-    break;
+						$wp_user_id = get_current_user_id();
+						if ( $wp_user_id && function_exists( 'tw_invalidate_game_data_cache' ) ) {
+							tw_invalidate_game_data_cache( $wp_user_id );
+						}
+						do_action( 'tw_location_changed', $wp_user_id, [
+							'char_id'     => $char_id,
+							'location_id' => $val,
+						] );
+					}
+					break;
 
 				case 'ENTROPY_UP':
 					$delta    = (int) $val;
@@ -378,7 +391,7 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					}
 					break;
 
-				// Pozostałe tagi (ITEM_GET, SESSION_END itp.) — TODO w następnym etapie
+				// Pozostałe tagi (ITEM_GET, SESSION_END itp.) — TODO
 				default:
 					error_log( 'TW ai-chat: nieobsługiwany tag ' . $tag . ':' . $val );
 			}
@@ -393,8 +406,7 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 if ( ! function_exists( 'tw_rest_ai_realtime_send' ) ) {
 	/**
 	 * Wysyła wiadomość przez Supabase Realtime Broadcast.
-	 * Używa SQL realtime.send() przez tw_supabase_rpc(),
-	 * które wywołuje endpoint /rpc/ — nie wymaga service_role key po stronie JS.
+	 * Używa SQL realtime.send() przez tw_supabase_rpc().
 	 *
 	 * @param string $topic   Nazwa kanału, np. 'game:session-uuid'
 	 * @param string $event   Nazwa zdarzenia, np. 'gm_response'
