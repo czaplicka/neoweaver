@@ -4,17 +4,16 @@
  *
  * WordPress ↔ Supabase auth handshake:
  *  1. Na logowaniu WP: tworzy/znajduje użytkownika w auth.users + cyber_users.
- *  2. Pobiera sesję przez Admin API (POST auth/v1/admin/users/{uid}/session).
- *     Supabase podpisuje token swoim aktywnym kluczem (ECC P-256 lub HS256).
+ *  2. Generuje magic link przez Admin API, wymienia na access_token.
+ *     Kompatybilne z Hostinger Supabase (starsze wersje nie mają /session endpoint).
  *  3. Cachuje access_token + refresh_token w transiencie WP (55 min).
- *     Przy kolejnych żądaniach odświeża token przez /auth/v1/token?grant_type=refresh_token.
+ *     Przy kolejnych żądaniach odświeża token zamiast tworzyć nową sesję.
  *
- * NIE wymaga TW_SUPABASE_JWT_SECRET — token generuje Supabase po stronie serwera.
+ * NIE wymaga TW_SUPABASE_JWT_SECRET.
  * Wymaga tylko TW_SUPABASE_SERVICE_KEY w wp-config.php.
  *
  * RLS note: token zawiera auth.uid() = Supabase UUID.
  *           cyber_users.id = supabase_uid — RLS używa: auth.uid() = id
- *           cyber_users.wp_user_id — tylko do joinów po stronie serwera (service key).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -41,19 +40,16 @@ function tw_supabase_ensure_token_for_current_user(): void {
 
 // ─── Core ────────────────────────────────────────────────────────────────────
 
-/**
- * Główna funkcja: provision użytkownika i zwróć access_token.
- */
 function tw_supabase_provision_user( int $wp_user_id, string $email ): ?string {
 	$supabase_uid = tw_supabase_get_or_create_auth_user( $wp_user_id, $email );
 	if ( ! $supabase_uid ) {
 		return null;
 	}
 
-	// Spróbuj odświeżyć istniejącą sesję zanim tworzysz nową.
+	// Spróbuj odświeżyć istniejącą sesję.
 	$token = tw_supabase_refresh_token_if_possible( $wp_user_id );
 	if ( ! $token ) {
-		$token = tw_supabase_create_session_for_uid( $supabase_uid, $wp_user_id );
+		$token = tw_supabase_fetch_token_via_magiclink( $supabase_uid, $wp_user_id );
 	}
 
 	return $token;
@@ -73,55 +69,105 @@ function tw_supabase_get_current_user_token(): ?string {
 	return tw_supabase_get_cached_token( get_current_user_id() );
 }
 
-// ─── Session via Admin API ────────────────────────────────────────────────────
+// ─── Token via generate_link + verify ────────────────────────────────────────────
 
 /**
- * Tworzy nową sesję Supabase dla danego UUID (bez emaila/OTP).
- * Endpoint: POST auth/v1/admin/users/{uid}/session
- * Zwraca access_token lub null.
+ * Generuje token przez Admin API:
+ *  1. POST auth/v1/admin/generate_link (magiclink) — otrzymuje token_hash
+ *  2. POST auth/v1/verify (magiclink) — wymienia token_hash na access_token
+ *
+ * UWAGA: pole to nazywa się 'token_hash' w odpowiedzi generate_link,
+ * NIE 'hashed_token'. Błąd w tym miejscu powodujeł 404 przy verify.
  */
-function tw_supabase_create_session_for_uid( string $supabase_uid, int $wp_user_id ): ?string {
-	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid . '/session';
+function tw_supabase_fetch_token_via_magiclink( string $supabase_uid, int $wp_user_id ): ?string {
+	// Krok 1: pobierz email usera.
+	$email = tw_supabase_get_email_for_uid( $supabase_uid );
+	if ( ! $email ) {
+		return null;
+	}
 
-	$response = wp_remote_post( $url, [
+	// Krok 2: generate_link.
+	$gen_url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/generate_link';
+	$gen = wp_remote_post( $gen_url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
 			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
 			'Content-Type'  => 'application/json',
 		],
-		'body'    => wp_json_encode( [ 'issuer' => 'neoweaver-wp' ] ),
+		'body'    => wp_json_encode( [
+			'type'  => 'magiclink',
+			'email' => $email,
+		] ),
 		'timeout' => 15,
 	] );
 
-	if ( is_wp_error( $response ) ) {
-		error_log( 'NeoWeaver [session]: ' . $response->get_error_message() );
+	if ( is_wp_error( $gen ) ) {
+		error_log( 'NeoWeaver [generate_link]: ' . $gen->get_error_message() );
 		return null;
 	}
 
-	$code = wp_remote_retrieve_response_code( $response );
-	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+	$gcode = wp_remote_retrieve_response_code( $gen );
+	$gbody = json_decode( wp_remote_retrieve_body( $gen ), true );
 
-	if ( $code !== 200 || empty( $body['access_token'] ) ) {
-		error_log( 'NeoWeaver [session]: HTTP ' . $code . ' uid=' . $supabase_uid );
+	if ( $gcode !== 200 ) {
+		error_log( 'NeoWeaver [generate_link]: HTTP ' . $gcode );
 		return null;
 	}
 
-	// Cachuj access_token + refresh_token.
+	// Pole to może być 'token_hash' albo zagnieżdżone w 'properties'.
+	$token_hash = $gbody['token_hash']
+		?? $gbody['properties']['token_hash']
+		?? $gbody['properties']['hashed_token']
+		?? null;
+
+	if ( ! $token_hash ) {
+		error_log( 'NeoWeaver [generate_link]: brak token_hash w odpowiedzi. Keys: ' . implode( ', ', array_keys( $gbody ) ) );
+		return null;
+	}
+
+	// Krok 3: verify — wymień token_hash na access_token.
+	$verify = wp_remote_post(
+		trailingslashit( tw_supabase_url() ) . 'auth/v1/verify',
+		[
+			'headers' => [
+				'apikey'       => tw_supabase_anon_key(),
+				'Content-Type' => 'application/json',
+			],
+			'body'    => wp_json_encode( [
+				'type'       => 'magiclink',
+				'token_hash' => $token_hash,
+			] ),
+			'timeout' => 15,
+		]
+	);
+
+	if ( is_wp_error( $verify ) ) {
+		error_log( 'NeoWeaver [verify]: ' . $verify->get_error_message() );
+		return null;
+	}
+
+	$vcode = wp_remote_retrieve_response_code( $verify );
+	$vbody = json_decode( wp_remote_retrieve_body( $verify ), true );
+
+	if ( $vcode !== 200 || empty( $vbody['access_token'] ) ) {
+		error_log( 'NeoWeaver [verify]: HTTP ' . $vcode );
+		return null;
+	}
+
 	set_transient(
 		'tw_supa_jwt_' . $wp_user_id,
 		[
-			'access_token'  => $body['access_token'],
-			'refresh_token' => $body['refresh_token'] ?? '',
+			'access_token'  => $vbody['access_token'],
+			'refresh_token' => $vbody['refresh_token'] ?? '',
 		],
 		55 * MINUTE_IN_SECONDS
 	);
 
-	return $body['access_token'];
+	return $vbody['access_token'];
 }
 
 /**
- * Odświeża token przez refresh_token jeśli jest zapisany.
- * Używa: POST auth/v1/token?grant_type=refresh_token
+ * Odświeża token przez refresh_token.
  */
 function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
 	$cached = get_transient( 'tw_supa_jwt_' . $wp_user_id );
@@ -130,7 +176,6 @@ function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
 	}
 
 	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/token?grant_type=refresh_token';
-
 	$response = wp_remote_post( $url, [
 		'headers' => [
 			'apikey'       => tw_supabase_anon_key(),
@@ -148,7 +193,6 @@ function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
 	$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 	if ( $code !== 200 || empty( $body['access_token'] ) ) {
-		// refresh wygasł — usuń cache, provision zrobi nową sesję.
 		delete_transient( 'tw_supa_jwt_' . $wp_user_id );
 		return null;
 	}
@@ -165,6 +209,28 @@ function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
 	return $body['access_token'];
 }
 
+/**
+ * Pobiera email dla danego Supabase UID przez Admin API.
+ */
+function tw_supabase_get_email_for_uid( string $supabase_uid ): ?string {
+	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid;
+	$response = wp_remote_get( $url, [
+		'headers' => [
+			'apikey'        => tw_supabase_service_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+		],
+		'timeout' => 10,
+	] );
+
+	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [get_email]: ' . $response->get_error_message() );
+		return null;
+	}
+
+	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+	return $body['email'] ?? null;
+}
+
 // ─── Supabase auth.users provisioning ────────────────────────────────────────
 
 function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): ?string {
@@ -178,7 +244,7 @@ function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): 
 	if ( ! $supabase_uid ) {
 		$supabase_uid = tw_supabase_create_auth_user( $wp_user_id, $email );
 	} else {
-		// User istnieje w Supabase Auth ale nie ma wp_user_id w app_metadata — uzupełnij.
+		// User istniał w Supabase Auth bez wp_user_id w app_metadata — uzupełnij.
 		tw_supabase_patch_app_metadata( $supabase_uid, $wp_user_id );
 	}
 
@@ -247,8 +313,7 @@ function tw_supabase_create_auth_user( int $wp_user_id, string $email ): ?string
 			'email'         => $email,
 			'password'      => wp_generate_password( 32, true, true ),
 			'email_confirm' => true,
-			// app_metadata jest dostępne w JWT jako auth.jwt()->'app_metadata'
-			// i może być używane w RLS policies.
+			// app_metadata trafia do JWT i może być używane w RLS.
 			'app_metadata'  => [ 'wp_user_id' => $wp_user_id ],
 			'user_metadata' => [ 'wp_user_id' => $wp_user_id ],
 		] ),
@@ -264,7 +329,7 @@ function tw_supabase_create_auth_user( int $wp_user_id, string $email ): ?string
 	$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 	if ( $code !== 200 && $code !== 201 ) {
-		error_log( 'NeoWeaver [create_user]: HTTP ' . $code . ' email=' . $email );
+		error_log( 'NeoWeaver [create_user]: HTTP ' . $code );
 		return null;
 	}
 
@@ -273,7 +338,6 @@ function tw_supabase_create_auth_user( int $wp_user_id, string $email ): ?string
 
 /**
  * Uzupełnia app_metadata.wp_user_id dla userów którzy istnieli przed tym fixem.
- * Ważne dla RLS: bez tego stary user nie ma wp_user_id w JWT.
  */
 function tw_supabase_patch_app_metadata( string $supabase_uid, int $wp_user_id ): void {
 	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid;
