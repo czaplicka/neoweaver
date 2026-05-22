@@ -1,12 +1,4 @@
 <?php
-/**
- * [TW] Deck Panel - UI tabs (Mission / Augments / Skills)
- *
- * Shortcode: [tw_deck_panel]
- *
- * @package Neoweaver
- */
-
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'tw_deck_panel_render' ) ) {
@@ -83,7 +75,6 @@ if ( ! function_exists( 'tw_deck_panel_render' ) ) {
 			</div>
 		</div>
 		<?php
-
 		return (string) ob_get_clean();
 	}
 }
