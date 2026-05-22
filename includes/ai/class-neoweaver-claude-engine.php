@@ -10,16 +10,27 @@ require_once dirname(__DIR__) . '/supabase-config.php';
  * NeoWeaver Claude Engine
  * Uses Anthropic Claude API via NeoWeaver_Claude_Client.
  *
- * History is stored in Supabase (cyber_chat_messages) using message_type
- * values 'player' and 'gm' — mapped to 'user'/'assistant' only when
- * passing to Claude API (which requires those exact role names).
+ * Dwie metody wejścia:
  *
- * wp-config.php constants used:
- *  - NEOWEAVER_ANTHROPIC_API_KEY — klucz Anthropic
- *  - NEOWEAVER_MODEL_GM          — model GM (np. claude-sonnet-4-5)
- *  - NEOWEAVER_TOKENS_GM         — max output tokens dla GM (600)
- *  - TW_SUPABASE_PROJECT_ID      — ID projektu Supabase
- *  - TW_SUPABASE_SERVICE_KEY     — service key Supabase
+ * process( $char_id, $message )
+ *   — użyj gdy engine ma sam budować kontekst i pobierać historię po char_id.
+ *   — zapisuje historię do cyber_chat_messages po char_id.
+ *
+ * process_with_context( $context, $history, $message )
+ *   — użyj gdy kontekst i historia są już zbudowane zewnętrznie (np. rest-ai-chat.php).
+ *   — NIE zapisuje historii — zapis leży po stronie wywołującego.
+ *   — Historia pobierana per channel_id, więc każdy kanał czatu ma swoją historię.
+ *
+ * Historia przechowywana w Supabase (cyber_chat_messages):
+ *   message_type = 'player' | 'gm'
+ *   Mapowane na 'user' | 'assistant' tylko przy przekazaniu do Claude API.
+ *
+ * wp-config.php constants:
+ *  - NEOWEAVER_ANTHROPIC_API_KEY
+ *  - NEOWEAVER_MODEL_GM          (np. claude-sonnet-4-5)
+ *  - NEOWEAVER_TOKENS_GM         (600)
+ *  - TW_SUPABASE_PROJECT_ID
+ *  - TW_SUPABASE_SERVICE_KEY
  */
 class NeoWeaver_Claude_Engine {
 
@@ -39,7 +50,9 @@ PROMPT;
     }
 
     // ============================================================
-    // PUBLIC: główna metoda
+    // PUBLIC: process() — engine sam buduje kontekst i historię
+    // Wywołuj z miejsc, gdzie nie masz jeszcze kontekstu.
+    // Zapisuje historię per char_id.
     // Zwraca: ['text'=>'...', 'tags'=>[...], 'protocol'=>'...', 'tokens'=>[...]]
     // ============================================================
     public function process( string $char_id, string $message ): array {
@@ -53,10 +66,7 @@ PROMPT;
         $ctx             = $this->context->build( $char_id, $protocol );
         $dynamic_context = $ctx['block_b'] . "\n\n---\n\n" . $ctx['block_c'];
 
-        // Pobierz historię z Supabase (message_type player/gm → role user/assistant)
-        $history = $this->get_history( $char_id );
-
-        // Dołącz aktualną wiadomość gracza
+        $history   = $this->get_history( $char_id );
         $history[] = [
             'role'    => 'user',
             'content' => "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}",
@@ -74,9 +84,7 @@ PROMPT;
             return [ 'error' => $result->get_error_message() ];
         }
 
-        // Zapisz do Supabase z message_type = 'player' / 'gm'
         $this->save_to_history( $char_id, $message, $result['content'], $ctx['world_id'] ?? null );
-
         $this->log_tokens( $char_id, $ctx['world_id'] ?? null, $result['usage'], $protocol );
 
         $parsed = $this->parse_tags( $result['content'] );
@@ -90,6 +98,80 @@ PROMPT;
                 'completion' => $result['usage']['output_tokens'] ?? 0,
             ],
         ];
+    }
+
+    // ============================================================
+    // PUBLIC: process_with_context() — kontekst i historia z zewnątrz
+    // Używa rest-ai-chat.php, który:
+    //   — sam buduje $context przez tw_rest_ai_build_context()
+    //   — sam pobiera $history przez tw_rest_ai_get_history() per channel_id
+    //   — sam zapisuje wiadomości do cyber_chat_messages po rozmowie
+    // Engine tutaj TYLKO: buduje prompt → wywołuje Claude → parsuje tagi.
+    // Zwraca: ['text'=>'...', 'tags'=>[...], 'tokens'=>[...]] lub ['error'=>'...']
+    // ============================================================
+    public function process_with_context( array $context, array $history, string $message ): array {
+
+        $protocol        = $context['protocol'] ?? 'NARRATE';
+        $extra           = $context['extra']    ?? '';
+        $char            = $context['char']     ?? [];
+        $location        = $context['location'] ?? [];
+        $world           = $context['world']    ?? [];
+        $world_id        = $world['id']         ?? null;
+        $char_id         = $char['id']          ?? '';
+
+        // Zbuduj blok kontekstu gry z gotówych danych
+        $dynamic_context = $this->build_context_block( $char, $location, $world, $extra );
+
+        // Dopiń aktualną wiadomość gracza na koniec historii
+        $history[] = [
+            'role'    => 'user',
+            'content' => "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}",
+        ];
+
+        $result = NeoWeaver_Claude_Client::call(
+            self::SYSTEM_INSTRUCTIONS,
+            $history,
+            NEOWEAVER_MODEL_GM,
+            NEOWEAVER_TOKENS_GM,
+            0.85
+        );
+
+        if ( is_wp_error( $result ) ) {
+            return [ 'error' => $result->get_error_message() ];
+        }
+
+        // Loguj tokeny (zapis historii leży po stronie rest-ai-chat.php)
+        if ( $char_id ) {
+            $this->log_tokens( $char_id, $world_id, $result['usage'], $protocol );
+        }
+
+        $parsed = $this->parse_tags( $result['content'] );
+
+        return [
+            'text'   => $parsed['text'],
+            'tags'   => $parsed['tags'],
+            'tokens' => [
+                'prompt'     => $result['usage']['input_tokens']  ?? 0,
+                'completion' => $result['usage']['output_tokens'] ?? 0,
+            ],
+        ];
+    }
+
+    // ============================================================
+    // Buduje blok kontekstu gry z tablic danych (dla process_with_context)
+    // ============================================================
+    private function build_context_block( array $char, array $location, array $world, string $extra ): string {
+        $lines = [];
+
+        if ( ! empty( $char['name'] ) )     { $lines[] = 'CHAR: '     . $char['name']; }
+        if ( ! empty( $char['hp'] ) )       { $lines[] = 'HP: '       . $char['hp']; }
+        if ( ! empty( $char['gold'] ) )     { $lines[] = 'GOLD: '     . $char['gold']; }
+        if ( ! empty( $location['name'] ) ) { $lines[] = 'LOCATION: ' . $location['name']; }
+        if ( ! empty( $location['desc'] ) ) { $lines[] = 'LOC_DESC: ' . $location['desc']; }
+        if ( ! empty( $world['name'] ) )    { $lines[] = 'WORLD: '    . $world['name']; }
+        if ( $extra !== '' )                { $lines[] = $extra; }
+
+        return implode( "\n", $lines );
     }
 
     // ============================================================
@@ -119,10 +201,10 @@ PROMPT;
 
     // ============================================================
     // Historia konwersacji — cyber_chat_messages
-    // Przechowujemy: message_type = 'player' | 'gm'
-    // Do Claude API mapujemy: player → user, gm → assistant
+    // Używane przez process() (per char_id).
+    // process_with_context() używa historii podanej z zewnątrz.
+    // Mapowanie: player → user, gm → assistant (tylko dla Claude API)
     // ============================================================
-
     private function get_history( string $char_id ): array {
         $result = $this->supabase_request(
             'GET',
@@ -137,11 +219,9 @@ PROMPT;
             return [];
         }
 
-        // Odwróć — chcemy od najstarszej do najnowszej
         $result = array_reverse( $result );
 
         return array_map( function ( $row ) {
-            // Mapowanie message_type → role wymagane przez Claude API
             $role = ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant';
             return [
                 'role'    => $role,
@@ -151,7 +231,6 @@ PROMPT;
     }
 
     private function save_to_history( string $char_id, string $user_message, string $gm_message, ?string $world_id ): void {
-        // Wiadomość gracza
         $this->supabase_request(
             'POST',
             '/rest/v1/cyber_chat_messages',
@@ -165,7 +244,6 @@ PROMPT;
             [ 'Prefer' => 'return=minimal' ]
         );
 
-        // Odpowiedź GM-a
         $this->supabase_request(
             'POST',
             '/rest/v1/cyber_chat_messages',
