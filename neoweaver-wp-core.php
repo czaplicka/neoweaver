@@ -75,11 +75,10 @@ final class NeoWeaver_Core {
 			'includes/assets/signal-quality.php',
 			'includes/assets/time-wheel.php',
 			'includes/assets/vehicle-panel.php',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
+			'includes/assets/weaver-list.php',
+			'includes/assets/world-archive.php',
+			'includes/assets/world-creator.php',
+			'includes/assets/world-news.php',
 			
 			
 			'includes/assets/public-character-profile.php',
@@ -98,6 +97,7 @@ final class NeoWeaver_Core {
 			'includes/head-injection.php',
 			'includes/inventory-system.php',
 			'includes/lexicon-shortcodes.php',
+			'includes/rest-ai-chat.php',
 			'includes/quest-helpers.php',
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
