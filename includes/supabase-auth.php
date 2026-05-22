@@ -4,11 +4,17 @@
  *
  * WordPress ↔ Supabase auth handshake:
  *  1. Na logowaniu WP: tworzy/znajduje użytkownika w auth.users + cyber_users.
- *  2. Pobiera token od Supabase Admin API (obsługuje nowe klucze ECC/P-256).
- *  3. Cachuje token w transiencie WP i przekazuje do JS przez twAdventureData.
+ *  2. Pobiera sesję przez Admin API (POST auth/v1/admin/users/{uid}/session).
+ *     Supabase podpisuje token swoim aktywnym kluczem (ECC P-256 lub HS256).
+ *  3. Cachuje access_token + refresh_token w transiencie WP (55 min).
+ *     Przy kolejnych żądaniach odświeża token przez /auth/v1/token?grant_type=refresh_token.
  *
  * NIE wymaga TW_SUPABASE_JWT_SECRET — token generuje Supabase po stronie serwera.
  * Wymaga tylko TW_SUPABASE_SERVICE_KEY w wp-config.php.
+ *
+ * RLS note: token zawiera auth.uid() = Supabase UUID.
+ *           cyber_users.id = supabase_uid — RLS używa: auth.uid() = id
+ *           cyber_users.wp_user_id — tylko do joinów po stronie serwera (service key).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -35,21 +41,29 @@ function tw_supabase_ensure_token_for_current_user(): void {
 
 // ─── Core ────────────────────────────────────────────────────────────────────
 
+/**
+ * Główna funkcja: provision użytkownika i zwróć access_token.
+ */
 function tw_supabase_provision_user( int $wp_user_id, string $email ): ?string {
 	$supabase_uid = tw_supabase_get_or_create_auth_user( $wp_user_id, $email );
 	if ( ! $supabase_uid ) {
 		return null;
 	}
-	$token = tw_supabase_fetch_token_for_uid( $supabase_uid );
-	if ( $token ) {
-		set_transient( 'tw_supa_jwt_' . $wp_user_id, $token, 55 * MINUTE_IN_SECONDS );
+
+	// Spróbuj odświeżyć istniejącą sesję zanim tworzysz nową.
+	$token = tw_supabase_refresh_token_if_possible( $wp_user_id );
+	if ( ! $token ) {
+		$token = tw_supabase_create_session_for_uid( $supabase_uid, $wp_user_id );
 	}
+
 	return $token;
 }
 
 function tw_supabase_get_cached_token( int $wp_user_id ): ?string {
-	$token = get_transient( 'tw_supa_jwt_' . $wp_user_id );
-	return $token ?: null;
+	$cached = get_transient( 'tw_supa_jwt_' . $wp_user_id );
+	return ( is_array( $cached ) && ! empty( $cached['access_token'] ) )
+		? $cached['access_token']
+		: null;
 }
 
 function tw_supabase_get_current_user_token(): ?string {
@@ -59,85 +73,98 @@ function tw_supabase_get_current_user_token(): ?string {
 	return tw_supabase_get_cached_token( get_current_user_id() );
 }
 
-// ─── Token via Admin API (obsługuje ECC P-256 i HS256) ───────────────────────
+// ─── Session via Admin API ────────────────────────────────────────────────────
 
 /**
- * Prosi Supabase o wystawienie sesji (access_token) dla danego UUID.
- * Supabase podpisuje token swoim aktywnym kluczem (ECC lub HS256).
+ * Tworzy nową sesję Supabase dla danego UUID (bez emaila/OTP).
+ * Endpoint: POST auth/v1/admin/users/{uid}/session
+ * Zwraca access_token lub null.
  */
-function tw_supabase_fetch_token_for_uid( string $supabase_uid ): ?string {
-    // Najpierw pobierz email usera z auth.users
-    $url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid;
+function tw_supabase_create_session_for_uid( string $supabase_uid, int $wp_user_id ): ?string {
+	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid . '/session';
 
-    $response = wp_remote_get( $url, [
-        'headers' => [
-            'apikey'        => tw_supabase_service_key(),
-            'Authorization' => 'Bearer ' . tw_supabase_service_key(),
-        ],
-        'timeout' => 10,
-    ] );
+	$response = wp_remote_post( $url, [
+		'headers' => [
+			'apikey'        => tw_supabase_service_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+			'Content-Type'  => 'application/json',
+		],
+		'body'    => wp_json_encode( [ 'issuer' => 'neoweaver-wp' ] ),
+		'timeout' => 15,
+	] );
 
-    $body  = json_decode( wp_remote_retrieve_body( $response ), true );
-    $email = $body['email'] ?? null;
+	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [session]: ' . $response->get_error_message() );
+		return null;
+	}
 
-    if ( ! $email ) {
-        error_log( 'NeoWeaver: brak email dla uid ' . $supabase_uid );
-        return null;
-    }
+	$code = wp_remote_retrieve_response_code( $response );
+	$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-    // Generuj OTP link
-    $gen_url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/generate_link';
+	if ( $code !== 200 || empty( $body['access_token'] ) ) {
+		error_log( 'NeoWeaver [session]: HTTP ' . $code . ' uid=' . $supabase_uid );
+		return null;
+	}
 
-    $gen = wp_remote_post( $gen_url, [
-        'headers' => [
-            'apikey'        => tw_supabase_service_key(),
-            'Authorization' => 'Bearer ' . tw_supabase_service_key(),
-            'Content-Type'  => 'application/json',
-        ],
-        'body' => wp_json_encode( [
-            'type'  => 'magiclink',
-            'email' => $email,
-        ] ),
-        'timeout' => 15,
-    ] );
+	// Cachuj access_token + refresh_token.
+	set_transient(
+		'tw_supa_jwt_' . $wp_user_id,
+		[
+			'access_token'  => $body['access_token'],
+			'refresh_token' => $body['refresh_token'] ?? '',
+		],
+		55 * MINUTE_IN_SECONDS
+	);
 
-    $gcode = wp_remote_retrieve_response_code( $gen );
-    $gbody = json_decode( wp_remote_retrieve_body( $gen ), true );
-
-    error_log( 'NeoWeaver: generate_link HTTP ' . $gcode . ' — ' . wp_json_encode( $gbody ) );
-
-    if ( $gcode !== 200 || empty( $gbody['properties']['hashed_token'] ) ) {
-        return null;
-    }
-
-    // Wymień token na access_token
-    $verify = wp_remote_post(
-        trailingslashit( tw_supabase_url() ) . 'auth/v1/verify',
-        [
-            'headers' => [
-                'apikey'       => tw_supabase_anon_key(),
-                'Content-Type' => 'application/json',
-            ],
-            'body' => wp_json_encode( [
-                'type'  => 'magiclink',
-                'token' => $gbody['properties']['hashed_token'],
-                'email' => $email,
-            ] ),
-            'timeout' => 15,
-        ]
-    );
-
-    $vcode = wp_remote_retrieve_response_code( $verify );
-    $vbody = json_decode( wp_remote_retrieve_body( $verify ), true );
-
-    error_log( 'NeoWeaver: verify HTTP ' . $vcode . ' — ' . wp_json_encode( $vbody ) );
-
-    if ( $vcode !== 200 || empty( $vbody['access_token'] ) ) {
-        return null;
-    }
-
-    return $vbody['access_token'];
+	return $body['access_token'];
 }
+
+/**
+ * Odświeża token przez refresh_token jeśli jest zapisany.
+ * Używa: POST auth/v1/token?grant_type=refresh_token
+ */
+function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
+	$cached = get_transient( 'tw_supa_jwt_' . $wp_user_id );
+	if ( ! is_array( $cached ) || empty( $cached['refresh_token'] ) ) {
+		return null;
+	}
+
+	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/token?grant_type=refresh_token';
+
+	$response = wp_remote_post( $url, [
+		'headers' => [
+			'apikey'       => tw_supabase_anon_key(),
+			'Content-Type' => 'application/json',
+		],
+		'body'    => wp_json_encode( [ 'refresh_token' => $cached['refresh_token'] ] ),
+		'timeout' => 10,
+	] );
+
+	if ( is_wp_error( $response ) ) {
+		return null;
+	}
+
+	$code = wp_remote_retrieve_response_code( $response );
+	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+	if ( $code !== 200 || empty( $body['access_token'] ) ) {
+		// refresh wygasł — usuń cache, provision zrobi nową sesję.
+		delete_transient( 'tw_supa_jwt_' . $wp_user_id );
+		return null;
+	}
+
+	set_transient(
+		'tw_supa_jwt_' . $wp_user_id,
+		[
+			'access_token'  => $body['access_token'],
+			'refresh_token' => $body['refresh_token'] ?? $cached['refresh_token'],
+		],
+		55 * MINUTE_IN_SECONDS
+	);
+
+	return $body['access_token'];
+}
+
 // ─── Supabase auth.users provisioning ────────────────────────────────────────
 
 function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): ?string {
@@ -150,6 +177,9 @@ function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): 
 
 	if ( ! $supabase_uid ) {
 		$supabase_uid = tw_supabase_create_auth_user( $wp_user_id, $email );
+	} else {
+		// User istnieje w Supabase Auth ale nie ma wp_user_id w app_metadata — uzupełnij.
+		tw_supabase_patch_app_metadata( $supabase_uid, $wp_user_id );
 	}
 
 	if ( ! $supabase_uid ) {
@@ -174,6 +204,7 @@ function tw_supabase_find_supabase_uid_by_wp_id( int $wp_user_id ): ?string {
 	] );
 
 	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [find_uid]: ' . $response->get_error_message() );
 		return null;
 	}
 
@@ -194,6 +225,7 @@ function tw_supabase_find_auth_user_by_email( string $email ): ?string {
 	] );
 
 	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [find_email]: ' . $response->get_error_message() );
 		return null;
 	}
 
@@ -215,23 +247,60 @@ function tw_supabase_create_auth_user( int $wp_user_id, string $email ): ?string
 			'email'         => $email,
 			'password'      => wp_generate_password( 32, true, true ),
 			'email_confirm' => true,
+			// app_metadata jest dostępne w JWT jako auth.jwt()->'app_metadata'
+			// i może być używane w RLS policies.
+			'app_metadata'  => [ 'wp_user_id' => $wp_user_id ],
 			'user_metadata' => [ 'wp_user_id' => $wp_user_id ],
 		] ),
 		'timeout' => 15,
 	] );
 
 	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [create_user]: ' . $response->get_error_message() );
 		return null;
 	}
 
+	$code = wp_remote_retrieve_response_code( $response );
 	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+	if ( $code !== 200 && $code !== 201 ) {
+		error_log( 'NeoWeaver [create_user]: HTTP ' . $code . ' email=' . $email );
+		return null;
+	}
+
 	return $body['id'] ?? null;
+}
+
+/**
+ * Uzupełnia app_metadata.wp_user_id dla userów którzy istnieli przed tym fixem.
+ * Ważne dla RLS: bez tego stary user nie ma wp_user_id w JWT.
+ */
+function tw_supabase_patch_app_metadata( string $supabase_uid, int $wp_user_id ): void {
+	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid;
+
+	$response = wp_remote_request( $url, [
+		'method'  => 'PUT',
+		'headers' => [
+			'apikey'        => tw_supabase_service_key(),
+			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+			'Content-Type'  => 'application/json',
+		],
+		'body'    => wp_json_encode( [
+			'app_metadata'  => [ 'wp_user_id' => $wp_user_id ],
+			'user_metadata' => [ 'wp_user_id' => $wp_user_id ],
+		] ),
+		'timeout' => 10,
+	] );
+
+	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [patch_meta]: ' . $response->get_error_message() );
+	}
 }
 
 function tw_supabase_upsert_cyber_user( string $supabase_uid, int $wp_user_id ): void {
 	$url = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_users';
 
-	wp_remote_post( $url, [
+	$response = wp_remote_post( $url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
 			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
@@ -245,4 +314,8 @@ function tw_supabase_upsert_cyber_user( string $supabase_uid, int $wp_user_id ):
 		] ),
 		'timeout' => 10,
 	] );
+
+	if ( is_wp_error( $response ) ) {
+		error_log( 'NeoWeaver [upsert_cyber]: ' . $response->get_error_message() );
+	}
 }
