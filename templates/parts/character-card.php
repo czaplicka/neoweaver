@@ -120,8 +120,8 @@ $total_power          = $args['total_power'];
 
 			<div class="tw-tab-content active" id="status">
 				 <div class="tw-bars-block">
-					<div class="tw-stat-bar-container">
-						<!--<div class="tw-stat-label main-label">
+					<!--<div class="tw-stat-bar-container">
+						<div class="tw-stat-label main-label">
 							<span>HEALTH</span>
 							<span><?php echo (int) $c_hp; ?>/<?php echo (int) $m_hp; ?></span>
 						</div>
@@ -182,9 +182,9 @@ $total_power          = $args['total_power'];
 							<div class="tw-progress-bg small-bar">
 								<div class="tw-progress-fill rest-purple" style="width:<?php echo (int) $c_rest; ?>%;"></div>
 							</div>
-						</div> -->
-					</div>
-
+						</div> 
+					</div>-->
+				 
 				</div> 
 <?php echo do_shortcode( '[tw_vitalis_panel]' ); ?>
 				<div class="tw-accordion-group">
