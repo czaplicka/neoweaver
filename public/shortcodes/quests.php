@@ -1,139 +1,178 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-function tw_time_ago( $timestamp ) {
-    $created = strtotime( $timestamp );
-    if ( ! $created ) return '';
+if ( ! function_exists( 'tw_time_ago' ) ) {
+	function tw_time_ago( $timestamp ): string {
+		$created = strtotime( (string) $timestamp );
 
-    $diff = time() - $created;
+		if ( ! $created ) {
+			return '';
+		}
 
-    if ( $diff < 60 )    return 'just now';
-    if ( $diff < 3600 )  return floor( $diff / 60 ) . ' min ago';
-    if ( $diff < 86400 ) return floor( $diff / 3600 ) . ' h ago';
+		$diff = time() - $created;
 
-    return floor( $diff / 86400 ) . ' d ago';
+		if ( $diff < 60 ) {
+			return 'just now';
+		}
+
+		if ( $diff < 3600 ) {
+			return floor( $diff / 60 ) . ' min ago';
+		}
+
+		if ( $diff < 86400 ) {
+			return floor( $diff / 3600 ) . ' h ago';
+		}
+
+		return floor( $diff / 86400 ) . ' d ago';
+	}
 }
 
-function tw_render_quest_card( array $quest ): string {
-    $scenario = $quest['cyber_scenarios'] ?? null;
-    if ( ! $scenario || ! is_array( $scenario ) ) return '';
+if ( ! function_exists( 'tw_render_quest_card' ) ) {
+	function tw_render_quest_card( array $quest ): string {
+		$scenario = $quest['cyber_scenarios'] ?? null;
 
-    $quest_type = $scenario['type']     ?? 'side';
-    $quest_name = $scenario['name']     ?? 'Unknown objective';
-    $quest_tags = $scenario['tags']     ?? '';
-    $category   = $scenario['category'] ?? 'UNCATEGORIZED';
-    $goal       = $scenario['goal']     ?? 'N/A';
+		if ( ! $scenario || ! is_array( $scenario ) ) {
+			return '';
+		}
 
-    $area      = $scenario['cyber_areas'] ?? null;
-    $area_name = is_array( $area ) ? ( $area['name'] ?? 'Unknown area' ) : 'Unknown area';
+		$quest_type = (string) ( $scenario['type'] ?? 'side' );
+		$quest_name = (string) ( $scenario['name'] ?? 'Unknown objective' );
+		$quest_tags = $scenario['tags'] ?? '';
+		$category   = (string) ( $scenario['category'] ?? 'UNCATEGORIZED' );
+		$goal       = (string) ( $scenario['goal'] ?? 'N/A' );
 
-    $created_at = $quest['created_at'] ?? null;
-    $time_ago   = $created_at ? tw_time_ago( $created_at ) : '';
+		$area      = $scenario['cyber_areas'] ?? null;
+		$area_name = is_array( $area ) ? (string) ( $area['name'] ?? 'Unknown area' ) : 'Unknown area';
 
-    $tags_html = '';
-    if ( ! empty( $quest_tags ) ) {
-        // quest_tags may be a jsonb array or a comma-delimited string.
-        $tags_list = is_array( $quest_tags )
-            ? $quest_tags
-            : explode( ',', $quest_tags );
+		$created_at = $quest['created_at'] ?? null;
+		$time_ago   = $created_at ? tw_time_ago( $created_at ) : '';
 
-        foreach ( $tags_list as $tag ) {
-            $tag = trim( (string) $tag );
-            if ( $tag !== '' ) {
-                $tags_html .= '<span class="tw-tag">' . esc_html( $tag ) . '</span>';
-            }
-        }
-    }
+		$tags_html = '';
 
-    return sprintf(
-        "<div class='scenario-card'>
-            <div class='quest-header'>// OBJECTIVE: %s - %s</div>
-            <div class='quest-name-line'>%s</div>
-            <div class='quest-tags-line'>%s</div>
-            <div class='quest-what'>// WHAT: %s</div>
-            <div class='quest-where'>// WHERE: %s</div>
-            <div class='quest-time'>// TIME: %s</div>
-        </div>",
-        esc_html( strtoupper( $category ) ),
-        esc_html( strtoupper( $quest_type ) ),
-        esc_html( $quest_name ),
-        $tags_html,
-        esc_html( $goal ),
-        esc_html( $area_name ),
-        esc_html( $time_ago )
-    );
+		if ( ! empty( $quest_tags ) ) {
+			$tags_list = is_array( $quest_tags ) ? $quest_tags : explode( ',', (string) $quest_tags );
+
+			foreach ( $tags_list as $tag ) {
+				$tag = trim( (string) $tag );
+
+				if ( '' !== $tag ) {
+					$tags_html .= '<span class="tw-tag">' . esc_html( $tag ) . '</span>';
+				}
+			}
+		}
+
+		return sprintf(
+			"<div class='scenario-card'>
+				<div class='quest-header'>// OBJECTIVE: %s - %s</div>
+				<div class='quest-name-line'>%s</div>
+				<div class='quest-tags-line'>%s</div>
+				<div class='quest-what'>// WHAT: %s</div>
+				<div class='quest-where'>// WHERE: %s</div>
+				<div class='quest-time'>// TIME: %s</div>
+			</div>",
+			esc_html( strtoupper( $category ) ),
+			esc_html( strtoupper( $quest_type ) ),
+			esc_html( $quest_name ),
+			$tags_html,
+			esc_html( $goal ),
+			esc_html( $area_name ),
+			esc_html( $time_ago )
+		);
+	}
 }
 
-/**
- * BUG-FIX: previously used TW_SUPABASE_PROJECT_ID / TW_SUPABASE_ANON_KEY
- * constants which are never defined in wp-config.php — only the helper
- * functions tw_supabase_url() and tw_supabase_anon_key() exist.
- * Every call to this shortcode fatalled with "Use of undefined constant".
- * Fixed: use the project-standard helpers throughout.
- */
-function tw_display_active_scenarios_shortcode(): string {
-    $character_id = tw_get_current_character_id();
+if ( ! function_exists( 'tw_display_active_scenarios_shortcode' ) ) {
+	function tw_display_active_scenarios_shortcode(): string {
+		if ( ! function_exists( 'tw_get_current_character_id' ) ) {
+			return '<div class="echo-stream-container">// ERROR: SESSION HELPER MISSING</div>';
+		}
 
-    if ( ! $character_id ) {
-        return '<div class="echo-stream-container">// ERROR: NO ACTIVE SESSION DETECTED</div>';
-    }
+		$character_id = tw_get_current_character_id();
 
-    if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-        return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG MISSING</div>';
-    }
+		if ( ! $character_id ) {
+			return '<div class="echo-stream-container">// ERROR: NO ACTIVE SESSION DETECTED</div>';
+		}
 
-    $anon_key = tw_supabase_anon_key();
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG MISSING</div>';
+		}
 
-    $url = add_query_arg( [
-        'character_id' => 'eq.' . rawurlencode( $character_id ),
-        'select'       => '*,cyber_scenarios(*,cyber_areas(*))',
-    ], trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests' );
+		if ( function_exists( 'tw_enqueue_quests_assets' ) ) {
+			tw_enqueue_quests_assets();
+		}
 
-    $response = wp_remote_get( $url, [
-        'headers' => [
-            'apikey'        => $anon_key,
-            'Authorization' => 'Bearer ' . $anon_key,
-        ],
-        'timeout' => 15,
-    ] );
+		$anon_key = tw_supabase_anon_key();
 
-    $error_card = '<div class="scenario-card" style="opacity:0.5;text-align:center;border:1px dashed #444;">%s</div>';
+		$url = add_query_arg(
+			array(
+				'character_id' => 'eq.' . rawurlencode( (string) $character_id ),
+				'select'       => '*,cyber_scenarios(*,cyber_areas(*))',
+			),
+			trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests'
+		);
 
-    if ( is_wp_error( $response ) ) {
-        return sprintf( $error_card, '// CONNECTION ERROR' );
-    }
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'apikey'        => $anon_key,
+					'Authorization' => 'Bearer ' . $anon_key,
+				),
+				'timeout' => 15,
+			)
+		);
 
-    $quests = json_decode( wp_remote_retrieve_body( $response ), true );
+		$error_card = '<div class="scenario-card scenario-card--error">%s</div>';
 
-    if ( ! is_array( $quests ) || isset( $quests['code'], $quests['message'] ) ) {
-        return sprintf( $error_card, '// API ERROR' );
-    }
+		if ( is_wp_error( $response ) ) {
+			return sprintf( $error_card, '// CONNECTION ERROR' );
+		}
 
-    if ( empty( $quests ) ) {
-        return sprintf( $error_card, 'NO OBJECTIVES' );
-    }
+		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			return sprintf( $error_card, '// API ERROR' );
+		}
 
-    $grouped = array_fill_keys( [ 'active', 'completed', 'failed', 'paused' ], [] );
+		$quests = json_decode( wp_remote_retrieve_body( $response ), true );
 
-    foreach ( $quests as $quest ) {
-        if ( ! is_array( $quest ) ) continue;
-        $status = $quest['status'] ?? 'active';
-        $grouped[ array_key_exists( $status, $grouped ) ? $status : 'active' ][] = $quest;
-    }
+		if ( ! is_array( $quests ) || isset( $quests['code'], $quests['message'] ) ) {
+			return sprintf( $error_card, '// API ERROR' );
+		}
 
-    $output = '<div class="active-scenarios-container">';
+		if ( empty( $quests ) ) {
+			return sprintf( $error_card, 'NO OBJECTIVES' );
+		}
 
-    foreach ( $grouped as $status => $quests_in_group ) {
-        if ( empty( $quests_in_group ) ) continue;
+		$grouped = array_fill_keys( array( 'active', 'completed', 'failed', 'paused' ), array() );
 
-        $output .= '<div class="quest-status-header">' . strtoupper( $status ) . ':</div>';
-        foreach ( $quests_in_group as $quest ) {
-            $output .= tw_render_quest_card( $quest );
-        }
-    }
+		foreach ( $quests as $quest ) {
+			if ( ! is_array( $quest ) ) {
+				continue;
+			}
 
-    $output .= '</div>';
+			$status = isset( $quest['status'] ) ? (string) $quest['status'] : 'active';
+			$key    = array_key_exists( $status, $grouped ) ? $status : 'active';
 
-    return $output;
+			$grouped[ $key ][] = $quest;
+		}
+
+		$output = '<div class="active-scenarios-container">';
+
+		foreach ( $grouped as $status => $quests_in_group ) {
+			if ( empty( $quests_in_group ) ) {
+				continue;
+			}
+
+			$output .= '<div class="quest-status-header">' . esc_html( strtoupper( $status ) ) . ':</div>';
+
+			foreach ( $quests_in_group as $quest ) {
+				$output .= tw_render_quest_card( $quest );
+			}
+		}
+
+		$output .= '</div>';
+
+		return $output;
+	}
+
+	add_shortcode( 'active_scenarios', 'tw_display_active_scenarios_shortcode' );
 }
-
-add_shortcode( 'active_scenarios', 'tw_display_active_scenarios_shortcode' );
