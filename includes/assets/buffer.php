@@ -4,20 +4,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! function_exists( 'tw_is_buffer_context' ) ) {
-	/**
-	 * Detect whether current request needs buffer assets.
-	 * Dostosuj warunki do miejsc, gdzie realnie używasz buffera.
-	 */
 	function tw_is_buffer_context(): bool {
 		if ( is_admin() ) {
 			return false;
 		}
 
-		if ( function_exists( 'tw_has_shortcode_on_current_page' ) && tw_has_shortcode_on_current_page( 'tw_buffer' ) ) {
+		if ( is_page_template( 'templates/adventure.php' ) ) {
 			return true;
 		}
 
-		if ( function_exists( 'tw_has_shortcode_on_current_page' ) && tw_has_shortcode_on_current_page( 'cyber_hud' ) ) {
+		if ( function_exists( 'tw_has_shortcode_on_current_page' ) && tw_has_shortcode_on_current_page( 'tw_buffer' ) ) {
 			return true;
 		}
 
@@ -26,9 +22,6 @@ if ( ! function_exists( 'tw_is_buffer_context' ) ) {
 }
 
 if ( ! function_exists( 'tw_register_buffer_assets' ) ) {
-	/**
-	 * Enqueue public buffer assets.
-	 */
 	function tw_register_buffer_assets(): void {
 		if ( ! tw_is_buffer_context() ) {
 			return;
