@@ -58,4 +58,23 @@ if ( ! function_exists( 'tw_enqueue_connect_campaign_world_assets' ) ) {
 	}
 }
 
+if ( ! function_exists( 'tw_maybe_enqueue_connect_campaign_world_assets' ) ) {
+	function tw_maybe_enqueue_connect_campaign_world_assets(): void {
+		if ( is_admin() || ! is_singular() ) {
+			return;
+		}
+
+		$post = get_post();
+
+		if ( ! $post || empty( $post->post_content ) ) {
+			return;
+		}
+
+		if ( has_shortcode( $post->post_content, 'tw_connect_campaign_world' ) ) {
+			tw_enqueue_connect_campaign_world_assets();
+		}
+	}
+}
+
 add_action( 'wp_enqueue_scripts', 'tw_register_connect_campaign_world_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_connect_campaign_world_assets', 20 );
