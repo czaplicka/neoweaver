@@ -8,13 +8,12 @@
  * - calls the Claude client and logs tokens to cyber_token_ledger
  *
  * Required constants in wp-config.php:
- *   define( 'NW_SUPABASE_URL', 'https://xxx.supabase.co' );
- *   define( 'NW_SUPABASE_SERVICE_KEY', 'service_role_key' );
+ *   define( 'NW_CLAUDE_API_KEY', 'sk-ant-...' );
+ *   define( 'NEOWEAVER_MODEL_GM', 'claude-sonnet-4-5-20251001' );
+ *   define( 'NEOWEAVER_TOKENS_GM', 1024 );
  *
  * Optional:
- *   define( 'NW_GPT_MODEL', 'claude-sonnet-4-5-20251001' );
- *   define( 'NW_GPT_MAX_TOKENS', 600 );
- *   define( 'NW_GPT_HISTORY_LEN', 12 );
+ *   define( 'NW_GPT_HISTORY_LEN', 12 );  // number of past messages to load
  *
  * @package NeoWeaver
  */
@@ -34,9 +33,9 @@ class NW_Chat_Claude {
 	private int    $history_len;
 
 	public function __construct() {
-		$this->model       = defined( 'NW_GPT_MODEL' )       ? NW_GPT_MODEL       : 'claude-sonnet-4-5-20251001';
-		$this->max_tokens  = defined( 'NW_GPT_MAX_TOKENS' )  ? NW_GPT_MAX_TOKENS  : 600;
-		$this->history_len = defined( 'NW_GPT_HISTORY_LEN' ) ? NW_GPT_HISTORY_LEN : 12;
+		$this->model       = defined( 'NEOWEAVER_MODEL_GM' )    ? NEOWEAVER_MODEL_GM    : 'claude-sonnet-4-5-20251001';
+		$this->max_tokens  = defined( 'NEOWEAVER_TOKENS_GM' )   ? NEOWEAVER_TOKENS_GM   : 1024;
+		$this->history_len = defined( 'NW_GPT_HISTORY_LEN' )    ? NW_GPT_HISTORY_LEN    : 12;
 	}
 
 	// =========================================================
@@ -62,9 +61,9 @@ class NW_Chat_Claude {
 	 *   world        array   Row from cyber_worlds
 	 *
 	 * @return array {
-	 *   'raw'     => string,
-	 *   'error'   => ?string,
-	 *   'usage'   => array,
+	 *   'raw'   => string,
+	 *   'error' => ?string,
+	 *   'usage' => array{ input_tokens: int, output_tokens: int },
 	 * }
 	 */
 	public function send( string $user_message, array $context, string $protocol = 'DIALOG' ): array {
@@ -76,10 +75,10 @@ class NW_Chat_Claude {
 		$system_prompt = $this->build_system_prompt( $context, $protocol );
 
 		// 2. Load conversation history from Supabase
-		$history = $this->get_history( $channel_id, $char_id );
+		$history = $this->get_history( $channel_id );
 
 		// 3. Call Claude
-		$api_result = $this->call_api( $system_prompt, $history, $user_message, $char_id );
+		$api_result = $this->call_api( $system_prompt, $history, $user_message );
 
 		if ( ! empty( $api_result['error'] ) ) {
 			return $api_result;
@@ -112,21 +111,21 @@ Rules:
 - Player decisions have real consequences.
 - NEVER decide for the player. Describe the world and react to actions.
 - At the end of the response, include a ---SYSTEM--- block with #MEMORY tags if something important happened.
-  Block format: ---SYSTEM---\\n#MEMORY:topic:content\\n---END---
+  Block format: ---SYSTEM---\n#MEMORY:topic:content\n---END---
   Allowed topics: character, npc, location, faction, campaign, item, summary
 PROMPT;
 
 		// Block B: Dynamic world state
-		$char_name  = esc_html( $char['name'] ?? 'Unknown' );
-		$hp         = (int) ( $char['currenthp'] ?? 0 );
-		$hp_max     = (int) ( $char['maxhp'] ?? 0 );
-		$mp         = (int) ( $char['mp'] ?? 0 );
-		$gold       = (int) ( $char['gold'] ?? 0 );
+		$char_name  = esc_html( $char['name']             ?? 'Unknown' );
+		$hp         = (int) ( $char['currenthp']          ?? 0 );
+		$hp_max     = (int) ( $char['maxhp']              ?? 0 );
+		$mp         = (int) ( $char['mp']                 ?? 0 );
+		$gold       = (int) ( $char['gold']               ?? 0 );
 		$loc_name   = esc_html( $location['locationname'] ?? 'Unknown location' );
 		$loc_tags   = esc_html( $location['instancetags'] ?? '' );
-		$loc_prompt = esc_html( $location['aiprompt'] ?? '' );
-		$entropy    = (int) ( $world['entropy'] ?? 0 );
-		$w_tags     = esc_html( $world['globaltag1'] ?? '' );
+		$loc_prompt = esc_html( $location['aiprompt']     ?? '' );
+		$entropy    = (int) ( $world['entropy']           ?? 0 );
+		$w_tags     = esc_html( $world['globaltag1']      ?? '' );
 
 		$block_b  = "AGENT: {$char_name} | HP: {$hp}/{$hp_max} | MP: {$mp} | Gold: {$gold}g\n";
 		$block_b .= "LOCATION: {$loc_name} | TAGS: {$loc_tags}\n";
@@ -151,7 +150,7 @@ PROMPT;
 	// HISTORY
 	// =========================================================
 
-	private function get_history( string $channel_id, string $char_id ): array {
+	private function get_history( string $channel_id ): array {
 		if ( ! $channel_id || ! function_exists( 'tw_supabase_get' ) ) {
 			return [];
 		}
@@ -168,6 +167,7 @@ PROMPT;
 			return [];
 		}
 
+		// Reverse so messages are in chronological order (oldest first)
 		$reversed = array_reverse( $rows );
 
 		return array_map( fn( $r ) => [
@@ -180,7 +180,7 @@ PROMPT;
 	// CLAUDE API
 	// =========================================================
 
-	private function call_api( string $system_prompt, array $history, string $user_message, string $char_id ): array {
+	private function call_api( string $system_prompt, array $history, string $user_message ): array {
 
 		$messages = array_merge(
 			$history,
@@ -204,12 +204,14 @@ PROMPT;
 		return [
 			'raw'   => $result['content'],
 			'error' => null,
-			'usage' => $result['usage'],
+			'usage' => $result['usage'],  // ['input_tokens' => int, 'output_tokens' => int]
 		];
 	}
 
 	// =========================================================
 	// TOKEN LOGGING
+	// input_tokens / output_tokens = Claude API naming convention
+	// prompt_tokens / completion_tokens = column names in cyber_token_ledger
 	// =========================================================
 
 	private function log_tokens( array $usage, array $ctx, string $protocol ): void {
@@ -229,8 +231,8 @@ PROMPT;
 				'channel_id'        => $ctx['channel_id']  ?? null,
 				'protocol'          => $protocol,
 				'model'             => $this->model,
-				'prompt_tokens'     => $usage['prompt_tokens']     ?? 0,
-				'completion_tokens' => $usage['completion_tokens'] ?? 0,
+				'prompt_tokens'     => $usage['input_tokens']  ?? 0,  // Claude → ledger mapping
+				'completion_tokens' => $usage['output_tokens'] ?? 0,  // Claude → ledger mapping
 			],
 			[
 				'headers' => [
