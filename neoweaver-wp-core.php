@@ -117,6 +117,7 @@ final class NeoWeaver_Core {
 			'includes/ajax/public-profile.php',
 			'includes/ajax/save-player-notes.php',
 			'includes/ajax/update-vehicle-module.php',
+			'includes/ajax/world-news.php',
 
 			// includes/classes
 			'includes/classes/class-supabase.php',
