@@ -6,11 +6,11 @@ if ( ! function_exists( 'tw_render_kingdom_info_shortcode' ) ) {
 		$user_id = get_current_user_id();
 
 		if ( ! $user_id ) {
-			return 'Zaloguj się.';
+			return 'Log in Operator.';
 		}
 
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-			return '<p style="color:#f00;">Brak konfiguracji Supabase.</p>';
+			return '<p style="color:#f00;">Supabase error.</p>';
 		}
 
 		if ( function_exists( 'tw_enqueue_kingdom_info_assets' ) ) {
@@ -37,17 +37,17 @@ if ( ! function_exists( 'tw_render_kingdom_info_shortcode' ) ) {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return '<p style="color:#f00;">Błąd połączenia z bazą danych.</p>';
+			return '<p style="color:#f00;">Error connecting with base.</p>';
 		}
 
 		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			return '<p style="color:#f00;">Błąd pobierania danych domeny.</p>';
+			return '<p style="color:#f00;">Domain error.</p>';
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( empty( $body ) || ! is_array( $body ) || empty( $body[0] ) || ! is_array( $body[0] ) ) {
-			return "<div class='kingdom-card' style='--status-color:#555; padding:20px; text-align:center;'><em style='color:#888;'>📡 Sygnał utracony: Brak danych o domenie...</em></div>";
+			return "<div class='kingdom-card' style='--status-color:#555; padding:20px; text-align:center;'><em style='color:#888;'>📡 No signal:  No signal about domain...</em></div>";
 		}
 
 		$data = (object) $body[0];
