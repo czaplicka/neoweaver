@@ -58,6 +58,20 @@ final class NeoWeaver_Core {
 			'includes/assets/cyber-hud.php',
 			'includes/assets/deck-panel.php',
 			'includes/assets/essences.php',
+			'includes/assets/fate-of-loom.php',
+			'includes/assets/foundry.php',
+			'includes/assets/hand.php',
+			'includes/assets/join-terminal.php',
+			'includes/assets/kingdom-info.php',
+			'includes/assets/library.php',
+			//'includes/assets/',
+			//'includes/assets/',
+			//'includes/assets/',
+			//'includes/assets/',
+			//'includes/assets/',
+			//'includes/assets/',
+			
+			
 			'includes/assets/public-character-profile.php',
 			'includes/assets/public-runtime.php',
 
@@ -87,6 +101,7 @@ final class NeoWeaver_Core {
 			'includes/ajax/get-scenarios.php',
 			'includes/ajax/get-session-state.php',
 			'includes/ajax/handlers.php',
+			'includes/ajax/join-terminal.php'
 			'includes/ajax/lobby-heartbeat.php',
 			'includes/ajax/public-profile.php',
 			'includes/ajax/save-player-notes.php',
