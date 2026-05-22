@@ -66,34 +66,68 @@ function tw_supabase_get_current_user_token(): ?string {
  * Supabase podpisuje token swoim aktywnym kluczem (ECC lub HS256).
  */
 function tw_supabase_fetch_token_for_uid( string $supabase_uid ): ?string {
-	$url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid . '/token';
+    // Krok 1: wygeneruj magic link (OTP) dla usera
+    $url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/generate_link';
 
-	$response = wp_remote_post( $url, [
-		'headers' => [
-			'apikey'        => tw_supabase_service_key(),
-			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
-			'Content-Type'  => 'application/json',
-		],
-		'body'    => wp_json_encode( [ 'expiresIn' => 3600 ] ),
-		'timeout' => 15,
-	] );
+    $response = wp_remote_post( $url, [
+        'headers' => [
+            'apikey'        => tw_supabase_service_key(),
+            'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+            'Content-Type'  => 'application/json',
+        ],
+        'body' => wp_json_encode( [
+            'type'    => 'magiclink',
+            'user_id' => $supabase_uid,
+        ] ),
+        'timeout' => 15,
+    ] );
 
-	if ( is_wp_error( $response ) ) {
-		error_log( 'NeoWeaver: tw_supabase_fetch_token_for_uid error: ' . $response->get_error_message() );
-		return null;
-	}
+    if ( is_wp_error( $response ) ) {
+        error_log( 'NeoWeaver: generate_link error: ' . $response->get_error_message() );
+        return null;
+    }
 
-	$code = wp_remote_retrieve_response_code( $response );
-	$body = json_decode( wp_remote_retrieve_body( $response ), true );
+    $code = wp_remote_retrieve_response_code( $response );
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-	if ( $code !== 200 || empty( $body['access_token'] ) ) {
-		error_log( 'NeoWeaver: fetch_token HTTP ' . $code . ' — ' . wp_json_encode( $body ) );
-		return null;
-	}
+    if ( $code !== 200 ) {
+        error_log( 'NeoWeaver: generate_link HTTP ' . $code . ' — ' . wp_json_encode( $body ) );
+        return null;
+    }
 
-	return $body['access_token'];
+    // Krok 2: wymień token OTP na access_token
+    $otp_token  = $body['properties']['hashed_token'] ?? null;
+    $email      = $body['email'] ?? null;
+
+    if ( ! $otp_token || ! $email ) {
+        error_log( 'NeoWeaver: brak hashed_token lub email w odpowiedzi' );
+        return null;
+    }
+
+    $verify_url = trailingslashit( tw_supabase_url() ) . 'auth/v1/verify';
+    $verify_response = wp_remote_post( $verify_url, [
+        'headers' => [
+            'apikey'       => tw_supabase_anon_key(),
+            'Content-Type' => 'application/json',
+        ],
+        'body' => wp_json_encode( [
+            'type'  => 'magiclink',
+            'token' => $otp_token,
+            'email' => $email,
+        ] ),
+        'timeout' => 15,
+    ] );
+
+    $vcode = wp_remote_retrieve_response_code( $verify_response );
+    $vbody = json_decode( wp_remote_retrieve_body( $verify_response ), true );
+
+    if ( $vcode !== 200 || empty( $vbody['access_token'] ) ) {
+        error_log( 'NeoWeaver: verify HTTP ' . $vcode . ' — ' . wp_json_encode( $vbody ) );
+        return null;
+    }
+
+    return $vbody['access_token'];
 }
-
 // ─── Supabase auth.users provisioning ────────────────────────────────────────
 
 function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): ?string {
