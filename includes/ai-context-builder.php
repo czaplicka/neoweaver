@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *     'char'     => [...],   // dane postaci
  *     'location' => [...],   // dane bieżącej lokacji
  *     'world'    => [...],   // dane świata
+ *     'world_id' => string,  // UUID świata (skrót dla tw_ai_gm)
  *     'protocol' => string,  // przekazany protokół
  *     'extra'    => string,  // blok C — dane specyficzne dla protokołu
  *   ]
@@ -45,7 +46,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 		);
 		if ( is_wp_error( $char_rows ) || empty( $char_rows ) ) {
 			error_log( 'TW ai-context-builder: nie można pobrać postaci ' . $safe_char_id );
-			return [ 'char' => [], 'location' => [], 'world' => [], 'protocol' => $protocol, 'extra' => '' ];
+			return [ 'char' => [], 'location' => [], 'world' => [], 'world_id' => null, 'protocol' => $protocol, 'extra' => '' ];
 		}
 		$char = $char_rows[0];
 
@@ -67,9 +68,10 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 		}
 
 		// --- Core: dane świata ---
-		$world = [];
-		if ( ! empty( $char['world_id'] ) ) {
-			$safe_world_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['world_id'] ) );
+		$world    = [];
+		$world_id = isset( $char['world_id'] ) ? $char['world_id'] : null;
+		if ( $world_id ) {
+			$safe_world_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $world_id ) );
 			$world_rows = tw_supabase_get(
 				'cyber_worlds',
 				[
@@ -105,12 +107,11 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 					}
 				}
 				$extra .= 'AVAILABLE_EXITS: ' . ( $exits ? implode( ' | ', $exits ) : 'none' ) . "\n";
-				$extra .= 'SATIETY: ' . (int)( $char['satiety'] ?? 0 ) . ' | HYDRATION: ' . (int)( $char['hydration'] ?? 0 ) . "\n";
-				$extra .= 'ENCOUNTER_RISK: ' . min( 100, (int)( $location['threatlevel'] ?? 0 ) * 10 ) . "%\n";
+				$extra .= 'SATIETY: ' . (int)( isset( $char['satiety'] ) ? $char['satiety'] : 0 ) . ' | HYDRATION: ' . (int)( isset( $char['hydration'] ) ? $char['hydration'] : 0 ) . "\n";
+				$extra .= 'ENCOUNTER_RISK: ' . min( 100, (int)( isset( $location['threatlevel'] ) ? $location['threatlevel'] : 0 ) * 10 ) . "%\n";
 				break;
 
 			case 'COMBAT':
-				// Karty w ręce (jeśli tabela istnieje)
 				$hand_rows = tw_supabase_get(
 					'cyber_deck_state',
 					[
@@ -121,19 +122,25 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 					]
 				);
 				if ( ! is_wp_error( $hand_rows ) && ! empty( $hand_rows ) ) {
-					$cards = array_filter( array_map( fn($r) => $r['cyber_cards']['name'] ?? null, $hand_rows ) );
-					$extra .= 'HAND: ' . implode( ', ', $cards ) . "\n";
+					$cards = [];
+					foreach ( $hand_rows as $r ) {
+						if ( ! empty( $r['cyber_cards']['name'] ) ) {
+							$cards[] = $r['cyber_cards']['name'];
+						}
+					}
+					if ( $cards ) {
+						$extra .= 'HAND: ' . implode( ', ', $cards ) . "\n";
+					}
 				}
-				$extra .= 'LOCATION_THREAT: ' . (int)( $location['threatlevel'] ?? 0 ) . "\n";
-				$extra .= 'MP: ' . (int)( $char['mp'] ?? 0 ) . "\n";
+				$extra .= 'LOCATION_THREAT: ' . (int)( isset( $location['threatlevel'] ) ? $location['threatlevel'] : 0 ) . "\n";
+				$extra .= 'MP: ' . (int)( isset( $char['mp'] ) ? $char['mp'] : 0 ) . "\n";
 				break;
 
 			case 'TRADE':
-				// Inwentarz NPC/sklepu z bieżącej lokacji
 				$shop_rows = tw_supabase_get(
 					'cyber_npc_inventory',
 					[
-						'location_id' => 'eq.' . ( $location['id'] ?? '' ),
+						'location_id' => 'eq.' . ( isset( $location['id'] ) ? $location['id'] : '' ),
 						'for_sale'    => 'eq.true',
 						'select'      => 'cyber_items(name,rarity,slot),price,quantity',
 						'limit'       => 10,
@@ -142,32 +149,31 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				if ( ! is_wp_error( $shop_rows ) && ! empty( $shop_rows ) ) {
 					$shop_lines = [];
 					foreach ( $shop_rows as $s ) {
-						$name  = esc_html( $s['cyber_items']['name'] ?? '?' );
-						$price = (int) ( $s['price'] ?? 0 );
-						$qty   = (int) ( $s['quantity'] ?? 0 );
+						$name  = esc_html( isset( $s['cyber_items']['name'] ) ? $s['cyber_items']['name'] : '?' );
+						$price = (int) ( isset( $s['price'] ) ? $s['price'] : 0 );
+						$qty   = (int) ( isset( $s['quantity'] ) ? $s['quantity'] : 0 );
 						$shop_lines[] = "{$name} ({$price}g x{$qty})";
 					}
 					$extra .= 'SHOP_INVENTORY: ' . implode( ', ', $shop_lines ) . "\n";
 				}
-				$extra .= 'PLAYER_GOLD: ' . (int)( $char['gold'] ?? 0 ) . "\n";
-				$extra .= 'WORLD_DIFFICULTY: ' . esc_html( $world['difficulty'] ?? 'normal' ) . "\n";
+				$extra .= 'PLAYER_GOLD: ' . (int)( isset( $char['gold'] ) ? $char['gold'] : 0 ) . "\n";
+				$extra .= 'WORLD_DIFFICULTY: ' . esc_html( isset( $world['difficulty'] ) ? $world['difficulty'] : 'normal' ) . "\n";
 				break;
 
 			case 'DIALOG':
-				// NPC w bieżącej lokacji
 				$npc_rows = tw_supabase_get(
 					'cyber_npcs',
 					[
-						'location_id' => 'eq.' . ( $location['id'] ?? '' ),
+						'location_id' => 'eq.' . ( isset( $location['id'] ) ? $location['id'] : '' ),
 						'select'      => 'id,name,ai_personality_prompt,faction,disposition',
 						'limit'       => 3,
 					]
 				);
 				if ( ! is_wp_error( $npc_rows ) && ! empty( $npc_rows ) ) {
 					foreach ( $npc_rows as $npc ) {
-						$extra .= 'NPC: ' . esc_html( $npc['name'] ?? '?' );
-						if ( ! empty( $npc['faction'] ) )      $extra .= ' [faction:' . esc_html( $npc['faction'] ) . ']';
-						if ( ! empty( $npc['disposition'] ) )  $extra .= ' [disp:' . esc_html( $npc['disposition'] ) . ']';
+						$extra .= 'NPC: ' . esc_html( isset( $npc['name'] ) ? $npc['name'] : '?' );
+						if ( ! empty( $npc['faction'] ) )     $extra .= ' [faction:' . esc_html( $npc['faction'] ) . ']';
+						if ( ! empty( $npc['disposition'] ) ) $extra .= ' [disp:' . esc_html( $npc['disposition'] ) . ']';
 						if ( ! empty( $npc['ai_personality_prompt'] ) ) {
 							$extra .= "\nPERSONALITY: " . mb_substr( esc_html( $npc['ai_personality_prompt'] ), 0, 200 );
 						}
@@ -180,7 +186,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				$tag_rows = tw_supabase_get(
 					'cyber_world_tags',
 					[
-						'world_id' => 'eq.' . ( $world['id'] ?? '' ),
+						'world_id' => 'eq.' . ( isset( $world['id'] ) ? $world['id'] : '' ),
 						'select'   => 'tag_name,tag_description',
 						'limit'    => 10,
 					]
@@ -188,18 +194,19 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				if ( ! is_wp_error( $tag_rows ) && ! empty( $tag_rows ) ) {
 					$lore = [];
 					foreach ( $tag_rows as $t ) {
-						$lore[] = esc_html( $t['tag_name'] ?? '' ) . ': ' . mb_substr( esc_html( $t['tag_description'] ?? '' ), 0, 100 );
+						$lore[] = esc_html( isset( $t['tag_name'] ) ? $t['tag_name'] : '' ) . ': ' . mb_substr( esc_html( isset( $t['tag_description'] ) ? $t['tag_description'] : '' ), 0, 100 );
 					}
 					$extra .= 'WORLD_LORE: ' . implode( ' | ', $lore ) . "\n";
 				}
-				$extra .= 'ECHO_TAGS: ' . esc_html( implode( ', ', (array)( $char['echo_tags'] ?? [] ) ) ) . "\n";
+				$extra .= 'ECHO_TAGS: ' . esc_html( implode( ', ', (array)( isset( $char['echo_tags'] ) ? $char['echo_tags'] : [] ) ) ) . "\n";
 				break;
 
 			case 'REST':
-				$safe_zone = ! empty( $location['instancetags'] ) && str_contains( $location['instancetags'], 'safe' );
+				$instance_tags = isset( $location['instancetags'] ) ? $location['instancetags'] : '';
+				$safe_zone     = ! empty( $instance_tags ) && ( strpos( $instance_tags, 'safe' ) !== false );
 				$extra .= 'SAFE_ZONE: ' . ( $safe_zone ? 'yes' : 'no' ) . "\n";
-				$extra .= 'SATIETY: ' . (int)( $char['satiety'] ?? 0 ) . ' | HYDRATION: ' . (int)( $char['hydration'] ?? 0 ) . "\n";
-				$extra .= 'HP_MISSING: ' . max( 0, (int)( $char['maxhp'] ?? 100 ) - (int)( $char['currenthp'] ?? 0 ) ) . "\n";
+				$extra .= 'SATIETY: ' . (int)( isset( $char['satiety'] ) ? $char['satiety'] : 0 ) . ' | HYDRATION: ' . (int)( isset( $char['hydration'] ) ? $char['hydration'] : 0 ) . "\n";
+				$extra .= 'HP_MISSING: ' . max( 0, (int)( isset( $char['maxhp'] ) ? $char['maxhp'] : 100 ) - (int)( isset( $char['currenthp'] ) ? $char['currenthp'] : 0 ) ) . "\n";
 				break;
 
 			case 'DECK':
@@ -214,8 +221,8 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				if ( ! is_wp_error( $all_hand ) ) {
 					$zones = [];
 					foreach ( $all_hand as $r ) {
-						$zone  = $r['zone'] ?? 'unknown';
-						$cname = $r['cyber_cards']['name'] ?? '?';
+						$zone  = isset( $r['zone'] ) ? $r['zone'] : 'unknown';
+						$cname = isset( $r['cyber_cards']['name'] ) ? $r['cyber_cards']['name'] : '?';
 						$zones[ $zone ][] = $cname;
 					}
 					foreach ( $zones as $z => $cards ) {
@@ -224,7 +231,6 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				}
 				break;
 
-			// META i UNKNOWN nie potrzebują extra danych po stronie AI
 			default:
 				break;
 		}
@@ -233,6 +239,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 			'char'     => $char,
 			'location' => $location,
 			'world'    => $world,
+			'world_id' => $world_id,
 			'protocol' => $protocol,
 			'extra'    => trim( $extra ),
 		];
