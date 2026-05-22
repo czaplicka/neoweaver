@@ -155,7 +155,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/signal-quality.php',
 			'public/shortcodes/time-wheel.php',
 			'public/shortcodes/vehicle-panel.php',
-			'public/shortcodes/vitals.php',
+			'public/shortcodes/vitalis.php',
 			'public/shortcodes/weaver-list.php',
 			'public/shortcodes/world-archive.php',
 			'public/shortcodes/world-creator.php',
