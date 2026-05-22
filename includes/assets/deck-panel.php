@@ -1,5 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+
 if ( ! function_exists( 'tw_register_deck_panel_assets' ) ) {
 	function tw_register_deck_panel_assets(): void {
 		$module   = 'deck-panel';
@@ -50,4 +51,23 @@ if ( ! function_exists( 'tw_enqueue_deck_panel_assets' ) ) {
 	}
 }
 
+if ( ! function_exists( 'tw_maybe_enqueue_deck_panel_assets' ) ) {
+	function tw_maybe_enqueue_deck_panel_assets(): void {
+		if ( is_admin() || ! is_singular() ) {
+			return;
+		}
+
+		$post = get_post();
+
+		if ( ! $post || empty( $post->post_content ) ) {
+			return;
+		}
+
+		if ( has_shortcode( $post->post_content, 'tw_deck_panel' ) ) {
+			tw_enqueue_deck_panel_assets();
+		}
+	}
+}
+
 add_action( 'wp_enqueue_scripts', 'tw_register_deck_panel_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_deck_panel_assets', 20 );
