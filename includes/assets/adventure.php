@@ -78,16 +78,16 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 		if ( is_user_logged_in() ) {
 			$jwt = function_exists( 'tw_generate_supabase_jwt' ) ? tw_generate_supabase_jwt( get_current_user_id() ) : '';
 
-			wp_localize_script(
-				'neoweaver-header-node',
-				'twAdventureData',
-				[
-					'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
-					'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-					'jwt'         => $jwt,
-					'wpUserId'    => get_current_user_id(),
-				]
-			);
+wp_localize_script(
+    'nw-services',
+    'twAdventureData',
+    [
+        'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
+        'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
+        'jwt'         => $jwt,
+        'wpUserId'    => get_current_user_id(),
+    ]
+);
 		}
 	}
 }
