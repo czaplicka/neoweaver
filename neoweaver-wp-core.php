@@ -101,7 +101,7 @@ final class NeoWeaver_Core {
 			'includes/ajax/get-scenarios.php',
 			'includes/ajax/get-session-state.php',
 			'includes/ajax/handlers.php',
-			'includes/ajax/join-terminal.php'
+			'includes/ajax/join-terminal.php',
 			'includes/ajax/lobby-heartbeat.php',
 			'includes/ajax/public-profile.php',
 			'includes/ajax/save-player-notes.php',
