@@ -13,23 +13,21 @@ require_once dirname( __DIR__ ) . '/supabase-config.php';
  *
  * build( $char_id, $protocol ) zwraca:
  *   [
- *     'block_a'  => string,
- *     'block_b'  => string,
- *     'block_c'  => string,
+ *     'block_a'  => string,   // system instructions (archetype, reguły)
+ *     'block_b'  => string,   // stan gry (postać, lokacja, świat)
+ *     'block_c'  => string,   // dane specyficzne per protokół
  *     'world_id' => string|null,
  *   ]
  *
- * Zweryfikowane nazwy tabel/kolumn (2026-05-22):
- *  - cyber_worlds:           id, name, difficulty, global_tag_1/2/3 (brak entropy i archetype w tabeli)
- *  - cyber_world_map:        id, locationname, instancetags, aiprompt, threatlevel, nid, eid, sid, wid, location_type
- *  - cyber_characters:       worldid (bez podkreślnika!), locationid, echo_tags, currenthp, maxhp, mp, satiety, hydration, gold
- *  - cyber_character_buffer: character_id, buffer_card_id, location, hand_order, instance_tags
- *  - cyber_lore:             id, lore_key, lore_type, lore, tags
- *  - cyber_world_tags:       world_id, tag_id  (join table — nie ma tag_name/tag_value bezpośrednio)
+ * Uwaga: kolumna world FK w cyber_characters to "worldid" (bez podkreślnika).
+ * Jeśli zmienisz w Supabase na world_id — zaktualizuj get_core_context().
  */
 class NeoWeaver_Context_Builder {
 
-	public function __construct() {}
+	public function __construct() {
+		// Stałe pobierane przez helpery z supabase-config.php:
+		// tw_supabase_url(), tw_supabase_service_key()
+	}
 
 	// ============================================================
 	// PUBLIC
@@ -49,13 +47,13 @@ class NeoWeaver_Context_Builder {
 	}
 
 	// ============================================================
-	// CORE
+	// CORE: dane zawsze potrzebne
 	// ============================================================
 
 	private function get_core_context( string $char_id ): array {
 		$char = $this->query(
 			'cyber_characters',
-			'id=eq.' . $char_id . '&select=id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid&limit=1'
+			'id=eq.' . $char_id . '&select=id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid,archetype&limit=1'
 		)[0] ?? [];
 
 		$location = [];
@@ -69,10 +67,9 @@ class NeoWeaver_Context_Builder {
 		}
 
 		if ( ! empty( $char['worldid'] ) ) {
-			// cyber_worlds: kolumny to "name", "global_tag_1/2/3" (brak entropy i archetype)
 			$world = $this->query(
 				'cyber_worlds',
-				'id=eq.' . $this->sanitize_uuid( $char['worldid'] ) . '&select=id,name,difficulty,global_tag_1,global_tag_2,global_tag_3&limit=1'
+				'id=eq.' . $this->sanitize_uuid( $char['worldid'] ) . '&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype&limit=1'
 			)[0] ?? [];
 		}
 
@@ -95,10 +92,10 @@ class NeoWeaver_Context_Builder {
 						'cyber_monsters',
 						'locationid=eq.' . $loc_id . '&select=name,hp,attack,defense,tags&limit=3'
 					),
-					// cyber_character_buffer: location='hand', klucz to character_id
+					// cyber_buffer zamiast cyber_deck_state
 					'hand' => $this->query(
-						'cyber_character_buffer',
-						'character_id=eq.' . $char_id . '&location=eq.hand&select=buffer_card_id,instance_tags&limit=10'
+						'cyber_buffer',
+						'char_id=eq.' . $char_id . '&zone=eq.hand&select=card_id,card_name,card_type,effect_tags'
 					),
 				];
 
@@ -136,13 +133,19 @@ class NeoWeaver_Context_Builder {
 				];
 
 			case 'LORE':
-				// cyber_lore: pobieramy fragmenty lore powiązane z aktualną lokacją
-				// location_ids to tablica UUID w jsonb — filtrujemy po zawartości
 				return [
-					'lore' => $loc_id ? $this->query(
+					// cyber_lore zamiast cyber_world_tags
+					// Jeśli kolumny mają inne nazwy w cyber_lore — zaktualizuj select=
+					'lore_entries' => $this->query(
 						'cyber_lore',
-						'location_ids=cs.["' . $loc_id . '"]&select=lore_key,lore_type,lore,tags&limit=5'
-					) : [],
+						'worldid=eq.' . $world_id . '&select=tag_name,tag_value&limit=10'
+					),
+					// Jeśli chcesz filtrować tylko odkryte lore danej postaci,
+					// odkomentuj poniższe i zakomentuj lore_entries powyżej:
+					// 'lore_entries' => $this->query(
+					//     'cyber_discovered_lore',
+					//     'char_id=eq.' . $char_id . '&select=lore_id,lore_name,lore_content&limit=10'
+					// ),
 				];
 
 			case 'REST':
@@ -152,11 +155,11 @@ class NeoWeaver_Context_Builder {
 				];
 
 			case 'DECK':
-				// cyber_character_buffer grupuje karty wg location: hand / draw_pile / discard_pile / library
 				return [
-					'buffer' => $this->query(
-						'cyber_character_buffer',
-						'character_id=eq.' . $char_id . '&select=location,buffer_card_id,instance_tags,hand_order&limit=40'
+					// cyber_buffer zamiast cyber_deck_state
+					'deck_state' => $this->query(
+						'cyber_buffer',
+						'char_id=eq.' . $char_id . '&select=zone,card_name,card_type&limit=30'
 					),
 				];
 
@@ -170,11 +173,12 @@ class NeoWeaver_Context_Builder {
 	// ============================================================
 
 	private function build_block_a( array $core ): string {
-		// cyber_worlds nie ma kolumny archetype — pomijamy lub dajemy stałą
-		return "You are the AI Game Master of NeoWeave — a dark, narrative RPG.\n"
-			. "Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.\n"
-			. "Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #LOC:42, #STATUS_POISONED, #HP_CHANGE:-10, #GOLD_CHANGE:-5).\n"
-			. "Tags are parsed by the system — the player never sees them. Never explain tags to the player.\n"
+		$archetype = esc_html( $core['world']['archetype'] ?? 'EPIC' );
+		return "You are the AI Game Master of NeoWeave — a dark, narrative RPG.\\n"
+			. "Archetype: {$archetype}\\n"
+			. "Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.\\n"
+			. "Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #LOC:42, #STATUS_POISONED, #HP_CHANGE:-10, #GOLD_CHANGE:-5).\\n"
+			. "Tags are parsed by the system — the player never sees them. Never explain tags to the player.\\n"
 			. "Respond in the same language the player uses.";
 	}
 
@@ -189,19 +193,12 @@ class NeoWeaver_Context_Builder {
 		}
 		$tags = is_array( $echo_tags_raw ) && ! empty( $echo_tags_raw ) ? implode( ', ', $echo_tags_raw ) : 'none';
 
-		// cyber_worlds: kolumna to "name" (nie worldname), brak entropy
-		$world_tags = implode( ', ', array_filter( [
-			$w['global_tag_1'] ?? '',
-			$w['global_tag_2'] ?? '',
-			$w['global_tag_3'] ?? '',
-		] ) );
-
-		return "WORLD: " . esc_html( $w['name'] ?? '' ) . " | Difficulty: " . esc_html( $w['difficulty'] ?? 'normal' ) . "\n"
-			. "WORLD_TAGS: " . esc_html( $world_tags ) . "\n"
-			. "AGENT: " . esc_html( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['currenthp'] ?? 0 ) . "/" . (int) ( $c['maxhp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
-			. "BIOMETRICS: Satiety " . (int) ( $c['satiety'] ?? 0 ) . "% | Hydration " . (int) ( $c['hydration'] ?? 0 ) . "%\n"
-			. "ECHO: " . esc_html( $tags ) . "\n"
-			. "LOCATION: " . esc_html( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . esc_html( $l['instancetags'] ?? '' ) . "\n"
+		return "WORLD: " . esc_html( $w['worldname'] ?? '' ) . " | Entropy: " . (int) ( $w['entropy'] ?? 0 ) . "/100 | Difficulty: " . esc_html( $w['difficulty'] ?? 'normal' ) . "\\n"
+			. "WORLD_TAGS: " . esc_html( implode( ', ', array_filter( [ $w['globaltag1'] ?? '', $w['globaltag2'] ?? '', $w['globaltag3'] ?? '' ] ) ) ) . "\\n"
+			. "AGENT: " . esc_html( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['currenthp'] ?? 0 ) . "/" . (int) ( $c['maxhp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\\n"
+			. "BIOMETRICS: Satiety " . (int) ( $c['satiety'] ?? 0 ) . "% | Hydration " . (int) ( $c['hydration'] ?? 0 ) . "%\\n"
+			. "ECHO: " . esc_html( $tags ) . "\\n"
+			. "LOCATION: " . esc_html( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . esc_html( $l['instancetags'] ?? '' ) . "\\n"
 			. "GM_NOTE: " . esc_html( $l['aiprompt'] ?? '' );
 	}
 
@@ -220,8 +217,8 @@ class NeoWeaver_Context_Builder {
 				foreach ( $extra['monsters'] ?? [] as $m ) {
 					$lines[] = "ENEMY: " . esc_html( $m['name'] ) . " HP:{$m['hp']} ATK:{$m['attack']} DEF:{$m['defense']}";
 				}
-				$hand_ids = array_column( $extra['hand'] ?? [], 'buffer_card_id' );
-				$lines[]  = "PLAYER_HAND_IDS: " . implode( ', ', $hand_ids );
+				$hand    = array_column( $extra['hand'] ?? [], 'card_name' );
+				$lines[] = "PLAYER_HAND: " . implode( ', ', array_map( 'esc_html', $hand ) );
 				break;
 
 			case 'TRADE':
@@ -241,8 +238,8 @@ class NeoWeaver_Context_Builder {
 				break;
 
 			case 'LORE':
-				foreach ( $extra['lore'] ?? [] as $l ) {
-					$lines[] = "LORE[" . esc_html( $l['lore_type'] ?? '' ) . "]: " . esc_html( $l['lore_key'] ?? '' ) . " — " . mb_substr( esc_html( $l['lore'] ?? '' ), 0, 300 );
+				foreach ( $extra['lore_entries'] ?? [] as $t ) {
+					$lines[] = "LORE: " . esc_html( $t['tag_name'] ) . " = " . esc_html( $t['tag_value'] ?? '' );
 				}
 				break;
 
@@ -253,21 +250,21 @@ class NeoWeaver_Context_Builder {
 
 			case 'DECK':
 				$zones = [];
-				foreach ( $extra['buffer'] ?? [] as $r ) {
-					$zone           = strtoupper( $r['location'] ?? 'LIBRARY' );
-					$zones[ $zone ][] = $r['buffer_card_id'] ?? '?';
+				foreach ( $extra['deck_state'] ?? [] as $r ) {
+					$zone            = strtoupper( $r['zone'] ?? 'UNKNOWN' );
+					$zones[ $zone ][] = esc_html( $r['card_name'] ?? '?' );
 				}
-				foreach ( $zones as $zone => $ids ) {
-					$lines[] = "{$zone}: " . implode( ', ', $ids ) . ' (' . count( $ids ) . ' cards)';
+				foreach ( $zones as $zone => $cards ) {
+					$lines[] = "{$zone}: " . implode( ', ', $cards );
 				}
 				break;
 		}
 
-		return implode( "\n", $lines );
+		return implode( "\\n", $lines );
 	}
 
 	// ============================================================
-	// HELPER: Supabase REST
+	// HELPER: zapytanie do Supabase REST
 	// ============================================================
 
 	private function query( string $table, string $params ): array {
@@ -288,6 +285,10 @@ class NeoWeaver_Context_Builder {
 
 		return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
 	}
+
+	// ============================================================
+	// HELPER: sanitacja UUID
+	// ============================================================
 
 	private function sanitize_uuid( string $id ): string {
 		return preg_replace( '/[^a-f0-9\-]/', '', strtolower( $id ) );
