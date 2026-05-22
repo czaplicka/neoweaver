@@ -1,6 +1,5 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-
 if ( ! function_exists( 'tw_register_deck_panel_assets' ) ) {
 	function tw_register_deck_panel_assets(): void {
 		$module   = 'deck-panel';
