@@ -1,3 +1,5 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 if ( ! function_exists( 'tw_render_quick_actions_cmd_center' ) ) {
 	function tw_render_quick_actions_cmd_center(): string {
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
