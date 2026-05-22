@@ -57,7 +57,7 @@ final class NeoWeaver_Core {
 			'includes/assets/connect-character-campaign.php',
 			'includes/assets/cyber-hud.php',
 			'includes/assets/deck-panel.php',
-			//'includes/assets/',
+			'includes/assets/essence',
 			//'includes/assets/',
 			//'includes/assets/',
 			//'includes/assets/',
