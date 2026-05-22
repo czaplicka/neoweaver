@@ -105,7 +105,7 @@ final class NeoWeaver_Core {
 			'includes/classes/class-chat-handler.php',
 
 			// includes/ai
-			'includes/ai/class-neoweaver-gpt-engine.php',
+			'includes/ai/class-neoweaver-claude-client.php',
 			'includes/ai/class-neoweaver-intent-router.php',
 			'includes/ai/class-neoweaver-context-builder.php',
 
