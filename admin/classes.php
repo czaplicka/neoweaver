@@ -103,6 +103,20 @@ class NW_Classes_Admin {
 	}
 
 	/* ---------------------------------------------------------------- */
+	/*  SERVICE KEY HEADERS (omija RLS — tylko dla admin PHP)           */
+	/* ---------------------------------------------------------------- */
+
+	private function sk(): array {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			return [];
+		}
+		return [
+			'apikey'        => TW_SUPABASE_SERVICE_KEY,
+			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+		];
+	}
+
+	/* ---------------------------------------------------------------- */
 	/*  SUPABASE                                                         */
 	/* ---------------------------------------------------------------- */
 
@@ -128,7 +142,7 @@ class NW_Classes_Admin {
 				parse_str( $qs, $query );
 			}
 
-			$data = tw_supabase_get( $table, $query );
+			$data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
 
 			if ( ! is_array( $data ) ) {
 				return [
@@ -237,7 +251,9 @@ class NW_Classes_Admin {
 
 		$res = $this->supa(
 			'GET',
-			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.desc'
+			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.desc',
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
@@ -260,7 +276,7 @@ class NW_Classes_Admin {
 	 */
 	private function is_uuid( string $value ): bool {
 		return (bool) preg_match(
-			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
+			'/^[0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[1-5][0-9a-fA-F]{3}\\-[89abAB][0-9a-fA-F]{3}\\-[0-9a-fA-F]{12}$/',
 			$value
 		);
 	}
@@ -391,13 +407,15 @@ class NW_Classes_Admin {
 			$res = $this->supa(
 				'PATCH',
 				$this->table . '?id=eq.' . rawurlencode( $id ),
-				$payload
+				$payload,
+				$this->sk()
 			);
 		} else {
 			$res = $this->supa(
 				'POST',
 				$this->table,
-				$payload
+				$payload,
+				$this->sk()
 			);
 		}
 
@@ -434,7 +452,9 @@ class NW_Classes_Admin {
 
 		$res = $this->supa(
 			'DELETE',
-			$this->table . '?id=eq.' . rawurlencode( $id )
+			$this->table . '?id=eq.' . rawurlencode( $id ),
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
