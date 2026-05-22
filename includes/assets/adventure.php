@@ -34,7 +34,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 		$styles = [
 			'neoweaver-tw-core'      => [ 'assets/css/public/core.css', [], 'all' ],
 			'neoweaver-tw-chat'      => [ 'assets/css/public/chat.css', [ 'neoweaver-tw-core' ], 'all' ],
-			'neoweaver-tw-deck'      => [ 'assets/css/public/deck.css', [ 'neoweaver-tw-core' ], 'all' ],
+			// 'neoweaver-tw-deck'      => [ 'assets/css/public/deck-core.css', [ 'neoweaver-tw-core' ], 'all' ],
 			'neoweaver-terminal'     => [ 'assets/css/public/terminal.css', [], 'all' ],
 			'neoweaver-interference' => [ 'assets/css/public/interference.css', [], 'all' ],
 			'world-news'             => [ 'assets/css/public/world-news.css', [], 'all' ],
@@ -49,7 +49,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'nw-panel-tactical-left' => [ 'assets/js/public/panel-tactical-left.js', [] ],
 			'neoweaver-interference' => [ 'assets/js/public/interference.js', [ 'jquery' ] ],
 			'world-news'             => [ 'assets/js/public/world-news.js', [ 'jquery' ] ],
-			'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js', [ 'jquery' ] ],
+			// 'nw-deck-panel'          => [ 'assets/js/public/deck-panel.js', [ 'jquery' ] ],
 			'nw-vehicle-panel'       => [ 'assets/js/public/vehicle-panel.js', [ 'jquery' ] ],
 			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ] ],
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
