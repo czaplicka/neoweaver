@@ -44,24 +44,8 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ] ],
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
-			'nw-game-data'           => [ 'assets/js/public/game-data.js', [] ],
-    'nw-chat-engine'         => [ 'assets/js/chat-engine.js', [] ],   
+			'nw-chat-engine'         => [ 'assets/js/chat-engine.js', [] ],
 		];
-
-		if ( is_user_logged_in() ) {
-    $jwt = function_exists( 'tw_generate_supabase_jwt' ) ? tw_generate_supabase_jwt( get_current_user_id() ) : '';
-
-    wp_localize_script(
-        'nw-game-data',       // ← ten skrypt
-        'twAdventureData',
-        [
-            'supabase_url'      => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
-            'supabase_anon_key' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-            'supabaseToken'     => $jwt,
-            'wpUserId'          => get_current_user_id(),
-        ]
-    );
-}
 
 		foreach ( $scripts as $handle => [ $relative_path, $deps ] ) {
 			tw_enqueue_script_asset( $handle, $relative_path, $deps, true );
@@ -69,7 +53,6 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 
 		$uploads = wp_upload_dir();
 
-		// Dane podstawowe dla header-node (Supabase URL + sounds)
 		wp_localize_script(
 			'neoweaver-header-node',
 			'twNeoWeaverData',
@@ -80,7 +63,6 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			]
 		);
 
-		// Dane dla AI chat
 		wp_localize_script(
 			'neoweaver-ai-chat',
 			'neoweaver_ajax',
@@ -90,22 +72,6 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 				'is_admin' => current_user_can( 'manage_options' ),
 			]
 		);
-
-		// Token JWT dla zalogowanego gracza — przekazany do JS żeby Supabase działało jako ten user
-		if ( is_user_logged_in() ) {
-			$jwt = function_exists( 'tw_generate_supabase_jwt' ) ? tw_generate_supabase_jwt( get_current_user_id() ) : '';
-
-wp_localize_script(
-    'nw-services',
-    'twAdventureData',
-    [
-        'supabaseUrl' => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
-        'supabaseKey' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-        'jwt'         => $jwt,
-        'wpUserId'    => get_current_user_id(),
-    ]
-);
-		}
 	}
 }
 
