@@ -21,23 +21,9 @@
 		return window.gameState?.activeCharacterId || null;
 	}
 
-	function getSupabase() {
-		const cfg = getConfig();
-
-		if (window.twSupabase) {
-			return window.twSupabase;
-		}
-
-		if (typeof window.supabase?.createClient === 'function') {
-			window.twSupabase = window.supabase.createClient(
-				window.twGlobals?.supabaseUrl || cfg.supabaseUrl || '',
-				window.twGlobals?.anonKey || cfg.anonKey || ''
-			);
-			return window.twSupabase;
-		}
-
-		return null;
-	}
+function getSupabase() {
+    return window.twSupabase || null;
+}
 
 	function getBar() {
 		if (cachedBar && document.body.contains(cachedBar)) {
