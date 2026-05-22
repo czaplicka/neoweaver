@@ -20,7 +20,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-require_once __DIR__ . '/class-neoweaver-claude-client.php';
+require_once dirname( __DIR__ ) . '/ai/class-neoweaver-claude-client.php';
 
 class NW_Chat_Claude {
 
@@ -33,9 +33,9 @@ class NW_Chat_Claude {
 	private int    $history_len;
 
 	public function __construct() {
-		$this->model       = defined( 'NEOWEAVER_MODEL_GM' )    ? NEOWEAVER_MODEL_GM    : 'claude-sonnet-4-5-20251001';
-		$this->max_tokens  = defined( 'NEOWEAVER_TOKENS_GM' )   ? NEOWEAVER_TOKENS_GM   : 1024;
-		$this->history_len = defined( 'NW_GPT_HISTORY_LEN' )    ? NW_GPT_HISTORY_LEN    : 12;
+		$this->model       = defined( 'NEOWEAVER_MODEL_GM' )  ? NEOWEAVER_MODEL_GM  : 'claude-sonnet-4-5-20251001';
+		$this->max_tokens  = defined( 'NEOWEAVER_TOKENS_GM' ) ? NEOWEAVER_TOKENS_GM : 1024;
+		$this->history_len = defined( 'NW_GPT_HISTORY_LEN' )  ? NW_GPT_HISTORY_LEN  : 12;
 	}
 
 	// =========================================================
@@ -68,7 +68,6 @@ class NW_Chat_Claude {
 	 */
 	public function send( string $user_message, array $context, string $protocol = 'DIALOG' ): array {
 
-		$char_id    = $context['char_id']    ?? '';
 		$channel_id = $context['channel_id'] ?? '';
 
 		// 1. Build system prompt
@@ -167,13 +166,11 @@ PROMPT;
 			return [];
 		}
 
-		// Reverse so messages are in chronological order (oldest first)
-		$reversed = array_reverse( $rows );
-
-		return array_map( fn( $r ) => [
-			'role'    => $r['role'],
-			'content' => $r['content'],
-		], $reversed );
+		// Reverse to chronological order (oldest first) — Claude requires user first
+		return array_map(
+			fn( $r ) => [ 'role' => $r['role'], 'content' => $r['content'] ],
+			array_reverse( $rows )
+		);
 	}
 
 	// =========================================================
@@ -184,9 +181,7 @@ PROMPT;
 
 		$messages = array_merge(
 			$history,
-			[
-				[ 'role' => 'user', 'content' => $user_message ],
-			]
+			[ [ 'role' => 'user', 'content' => $user_message ] ]
 		);
 
 		$result = NeoWeaver_Claude_Client::call(
@@ -204,14 +199,15 @@ PROMPT;
 		return [
 			'raw'   => $result['content'],
 			'error' => null,
-			'usage' => $result['usage'],  // ['input_tokens' => int, 'output_tokens' => int]
+			'usage' => $result['usage'],
 		];
 	}
 
 	// =========================================================
 	// TOKEN LOGGING
-	// input_tokens / output_tokens = Claude API naming convention
-	// prompt_tokens / completion_tokens = column names in cyber_token_ledger
+	// Claude usage keys:  input_tokens / output_tokens
+	// Ledger column names: prompt_tokens / completion_tokens
+	// The client already provides both aliases — using prompt/completion here.
 	// =========================================================
 
 	private function log_tokens( array $usage, array $ctx, string $protocol ): void {
@@ -231,8 +227,8 @@ PROMPT;
 				'channel_id'        => $ctx['channel_id']  ?? null,
 				'protocol'          => $protocol,
 				'model'             => $this->model,
-				'prompt_tokens'     => $usage['input_tokens']  ?? 0,  // Claude → ledger mapping
-				'completion_tokens' => $usage['output_tokens'] ?? 0,  // Claude → ledger mapping
+				'prompt_tokens'     => $usage['prompt_tokens']     ?? 0,
+				'completion_tokens' => $usage['completion_tokens'] ?? 0,
 			],
 			[
 				'headers' => [
