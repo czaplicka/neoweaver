@@ -135,4 +135,7 @@ final class NW_Admin_Bootstrap {
 	}
 }
 
+// Klasa bazowa musi być załadowana przed wszystkimi modułami admin.
+require_once NW_PLUGIN_DIR . 'admin/class-base-admin.php';
+
 NW_Admin_Bootstrap::init();
