@@ -3,34 +3,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! function_exists( 'tw_is_agents_list_context' ) ) {
-	function tw_is_agents_list_context(): bool {
-		if ( is_admin() ) {
-			return false;
-		}
+if ( ! function_exists( 'tw_register_agents_list_assets' ) ) {
+	function tw_register_agents_list_assets(): void {
+		$css_rel  = 'assets/css/public/agents-list.css';
+		$js_rel   = 'assets/js/public/agents-list.js';
+		$css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
+		$js_path  = NEOWEAVER_PLUGIN_DIR . $js_rel;
 
-		return function_exists( 'tw_has_shortcode_on_current_page' )
-			&& tw_has_shortcode_on_current_page( 'tw_characters_list' );
+		wp_register_style(
+			'tw-agents-list',
+			NEOWEAVER_PLUGIN_URL . $css_rel,
+			[],
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION
+		);
+
+		wp_register_script(
+			'tw-agents-list',
+			NEOWEAVER_PLUGIN_URL . $js_rel,
+			[],
+			file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION,
+			true
+		);
 	}
 }
 
-if ( ! function_exists( 'tw_register_agents_list_assets' ) ) {
-	function tw_register_agents_list_assets(): void {
-		if ( ! tw_is_agents_list_context() ) {
+if ( ! function_exists( 'tw_enqueue_agents_list_assets' ) ) {
+	function tw_enqueue_agents_list_assets(): void {
+		static $done = false;
+
+		wp_enqueue_style( 'tw-agents-list' );
+		wp_enqueue_script( 'tw-agents-list' );
+
+		if ( $done ) {
 			return;
 		}
 
-		tw_enqueue_style_asset(
-			'tw-agents-list',
-			'assets/css/public/agents-list.css'
-		);
-
-		tw_enqueue_script_asset(
-			'tw-agents-list',
-			'assets/js/public/agents-list.js',
-			[],
-			true
-		);
+		$done = true;
 
 		wp_add_inline_script(
 			'tw-agents-list',
@@ -60,4 +68,30 @@ if ( ! function_exists( 'tw_register_agents_list_assets' ) ) {
 	}
 }
 
-add_action( 'wp_enqueue_scripts', 'tw_register_agents_list_assets' );
+if ( ! function_exists( 'tw_maybe_enqueue_agents_list_assets' ) ) {
+	function tw_maybe_enqueue_agents_list_assets(): void {
+		if ( is_admin() || ! is_singular() ) {
+			return;
+		}
+
+		$post = get_post();
+
+		if ( ! $post ) {
+			return;
+		}
+
+		// has_shortcode() sprawdza post_content — działa dla klasycznych stron.
+		// Fallback: tw_has_shortcode_on_current_page obsługuje page buildera/bloki.
+		$in_content = has_shortcode( $post->post_content, 'tw_characters_list' );
+		$in_builder = ! $in_content
+			&& function_exists( 'tw_has_shortcode_on_current_page' )
+			&& tw_has_shortcode_on_current_page( 'tw_characters_list' );
+
+		if ( $in_content || $in_builder ) {
+			tw_enqueue_agents_list_assets();
+		}
+	}
+}
+
+add_action( 'wp_enqueue_scripts', 'tw_register_agents_list_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_agents_list_assets', 20 );
