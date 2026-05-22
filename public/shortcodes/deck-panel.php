@@ -7,10 +7,6 @@ if ( ! function_exists( 'tw_deck_panel_render' ) ) {
 			return '';
 		}
 
-		if ( function_exists( 'tw_enqueue_deck_panel_assets' ) ) {
-			tw_enqueue_deck_panel_assets();
-		}
-
 		ob_start();
 		?>
 		<div id="deck-panel" class="is-collapsed" aria-label="<?php echo esc_attr__( 'Deck panel', 'neoweaver' ); ?>">
