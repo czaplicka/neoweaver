@@ -58,23 +58,54 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 			$selected_char_id = $allowed_char_ids[0];
 		}
 
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $selected_char_id );
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $selected_char_id );
 
-		$all_cards = array();
-
+		// ── 1. Karty w aktywnej rozgrywce (cyber_buffer) ──────────────────────────
+		$buffer_cards = array();
 		if ( function_exists( 'tw_supabase_get' ) ) {
-			$all_cards = tw_supabase_get(
+			$raw_buffer = tw_supabase_get(
+				'cyber_buffer',
+				array(
+					'char_id' => 'eq.' . $safe_id,
+					'select'  => 'id,zone,deck_card_id,cyber_character_deck(id,card_id,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect))',
+				)
+			);
+			if ( is_array( $raw_buffer ) ) {
+				$buffer_cards = $raw_buffer;
+			}
+		}
+
+		// Zbierz IDs rekordów cyber_character_deck będących w bufferze
+		$in_game_deck_ids = array();
+		foreach ( $buffer_cards as $b ) {
+			$deck_row_id = $b['deck_card_id'] ?? ( $b['cyber_character_deck']['id'] ?? null );
+			if ( $deck_row_id ) {
+				$in_game_deck_ids[] = (int) $deck_row_id;
+			}
+		}
+
+		// ── 2. Wszystkie karty postaci (cyber_character_deck) ─────────────────────
+		$all_assigned = array();
+		if ( function_exists( 'tw_supabase_get' ) ) {
+			$raw_assigned = tw_supabase_get(
 				'cyber_character_deck',
 				array(
 					'character_id' => 'eq.' . $safe_id,
-					'select'       => '*,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect)',
+					'select'       => 'id,card_id,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect)',
 				)
 			);
+			if ( is_array( $raw_assigned ) ) {
+				$all_assigned = $raw_assigned;
+			}
 		}
 
-		if ( ! is_array( $all_cards ) ) {
-			$all_cards = array();
-		}
+		// Karty NIE będące w bufferze = nieaktywne (biblioteka)
+		$inactive_cards = array_filter(
+			$all_assigned,
+			static function ( $row ) use ( $in_game_deck_ids ) {
+				return ! in_array( (int) ( $row['id'] ?? 0 ), $in_game_deck_ids, true );
+			}
+		);
 
 		if ( function_exists( 'tw_enqueue_library_assets' ) ) {
 			tw_enqueue_library_assets(
@@ -134,92 +165,92 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 			<div class="deck-builder-container">
 				<div id="deck-warning" class="deck-warning"></div>
 
+				<?php // ── SEKCJA 1: KARTY W ROZGRYWCE (z cyber_buffer, 20–50) ── ?>
 				<div class="deck-section">
-					<h3>ACTIVE DECK (20 – 50)</h3>
+					<h3>IN GAME (<?php echo count( $buffer_cards ); ?> / 20–50)</h3>
 					<div id="active-deck" class="card-slot-container card-slot-container--active">
-						<?php
-						$active_locations = array( 'pile', 'hand', 'discard' );
-						foreach ( $all_cards as $card ) :
-							$loc = isset( $card['location'] ) ? (string) $card['location'] : '';
+						<?php if ( empty( $buffer_cards ) ) : ?>
+							<p class="deck-empty-note">No cards in active play.</p>
+						<?php else : ?>
+							<?php foreach ( $buffer_cards as $buf ) : ?>
+								<?php
+								$buf_id  = (string) ( $buf['id'] ?? '' );
+								$zone    = (string) ( $buf['zone'] ?? 'hand' );
+								$deck_row = is_array( $buf['cyber_character_deck'] ?? null ) ? $buf['cyber_character_deck'] : array();
+								$cdata   = is_array( $deck_row['cyber_deck'] ?? null ) ? $deck_row['cyber_deck'] : array();
+								$img_url = (string) ( $cdata['img_url'] ?? '' );
+								$name    = (string) ( $cdata['name'] ?? '' );
+								$level   = (string) ( $cdata['level'] ?? '' );
 
-							if ( ! in_array( $loc, $active_locations, true ) ) {
-								continue;
-							}
-
-							$iid     = (string) ( $card['instance_id'] ?? $card['id'] ?? '' );
-							$cdata   = is_array( $card['cyber_deck'] ?? null ) ? $card['cyber_deck'] : array();
-							$img_url = (string) ( $cdata['img_url'] ?? '' );
-							$name    = (string) ( $cdata['name'] ?? '' );
-							$level   = (string) ( $cdata['level'] ?? '' );
-
-							if ( '' === $iid ) {
-								continue;
-							}
-							?>
-							<div
-								class="cyber-card"
-								draggable="true"
-								id="card-<?php echo esc_attr( $iid ); ?>"
-								data-instance-id="<?php echo esc_attr( $iid ); ?>"
-								data-card-location="active"
-							>
-								<?php if ( '' !== $img_url ) : ?>
-									<img
-										src="<?php echo esc_url( $img_url ); ?>"
-										alt="<?php echo esc_attr( $name ); ?>"
-										loading="lazy"
-									>
-								<?php endif; ?>
-
-								<div class="card-info">
-									<div class="card-name"><?php echo esc_html( $name ); ?></div>
-									<div class="card-lvl">LVL <?php echo esc_html( $level ); ?></div>
+								if ( '' === $buf_id ) {
+									continue;
+								}
+								?>
+								<div
+									class="cyber-card cyber-card--<?php echo esc_attr( $zone ); ?>"
+									id="card-buf-<?php echo esc_attr( $buf_id ); ?>"
+									data-buffer-id="<?php echo esc_attr( $buf_id ); ?>"
+									data-zone="<?php echo esc_attr( $zone ); ?>"
+									data-card-location="active"
+								>
+									<?php if ( '' !== $img_url ) : ?>
+										<img
+											src="<?php echo esc_url( $img_url ); ?>"
+											alt="<?php echo esc_attr( $name ); ?>"
+											loading="lazy"
+										>
+									<?php endif; ?>
+									<div class="card-info">
+										<div class="card-name"><?php echo esc_html( $name ); ?></div>
+										<div class="card-lvl">LVL <?php echo esc_html( $level ); ?></div>
+										<div class="card-zone"><?php echo esc_html( strtoupper( $zone ) ); ?></div>
+									</div>
 								</div>
-							</div>
-						<?php endforeach; ?>
+							<?php endforeach; ?>
+						<?php endif; ?>
 					</div>
 				</div>
 
+				<?php // ── SEKCJA 2: BIBLIOTEKA (karty nieaktywne, bez limitu) ── ?>
 				<div class="deck-section">
-					<h3>LIBRARY (REPOSITORY)</h3>
+					<h3>LIBRARY (<?php echo count( $inactive_cards ); ?> cards)</h3>
 					<div id="library-deck" class="card-slot-container card-slot-container--library">
-						<?php foreach ( $all_cards as $card ) : ?>
-							<?php
-							if ( 'library' !== (string) ( $card['location'] ?? '' ) ) {
-								continue;
-							}
+						<?php if ( empty( $inactive_cards ) ) : ?>
+							<p class="deck-empty-note">Library is empty.</p>
+						<?php else : ?>
+							<?php foreach ( $inactive_cards as $card ) : ?>
+								<?php
+								$iid     = (string) ( $card['id'] ?? '' );
+								$cdata   = is_array( $card['cyber_deck'] ?? null ) ? $card['cyber_deck'] : array();
+								$img_url = (string) ( $cdata['img_url'] ?? '' );
+								$name    = (string) ( $cdata['name'] ?? '' );
+								$level   = (string) ( $cdata['level'] ?? '' );
 
-							$iid     = (string) ( $card['instance_id'] ?? $card['id'] ?? '' );
-							$cdata   = is_array( $card['cyber_deck'] ?? null ) ? $card['cyber_deck'] : array();
-							$img_url = (string) ( $cdata['img_url'] ?? '' );
-							$name    = (string) ( $cdata['name'] ?? '' );
-							$level   = (string) ( $cdata['level'] ?? '' );
-
-							if ( '' === $iid ) {
-								continue;
-							}
-							?>
-							<div
-								class="cyber-card"
-								draggable="true"
-								id="card-<?php echo esc_attr( $iid ); ?>"
-								data-instance-id="<?php echo esc_attr( $iid ); ?>"
-								data-card-location="library"
-							>
-								<?php if ( '' !== $img_url ) : ?>
-									<img
-										src="<?php echo esc_url( $img_url ); ?>"
-										alt="<?php echo esc_attr( $name ); ?>"
-										loading="lazy"
-									>
-								<?php endif; ?>
-
-								<div class="card-info">
-									<div class="card-name"><?php echo esc_html( $name ); ?></div>
-									<div class="card-lvl">LVL <?php echo esc_html( $level ); ?></div>
+								if ( '' === $iid ) {
+									continue;
+								}
+								?>
+								<div
+									class="cyber-card"
+									draggable="true"
+									id="card-<?php echo esc_attr( $iid ); ?>"
+									data-instance-id="<?php echo esc_attr( $iid ); ?>"
+									data-card-location="library"
+								>
+									<?php if ( '' !== $img_url ) : ?>
+										<img
+											src="<?php echo esc_url( $img_url ); ?>"
+											alt="<?php echo esc_attr( $name ); ?>"
+											loading="lazy"
+										>
+									<?php endif; ?>
+									<div class="card-info">
+										<div class="card-name"><?php echo esc_html( $name ); ?></div>
+										<div class="card-lvl">LVL <?php echo esc_html( $level ); ?></div>
+									</div>
 								</div>
-							</div>
-						<?php endforeach; ?>
+							<?php endforeach; ?>
+						<?php endif; ?>
 					</div>
 				</div>
 
