@@ -1,16 +1,18 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+require_once __DIR__ . '/class-neoweaver-claude-client.php';
+
 class NeoWeaver_Intent_Router {
 
     /**
-     * Klasyfikuje wiadomość gracza na protokół.
-     * Najpierw próbuje regex (tanie), fallback do GPT mini (drogie).
+     * Classifies the player message into a gameplay protocol.
+     * First tries regex rules (cheap), then falls back to Claude (more expensive).
      */
     public static function classify(string $message): string {
         $msg = mb_strtolower(trim($message));
 
-        // --- REGEX rules (kolejność ma znaczenie) ---
+        // Regex rules (order matters)
         $rules = [
             'META'   => '/^(status|hp|mp|stats|ekwipunek|inventory|karty|hand|mapa|map)\b/i',
             'COMBAT' => '/\b(atakuję|atak|attack|use card|zagraj kartę|walcz|fight|strike|shoot|cast)\b/i',
@@ -28,34 +30,31 @@ class NeoWeaver_Intent_Router {
             }
         }
 
-        // Fallback: krótkie zapytanie do GPT-4o-mini (tanio)
         return self::classify_with_gpt($message);
     }
 
+    /**
+     * Fallback intent classification via Claude.
+     * Returns exactly one allowed protocol label.
+     */
     private static function classify_with_gpt(string $message): string {
-        $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
-            'headers' => [
-                'Authorization' => 'Bearer ' . NEOWEAVER_OPENAI_KEY,
-                'Content-Type'  => 'application/json',
+        $result = NeoWeaver_Claude_Client::call(
+            'Classify the player message into ONE word: TRAVEL, COMBAT, TRADE, DIALOG, LORE, REST, DECK, META. Reply with ONLY that word.',
+            [
+                [ 'role' => 'user', 'content' => $message ],
             ],
-            'body' => json_encode([
-                'model'      => 'gpt-4o-mini',
-                'max_tokens' => 10,
-                'messages'   => [
-                    ['role' => 'system', 'content' => 
-                        'Classify the player message into ONE word: TRAVEL, COMBAT, TRADE, DIALOG, LORE, REST, DECK, META. Reply with ONLY that word.'],
-                    ['role' => 'user', 'content' => $message],
-                ],
-            ]),
-            'timeout' => 10,
-        ]);
+            NEOWEAVER_MODEL_ROUTER,
+            10,
+            0.0
+        );
 
-        if (is_wp_error($response)) return 'DIALOG';
+        if (is_wp_error($result)) {
+            return 'DIALOG';
+        }
 
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        $intent = strtoupper(trim($body['choices'][0]['message']['content'] ?? 'DIALOG'));
+        $intent = strtoupper(trim($result['content'] ?? 'DIALOG'));
+        $valid  = [ 'TRAVEL', 'COMBAT', 'TRADE', 'DIALOG', 'LORE', 'REST', 'DECK', 'META' ];
 
-        $valid = ['TRAVEL','COMBAT','TRADE','DIALOG','LORE','REST','DECK','META'];
-        return in_array($intent, $valid) ? $intent : 'DIALOG';
+        return in_array($intent, $valid, true) ? $intent : 'DIALOG';
     }
 }
