@@ -40,6 +40,7 @@ final class NeoWeaver_Core {
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 			'includes/supabase-auth.php',   // Auth bridge: WP ↔ Supabase JWT
+			'assets/js/game-data.js',
 			
 			'includes/assets.php',
 			'includes/assets/vendors.php',
