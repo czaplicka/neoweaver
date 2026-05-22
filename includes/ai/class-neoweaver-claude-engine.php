@@ -8,19 +8,21 @@ require_once dirname(__DIR__) . '/supabase-config.php';
 
 /**
  * NeoWeaver Claude Engine
+ * Uses Anthropic Claude API via NeoWeaver_Claude_Client.
  *
- * Historia rozmowy trzymana w cyber_chat_messages:
- * - channel_id
- * - char_id
- * - campaign_id
- * - message_type = player / gm
+ * History is stored in Supabase (cyber_chat_messages) and passed
+ * as a messages array on every request — Claude has no server-side threading.
  *
- * Claude nie ma previous_response_id, więc wysyłamy explicite historię wiadomości.
+ * wp-config.php constants used:
+ *  - NEOWEAVER_MODEL_GM         — model GM (claude-sonnet-4-5 or similar)
+ *  - NEOWEAVER_TOKENS_GM        — max output tokens dla GM (600)
+ *  - TW_SUPABASE_PROJECT_ID     — ID projektu Supabase (przez tw_supabase_url())
+ *  - TW_SUPABASE_SERVICE_KEY    — service key Supabase (przez tw_supabase_service_key())
  */
 class NeoWeaver_Claude_Engine {
 
     /**
-     * Stały prompt systemowy dla GM-a.
+     * Stały system prompt — instrukcje dla GM-a.
      */
     private const SYSTEM_INSTRUCTIONS = <<<PROMPT
 You are the AI Game Master of NeoWeave — a dark, narrative RPG.
@@ -38,37 +40,34 @@ PROMPT;
     }
 
     // ============================================================
-    // PUBLIC
+    // PUBLIC: główna metoda — wywołaj z AJAX handlera
+    // Zwraca: ['text'=>'...', 'tags'=>[...], 'protocol'=>'...', 'tokens'=>[...]]
     // ============================================================
-    public function process( string $char_id, string $message ): array {
+    public function process(string $char_id, string $message): array {
 
-        $protocol = NeoWeaver_Intent_Router::classify( $message );
+        // 1. Klasyfikacja intencji (regex + GPT-mini fallback)
+        $protocol = NeoWeaver_Intent_Router::classify($message);
 
-        if ( $protocol === 'META' ) {
-            return $this->handle_meta( $char_id );
+        // META = dane bez wywołania AI
+        if ($protocol === 'META') {
+            return $this->handle_meta($char_id);
         }
 
-        $ctx             = $this->context->build( $char_id, $protocol );
+        // 2. Pobierz dynamiczny kontekst z Supabase (Bloki B + C)
+        $ctx             = $this->context->build($char_id, $protocol);
         $dynamic_context = $ctx['block_b'] . "\n\n---\n\n" . $ctx['block_c'];
         $system_prompt   = self::SYSTEM_INSTRUCTIONS;
 
-        $channel_id  = $ctx['channel_id']  ?? null;
-        $campaign_id = $ctx['campaign_id'] ?? null;
-        $world_id    = $ctx['world_id']    ?? null;
+        // 3. Pobierz historię konwersacji (ostatnie 14 wiadomości) z cyber_chat_messages
+        $history = $this->get_history($char_id);
 
-        if ( ! $channel_id ) {
-            return [ 'error' => 'Brak channel_id dla tej rozmowy.' ];
-        }
-
-        // Ostatnie 14 wiadomości z właściwego kanału / postaci / kampanii
-        $history = $this->get_history( $channel_id, $char_id, $campaign_id );
-
-        // Doklejamy bieżącą wiadomość gracza z kontekstem gry
+        // 4. Dołącz aktualną wiadomość gracza (z kontekstem stanu gry)
         $history[] = [
             'role'    => 'user',
             'content' => "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}",
         ];
 
+        // 5. Wywołaj Claude
         $result = NeoWeaver_Claude_Client::call(
             $system_prompt,
             $history,
@@ -77,22 +76,18 @@ PROMPT;
             0.85
         );
 
-        if ( is_wp_error( $result ) ) {
-            return [ 'error' => $result->get_error_message() ];
+        if (is_wp_error($result)) {
+            return ['error' => $result->get_error_message()];
         }
 
-        $this->save_to_history(
-            $channel_id,
-            $char_id,
-            $campaign_id,
-            $world_id,
-            $message,
-            $result['content']
-        );
+        // 6. Zapisz parę user+assistant do historii w Supabase
+        $this->save_to_history($char_id, $message, $result['content'], $ctx['world_id'] ?? null);
 
-        $this->log_tokens( $char_id, $world_id, $result['usage'], $protocol );
+        // 7. Loguj tokeny do Supabase
+        $this->log_tokens($char_id, $ctx['world_id'] ?? null, $result['usage'], $protocol);
 
-        $parsed = $this->parse_tags( $result['content'] );
+        // 8. Parsuj tagi systemowe z odpowiedzi GM-a
+        $parsed = $this->parse_tags($result['content']);
 
         return [
             'text'     => $parsed['text'],
@@ -106,161 +101,109 @@ PROMPT;
     }
 
     // ============================================================
-    // SUPABASE HELPER
+    // Pomocniczy helper Supabase REST
     // ============================================================
-    private function supabase_request( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array|null {
+    private function supabase_request(string $method, string $endpoint, array $body = [], array $extra_headers = []): array|null {
         $args = [
             'method'  => $method,
-            'headers' => array_merge( [
+            'headers' => array_merge([
                 'apikey'        => tw_supabase_service_key(),
                 'Authorization' => 'Bearer ' . tw_supabase_service_key(),
                 'Content-Type'  => 'application/json',
-            ], $extra_headers ),
+            ], $extra_headers),
             'timeout' => 10,
         ];
-
-        if ( ! empty( $body ) ) {
-            $args['body'] = wp_json_encode( $body );
+        if (!empty($body)) {
+            $args['body'] = json_encode($body);
         }
-
-        $response = wp_remote_request(
-            trailingslashit( tw_supabase_url() ) . ltrim( $endpoint, '/' ),
-            $args
-        );
-
-        if ( is_wp_error( $response ) ) {
-            error_log( '[NeoWeaver Claude] Supabase request failed: ' . $response->get_error_message() );
+        $response = wp_remote_request(trailingslashit(tw_supabase_url()) . ltrim($endpoint, '/'), $args);
+        if (is_wp_error($response)) {
+            error_log('[NeoWeaver Claude] Supabase request failed: ' . $response->get_error_message());
             return null;
         }
-
-        $decoded = json_decode( wp_remote_retrieve_body( $response ), true );
-        return is_array( $decoded ) ? $decoded : null;
+        $decoded = json_decode(wp_remote_retrieve_body($response), true);
+        return is_array($decoded) ? $decoded : null;
     }
 
     // ============================================================
-    // HISTORY
+    // Historia konwersacji — Supabase: cyber_chat_messages
+    // Pobieramy ostatnie 14 wiadomości (7 tur) posortowane ASC.
     // ============================================================
-    private function get_history( string $channel_id, string $char_id, ?string $campaign_id ): array {
-        $endpoint =
+
+    /**
+     * Pobierz historię jako tablicę [{role, content}, ...].
+     */
+    private function get_history(string $char_id): array {
+        // Pobieramy 14 ostatnich DESC, potem odwracamy do ASC
+        $result = $this->supabase_request(
+            'GET',
             '/rest/v1/cyber_chat_messages'
-            . '?channel_id=eq.' . urlencode( $channel_id )
-            . '&char_id=eq.' . urlencode( $char_id )
+            . '?char_id=eq.' . urlencode($char_id)
+            . '&select=role,content'
             . '&order=created_at.desc'
             . '&limit=14'
-            . '&select=message_type,content,campaign_id';
+        );
 
-        if ( $campaign_id ) {
-            $endpoint =
-                '/rest/v1/cyber_chat_messages'
-                . '?channel_id=eq.' . urlencode( $channel_id )
-                . '&char_id=eq.' . urlencode( $char_id )
-                . '&campaign_id=eq.' . urlencode( $campaign_id )
-                . '&order=created_at.desc'
-                . '&limit=14'
-                . '&select=message_type,content';
-        }
-
-        $result = $this->supabase_request( 'GET', $endpoint );
-
-        if ( empty( $result ) || ! is_array( $result ) ) {
+        if (empty($result)) {
             return [];
         }
 
-        $result  = array_reverse( $result );
-        $history = [];
-
-        foreach ( $result as $row ) {
-            $type = $row['message_type'] ?? '';
-            $role = null;
-
-            if ( $type === 'player' ) {
-                $role = 'user';
-            } elseif ( $type === 'gm' ) {
-                $role = 'assistant';
-            }
-
-            if ( $role && ! empty( $row['content'] ) ) {
-                $history[] = [
-                    'role'    => $role,
-                    'content' => $row['content'],
-                ];
-            }
-        }
-
-        return $history;
+        // Odwróć kolejność — chcemy od najstarszej do najnowszej
+        return array_reverse(array_map(fn($row) => [
+            'role'    => $row['role'],
+            'content' => $row['content'],
+        ], $result));
     }
 
-    private function save_to_history(
-        string $channel_id,
-        string $char_id,
-        ?string $campaign_id,
-        ?string $world_id,
-        string $player_message,
-        string $gm_message
-    ): void {
-        $wp_user_id = get_current_user_id();
-
-        if ( ! $wp_user_id ) {
-            error_log( '[NeoWeaver Claude] Missing wp_user_id while saving chat history.' );
-            return;
-        }
-
-        $rows = [
-            [
-                'channel_id'   => $channel_id,
-                'campaign_id'  => $campaign_id,
-                'char_id'      => $char_id,
-                'wp_user_id'   => $wp_user_id,
-                'message_type' => 'player',
-                'content'      => $player_message,
-                'created_at'   => gmdate( 'c' ),
-                'is_ready'     => true,
-                'meta'         => [
-                    'world_id' => $world_id,
-                    'source'   => 'claude_engine',
-                ],
-            ],
-            [
-                'channel_id'   => $channel_id,
-                'campaign_id'  => $campaign_id,
-                'char_id'      => $char_id,
-                'wp_user_id'   => $wp_user_id,
-                'message_type' => 'gm',
-                'content'      => $gm_message,
-                'created_at'   => gmdate( 'c' ),
-                'is_ready'     => true,
-                'meta'         => [
-                    'world_id' => $world_id,
-                    'source'   => 'claude_engine',
-                ],
-            ],
-        ];
-
+    /**
+     * Zapisz wiadomość gracza i odpowiedź GM-a do historii.
+     * Uwaga: zapisujemy oryginalną wiadomość gracza (bez prefixu GAME STATE).
+     */
+    private function save_to_history(string $char_id, string $user_message, string $assistant_message, ?string $world_id): void {
+        // Wstaw user
         $this->supabase_request(
             'POST',
             '/rest/v1/cyber_chat_messages',
-            $rows,
-            [ 'Prefer' => 'return=minimal' ]
+            [
+                'char_id'    => $char_id,
+                'world_id'   => $world_id,
+                'role'       => 'user',
+                'content'    => $user_message,
+                'created_at' => gmdate('c'),
+            ],
+            ['Prefer' => 'return=minimal']
+        );
+
+        // Wstaw assistant
+        $this->supabase_request(
+            'POST',
+            '/rest/v1/cyber_chat_messages',
+            [
+                'char_id'    => $char_id,
+                'world_id'   => $world_id,
+                'role'       => 'assistant',
+                'content'    => $assistant_message,
+                'created_at' => gmdate('c'),
+            ],
+            ['Prefer' => 'return=minimal']
         );
     }
 
-    public function reset_history( string $channel_id, string $char_id, ?string $campaign_id = null ): void {
-        $endpoint =
-            '/rest/v1/cyber_chat_messages'
-            . '?channel_id=eq.' . urlencode( $channel_id )
-            . '&char_id=eq.' . urlencode( $char_id );
-
-        if ( $campaign_id ) {
-            $endpoint .= '&campaign_id=eq.' . urlencode( $campaign_id );
-        }
-
-        $this->supabase_request( 'DELETE', $endpoint );
+    /**
+     * Reset historii gracza (nowa sesja gry, śmierć postaci itp.).
+     * Usuwa wszystkie wiadomości z cyber_chat_messages dla danej postaci.
+     */
+    public function reset_history(string $char_id): void {
+        $this->supabase_request(
+            'DELETE',
+            '/rest/v1/cyber_chat_messages?char_id=eq.' . urlencode($char_id)
+        );
     }
 
     // ============================================================
-    // TOKENS
+    // Logowanie tokenów do Supabase (cyber_token_ledger)
     // ============================================================
-    private function log_tokens( string $char_id, ?string $world_id, array $usage, string $protocol ): void {
+    private function log_tokens(string $char_id, ?string $world_id, array $usage, string $protocol): void {
         $this->supabase_request(
             'POST',
             '/rest/v1/cyber_token_ledger',
@@ -272,42 +215,40 @@ PROMPT;
                 'model'             => NEOWEAVER_MODEL_GM,
                 'protocol'          => $protocol,
             ],
-            [ 'Prefer' => 'return=minimal' ]
+            ['Prefer' => 'return=minimal']
         );
     }
 
     // ============================================================
-    // TAG PARSER
+    // Parser tagów systemowych z odpowiedzi GM-a.
+    // Usuwa tagi z tekstu przed wyświetleniem graczowi.
     // ============================================================
-    private function parse_tags( string $raw ): array {
+    private function parse_tags(string $raw): array {
         $tags = [];
         $text = preg_replace_callback(
-            '/#([A-Z][A-Z0-9_]+)(?::([a-zA-Z0-9_\\-]+))?/',
-            function ( $m ) use ( &$tags ) {
-                $tags[] = [
-                    'tag' => $m[1],
-                    'val' => $m[2] ?? null,
-                ];
+            '/#([A-Z][A-Z0-9_]+)(?::([a-zA-Z0-9_\-]+))?/',
+            function ($m) use (&$tags) {
+                $tags[] = ['tag' => $m[1], 'val' => $m[2] ?? null];
                 return '';
             },
             $raw
         );
 
         return [
-            'text' => trim( preg_replace( '/\\s+/', ' ', $text ) ),
+            'text' => trim(preg_replace('/\s+/', ' ', $text)),
             'tags' => $tags,
         ];
     }
 
     // ============================================================
-    // META
+    // META — odpowiedź bez wywołania AI (status, HP, mapa)
     // ============================================================
-    private function handle_meta( string $char_id ): array {
+    private function handle_meta(string $char_id): array {
         return [
             'text'     => '',
-            'tags'     => [ [ 'tag' => 'HUD_REFRESH', 'val' => null ] ],
+            'tags'     => [['tag' => 'HUD_REFRESH', 'val' => null]],
             'protocol' => 'META',
-            'tokens'   => [ 'prompt' => 0, 'completion' => 0 ],
+            'tokens'   => ['prompt' => 0, 'completion' => 0],
         ];
     }
 }
