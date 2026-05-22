@@ -53,17 +53,11 @@ if ( ! function_exists( 'tw_enqueue_deck_panel_assets' ) ) {
 
 if ( ! function_exists( 'tw_maybe_enqueue_deck_panel_assets' ) ) {
 	function tw_maybe_enqueue_deck_panel_assets(): void {
-		if ( is_admin() || ! is_singular() ) {
+		if ( is_admin() ) {
 			return;
 		}
 
-		$post = get_post();
-
-		if ( ! $post || empty( $post->post_content ) ) {
-			return;
-		}
-
-		if ( has_shortcode( $post->post_content, 'tw_deck_panel' ) ) {
+		if ( is_page_template( 'templates/adventure.php' ) ) {
 			tw_enqueue_deck_panel_assets();
 		}
 	}
