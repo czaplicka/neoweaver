@@ -44,7 +44,23 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ] ],
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
+			'nw-game-data'           => [ 'assets/js/public/game-data.js', [] ],
 		];
+
+		if ( is_user_logged_in() ) {
+    $jwt = function_exists( 'tw_generate_supabase_jwt' ) ? tw_generate_supabase_jwt( get_current_user_id() ) : '';
+
+    wp_localize_script(
+        'nw-game-data',       // ← ten skrypt
+        'twAdventureData',
+        [
+            'supabase_url'      => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
+            'supabase_anon_key' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
+            'supabaseToken'     => $jwt,
+            'wpUserId'          => get_current_user_id(),
+        ]
+    );
+}
 
 		foreach ( $scripts as $handle => [ $relative_path, $deps ] ) {
 			tw_enqueue_script_asset( $handle, $relative_path, $deps, true );
