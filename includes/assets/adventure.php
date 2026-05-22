@@ -54,7 +54,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'nw-services'            => [ 'assets/js/public/services.js', [ 'jquery' ] ],
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
-			'tw-adventure'           => [ 'assets/js/adventure.js', [] ],
+			//'tw-adventure'           => [ 'assets/js/adventure.js', [] ],
 		];
 
 		foreach ( $scripts as $handle => [ $relative_path, $deps ] ) {
