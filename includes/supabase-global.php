@@ -2,6 +2,12 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+error_log( 'NW: supabase-global loaded' );
 
 add_action( 'wp_enqueue_scripts', function () {
 	if ( ! is_user_logged_in() ) {
