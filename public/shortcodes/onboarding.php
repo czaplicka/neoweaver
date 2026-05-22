@@ -1,60 +1,31 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
-
 	class TW_Onboarding_Shortcode {
 
 		const SHORTCODE = 'tw_onboarding_slider';
 
 		public static function init(): void {
-			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
-			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+			add_shortcode( self::SHORTCODE, array( __CLASS__, 'render_shortcode' ) );
 		}
 
-		public static function enqueue_assets(): void {
-			if ( ! function_exists( 'tw_has_shortcode_on_current_page' ) || ! tw_has_shortcode_on_current_page( self::SHORTCODE ) ) {
-				return;
-			}
+		public static function render_shortcode( $atts = array() ): string {
+			unset( $atts );
 
-			tw_enqueue_style_asset(
-				'neoweaver-onboarding',
-				'assets/css/public/onboarding.css',
-				[ 'neoweaver-public' ]
-			);
-
-			tw_enqueue_script_asset(
-				'neoweaver-onboarding',
-				'assets/js/public/onboarding.js',
-				[ 'jquery' ],
-				true
-			);
-
-			wp_localize_script(
-				'neoweaver-onboarding',
-				'twOnboarding',
-				[
-					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-					'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
-				]
-			);
-		}
-
-		public static function render_shortcode( $atts = [] ): string {
 			if ( ! is_user_logged_in() ) {
 				return '';
 			}
 
 			$wp_user_id = get_current_user_id();
+
 			if ( ! $wp_user_id ) {
 				return '';
 			}
 
 			if (
 				function_exists( 'tw_get_user_setting' ) &&
-				tw_get_user_setting( $wp_user_id, 'onboarding_dismissed' ) === '1'
+				'1' === (string) tw_get_user_setting( $wp_user_id, 'onboarding_dismissed' )
 			) {
 				return '';
 			}
@@ -69,6 +40,15 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 				&& ! empty( $progress['character'] )
 				&& ! empty( $progress['campaign'] )
 				&& ! empty( $progress['terminal'] );
+
+			if ( function_exists( 'tw_enqueue_onboarding_assets' ) ) {
+				tw_enqueue_onboarding_assets(
+					array(
+						'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+						'nonce'   => wp_create_nonce( 'neoweaver_onboarding' ),
+					)
+				);
+			}
 
 			ob_start();
 			?>
@@ -158,64 +138,77 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 		}
 
 		protected static function user_has_game_session( int $wp_user_id ): bool {
+			if ( ! function_exists( 'tw_supabase_get' ) ) {
+				return false;
+			}
+
 			$rows = tw_supabase_get(
 				'cyber_game_sessions',
-				[
+				array(
 					'wp_user_id' => 'eq.' . (int) $wp_user_id,
 					'select'     => 'id',
 					'limit'      => 1,
-				]
+				)
 			);
 
 			return ! empty( $rows );
 		}
 
 		protected static function get_user_progress( int $wp_user_id ): array {
+			if ( ! function_exists( 'tw_supabase_get' ) ) {
+				return array(
+					'world'     => false,
+					'character' => false,
+					'campaign'  => false,
+					'terminal'  => false,
+				);
+			}
+
 			$wp_user_id = (int) $wp_user_id;
 
 			$worlds = tw_supabase_get(
 				'cyber_worlds',
-				[
+				array(
 					'wp_user_id' => 'eq.' . $wp_user_id,
 					'select'     => 'id',
 					'limit'      => 1,
-				]
+				)
 			);
 
 			$characters = tw_supabase_get(
 				'cyber_characters',
-				[
+				array(
 					'wp_user_id' => 'eq.' . $wp_user_id,
 					'select'     => 'id',
 					'limit'      => 1,
-				]
+				)
 			);
 
 			$campaigns = tw_supabase_get(
 				'cyber_campaign',
-				[
+				array(
 					'wp_user_id' => 'eq.' . $wp_user_id,
 					'select'     => 'id',
 					'limit'      => 1,
-				]
+				)
 			);
 
 			$terminal_sessions = tw_supabase_get(
 				'cyber_game_sessions',
-				[
+				array(
 					'wp_user_id' => 'eq.' . $wp_user_id,
 					'select'     => 'id,status,campaign_id,character_id,world_id',
 					'status'     => 'eq.active',
 					'limit'      => 1,
-				]
+				)
 			);
 
-			return [
+			return array(
 				'world'     => ! empty( $worlds ),
 				'character' => ! empty( $characters ),
 				'campaign'  => ! empty( $campaigns ),
 				'terminal'  => ! empty( $terminal_sessions ),
-			];
+			);
 		}
 	}
 
