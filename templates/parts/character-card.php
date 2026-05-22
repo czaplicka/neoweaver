@@ -186,7 +186,30 @@ $total_power          = $args['total_power'];
 					</div>-->
 				 
 				</div> 
-<?php echo do_shortcode( '[tw_vitalis_panel]' ); ?>
+
+<?php
+$vitalis_args = array(
+    'c_hp'        => $c_hp,
+    'm_hp'        => $m_hp,
+    'c_mp'        => $c_mp,
+    'm_mp'        => $m_mp,
+    'sync_p'      => $sync_p,
+    'c_satiety'   => $c_satiety,
+    'c_hydration' => $c_hydration,
+    'c_rest'      => $c_rest,
+);
+
+// dostosuj ścieżkę do swojej struktury pluginu:
+$vitalis_partial = trailingslashit( NEOWEAVER_PLUGIN_DIR ) . 'templates/partials/character-vitalis.php';
+
+if ( file_exists( $vitalis_partial ) ) {
+    /** @var array $vitalis_args */
+    $args = $vitalis_args;
+    include $vitalis_partial;
+}
+?>
+
+				
 				<div class="tw-accordion-group">
 					<details>
 						<summary>Attributes</summary>
