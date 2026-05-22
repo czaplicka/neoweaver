@@ -66,63 +66,73 @@ function tw_supabase_get_current_user_token(): ?string {
  * Supabase podpisuje token swoim aktywnym kluczem (ECC lub HS256).
  */
 function tw_supabase_fetch_token_for_uid( string $supabase_uid ): ?string {
-    // Krok 1: wygeneruj magic link (OTP) dla usera
-    $url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/generate_link';
+    // Najpierw pobierz email usera z auth.users
+    $url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/users/' . $supabase_uid;
 
-    $response = wp_remote_post( $url, [
+    $response = wp_remote_get( $url, [
+        'headers' => [
+            'apikey'        => tw_supabase_service_key(),
+            'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+        ],
+        'timeout' => 10,
+    ] );
+
+    $body  = json_decode( wp_remote_retrieve_body( $response ), true );
+    $email = $body['email'] ?? null;
+
+    if ( ! $email ) {
+        error_log( 'NeoWeaver: brak email dla uid ' . $supabase_uid );
+        return null;
+    }
+
+    // Generuj OTP link
+    $gen_url = trailingslashit( tw_supabase_url() ) . 'auth/v1/admin/generate_link';
+
+    $gen = wp_remote_post( $gen_url, [
         'headers' => [
             'apikey'        => tw_supabase_service_key(),
             'Authorization' => 'Bearer ' . tw_supabase_service_key(),
             'Content-Type'  => 'application/json',
         ],
         'body' => wp_json_encode( [
-            'type'    => 'magiclink',
-            'user_id' => $supabase_uid,
-        ] ),
-        'timeout' => 15,
-    ] );
-
-    if ( is_wp_error( $response ) ) {
-        error_log( 'NeoWeaver: generate_link error: ' . $response->get_error_message() );
-        return null;
-    }
-
-    $code = wp_remote_retrieve_response_code( $response );
-    $body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-    if ( $code !== 200 ) {
-        error_log( 'NeoWeaver: generate_link HTTP ' . $code . ' — ' . wp_json_encode( $body ) );
-        return null;
-    }
-
-    // Krok 2: wymień token OTP na access_token
-    $otp_token  = $body['properties']['hashed_token'] ?? null;
-    $email      = $body['email'] ?? null;
-
-    if ( ! $otp_token || ! $email ) {
-        error_log( 'NeoWeaver: brak hashed_token lub email w odpowiedzi' );
-        return null;
-    }
-
-    $verify_url = trailingslashit( tw_supabase_url() ) . 'auth/v1/verify';
-    $verify_response = wp_remote_post( $verify_url, [
-        'headers' => [
-            'apikey'       => tw_supabase_anon_key(),
-            'Content-Type' => 'application/json',
-        ],
-        'body' => wp_json_encode( [
             'type'  => 'magiclink',
-            'token' => $otp_token,
             'email' => $email,
         ] ),
         'timeout' => 15,
     ] );
 
-    $vcode = wp_remote_retrieve_response_code( $verify_response );
-    $vbody = json_decode( wp_remote_retrieve_body( $verify_response ), true );
+    $gcode = wp_remote_retrieve_response_code( $gen );
+    $gbody = json_decode( wp_remote_retrieve_body( $gen ), true );
+
+    error_log( 'NeoWeaver: generate_link HTTP ' . $gcode . ' — ' . wp_json_encode( $gbody ) );
+
+    if ( $gcode !== 200 || empty( $gbody['properties']['hashed_token'] ) ) {
+        return null;
+    }
+
+    // Wymień token na access_token
+    $verify = wp_remote_post(
+        trailingslashit( tw_supabase_url() ) . 'auth/v1/verify',
+        [
+            'headers' => [
+                'apikey'       => tw_supabase_anon_key(),
+                'Content-Type' => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'type'  => 'magiclink',
+                'token' => $gbody['properties']['hashed_token'],
+                'email' => $email,
+            ] ),
+            'timeout' => 15,
+        ]
+    );
+
+    $vcode = wp_remote_retrieve_response_code( $verify );
+    $vbody = json_decode( wp_remote_retrieve_body( $verify ), true );
+
+    error_log( 'NeoWeaver: verify HTTP ' . $vcode . ' — ' . wp_json_encode( $vbody ) );
 
     if ( $vcode !== 200 || empty( $vbody['access_token'] ) ) {
-        error_log( 'NeoWeaver: verify HTTP ' . $vcode . ' — ' . wp_json_encode( $vbody ) );
         return null;
     }
 
