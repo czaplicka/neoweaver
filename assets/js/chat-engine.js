@@ -45,10 +45,6 @@
 		cfg.channelId = window.activeChannelId;
 	}
 
-	if ( ! cfg.supabaseUrl || ! cfg.supabaseKey ) {
-		console.error( '[NW Chat] Brak nwChat.supabaseUrl / supabaseKey' );
-		return;
-	}
 	if ( ! cfg.restUrl ) {
 		console.error( '[NW Chat] Brak nwChat.restUrl' );
 		return;
@@ -68,16 +64,6 @@
 		console.error( '[NW Chat] Brak elementów DOM czatu' );
 		return;
 	}
-
-	// ============================================================
-	// SUPABASE CLIENT
-	// ============================================================
-
-	const { createClient } = window.supabase;
-	const sb = createClient( cfg.supabaseUrl, cfg.supabaseKey );
-
-	// Eksportuj dla innych modułów (kompatybilność z window.twSupabase)
-	if ( ! window.twSupabase ) { window.twSupabase = sb; }
 
 	// ============================================================
 	// REALTIME — jeden channel, wiele eventów
@@ -103,7 +89,7 @@
 		// Błąd po stronie PHP / GPT
 		.on( 'broadcast', { event: 'gm_error' }, function ( payload ) {
 			const data = payload.payload || {};
-			showError( data.message || 'GM nie odpowiada — spróbuj ponownie.' );
+			showError( data.message || 'GM is thinking...' );
 			setInputBusy( false );
 		} )
 
