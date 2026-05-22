@@ -40,8 +40,8 @@ final class NeoWeaver_Core {
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 			'includes/supabase-auth.php',
-			'includes/supabase-global.php', 
-			
+			'includes/supabase-global.php',
+
 			'includes/assets.php',
 			'includes/assets/vendors.php',
 			'includes/assets/adventure.php',
@@ -57,22 +57,10 @@ final class NeoWeaver_Core {
 			'includes/assets/connect-character-campaign.php',
 			'includes/assets/cyber-hud.php',
 			'includes/assets/deck-panel.php',
-			'includes/assets/essence',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
-			//'includes/assets/',
+			'includes/assets/essences.php',
 			'includes/assets/public-character-profile.php',
 			'includes/assets/public-runtime.php',
-			
+
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
 			'includes/api-endpoints-character-data.php',
@@ -89,7 +77,6 @@ final class NeoWeaver_Core {
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
 			'includes/shortcodes-tags.php',
-			
 
 			// includes/ajax
 			'includes/ajax/buffer.php',
