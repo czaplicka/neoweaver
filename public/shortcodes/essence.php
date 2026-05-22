@@ -97,17 +97,6 @@ if ( ! function_exists( 'tw_essences_shortcode' ) ) {
 			$essences[ $row['essence_type'] ] = max( 0.0, (float) ( $row['quantity'] ?? 0 ) );
 		}
 
-		// ── Render ────────────────────────────────────────────────────────────
-		// OPTIMISATION: CSS is enqueued once via wp_add_inline_style so it is
-		// never duplicated when the shortcode appears more than once on a page.
-		// We attach it to wp_head if wp_styles is already set up, otherwise
-		// fall back to an inline <style> (covers edge-case REST/block rendering).
-		$css = '
-			.tw-essence-container{display:flex;flex-wrap:wrap;gap:12px;background:rgba(0,0,0,.3);padding:10px;border-radius:8px;border:1px solid #444;font-family:"Chakra Petch",sans-serif}
-			.tw-essence-item{display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(255,255,255,.05);border-radius:4px;font-size:14px;border-bottom:2px solid transparent}
-			.tw-essence-count{font-weight:700;font-size:16px}
-		';
-
 		// Register a dummy stylesheet handle the first time, then attach CSS.
 		if ( ! wp_style_is( 'tw-essences', 'registered' ) ) {
 			wp_register_style( 'tw-essences', false ); // phpcs:ignore
