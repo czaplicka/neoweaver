@@ -2,10 +2,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-<?php
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
 
 error_log( 'NW: supabase-global loaded' );
 
