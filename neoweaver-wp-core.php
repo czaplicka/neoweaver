@@ -39,7 +39,8 @@ final class NeoWeaver_Core {
 			// includes
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
-			'includes/supabase-auth.php',   // Auth bridge: WP ↔ Supabase JWT
+			'includes/supabase-auth.php',
+			'includes/supabase-global.php',
 			
 			'includes/assets.php',
 			'includes/assets/vendors.php',
