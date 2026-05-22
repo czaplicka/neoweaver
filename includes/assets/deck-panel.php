@@ -30,12 +30,12 @@ if ( ! function_exists( 'tw_register_deck_panel_assets' ) ) {
 
 if ( ! function_exists( 'tw_enqueue_deck_panel_assets' ) ) {
 	function tw_enqueue_deck_panel_assets( array $config = array() ): void {
-		static $inline_done = false;
+		static $done = false;
 
 		wp_enqueue_style( 'neoweaver-deck-panel' );
 		wp_enqueue_script( 'neoweaver-deck-panel' );
 
-		if ( true === $inline_done ) {
+		if ( true === $done ) {
 			return;
 		}
 
@@ -47,7 +47,7 @@ if ( ! function_exists( 'tw_enqueue_deck_panel_assets' ) ) {
 			);
 		}
 
-		$inline_done = true;
+		$done = true;
 	}
 }
 
