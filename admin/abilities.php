@@ -13,7 +13,7 @@ if ( class_exists( 'NW_Abilities_Admin', false ) ) {
 	return;
 }
 
-class NW_Abilities_Admin {
+class NW_Abilities_Admin extends NW_Base_Admin {
 
 	private string $page_slug = 'nw-abilities';
 
@@ -79,53 +79,6 @@ class NW_Abilities_Admin {
 		);
 	}
 
-	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
-		$method = strtoupper( $method );
-
-		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
-			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
-			$query = [];
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-			$data = tw_supabase_get( $table, $query );
-			if ( ! is_array( $data ) ) {
-				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
-			}
-			if ( isset( $data['code'], $data['message'] ) ) {
-				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
-			}
-			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
-		}
-
-		if ( function_exists( 'tw_supabase_request' ) ) {
-			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
-			$query = [];
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-			$extra_args = [];
-			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
-				$extra_args['headers']['Prefer'] = 'return=representation';
-			}
-			if ( ! empty( $extra_headers ) ) {
-				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
-			}
-			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
-			$ok   = $res['ok'] ?? false;
-			$code = $res['code'] ?? 0;
-			$data = $res['data'] ?? null;
-
-			if ( ! $ok ) {
-				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
-				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
-			}
-
-			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
-		}
-
-		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
-	}
 
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
@@ -389,153 +342,97 @@ class NW_Abilities_Admin {
 						<option value="1">Active only</option>
 						<option value="0">Inactive only</option>
 					</select>
-					<input type="text" id="nw-search" class="nw-search-input" placeholder="Search UUID, name or title&hellip;">
-					<button class="nw-btn nw-btn-ghost" id="nw-refresh-btn">&#8635; Refresh</button>
-					<button class="nw-btn nw-btn-primary" id="nw-add-btn">+ New Ability</button>
+					<input type="text" id="nw-search" class="nw-search-input" placeholder="Search UUID, name or tag…" />
+					<button id="nw-add-ability" class="button button-primary nw-btn-add">
+						<i data-lucide="plus"></i> Add Ability
+					</button>
 				</div>
 			</div>
-
-			<div id="nw-notice" class="nw-notice" style="display:none;"></div>
-
-			<div class="nw-stats-bar">
-				<span class="nw-stat-pill">Total: <strong id="nw-total">&mdash;</strong></span>
-				<span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">&mdash;</strong></span>
-				<span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">&mdash;</strong></span>
-				<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
-					<span class="nw-stat-pill"><?php echo esc_html( ucfirst( $t ) ); ?>: <strong id="nw-count-<?php echo esc_attr( $t ); ?>">&mdash;</strong></span>
-				<?php endforeach; ?>
-			</div>
-
-			<div class="nw-table-wrap">
-				<table class="nw-table">
-					<thead><tr>
-						<th>UUID / Name</th>
-						<th>Type</th>
-						<th>Cost</th>
-						<th>Target</th>
-						<th>Range</th>
-						<th>Duration</th>
-						<th>Passive</th>
-						<th>Active</th>
-						<th>Actions</th>
-					</tr></thead>
-					<tbody id="nw-abilities-tbody">
-						<tr><td colspan="9" style="text-align:center;padding:32px;color:#555;"><div class="nw-spinner"></div> Loading&hellip;</td></tr>
-					</tbody>
-				</table>
-			</div>
-
-			<div class="nw-modal-overlay" id="nw-modal-overlay" style="display:none;">
-				<div class="nw-modal">
+			<div id="nw-abilities-list" class="nw-items-grid"></div>
+			<div id="nw-ability-modal" class="nw-modal" style="display:none;">
+				<div class="nw-modal-backdrop"></div>
+				<div class="nw-modal-box">
 					<div class="nw-modal-header">
-						<h2 id="nw-modal-title">Edit Ability</h2>
-						<button class="nw-modal-close" id="nw-modal-close" type="button">&#x2715;</button>
+						<h2 class="nw-modal-title" id="nw-modal-title">Add Ability</h2>
+						<button class="nw-modal-close" id="nw-modal-close"><i data-lucide="x"></i></button>
 					</div>
-					<div class="nw-modal-body">
-						<form id="nw-ability-form">
-							<input type="hidden" id="nw-field-id" name="id">
-
-							<div class="nw-section-label">Identity</div>
-							<div class="nw-form-grid">
-								<div class="nw-field">
-									<label>Name / slug <span class="nw-req">*</span></label>
-									<input type="text" id="nw-field-name" name="name" required placeholder="e.g. fireball">
-								</div>
-								<div class="nw-field nw-field-full">
-									<label>Description</label>
-									<textarea id="nw-field-description" name="description" rows="3" placeholder="Ability description&hellip;"></textarea>
-								</div>
-								<div class="nw-field nw-field-full">
-									<label>Image URL <span class="nw-hint">(optional)</span></label>
-									<div class="nw-img-url-wrap">
-										<input type="url" id="nw-field-img_url" name="img_url" placeholder="https://&hellip;" class="nw-img-url-input">
-										<div class="nw-img-preview" id="nw-img-preview" style="display:none;">
-											<img id="nw-img-preview-img" src="" alt="Preview" style="max-height:80px;border-radius:4px;margin-top:6px;">
-										</div>
-									</div>
-								</div>
-								<div class="nw-field nw-field-full">
-									<label>Tags <span class="nw-hint">(comma-separated slugs)</span></label>
-									<input type="text" id="nw-field-tags" name="tags" placeholder="e.g. fire,aoe,damage">
-								</div>
-								<div class="nw-field">
-									<label>Source</label>
-									<input type="text" id="nw-field-source" name="source" placeholder="e.g. Core Rulebook">
-								</div>
-								<div class="nw-field nw-field-full">
-									<label>GM Notes <span class="nw-hint">(not visible to players)</span></label>
-									<textarea id="nw-field-gm_notes" name="gm_notes" rows="2" placeholder="Internal notes&hellip;"></textarea>
-								</div>
+					<form id="nw-ability-form" class="nw-form">
+						<input type="hidden" id="ability-id" name="id" />
+						<div class="nw-form-row">
+							<label for="ability-name">Name *</label>
+							<input type="text" id="ability-name" name="name" required />
+						</div>
+						<div class="nw-form-row">
+							<label for="ability-description">Description</label>
+							<textarea id="ability-description" name="description" rows="3"></textarea>
+						</div>
+						<div class="nw-form-row nw-form-row--half">
+							<div>
+								<label for="ability-type">Ability Type</label>
+								<select id="ability-type" name="ability_type">
+									<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
+										<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
+									<?php endforeach; ?>
+								</select>
 							</div>
-
-							<div class="nw-section-label">Mechanics</div>
-							<div class="nw-form-grid">
-								<div class="nw-field">
-									<label>Ability Type <span class="nw-req">*</span></label>
-									<select id="nw-field-ability_type" name="ability_type" class="nw-select">
-										<?php foreach ( self::ABILITY_TYPES as $t ) : ?>
-											<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</div>
-								<div class="nw-field">
-									<label>Cost Type</label>
-									<select id="nw-field-cost_type" name="cost_type" class="nw-select">
-										<?php foreach ( self::COST_TYPES as $c ) : ?>
-											<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</div>
-								<div class="nw-field">
-									<label>Cost Value</label>
-									<input type="number" id="nw-field-cost_value" name="cost_value" min="0" value="0">
-								</div>
-								<div class="nw-field">
-									<label>Target Type</label>
-									<select id="nw-field-target_type" name="target_type" class="nw-select">
-										<?php foreach ( self::TARGET_TYPES as $tt ) : ?>
-											<option value="<?php echo esc_attr( $tt ); ?>"><?php echo esc_html( ucfirst( $tt ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</div>
-								<div class="nw-field">
-									<label>Range (tiles)</label>
-									<input type="number" id="nw-field-range_tiles" name="range_tiles" min="0" value="1">
-								</div>
-								<div class="nw-field">
-									<label>Duration (turns)</label>
-									<input type="number" id="nw-field-duration_turns" name="duration_turns" min="0" value="0">
-								</div>
+							<div>
+								<label for="ability-target">Target Type</label>
+								<select id="ability-target" name="target_type">
+									<?php foreach ( self::TARGET_TYPES as $t ) : ?>
+										<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
+									<?php endforeach; ?>
+								</select>
 							</div>
-
-							<div class="nw-section-label">Status</div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-toggles">
-									<div class="nw-toggle-row">
-										<label class="nw-toggle-label">
-											<span class="nw-toggle">
-												<input type="checkbox" id="nw-field-is_passive" name="is_passive">
-												<span class="nw-toggle-slider nw-toggle-orange"></span>
-											</span>
-											<span>Passive ability</span>
-										</label>
-										<label class="nw-toggle-label">
-											<span class="nw-toggle">
-												<input type="checkbox" id="nw-field-is_active" name="is_active" checked>
-												<span class="nw-toggle-slider"></span>
-											</span>
-											<span>Active (available in game)</span>
-										</label>
-									</div>
-								</div>
+						</div>
+						<div class="nw-form-row nw-form-row--half">
+							<div>
+								<label for="ability-cost-type">Cost Type</label>
+								<select id="ability-cost-type" name="cost_type">
+									<?php foreach ( self::COST_TYPES as $t ) : ?>
+										<option value="<?php echo esc_attr( $t ); ?>"><?php echo esc_html( ucfirst( $t ) ); ?></option>
+									<?php endforeach; ?>
+								</select>
 							</div>
-						</form>
-					</div>
-					<div class="nw-modal-footer">
-						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" type="button" style="display:none;margin-right:auto;">&#128465; Delete</button>
-						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn" type="button">Cancel</button>
-						<button class="nw-btn nw-btn-primary" id="nw-save-btn" type="button"><span id="nw-save-label">Save Ability</span></button>
-					</div>
+							<div>
+								<label for="ability-cost-value">Cost Value</label>
+								<input type="number" id="ability-cost-value" name="cost_value" min="0" value="0" />
+							</div>
+						</div>
+						<div class="nw-form-row nw-form-row--half">
+							<div>
+								<label for="ability-range">Range (tiles)</label>
+								<input type="number" id="ability-range" name="range_tiles" min="0" value="1" />
+							</div>
+							<div>
+								<label for="ability-duration">Duration (turns)</label>
+								<input type="number" id="ability-duration" name="duration_turns" min="0" value="0" />
+							</div>
+						</div>
+						<div class="nw-form-row">
+							<label for="ability-tags">Tags (comma-separated)</label>
+							<input type="text" id="ability-tags" name="tags" placeholder="fire, ranged, debuff" />
+						</div>
+						<div class="nw-form-row">
+							<label for="ability-img">Image URL</label>
+							<input type="url" id="ability-img" name="img_url" />
+						</div>
+						<div class="nw-form-row">
+							<label for="ability-source">Source</label>
+							<input type="text" id="ability-source" name="source" />
+						</div>
+						<div class="nw-form-row">
+							<label for="ability-gm-notes">GM Notes</label>
+							<textarea id="ability-gm-notes" name="gm_notes" rows="2"></textarea>
+						</div>
+						<div class="nw-form-row nw-form-row--checkboxes">
+							<label><input type="checkbox" name="is_passive" value="1" id="ability-is-passive" /> Passive</label>
+							<label><input type="checkbox" name="is_active" value="1" id="ability-is-active" checked /> Active</label>
+						</div>
+						<div class="nw-form-actions">
+							<button type="submit" class="button button-primary">Save</button>
+							<button type="button" class="button nw-modal-cancel">Cancel</button>
+						</div>
+					</form>
 				</div>
 			</div>
 		</div>
