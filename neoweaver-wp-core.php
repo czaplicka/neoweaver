@@ -32,16 +32,6 @@ final class NeoWeaver_Core {
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
 	}
 
-	// ── Chat handler — lazy boot ──────────────────────────────────
-	// Instancja tworzona TYLKO gdy faktycznie przychodzi żądanie AJAX.
-	// Dzięki temu admin, cron i REST nie płacą kosztu konstruktora.
-
-	public static function boot_chat_handler(): void {
-		if ( class_exists( 'NW_Chat_Handler' ) ) {
-			( new NW_Chat_Handler() )->handle();
-		}
-	}
-
 	// ── File loading ─────────────────────────────────────────────
 
 	private static function load_files(): void {
@@ -77,8 +67,6 @@ final class NeoWeaver_Core {
 			// Pozostałe core
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
-			'includes/ai-engine.php',
-			'includes/ai-context-builder.php',
 			'includes/assets.php',
 			'includes/char-panel.php',
 			'includes/checkout.php',
