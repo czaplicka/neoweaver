@@ -12,6 +12,7 @@
 		const libraryContainer = document.getElementById( 'library-deck' );
 		const warningBox       = document.getElementById( 'deck-warning' );
 		const saveBtn          = document.getElementById( 'save-deck-btn' );
+		const counterEl        = document.getElementById( 'active-deck-count' );
 
 		if ( ! activeContainer || ! libraryContainer || ! saveBtn ) return;
 
@@ -19,18 +20,18 @@
 		const MIN = cfg.limits?.minActive ?? 20;
 		const MAX = cfg.limits?.maxActive ?? 50;
 
-		// Karty już w bufferze (IN GAME) — liczymy je do limitu, ale nie ruszamy
-		function countInGame() {
-			return activeContainer.querySelectorAll( '.cyber-card[data-buffer-id]' ).length;
-		}
-
-		// Karty przeciągnięte z library do active (nowe, mają data-instance-id)
-		function countPending() {
-			return activeContainer.querySelectorAll( '.cyber-card[data-instance-id]' ).length;
-		}
-
 		function countActive() {
 			return activeContainer.querySelectorAll( '.cyber-card' ).length;
+		}
+
+		function updateCounter() {
+			const count = countActive();
+			if ( counterEl ) {
+				counterEl.textContent = count + '/' + MAX;
+				counterEl.style.color = ( count >= MIN && count <= MAX )
+					? 'var(--nw-accent)'
+					: 'var(--nw-danger)';
+			}
 		}
 
 		// ── Drag & drop ───────────────────────────────────────────────────────
@@ -39,11 +40,6 @@
 		root.addEventListener( 'dragstart', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			// Karty IN GAME (buffer) są read-only
-			if ( card.dataset.bufferId ) {
-				e.preventDefault();
-				return;
-			}
 			dragged = card;
 			setTimeout( () => card.classList.add( 'is-dragging' ), 0 );
 			e.dataTransfer.effectAllowed = 'move';
@@ -84,6 +80,7 @@
 				container.appendChild( dragged );
 				dragged.dataset.cardLocation = container === activeContainer ? 'active' : 'library';
 				updateEmptyNotes();
+				updateCounter();
 				validateDeck( false );
 			} );
 		} );
@@ -92,8 +89,6 @@
 		root.addEventListener( 'dblclick', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			// Buffer cards are read-only
-			if ( card.dataset.bufferId ) return;
 
 			const isInActive = card.parentElement === activeContainer;
 
@@ -110,6 +105,7 @@
 			}
 
 			updateEmptyNotes();
+			updateCounter();
 			validateDeck( false );
 		} );
 
@@ -117,50 +113,45 @@
 		saveBtn.addEventListener( 'click', function () {
 			if ( ! validateDeck( false ) ) return;
 
-			const characterId = root.dataset.characterId;
-
-			// Wysyłamy WSZYSTKIE instance-id z active (przeciągnięte z library)
-			// + buffer-id już w grze (żeby handler wiedział co zostawić)
-			const newActiveIds    = collectByAttr( activeContainer, 'data-instance-id' );
-			const existingBufIds  = collectByAttr( activeContainer, 'data-buffer-id' );
+			const characterId  = root.dataset.characterId;
+			const activeIds    = collectByAttr( activeContainer, 'data-instance-id' );
 
 			saveBtn.classList.add( 'is-saving' );
 			saveBtn.textContent = 'SYNCING...';
-			saveBtn.disabled = true;
+			saveBtn.disabled    = true;
 
 			fetch( cfg.ajaxUrl, {
 				method:      'POST',
 				credentials: 'same-origin',
 				headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: new URLSearchParams( {
-					action:           'tw_save_deck',
-					nonce:            cfg.nonce,
-					character_id:     characterId,
-					active:           newActiveIds.join( ',' ),
-					keep_buffer_ids:  existingBufIds.join( ',' ),
+					action:       'tw_save_deck',
+					nonce:        cfg.nonce,
+					character_id: characterId,
+					active:       activeIds.join( ',' ),
 				} ),
 			} )
-				.then( r => r.json() )
-				.then( function ( data ) {
-					if ( data.success ) {
-						showSuccess( 'SYNCED ✓' );
-						setTimeout( () => {
-							saveBtn.textContent = 'SYNC WITH TERMINAL';
-							hideWarning();
-						}, 2500 );
-					} else {
-						showWarning( data.data || 'Sync failed. Try again.' );
+			.then( r => r.json() )
+			.then( function ( data ) {
+				if ( data.success ) {
+					showSuccess( 'SYNCED ✓' );
+					setTimeout( () => {
 						saveBtn.textContent = 'SYNC WITH TERMINAL';
-					}
-				} )
-				.catch( function () {
-					showWarning( 'Connection error. Try again.' );
+						hideWarning();
+					}, 2500 );
+				} else {
+					showWarning( data.data || 'Sync failed. Try again.' );
 					saveBtn.textContent = 'SYNC WITH TERMINAL';
-				} )
-				.finally( function () {
-					saveBtn.classList.remove( 'is-saving' );
-					saveBtn.disabled = false;
-				} );
+				}
+			} )
+			.catch( function () {
+				showWarning( 'Connection error. Try again.' );
+				saveBtn.textContent = 'SYNC WITH TERMINAL';
+			} )
+			.finally( function () {
+				saveBtn.classList.remove( 'is-saving' );
+				saveBtn.disabled = false;
+			} );
 		} );
 
 		// ── Helpers ───────────────────────────────────────────────────────────
@@ -212,12 +203,12 @@
 
 		function updateNote( container, text ) {
 			const hasCards = container.querySelector( '.cyber-card' );
-			let note = container.querySelector( '.deck-empty-note' );
+			let note       = container.querySelector( '.deck-empty-note' );
 			if ( hasCards ) {
 				if ( note ) note.remove();
 			} else {
 				if ( ! note ) {
-					note = document.createElement( 'p' );
+					note           = document.createElement( 'p' );
 					note.className = 'deck-empty-note';
 					note.textContent = text;
 					container.appendChild( note );
@@ -225,6 +216,8 @@
 			}
 		}
 
+		updateCounter();
 		validateDeck( true );
 	}
+
 } )();
