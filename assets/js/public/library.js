@@ -2,7 +2,6 @@
 ( function () {
 	'use strict';
 
-	// ── Wait for DOM ──────────────────────────────────────────────────────────
 	document.addEventListener( 'DOMContentLoaded', initDeckBuilder );
 
 	function initDeckBuilder() {
@@ -17,8 +16,8 @@
 		if ( ! activeContainer || ! libraryContainer || ! saveBtn ) return;
 
 		const cfg = ( typeof nwDeckConfig !== 'undefined' ) ? nwDeckConfig : {};
-		const MIN = ( cfg.limits && cfg.limits.minActive ) ? cfg.limits.minActive : 20;
-		const MAX = ( cfg.limits && cfg.limits.maxActive ) ? cfg.limits.maxActive : 50;
+		const MIN = cfg.limits?.minActive ?? 20;
+		const MAX = cfg.limits?.maxActive ?? 50;
 
 		// ── Drag & drop ───────────────────────────────────────────────────────
 		let dragged = null;
@@ -26,8 +25,7 @@
 		root.addEventListener( 'dragstart', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			// Block dragging IN-GAME cards (they're read-only in this view)
-			if ( card.dataset.cardLocation === 'active' ) {
+			if ( card.dataset.cardLocation === 'ingame' ) {
 				e.preventDefault();
 				return;
 			}
@@ -59,9 +57,8 @@
 				e.preventDefault();
 				container.classList.remove( 'drag-over' );
 				if ( ! dragged ) return;
-				if ( dragged.parentElement === container ) return; // already here
+				if ( dragged.parentElement === container ) return;
 
-				// Enforce MAX when moving to active
 				if ( container === activeContainer ) {
 					const count = activeContainer.querySelectorAll( '.cyber-card' ).length;
 					if ( count >= MAX ) {
@@ -70,11 +67,10 @@
 					}
 				}
 
-				// Move card
 				container.appendChild( dragged );
 				dragged.dataset.cardLocation = container === activeContainer ? 'active' : 'library';
 				updateEmptyNotes();
-				validateDeck();
+				validateDeck( false );
 			} );
 		} );
 
@@ -82,12 +78,11 @@
 		root.addEventListener( 'dblclick', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			if ( card.dataset.cardLocation === 'active' ) return; // no moving in-game cards
+			if ( card.dataset.cardLocation === 'ingame' ) return;
 
 			const isInActive = card.parentElement === activeContainer;
 
 			if ( ! isInActive ) {
-				// Library → Active: check MAX
 				const count = activeContainer.querySelectorAll( '.cyber-card' ).length;
 				if ( count >= MAX ) {
 					showWarning( 'Active deck is full (' + MAX + ' cards max).' );
@@ -101,37 +96,35 @@
 			}
 
 			updateEmptyNotes();
-			validateDeck();
+			validateDeck( false );
 		} );
 
 		// ── Save ──────────────────────────────────────────────────────────────
 		saveBtn.addEventListener( 'click', function () {
-			if ( ! validateDeck( true ) ) return;
+			if ( ! validateDeck( false ) ) return;
 
 			const characterId = root.dataset.characterId;
-
-			// Collect only library-section cards (IN GAME cards are not moved via this UI)
-			const activeIds  = collectIds( activeContainer );
-			const libraryIds = collectIds( libraryContainer );
+			const activeIds   = collectIds( activeContainer );
 
 			saveBtn.classList.add( 'is-saving' );
 			saveBtn.textContent = 'SYNCING...';
+			saveBtn.disabled = true;
 
 			fetch( cfg.ajaxUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				method:      'POST',
+				credentials: 'same-origin',
+				headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: new URLSearchParams( {
-					action:       'nw_save_deck',
+					action:       'tw_save_deck',
 					nonce:        cfg.nonce,
 					character_id: characterId,
-					active_ids:   JSON.stringify( activeIds ),
-					library_ids:  JSON.stringify( libraryIds ),
+					active:       activeIds.join( ',' ),
 				} ),
 			} )
 				.then( r => r.json() )
 				.then( function ( data ) {
 					if ( data.success ) {
-						saveBtn.textContent = 'SYNCED ✓';
+						showSuccess( 'SYNCED ✓' );
 						setTimeout( () => ( saveBtn.textContent = 'SYNC WITH TERMINAL' ), 2500 );
 						hideWarning();
 					} else {
@@ -145,6 +138,7 @@
 				} )
 				.finally( function () {
 					saveBtn.classList.remove( 'is-saving' );
+					saveBtn.disabled = false;
 				} );
 		} );
 
@@ -174,16 +168,24 @@
 		}
 
 		function showWarning( msg ) {
+			warningBox.style.color = '#ff4444';
+			warningBox.textContent = msg;
+			warningBox.classList.add( 'is-visible' );
+		}
+
+		function showSuccess( msg ) {
+			warningBox.style.color = '#adff00';
 			warningBox.textContent = msg;
 			warningBox.classList.add( 'is-visible' );
 		}
 
 		function hideWarning() {
 			warningBox.classList.remove( 'is-visible' );
+			warningBox.textContent = '';
 		}
 
 		function updateEmptyNotes() {
-			updateNote( activeContainer, 'No cards in active play.' );
+			updateNote( activeContainer, 'No cards in active deck.' );
 			updateNote( libraryContainer, 'Library is empty.' );
 		}
 
@@ -202,7 +204,6 @@
 			}
 		}
 
-		// Initial validation (disable save if deck too small on load)
-		validateDeck( false );
+		validateDeck( true );
 	}
 } )();
