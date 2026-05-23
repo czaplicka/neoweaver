@@ -71,14 +71,14 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		// 5. Zapis do cyber_chat_messages (service key przez tw_rest_ai_supa_post)
 		tw_rest_ai_supa_post( 'cyber_chat_messages', [
 			'channel_id'   => $channel_id,
-			'player_id'    => $char_id,
+			'char_id'    => $char_id,
 			'message_type' => 'player',
 			'content'      => $message,
 			'meta'         => wp_json_encode( [ 'protocol' => $protocol ] ),
 		] );
 		tw_rest_ai_supa_post( 'cyber_chat_messages', [
 			'channel_id'   => $channel_id,
-			'player_id'    => $char_id,
+			'char_id'    => $char_id,
 			'message_type' => 'gm',
 			'content'      => $gm_text,
 			'meta'         => wp_json_encode( [ 'protocol' => $protocol, 'tags' => $gm_tags ] ),
