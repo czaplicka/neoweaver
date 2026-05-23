@@ -30,19 +30,79 @@ final class NeoWeaver_Core {
 		add_action( 'plugins_loaded', [ __CLASS__, 'load_admin_files' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
+
+		// ✅ POPRAWKA 1: Chat handler tylko kiedy potrzebny
+		add_action( 'wp_ajax_nw_chat_message',        [ __CLASS__, 'boot_chat_handler' ] );
+		add_action( 'wp_ajax_nopriv_nw_chat_message', [ __CLASS__, 'boot_chat_handler' ] );
+	}
+
+	// ── Chat handler — lazy boot ──────────────────────────────────
+	// Instancja tworzona TYLKO gdy faktycznie przychodzi żądanie AJAX.
+	// Dzięki temu admin, cron i REST nie płacą kosztu konstruktora.
+
+	public static function boot_chat_handler(): void {
+		if ( class_exists( 'NW_Chat_Handler' ) ) {
+			( new NW_Chat_Handler() )->handle();
+		}
 	}
 
 	// ── File loading ─────────────────────────────────────────────
 
 	private static function load_files(): void {
-		$files = [
-			// includes
+
+		// ✅ OPTYMALIZACJA: pliki pogrupowane według tego, kiedy są potrzebne
+		$always = [
+			// Supabase — musi być pierwsza, reszta zależy
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 			'includes/supabase-auth.php',
 			'includes/supabase-global.php',
 
+			// AI engine — nowy, zunifikowany stack
+			'includes/ai/class-neoweaver-claude-client.php',
+			'includes/ai/class-neoweaver-intent-router.php',
+			'includes/ai/class-neoweaver-context-builder.php',
+			'includes/ai/class-neoweaver-claude-engine.php',
+
+			// REST + AJAX — rejestrują hooki, muszą być wcześnie
+			'includes/rest-ai-chat.php',
+			'includes/api-endpoints.php',
+			'includes/api-endpoints-character-data.php',
+
+			// Klasy game-core
+			'includes/classes/class-supabase.php',
+			'includes/classes/class-loader.php',
+			'includes/classes/class-agents-repository.php',
+			'includes/classes/class-agents-list.php',
+			'includes/classes/class-deployments-creator.php',
+			'includes/classes/class-nodes-creator.php',
+			'includes/classes/class-memory-parser.php',
+
+			// ✅ POPRAWKA 2: chat-handler ładowany, ale NIE instancjonowany tutaj
+			'includes/classes/class-chat-claude.php',
+			'includes/classes/class-chat-handler.php',
+
+			// Pozostałe core
+			'includes/trait-transient-cache.php',
+			'includes/adventure-data.php',
+			'includes/ai-engine.php',
+			'includes/ai-context-builder.php',
 			'includes/assets.php',
+			'includes/char-panel.php',
+			'includes/checkout.php',
+			'includes/deck-core.php',
+			'includes/game-data.php',
+			'includes/head-injection.php',
+			'includes/inventory-system.php',
+			'includes/lexicon-shortcodes.php',
+			'includes/quest-helpers.php',
+			'includes/quick-actions.php',
+			'includes/scenarios-loader.php',
+			'includes/shortcodes-tags.php',
+		];
+
+		// ✅ OPTYMALIZACJA: assety i shortcody tylko na frontendzie
+		$frontend_only = [
 			'includes/assets/vendors.php',
 			'includes/assets/adventure.php',
 			'includes/assets/agents-list.php',
@@ -82,26 +142,7 @@ final class NeoWeaver_Core {
 			'includes/assets/world-creator.php',
 			'includes/assets/world-news.php',
 
-			'includes/trait-transient-cache.php',
-			'includes/adventure-data.php',
-			'includes/ai-engine.php',
-			'includes/ai-context-builder.php',
-			'includes/api-endpoints-character-data.php',
-			'includes/api-endpoints.php',
-			'includes/char-panel.php',
-			'includes/checkout.php',
-			'includes/deck-core.php',
-			'includes/game-data.php',
-			'includes/head-injection.php',
-			'includes/inventory-system.php',
-			'includes/lexicon-shortcodes.php',
-			'includes/rest-ai-chat.php',
-			'includes/quest-helpers.php',
-			'includes/quick-actions.php',
-			'includes/scenarios-loader.php',
-			'includes/shortcodes-tags.php',
-
-			// includes/ajax
+			// AJAX handlers
 			'includes/ajax/buffer.php',
 			'includes/ajax/chat-gm.php',
 			'includes/ajax/deck-scenarios.php',
@@ -118,27 +159,10 @@ final class NeoWeaver_Core {
 			'includes/ajax/update-vehicle-module.php',
 			'includes/ajax/world-news.php',
 
-			// includes/classes
-			'includes/classes/class-supabase.php',
-			'includes/classes/class-loader.php',
-			'includes/classes/class-agents-repository.php',
-			'includes/classes/class-agents-list.php',
-			'includes/classes/class-deployments-creator.php',
-			'includes/classes/class-nodes-creator.php',
-			'includes/classes/class-memory-parser.php',
-			'includes/classes/class-chat-claude.php',
-			'includes/classes/class-chat-handler.php',
-
-			// includes/ai
-			'includes/ai/class-neoweaver-claude-client.php',
-			'includes/ai/class-neoweaver-intent-router.php',
-			'includes/ai/class-neoweaver-context-builder.php',
-			'includes/ai/class-neoweaver-claude-engine.php',
-
-			// public
+			// Public
 			'public/class-public.php',
 
-			// public/shortcodes
+			// Shortcodes
 			'public/shortcodes/achievements.php',
 			'public/shortcodes/adventure-terminal.php',
 			'public/shortcodes/agents-list.php',
@@ -176,54 +200,52 @@ final class NeoWeaver_Core {
 			'public/shortcodes/world-news.php',
 		];
 
-		foreach ( $files as $file ) {
+		foreach ( $always as $file ) {
 			$path = NEOWEAVER_PLUGIN_DIR . $file;
 			if ( file_exists( $path ) ) {
 				require_once $path;
 			}
 		}
+
+		// ✅ Shortcody i assety ładowane tylko na frontendzie + AJAX
+		if ( ! is_admin() || wp_doing_ajax() ) {
+			foreach ( $frontend_only as $file ) {
+				$path = NEOWEAVER_PLUGIN_DIR . $file;
+				if ( file_exists( $path ) ) {
+					require_once $path;
+				}
+			}
+		}
 	}
 
-	/**
-	 * Load and instantiate admin classes.
-	 * Files are loaded here (inside plugins_loaded) so Supabase helpers
-	 * are guaranteed to exist before any admin constructor runs.
-	 * Classes must NOT have their own add_action('plugins_loaded') at the bottom.
-	 */
+	// ── Admin files ───────────────────────────────────────────────
+
 	public static function load_admin_files(): void {
 		if ( ! is_admin() ) {
 			return;
 		}
 
-		$root = NW_PLUGIN_DIR . 'admin/admin.php';
-		if ( file_exists( $root ) ) {
-			require_once $root;
-		}
-
-		$bootstrap = NW_PLUGIN_DIR . 'admin/class-admin.php';
-		if ( file_exists( $bootstrap ) ) {
-			require_once $bootstrap;
+		foreach ( [ 'admin/admin.php', 'admin/class-admin.php' ] as $f ) {
+			$path = NW_PLUGIN_DIR . $f;
+			if ( file_exists( $path ) ) require_once $path;
 		}
 	}
 
-	// ── Page templates ──────────────────────────────────────────
+	// ── Page templates ────────────────────────────────────────────
 
 	public static function register_page_templates(): void {
 		add_filter( 'theme_page_templates', [ __CLASS__, 'filter_page_templates' ] );
-		add_filter( 'template_include', [ __CLASS__, 'include_plugin_template' ] );
+		add_filter( 'template_include',     [ __CLASS__, 'include_plugin_template' ] );
 	}
 
 	public static function filter_page_templates( array $templates ): array {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
 		$templates['templates/adventure.php']                = __( 'NeoWeaver Adventure', 'neoweaver' );
-
 		return $templates;
 	}
 
 	public static function include_plugin_template( string $template ): string {
-		if ( ! is_page() ) {
-			return $template;
-		}
+		if ( ! is_page() ) return $template;
 
 		$slug = get_page_template_slug( get_queried_object_id() );
 		$map  = [
@@ -231,25 +253,23 @@ final class NeoWeaver_Core {
 			'templates/adventure.php'                => NEOWEAVER_PLUGIN_DIR . 'templates/adventure.php',
 		];
 
-		if ( isset( $map[ $slug ] ) && file_exists( $map[ $slug ] ) ) {
-			return $map[ $slug ];
-		}
-
-		return $template;
+		return ( isset( $map[ $slug ] ) && file_exists( $map[ $slug ] ) )
+			? $map[ $slug ]
+			: $template;
 	}
 
-	// ── Game class bootstrap ───────────────────────────────────────
+	// ── Game class bootstrap ──────────────────────────────────────
 
 	public static function bootstrap_game_classes(): void {
-		$repo                = new Neoweaver_Agents_Repository();
-		$list                = new Neoweaver_Agents_List( $repo );
-		$deployments_creator = new Neoweaver_Deployments_Creator();
-		$nodes_creator       = new Neoweaver_Nodes_Creator();
+		$repo = new Neoweaver_Agents_Repository();
+		$list = new Neoweaver_Agents_List( $repo );
 
-		new Neoweaver_Public( $list, $deployments_creator, $nodes_creator );
+		new Neoweaver_Public(
+			$list,
+			new Neoweaver_Deployments_Creator(),
+			new Neoweaver_Nodes_Creator()
+		);
 	}
 }
+
 NeoWeaver_Core::init();
-if ( class_exists( 'NW_Chat_Handler' ) ) {
-	new NW_Chat_Handler();
-}
