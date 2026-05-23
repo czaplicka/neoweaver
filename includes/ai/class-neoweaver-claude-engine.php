@@ -111,68 +111,77 @@ PROMPT;
     // ============================================================
     public function process_with_context( array $context, array $history, string $message ): array {
 
-        $protocol        = $context['protocol'] ?? 'NARRATE';
-        $extra           = $context['extra']    ?? '';
-        $char            = $context['char']     ?? [];
-        $location        = $context['location'] ?? [];
-        $world           = $context['world']    ?? [];
-        $world_id        = $world['id']         ?? null;
-        $char_id         = $char['id']          ?? '';
+    $protocol = $context['protocol'] ?? 'NARRATE';
+    $extra    = $context['extra']    ?? '';
+    $char     = $context['char']     ?? [];
+    $location = $context['location'] ?? [];
+    $world    = $context['world']    ?? [];
+    $world_id = $world['id']         ?? null;
 
-        // Zbuduj blok kontekstu gry z gotówych danych
-        $dynamic_context = $this->build_context_block( $char, $location, $world, $extra );
-
-        // Dopiń aktualną wiadomość gracza na koniec historii
-        $history[] = [
-            'role'    => 'user',
-            'content' => "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}",
-        ];
-
-        $result = NeoWeaver_Claude_Client::call(
-            self::SYSTEM_INSTRUCTIONS,
-            $history,
-            NEOWEAVER_MODEL_GM,
-            NEOWEAVER_TOKENS_GM,
-            0.85
-        );
-
-        if ( is_wp_error( $result ) ) {
-            return [ 'error' => $result->get_error_message() ];
-        }
-
-        // Loguj tokeny (zapis historii leży po stronie rest-ai-chat.php)
-        if ( $char_id ) {
-            $this->log_tokens( $char_id, $world_id, $result['usage'], $protocol );
-        }
-
-        $parsed = $this->parse_tags( $result['content'] );
-
-        return [
-            'text'   => $parsed['text'],
-            'tags'   => $parsed['tags'],
-            'tokens' => [
-                'prompt'     => $result['usage']['input_tokens']  ?? 0,
-                'completion' => $result['usage']['output_tokens'] ?? 0,
-            ],
-        ];
+    // ✅ POPRAWKA 1: guard — brak char_id = twardy błąd, nie cichy null
+    $char_id = trim( $char['id'] ?? '' );
+    if ( $char_id === '' ) {
+        error_log( '[NeoWeaver Engine] process_with_context called without char.id' );
+        return [ 'error' => 'Missing character ID — cannot process message.' ];
     }
+
+    $dynamic_context = $this->build_context_block( $char, $location, $world, $extra );
+
+    $history[] = [
+        'role'    => 'user',
+        'content' => "[GAME STATE]\n{$dynamic_context}\n\n[PLAYER]\n{$message}",
+    ];
+
+    $result = NeoWeaver_Claude_Client::call(
+        self::SYSTEM_INSTRUCTIONS,
+        $history,
+        NEOWEAVER_MODEL_GM,
+        NEOWEAVER_TOKENS_GM,
+        0.85
+    );
+
+    if ( is_wp_error( $result ) ) {
+        return [ 'error' => $result->get_error_message() ];
+    }
+
+    $this->log_tokens( $char_id, $world_id, $result['usage'], $protocol );
+
+    $parsed = $this->parse_tags( $result['content'] );
+
+    return [
+        'text'   => $parsed['text'],
+        'tags'   => $parsed['tags'],
+        'tokens' => [
+            'prompt'     => $result['usage']['input_tokens']  ?? 0,
+            'completion' => $result['usage']['output_tokens'] ?? 0,
+        ],
+    ];
+}
 
     // ============================================================
     // Buduje blok kontekstu gry z tablic danych (dla process_with_context)
     // ============================================================
     private function build_context_block( array $char, array $location, array $world, string $extra ): string {
-        $lines = [];
+    $lines = [];
 
-        if ( ! empty( $char['name'] ) )     { $lines[] = 'CHAR: '     . $char['name']; }
-        if ( ! empty( $char['hp'] ) )       { $lines[] = 'HP: '       . $char['hp']; }
-        if ( ! empty( $char['gold'] ) )     { $lines[] = 'GOLD: '     . $char['gold']; }
-        if ( ! empty( $location['name'] ) ) { $lines[] = 'LOCATION: ' . $location['name']; }
-        if ( ! empty( $location['desc'] ) ) { $lines[] = 'LOC_DESC: ' . $location['desc']; }
-        if ( ! empty( $world['name'] ) )    { $lines[] = 'WORLD: '    . $world['name']; }
-        if ( $extra !== '' )                { $lines[] = $extra; }
+    // ✅ POPRAWKA 2: poprawne klucze — zgodne z cyber_characters i cyber_world_map
+    if ( ! empty( $char['name'] ) )             { $lines[] = 'CHAR: '       . $char['name']; }
+    if ( isset( $char['currenthp'] ) )          { $lines[] = 'HP: '         . $char['currenthp'] . '/' . ( $char['maxhp'] ?? '?' ); }
+    if ( isset( $char['gold'] ) )               { $lines[] = 'GOLD: '       . $char['gold']; }
+    if ( isset( $char['satiety'] ) )            { $lines[] = 'SATIETY: '    . $char['satiety']; }
+    if ( isset( $char['mp'] ) )                 { $lines[] = 'MP: '         . $char['mp']; }
+    if ( ! empty( $char['echo_tags'] ) )        { $lines[] = 'ECHO_TAGS: '  . ( is_array( $char['echo_tags'] ) ? implode( ',', $char['echo_tags'] ) : $char['echo_tags'] ); }
+    if ( ! empty( $location['locationname'] ) ) { $lines[] = 'LOCATION: '   . $location['locationname']; }
+    if ( ! empty( $location['aiprompt'] ) )     { $lines[] = 'LOC_DESC: '   . $location['aiprompt']; }
+    if ( ! empty( $location['instancetags'] ) ) { $lines[] = 'LOC_TAGS: '   . ( is_array( $location['instancetags'] ) ? implode( ',', $location['instancetags'] ) : $location['instancetags'] ); }
+    if ( isset( $location['threatlevel'] ) )    { $lines[] = 'THREAT: '     . $location['threatlevel']; }
+    if ( ! empty( $world['worldname'] ) )       { $lines[] = 'WORLD: '      . $world['worldname']; }
+    if ( isset( $world['entropy'] ) )           { $lines[] = 'ENTROPY: '    . $world['entropy']; }
+    if ( ! empty( $world['archetype'] ) )       { $lines[] = 'ARCHETYPE: '  . $world['archetype']; }
+    if ( $extra !== '' )                        { $lines[] = $extra; }
 
-        return implode( "\n", $lines );
-    }
+    return implode( "\n", $lines );
+}
 
     // ============================================================
     // Pomocniczy helper Supabase REST
