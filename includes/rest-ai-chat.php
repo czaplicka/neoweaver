@@ -6,21 +6,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * NEOWEAVER — REST Endpoint: /wp-json/neoweaver/v1/ai-chat
  *
- * Przyjmuje wiadomość gracza, wywołuje tw_ai_router() + tw_ai_gm(),
+ * Przyjmuje wiadomość gracza, wywołuje NeoWeaver_Claude_Engine,
  * zapisuje odpowiedź do Supabase i rozgłasza przez Supabase Realtime.
  *
  * Flow:
  *   POST /wp-json/neoweaver/v1/ai-chat
  *     → walidacja + pobranie kontekstu z Supabase
- *     → tw_ai_router()  — klasyfikacja (gpt-4o-mini)
- *     → tw_ai_gm()      — narracja + parser tagów (gpt-4o)
- *     → zapis wiadomości GM do cyber_chat_messages
- *     → SELECT realtime.send() — push do JS
+ *     → NeoWeaver_Intent_Router::classify() — klasyfikacja intencji
+ *     → NeoWeaver_Claude_Engine->process_with_context() — narracja + parser tagów
+ *     → zapis wiadomości gracza + GM do cyber_chat_messages
+ *     → tw_rest_ai_realtime_send() — push do JS przez Supabase Realtime
  *     → HTTP 202 Accepted (bez body, odpowiedź przez Realtime)
  *
  * Rejestracja: add_action( 'rest_api_init', 'tw_register_ai_chat_endpoint' );
- * Kompatybilność: PHP 7.4+
  */
+
+require_once __DIR__ . '/ai/class-neoweaver-claude-engine.php';
 
 if ( ! function_exists( 'tw_register_ai_chat_endpoint' ) ) {
 	function tw_register_ai_chat_endpoint() {
@@ -87,53 +88,50 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		}
 
 		// --------------------------------------------------------
-		// 2. Pobierz historię czatu (ostatnie 14 wiadomości)
+		// 2. Pobierz historię czatu (ostatnie 14 wiadomości) per channel_id
 		// --------------------------------------------------------
 
 		$history = tw_rest_ai_get_history( $channel_id );
 
 		// --------------------------------------------------------
-		// 3. Router — klasyfikacja intencji
+		// 3. Router — klasyfikacja intencji (NeoWeaver_Intent_Router)
 		// --------------------------------------------------------
 
-		if ( ! function_exists( 'tw_ai_router' ) ) {
-			return tw_rest_ai_broadcast_error( $session_id, 'tw_ai_router() niedostępne' );
-		}
-		$protocol            = tw_ai_router( $message );
+		$protocol            = NeoWeaver_Intent_Router::classify( $message );
 		$context['protocol'] = $protocol;
 
 		// Dane dodatkowe per protokół (TRAVEL, COMBAT, TRADE itp.)
 		$context['extra'] = tw_rest_ai_protocol_extra( $protocol, $char_id, $context );
 
 		// --------------------------------------------------------
-		// 4. GM Agent — narracja + parser tagów
+		// 4. GM Agent — NeoWeaver_Claude_Engine
 		// --------------------------------------------------------
 
-		if ( ! function_exists( 'tw_ai_gm' ) ) {
-			return tw_rest_ai_broadcast_error( $session_id, 'tw_ai_gm() niedostępne' );
-		}
+		$engine    = new NeoWeaver_Claude_Engine();
+		$gm_result = $engine->process_with_context( $context, $history, $message );
 
-		$ids = [
-			'char_id'     => $char_id,
-			'session_id'  => $session_id,
-			'campaign_id' => $campaign_id,
-			'channel_id'  => $channel_id,
-		];
-
-		$gm_result = tw_ai_gm( $context, $history, $message, $ids );
-
-		if ( is_wp_error( $gm_result ) ) {
-			return tw_rest_ai_broadcast_error( $session_id, $gm_result->get_error_message() );
+		if ( isset( $gm_result['error'] ) ) {
+			return tw_rest_ai_broadcast_error( $session_id, $gm_result['error'] );
 		}
 
 		$gm_text = $gm_result['text'];
 		$gm_tags = $gm_result['tags'];
 
 		// --------------------------------------------------------
-		// 5. Zapisz wiadomość GM do cyber_chat_messages
+		// 5. Zapisz wiadomości do cyber_chat_messages
+		//    (Engine nie zapisuje przy process_with_context — robimy to tutaj)
 		// --------------------------------------------------------
 
 		if ( function_exists( 'tw_supabase_insert' ) ) {
+			// Wiadomość gracza
+			tw_supabase_insert( 'cyber_chat_messages', [
+				'channel_id'   => $channel_id,
+				'player_id'    => $char_id,
+				'message_type' => 'player',
+				'content'      => $message,
+				'meta'         => wp_json_encode( [ 'protocol' => $protocol ] ),
+			] );
+			// Odpowiedź GM
 			tw_supabase_insert( 'cyber_chat_messages', [
 				'channel_id'   => $channel_id,
 				'player_id'    => $char_id,
@@ -245,7 +243,6 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			return [];
 		}
 
-		// Odwróć kolejność (najstarsze pierwsze) i zmapuj na format messages
 		$rows    = array_reverse( $rows );
 		$history = [];
 
@@ -292,14 +289,12 @@ if ( ! function_exists( 'tw_rest_ai_protocol_extra' ) ) {
 				break;
 
 			case 'COMBAT':
-				// TODO: pobierz aktywnego przeciwnika z cyber_combat_sessions
 				$extra = 'COMBAT_ACTIVE: true';
 				break;
 
 			case 'TRADE':
 				$gold  = isset( $char['gold'] ) ? (int) $char['gold'] : 0;
 				$extra = "PLAYER_GOLD: {$gold}";
-				// TODO: pobierz inventory NPC z cyber_npcs
 				break;
 
 			case 'REST':
@@ -391,9 +386,8 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					}
 					break;
 
-				// Pozostałe tagi (ITEM_GET, SESSION_END itp.) — TODO
 				default:
-					error_log( 'TW ai-chat: nieobsługiwany tag ' . $tag . ':' . $val );
+					error_log( 'NeoWeaver ai-chat: nieobsługiwany tag ' . $tag . ':' . $val );
 			}
 		}
 	}
@@ -404,17 +398,9 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 // ============================================================
 
 if ( ! function_exists( 'tw_rest_ai_realtime_send' ) ) {
-	/**
-	 * Wysyła wiadomość przez Supabase Realtime Broadcast.
-	 * Używa SQL realtime.send() przez tw_supabase_rpc().
-	 *
-	 * @param string $topic   Nazwa kanału, np. 'game:session-uuid'
-	 * @param string $event   Nazwa zdarzenia, np. 'gm_response'
-	 * @param array  $payload Dane do wysłania
-	 */
 	function tw_rest_ai_realtime_send( $topic, $event, $payload ) {
 		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
-			error_log( 'TW rest-ai-chat: tw_supabase_rpc() niedostępne — Realtime send pominięty' );
+			error_log( 'NeoWeaver rest-ai-chat: tw_supabase_rpc() niedostępne — Realtime send pominięty' );
 			return;
 		}
 
@@ -425,7 +411,7 @@ if ( ! function_exists( 'tw_rest_ai_realtime_send' ) ) {
 		] );
 
 		if ( is_wp_error( $result ) ) {
-			error_log( 'TW rest-ai-chat realtime_send error: ' . $result->get_error_message() );
+			error_log( 'NeoWeaver rest-ai-chat realtime_send error: ' . $result->get_error_message() );
 		}
 	}
 }
