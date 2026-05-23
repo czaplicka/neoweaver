@@ -210,34 +210,25 @@ PROMPT;
 	// The client already provides both aliases — using prompt/completion here.
 	// =========================================================
 
-	private function log_tokens( array $usage, array $ctx, string $protocol ): void {
-		if ( ! function_exists( 'tw_supabase_request' ) ) return;
+private function log_tokens( array $usage, array $ctx, string $protocol ): void {
+    if ( ! function_exists( 'tw_supabase_request' ) ) return;
 
-		$key = function_exists( 'tw_supabase_service_key' ) ? tw_supabase_service_key() : '';
-
-		tw_supabase_request(
-			'POST',
-			'cyber_token_ledger',
-			[],
-			[
-				'wp_user_id'        => $ctx['wp_user_id']  ?? null,
-				'char_id'           => $ctx['char_id']     ?? null,
-				'session_id'        => $ctx['session_id']  ?? null,
-				'campaign_id'       => $ctx['campaign_id'] ?? null,
-				'channel_id'        => $ctx['channel_id']  ?? null,
-				'protocol'          => $protocol,
-				'model'             => $this->model,
-				'prompt_tokens'     => $usage['prompt_tokens']     ?? 0,
-				'completion_tokens' => $usage['completion_tokens'] ?? 0,
-			],
-			[
-				'headers' => [
-					'apikey'        => $key,
-					'Authorization' => 'Bearer ' . $key,
-					'Content-Type'  => 'application/json',
-					'Prefer'        => 'return=minimal',
-				],
-			]
-		);
+    tw_supabase_request(
+        'POST',
+        'cyber_token_ledger',
+        [],  // query params (puste)
+        [    // body — tutaj był błąd, wcześniej szło do extra_args
+            'wp_user_id'        => $ctx['wp_user_id']  ?? null,
+            'char_id'           => $ctx['char_id']     ?? null,
+            'session_id'        => $ctx['session_id']  ?? null,
+            'campaign_id'       => $ctx['campaign_id'] ?? null,
+            'channel_id'        => $ctx['channel_id']  ?? null,
+            'protocol'          => $protocol,
+            'model'             => $this->model,
+            'prompt_tokens'     => $usage['prompt_tokens']     ?? 0,
+            'completion_tokens' => $usage['completion_tokens'] ?? 0,
+        ]
+        // extra_args: usunięte całkowicie — tw_supabase_request sam dodaje nagłówki auth
+    );
 	}
 }
