@@ -30,10 +30,6 @@ final class NeoWeaver_Core {
 		add_action( 'plugins_loaded', [ __CLASS__, 'load_admin_files' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
-
-		// ✅ POPRAWKA 1: Chat handler tylko kiedy potrzebny
-		add_action( 'wp_ajax_nw_chat_message',        [ __CLASS__, 'boot_chat_handler' ] );
-		add_action( 'wp_ajax_nopriv_nw_chat_message', [ __CLASS__, 'boot_chat_handler' ] );
 	}
 
 	// ── Chat handler — lazy boot ──────────────────────────────────
@@ -77,10 +73,6 @@ final class NeoWeaver_Core {
 			'includes/classes/class-deployments-creator.php',
 			'includes/classes/class-nodes-creator.php',
 			'includes/classes/class-memory-parser.php',
-
-			// ✅ POPRAWKA 2: chat-handler ładowany, ale NIE instancjonowany tutaj
-			'includes/classes/class-chat-claude.php',
-			'includes/classes/class-chat-handler.php',
 
 			// Pozostałe core
 			'includes/trait-transient-cache.php',
