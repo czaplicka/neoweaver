@@ -19,13 +19,28 @@
 		const MIN = cfg.limits?.minActive ?? 20;
 		const MAX = cfg.limits?.maxActive ?? 50;
 
+		// Karty już w bufferze (IN GAME) — liczymy je do limitu, ale nie ruszamy
+		function countInGame() {
+			return activeContainer.querySelectorAll( '.cyber-card[data-buffer-id]' ).length;
+		}
+
+		// Karty przeciągnięte z library do active (nowe, mają data-instance-id)
+		function countPending() {
+			return activeContainer.querySelectorAll( '.cyber-card[data-instance-id]' ).length;
+		}
+
+		function countActive() {
+			return activeContainer.querySelectorAll( '.cyber-card' ).length;
+		}
+
 		// ── Drag & drop ───────────────────────────────────────────────────────
 		let dragged = null;
 
 		root.addEventListener( 'dragstart', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			if ( card.dataset.cardLocation === 'ingame' ) {
+			// Karty IN GAME (buffer) są read-only
+			if ( card.dataset.bufferId ) {
 				e.preventDefault();
 				return;
 			}
@@ -60,8 +75,7 @@
 				if ( dragged.parentElement === container ) return;
 
 				if ( container === activeContainer ) {
-					const count = activeContainer.querySelectorAll( '.cyber-card' ).length;
-					if ( count >= MAX ) {
+					if ( countActive() >= MAX ) {
 						showWarning( 'Active deck is full (' + MAX + ' cards max).' );
 						return;
 					}
@@ -78,13 +92,13 @@
 		root.addEventListener( 'dblclick', function ( e ) {
 			const card = e.target.closest( '.cyber-card' );
 			if ( ! card ) return;
-			if ( card.dataset.cardLocation === 'ingame' ) return;
+			// Buffer cards are read-only
+			if ( card.dataset.bufferId ) return;
 
 			const isInActive = card.parentElement === activeContainer;
 
 			if ( ! isInActive ) {
-				const count = activeContainer.querySelectorAll( '.cyber-card' ).length;
-				if ( count >= MAX ) {
+				if ( countActive() >= MAX ) {
 					showWarning( 'Active deck is full (' + MAX + ' cards max).' );
 					return;
 				}
@@ -104,7 +118,11 @@
 			if ( ! validateDeck( false ) ) return;
 
 			const characterId = root.dataset.characterId;
-			const activeIds   = collectIds( activeContainer );
+
+			// Wysyłamy WSZYSTKIE instance-id z active (przeciągnięte z library)
+			// + buffer-id już w grze (żeby handler wiedział co zostawić)
+			const newActiveIds    = collectByAttr( activeContainer, 'data-instance-id' );
+			const existingBufIds  = collectByAttr( activeContainer, 'data-buffer-id' );
 
 			saveBtn.classList.add( 'is-saving' );
 			saveBtn.textContent = 'SYNCING...';
@@ -115,18 +133,21 @@
 				credentials: 'same-origin',
 				headers:     { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: new URLSearchParams( {
-					action:       'tw_save_deck',
-					nonce:        cfg.nonce,
-					character_id: characterId,
-					active:       activeIds.join( ',' ),
+					action:           'tw_save_deck',
+					nonce:            cfg.nonce,
+					character_id:     characterId,
+					active:           newActiveIds.join( ',' ),
+					keep_buffer_ids:  existingBufIds.join( ',' ),
 				} ),
 			} )
 				.then( r => r.json() )
 				.then( function ( data ) {
 					if ( data.success ) {
 						showSuccess( 'SYNCED ✓' );
-						setTimeout( () => ( saveBtn.textContent = 'SYNC WITH TERMINAL' ), 2500 );
-						hideWarning();
+						setTimeout( () => {
+							saveBtn.textContent = 'SYNC WITH TERMINAL';
+							hideWarning();
+						}, 2500 );
 					} else {
 						showWarning( data.data || 'Sync failed. Try again.' );
 						saveBtn.textContent = 'SYNC WITH TERMINAL';
@@ -144,21 +165,21 @@
 
 		// ── Helpers ───────────────────────────────────────────────────────────
 
-		function collectIds( container ) {
+		function collectByAttr( container, attr ) {
 			return Array.from(
-				container.querySelectorAll( '.cyber-card[data-instance-id]' )
-			).map( c => c.dataset.instanceId );
+				container.querySelectorAll( '.cyber-card[' + attr + ']' )
+			).map( c => c.getAttribute( attr ) ).filter( Boolean );
 		}
 
 		function validateDeck( silent ) {
-			const count = activeContainer.querySelectorAll( '.cyber-card' ).length;
+			const count = countActive();
 			if ( count < MIN ) {
-				if ( ! silent ) showWarning( 'Add at least ' + MIN + ' cards to active deck. (' + count + '/' + MIN + ')' );
+				if ( ! silent ) showWarning( 'Need at least ' + MIN + ' cards in active deck. (' + count + '/' + MIN + ')' );
 				saveBtn.disabled = true;
 				return false;
 			}
 			if ( count > MAX ) {
-				if ( ! silent ) showWarning( 'Too many cards in active deck (' + count + '/' + MAX + ').' );
+				if ( ! silent ) showWarning( 'Too many cards (' + count + '/' + MAX + ').' );
 				saveBtn.disabled = true;
 				return false;
 			}
@@ -185,7 +206,7 @@
 		}
 
 		function updateEmptyNotes() {
-			updateNote( activeContainer, 'No cards in active deck.' );
+			updateNote( activeContainer, 'No cards in active play.' );
 			updateNote( libraryContainer, 'Library is empty.' );
 		}
 
