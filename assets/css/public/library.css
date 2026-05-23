@@ -14,8 +14,8 @@
   --nw-text:          #e8e8e8;
   --nw-text-muted:    #7a7a7a;
   --nw-danger:        #ff3c5a;
+   --nw-pile:    #00d4ff;
   --nw-hand:          #adff00;
-  --nw-play:          #00d4ff;
   --nw-discard:       #ff6b35;
   --nw-radius:        6px;
   --nw-card-w:        120px;
@@ -223,12 +223,10 @@
 
 /* Zone colour badges */
 .cyber-card--hand   .card-zone { background: rgba(173,255,0,.2);  color: var(--nw-hand); }
-.cyber-card--play   .card-zone { background: rgba(0,212,255,.2);  color: var(--nw-play); }
 .cyber-card--discard .card-zone { background: rgba(255,107,53,.2); color: var(--nw-discard); }
 
 /* Zone left-border accent */
 .cyber-card--hand    { border-left: 2px solid var(--nw-hand); }
-.cyber-card--play    { border-left: 2px solid var(--nw-play); }
 .cyber-card--discard { border-left: 2px solid var(--nw-discard); }
 
 /* ── Save button ─────────────────────────────────────── */
@@ -281,4 +279,14 @@
   .deck-builder-wrap { padding: 16px 12px; }
   .card-slot-container { gap: 7px; padding: 9px; }
   .card-name { font-size: .6rem; }
+}
+/* W library: karta wybrana do aktywnej gry */
+.cyber-card--active {
+    border-left: 2px solid var(--nw-accent);
+    box-shadow: inset 0 0 0 1px var(--nw-accent-border);
+}
+
+.cyber-card--active .card-zone {
+    background: rgba(173,255,0,.2);
+    color: var(--nw-accent);
 }
