@@ -55,7 +55,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 		if ( ! empty( $char['locationid'] ) ) {
 			$safe_loc_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['locationid'] ) );
 			$loc_rows = tw_supabase_get(
-				'cyber_worldmap',
+				'cyber_world_map',
 				[
 					'id'     => 'eq.' . $safe_loc_id,
 					'select' => 'id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type',
@@ -97,7 +97,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 					if ( ! empty( $location[ $col ] ) ) {
 						$safe_exit = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $location[ $col ] ) );
 						$exit_rows = tw_supabase_get(
-							'cyber_worldmap',
+							'cyber_world_map',
 							[ 'id' => 'eq.' . $safe_exit, 'select' => 'id,locationname,threatlevel,location_type', 'limit' => 1 ]
 						);
 						if ( ! is_wp_error( $exit_rows ) && ! empty( $exit_rows ) ) {
