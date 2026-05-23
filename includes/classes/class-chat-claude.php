@@ -57,7 +57,7 @@ class NW_Chat_Claude {
 	 *   campaign_id  string  Campaign UUID (optional)
 	 *   wp_user_id   int     WP user ID
 	 *   char         array   Row from cyber_characters
-	 *   location     array   Row from cyber_worldmap
+	 *   location     array   Row from cyber_world_map
 	 *   world        array   Row from cyber_worlds
 	 *
 	 * @return array {
