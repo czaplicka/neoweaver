@@ -60,46 +60,74 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 
 		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $selected_char_id );
 
-		// ── 1. Karty w aktywnej rozgrywce (cyber_buffer) ──────────────────────────
-		$buffer_cards = array();
-		if ( function_exists( 'tw_supabase_get' ) ) {
-			$raw_buffer = tw_supabase_get(
-				'cyber_buffer',
-				array(
-					'char_id' => 'eq.' . $safe_id,
-					'select'  => 'id,zone,deck_card_id,cyber_character_deck(id,card_id,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect))',
-				)
-			);
-			if ( is_array( $raw_buffer ) ) {
-				$buffer_cards = $raw_buffer;
-			}
-		}
-
-		// Zbierz IDs rekordów cyber_character_deck będących w bufferze
-		$in_game_deck_ids = array();
-		foreach ( $buffer_cards as $b ) {
-			$deck_row_id = $b['deck_card_id'] ?? ( $b['cyber_character_deck']['id'] ?? null );
-			if ( $deck_row_id ) {
-				$in_game_deck_ids[] = (int) $deck_row_id;
-			}
-		}
-
-		// ── 2. Wszystkie karty postaci (cyber_character_deck) ─────────────────────
+		// ── 1. Wszystkie karty postaci (cyber_character_deck + cyber_deck) ──────────
 		$all_assigned = array();
 		if ( function_exists( 'tw_supabase_get' ) ) {
-			$raw_assigned = tw_supabase_get(
+			$raw = tw_supabase_get(
 				'cyber_character_deck',
 				array(
 					'character_id' => 'eq.' . $safe_id,
 					'select'       => 'id,card_id,cyber_deck(id,name,img_url,deck_category,type,rarity,level,description,effect)',
 				)
 			);
-			if ( is_array( $raw_assigned ) ) {
-				$all_assigned = $raw_assigned;
+			if ( is_array( $raw ) ) {
+				$all_assigned = $raw;
 			}
 		}
 
-		// Karty NIE będące w bufferze = nieaktywne (biblioteka)
+		// Mapa: deck_row_id => dane karty (użyjemy do IN GAME)
+		$deck_map = array();
+		foreach ( $all_assigned as $row ) {
+			$rid = (int) ( $row['id'] ?? 0 );
+			if ( $rid ) {
+				$deck_map[ $rid ] = $row;
+			}
+		}
+
+		// ── 2. Buffer: karty aktywnie w grze ────────────────────────────────
+		// Pobieramy tylko id, zone i deck_card_id — dane karty mamy już w deck_map
+		$buffer_raw = array();
+		if ( function_exists( 'tw_supabase_get' ) ) {
+			$raw_buf = tw_supabase_get(
+				'cyber_buffer',
+				array(
+					'char_id' => 'eq.' . $safe_id,
+					'select'  => 'id,zone,deck_card_id',
+				)
+			);
+			if ( is_array( $raw_buf ) ) {
+				$buffer_raw = $raw_buf;
+			}
+		}
+
+		// Zbierz IDs deck_row używanych w grze
+		$in_game_deck_ids = array();
+		foreach ( $buffer_raw as $b ) {
+			$did = (int) ( $b['deck_card_id'] ?? 0 );
+			if ( $did ) {
+				$in_game_deck_ids[] = $did;
+			}
+		}
+
+		// Wzbogac buffer o dane karty z deck_map
+		$buffer_cards = array();
+		foreach ( $buffer_raw as $b ) {
+			$did      = (int) ( $b['deck_card_id'] ?? 0 );
+			$deck_row = $deck_map[ $did ] ?? array();
+			$cdata    = is_array( $deck_row['cyber_deck'] ?? null ) ? $deck_row['cyber_deck'] : array();
+			if ( empty( $cdata ) ) {
+				continue; // karta bez danych – pomin
+			}
+			$buffer_cards[] = array(
+				'buf_id'  => (string) ( $b['id'] ?? '' ),
+				'zone'    => (string) ( $b['zone'] ?? 'hand' ),
+				'img_url' => (string) ( $cdata['img_url'] ?? '' ),
+				'name'    => (string) ( $cdata['name'] ?? '' ),
+				'level'   => (string) ( $cdata['level'] ?? '' ),
+			);
+		}
+
+		// Karty NIE w grze = biblioteka
 		$inactive_cards = array_filter(
 			$all_assigned,
 			static function ( $row ) use ( $in_game_deck_ids ) {
@@ -142,14 +170,12 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 							value="<?php echo esc_attr( wp_unslash( (string) $value ) ); ?>"
 						>
 					<?php endforeach; ?>
-
 					<label for="deck-char-select" class="ach-filter-label">Character</label>
 					<select id="deck-char-select" name="char_id" onchange="this.form.submit()">
 						<?php foreach ( $characters as $char ) : ?>
 							<?php
 							$char_id = isset( $char->id ) ? (string) $char->id : '';
 							$label   = isset( $char->name ) ? (string) $char->name : 'Unnamed character';
-
 							if ( isset( $char->lvl ) ) {
 								$label .= ' (Lv. ' . (int) $char->lvl . ')';
 							}
@@ -165,7 +191,7 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 			<div class="deck-builder-container">
 				<div id="deck-warning" class="deck-warning"></div>
 
-				<?php // ── SEKCJA 1: KARTY W ROZGRYWCE (z cyber_buffer, 20–50) ── ?>
+				<?php // ── IN GAME ── ?>
 				<div class="deck-section">
 					<h3>IN GAME (<?php echo count( $buffer_cards ); ?> / 20–50)</h3>
 					<div id="active-deck" class="card-slot-container card-slot-container--active">
@@ -173,37 +199,20 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 							<p class="deck-empty-note">No cards in active play.</p>
 						<?php else : ?>
 							<?php foreach ( $buffer_cards as $buf ) : ?>
-								<?php
-								$buf_id  = (string) ( $buf['id'] ?? '' );
-								$zone    = (string) ( $buf['zone'] ?? 'hand' );
-								$deck_row = is_array( $buf['cyber_character_deck'] ?? null ) ? $buf['cyber_character_deck'] : array();
-								$cdata   = is_array( $deck_row['cyber_deck'] ?? null ) ? $deck_row['cyber_deck'] : array();
-								$img_url = (string) ( $cdata['img_url'] ?? '' );
-								$name    = (string) ( $cdata['name'] ?? '' );
-								$level   = (string) ( $cdata['level'] ?? '' );
-
-								if ( '' === $buf_id ) {
-									continue;
-								}
-								?>
 								<div
-									class="cyber-card cyber-card--<?php echo esc_attr( $zone ); ?>"
-									id="card-buf-<?php echo esc_attr( $buf_id ); ?>"
-									data-buffer-id="<?php echo esc_attr( $buf_id ); ?>"
-									data-zone="<?php echo esc_attr( $zone ); ?>"
+									class="cyber-card cyber-card--<?php echo esc_attr( $buf['zone'] ); ?>"
+									id="card-buf-<?php echo esc_attr( $buf['buf_id'] ); ?>"
+									data-buffer-id="<?php echo esc_attr( $buf['buf_id'] ); ?>"
+									data-zone="<?php echo esc_attr( $buf['zone'] ); ?>"
 									data-card-location="active"
 								>
-									<?php if ( '' !== $img_url ) : ?>
-										<img
-											src="<?php echo esc_url( $img_url ); ?>"
-											alt="<?php echo esc_attr( $name ); ?>"
-											loading="lazy"
-										>
+									<?php if ( '' !== $buf['img_url'] ) : ?>
+										<img src="<?php echo esc_url( $buf['img_url'] ); ?>" alt="<?php echo esc_attr( $buf['name'] ); ?>" loading="lazy">
 									<?php endif; ?>
 									<div class="card-info">
-										<div class="card-name"><?php echo esc_html( $name ); ?></div>
-										<div class="card-lvl">LVL <?php echo esc_html( $level ); ?></div>
-										<div class="card-zone"><?php echo esc_html( strtoupper( $zone ) ); ?></div>
+										<div class="card-name"><?php echo esc_html( $buf['name'] ); ?></div>
+										<div class="card-lvl">LVL <?php echo esc_html( $buf['level'] ); ?></div>
+										<div class="card-zone"><?php echo esc_html( strtoupper( $buf['zone'] ) ); ?></div>
 									</div>
 								</div>
 							<?php endforeach; ?>
@@ -211,7 +220,7 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 					</div>
 				</div>
 
-				<?php // ── SEKCJA 2: BIBLIOTEKA (karty nieaktywne, bez limitu) ── ?>
+				<?php // ── LIBRARY ── ?>
 				<div class="deck-section">
 					<h3>LIBRARY (<?php echo count( $inactive_cards ); ?> cards)</h3>
 					<div id="library-deck" class="card-slot-container card-slot-container--library">
@@ -220,15 +229,12 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 						<?php else : ?>
 							<?php foreach ( $inactive_cards as $card ) : ?>
 								<?php
-								$iid     = (string) ( $card['id'] ?? '' );
-								$cdata   = is_array( $card['cyber_deck'] ?? null ) ? $card['cyber_deck'] : array();
+								$iid   = (string) ( $card['id'] ?? '' );
+								$cdata = is_array( $card['cyber_deck'] ?? null ) ? $card['cyber_deck'] : array();
+								if ( '' === $iid || empty( $cdata ) ) { continue; }
 								$img_url = (string) ( $cdata['img_url'] ?? '' );
 								$name    = (string) ( $cdata['name'] ?? '' );
 								$level   = (string) ( $cdata['level'] ?? '' );
-
-								if ( '' === $iid ) {
-									continue;
-								}
 								?>
 								<div
 									class="cyber-card"
@@ -238,11 +244,7 @@ if ( ! function_exists( 'cyber_deck_builder_shortcode' ) ) {
 									data-card-location="library"
 								>
 									<?php if ( '' !== $img_url ) : ?>
-										<img
-											src="<?php echo esc_url( $img_url ); ?>"
-											alt="<?php echo esc_attr( $name ); ?>"
-											loading="lazy"
-										>
+										<img src="<?php echo esc_url( $img_url ); ?>" alt="<?php echo esc_attr( $name ); ?>" loading="lazy">
 									<?php endif; ?>
 									<div class="card-info">
 										<div class="card-name"><?php echo esc_html( $name ); ?></div>
