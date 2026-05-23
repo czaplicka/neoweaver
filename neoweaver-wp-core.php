@@ -69,6 +69,8 @@ final class NeoWeaver_Core {
 			'includes/assets/lobby.php',
 			'includes/assets/map.php',
 			'includes/assets/onboarding.php',
+			'includes/assets/public-character-profile.php',
+			'includes/assets/public-runtime.php',
 			'includes/assets/quests.php',
 			'includes/assets/quick-actions-cmd-center.php',
 			'includes/assets/services.php',
@@ -79,10 +81,6 @@ final class NeoWeaver_Core {
 			'includes/assets/world-archive.php',
 			'includes/assets/world-creator.php',
 			'includes/assets/world-news.php',
-			
-			
-			'includes/assets/public-character-profile.php',
-			'includes/assets/public-runtime.php',
 
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
@@ -115,6 +113,7 @@ final class NeoWeaver_Core {
 			'includes/ajax/join-terminal.php',
 			'includes/ajax/lobby-heartbeat.php',
 			'includes/ajax/public-profile.php',
+			'includes/ajax/save-deck.php',
 			'includes/ajax/save-player-notes.php',
 			'includes/ajax/update-vehicle-module.php',
 			'includes/ajax/world-news.php',
