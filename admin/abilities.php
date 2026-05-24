@@ -44,10 +44,14 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
-			return;
-		}
-		
+	error_log( 'NW enqueue_assets HOOK: ' . $hook );
+	error_log( 'NW page_hook: ' . $this->page_hook );
+	error_log( 'NW GET page: ' . ( $_GET['page'] ?? 'brak' ) );
+
+	if ( $hook !== $this->page_hook ) {
+		return;
+	}
+
 	wp_enqueue_style( 'nw-font-chakra-petch' );
 
 	wp_enqueue_style(
@@ -60,17 +64,17 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	wp_enqueue_style(
 		'nw-abilities-style',
 		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
-		['nw-font-chakra-petch', 'nw-admin-core'],
+		[ 'nw-font-chakra-petch', 'nw-admin-core' ],
 		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
 	);
 
-	 wp_enqueue_script(
+	wp_enqueue_script(
 		'nw-abilities-script',
 		NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
 		[ 'jquery' ],
 		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
 		true
-	 );
+	);
 
 	wp_localize_script(
 		'nw-abilities-script',
