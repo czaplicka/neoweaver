@@ -112,6 +112,8 @@ function tw_shortcode_deck_library( $atts ): string {
 			$library_cards[] = $card;
 		}
 	}
+	var_dump( $safe_id, $current_user_id, $characters );
+die();
 		$test = tw_supabase_get( 'cyber_character_deck', [
     'character_id' => 'eq.' . $safe_id,
     'select'       => 'id,deck_id',
