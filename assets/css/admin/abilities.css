@@ -4,64 +4,76 @@
    Depends on: admin-core.css
    ============================================================= */
 
+/* =============================================================
+   NeoWeaver Admin — ABILITIES (vertical list)
+   ============================================================= */
+
 #nw-abilities-panel {
-	max-width: 1280px;
+	max-width: 980px;
 }
 
-/* Header button */
-#nw-add-ability {
-	white-space: nowrap;
-}
-
-/* Grid */
+/* Lista zamiast siatki */
 #nw-abilities-list {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-	gap: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 	margin-top: 20px;
 }
 
-/* Card */
+/* Pojedynczy wiersz */
 .nw-item-card {
 	background: #111;
 	border: 1px solid #2a2a2a;
-	border-radius: 10px;
-	padding: 16px;
+	border-radius: 8px;
+	padding: 10px 12px;
 	display: flex;
-	flex-direction: column;
+	align-items: center;
 	gap: 12px;
-	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.03);
-	transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+	transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .nw-item-card:hover {
 	border-color: #adff00;
-	transform: translateY(-1px);
-	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.22);
+	background: #151515;
 }
 
-/* Top */
-.nw-item-top {
+/* Kolumny w wierszu */
+.nw-item-main {
+	flex: 1;
 	display: flex;
-	align-items: flex-start;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.nw-item-row-top {
+	display: flex;
+	align-items: center;
 	justify-content: space-between;
 	gap: 10px;
 }
 
 .nw-item-title {
 	margin: 0;
-	font-size: 16px;
-	line-height: 1.25;
+	font-size: 14px;
 	font-weight: 700;
 	color: #fff;
-	word-break: break-word;
 }
 
-/* Type badge */
+/* typ + meta w jednej linii */
+.nw-item-meta-line {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	font-size: 11px;
+	color: #888;
+}
+
+/* typ */
 .nw-item-type {
 	display: inline-block;
 	font-size: 10px;
-	padding: 3px 9px;
+	padding: 2px 8px;
 	border-radius: 999px;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -72,41 +84,36 @@
 	color: #adff00;
 }
 
-/* Meta */
-.nw-item-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	font-size: 11px;
-	color: #888;
-}
-
-.nw-item-meta span {
+/* meta typu target/cost/range */
+.nw-item-meta-chip {
 	background: #181818;
 	border: 1px solid #242424;
 	border-radius: 999px;
-	padding: 3px 8px;
+	padding: 2px 7px;
 }
 
-/* Description */
+/* opis (jedna linia) */
 .nw-item-desc {
 	margin: 0;
-	font-size: 13px;
-	line-height: 1.5;
+	font-size: 12px;
 	color: #cfcfcf;
+	opacity: 0.9;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Tags */
+/* tagi */
 .nw-item-tags {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 4px;
 }
 
 .nw-tag {
 	display: inline-block;
 	font-size: 10px;
-	padding: 3px 8px;
+	padding: 2px 7px;
 	background: #1d1d1d;
 	border: 1px solid #2d2d2d;
 	border-radius: 999px;
@@ -114,29 +121,29 @@
 	white-space: nowrap;
 }
 
-/* Actions */
+/* akcje po prawej */
 .nw-item-actions {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 4px;
+	flex-direction: column;
+	gap: 4px;
 }
 
 .nw-item-actions .button {
 	font-family: 'Chakra Petch', sans-serif !important;
-	border-radius: 5px;
+	font-size: 11px;
+	padding: 3px 10px;
+	border-radius: 4px;
 }
 
-/* Empty / loading */
+/* empty / loading */
 .nw-empty,
 .nw-loading {
-	padding: 18px 20px;
+	padding: 14px 16px;
 	background: #111;
 	border: 1px solid #242424;
-	border-radius: 10px;
+	border-radius: 8px;
 	color: #888;
 }
-
 /* Modal shell */
 #nw-ability-modal {
 	position: fixed;
