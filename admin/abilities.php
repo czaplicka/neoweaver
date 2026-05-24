@@ -63,7 +63,7 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		wp_enqueue_script(
 			'nw-abilities-script',
 			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
-			[ 'jquery', 'nw-lucide' ],
+			[ 'jquery' ],
 			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
 			true
 		);
