@@ -39,7 +39,7 @@ if ( ! function_exists( 'neoweave_get_vehicle_slot_type_map' ) ) {
 }
 
 if ( ! function_exists( 'neoweave_get_owned_vehicle_module_type' ) ) {
-	function neoweave_get_owned_vehicle_module_type( string $module_id, string $character_id ) ) {
+	function neoweave_get_owned_vehicle_module_type( string $module_id, string $character_id ) {
 		if ( ! function_exists( 'tw_supabase_get' ) ) {
 			return new WP_Error( 'missing_helper', 'tw_supabase_get() missing' );
 		}
