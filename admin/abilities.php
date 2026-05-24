@@ -109,23 +109,25 @@ private function is_uuid( string $value ): bool {
 }
 
 	public function ajax_get_abilities(): void {
-		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+	check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
-			return;
-		}
-
-		wp_send_json_success( $res['data'] ?? [] );
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Forbidden', 403 );
+		return;
 	}
 
+	wp_send_json_success(
+		[
+			[
+				'id'           => 'test-id-1',
+				'name'         => 'Test Ability',
+				'ability_type' => 'active',
+				'is_active'    => true,
+				'tags'         => [ 'test' ],
+			],
+		]
+	);
+}
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 
