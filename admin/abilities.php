@@ -44,56 +44,50 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-		if ( $hook !== $this->page_hook ) {
-			return;
-		}
+	$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
 
-		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
-		);
-
-		wp_enqueue_style(
-			'nw-abilities-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
-		);
-wp_add_inline_style(
-		'nw-abilities-style',
-		'
-		#nw-abilities-panel {
-			border: 4px solid red !important;
-			background: #111 !important;
-			color: #adff00 !important;
-			padding: 20px !important;
-		}
-		#nw-abilities-panel input,
-		#nw-abilities-panel select,
-		#nw-abilities-panel textarea {
-			border: 2px solid #adff00 !important;
-		}
-		'
-	);
-		wp_enqueue_script(
-			'nw-abilities-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
-			[ 'jquery' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
-			true
-		);
-
-		wp_localize_script(
-			'nw-abilities-script',
-			'NWAbilities',
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
-			]
-		);
+	if ( $page !== $this->page_slug ) {
+		return;
 	}
+
+	wp_enqueue_style( 'nw-font-chakra-petch' );
+
+	wp_enqueue_style(
+		'nw-admin-core',
+		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+		[ 'nw-font-chakra-petch' ],
+		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
+	);
+
+	wp_enqueue_style(
+		'nw-abilities-style',
+		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
+		[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
+	);
+
+	wp_add_inline_style(
+		'nw-abilities-style',
+		'#nw-abilities-panel{border:4px solid red !important;background:#111 !important;color:#adff00 !important;padding:20px !important;}'
+	);
+
+	wp_enqueue_script(
+		'nw-abilities-script',
+		NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
+		[ 'jquery' ],
+		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
+		true
+	);
+
+	wp_localize_script(
+		'nw-abilities-script',
+		'NWAbilities',
+		[
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+		]
+	);
+}
 
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
