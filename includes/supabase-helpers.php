@@ -15,6 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   tw_supabase_rpc()     → array (może być []) LUB WP_Error przy błędzie
  *
  * Wszystkie wywołujące handlery sprawdzają is_wp_error() zanim użyją wyniku.
+ *
+ * KLUCZE:
+ *   tw_supabase_get()     → anon key (odczyty, respektuje RLS z JWT usera)
+ *   tw_supabase_request() → service key (serwer-side writes, omija RLS)
+ *   tw_supabase_rpc()     → anon key (SECURITY DEFINER w Postgres omija RLS samo w sobie)
+ *   Frontend JS           → zawsze anon key + JWT usera
  */
 
 // ============================================================
@@ -32,7 +38,7 @@ if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
 }
 
 // ============================================================
-// tw_supabase_get() — GET zapytania
+// tw_supabase_get() — GET zapytania (anon key, respektuje RLS)
 // Zwraca: array przy sukcesie, WP_Error przy błędzie sieci lub HTTP ≥ 300
 // ============================================================
 
@@ -57,9 +63,10 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 			$url = add_query_arg( $query, $url );
 		}
 
+		$anon_key = tw_supabase_anon_key();
 		$default_headers = [
-'apikey'        => defined('TW_SUPABASE_SERVICE_KEY') ? TW_SUPABASE_SERVICE_KEY : tw_supabase_anon_key(),
-'Authorization' => 'Bearer ' . ( defined('TW_SUPABASE_SERVICE_KEY') ? TW_SUPABASE_SERVICE_KEY : tw_supabase_anon_key() ),
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
 		];
 
 		// Merge nagłówków: extra_args['headers'] nadpisuje/rozszerza domyślne.
@@ -106,6 +113,8 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 
 // ============================================================
 // tw_supabase_request() — POST / PATCH / PUT / DELETE
+// Domyślnie używa SERVICE KEY (server-side writes omijają RLS).
+// Aby użyć anon key, przekaż headers w $extra_args.
 // Zwraca: WP_Error przy błędzie sieci lub HTTP ≥ 300
 //         ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
 // ============================================================
@@ -122,8 +131,14 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 			return new WP_Error( 'tw_supabase_args', 'tw_supabase_request: empty endpoint.' );
 		}
 
-		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-			return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined — falling back to anon key for ' . $method . ' ' . $endpoint );
+			if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
+				return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
+			}
+			$write_key = tw_supabase_anon_key();
+		} else {
+			$write_key = TW_SUPABASE_SERVICE_KEY;
 		}
 
 		$url = $base . $endpoint;
@@ -132,12 +147,12 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 		}
 
 		$default_headers = [
-			'apikey'        => tw_supabase_anon_key(),
-			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+			'apikey'        => $write_key,
+			'Authorization' => 'Bearer ' . $write_key,
 			'Content-Type'  => 'application/json',
 		];
 
-		// Merge nagłówków: extra_args['headers'] (np. service key, Prefer) nadpisuje/rozszerza.
+		// Merge nagłówków: extra_args['headers'] (np. Prefer) nadpisuje/rozszerza.
 		$merged_headers = array_merge(
 			$default_headers,
 			(array) ( $extra_args['headers'] ?? [] )
@@ -191,6 +206,8 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 
 // ============================================================
 // tw_supabase_rpc() — wywołanie funkcji Postgres przez RPC
+// Używa anon key; jeśli funkcja nie ma SECURITY DEFINER i potrzeba
+// service key, przekaż headers w $extra_args.
 // Zwraca: array przy sukcesie, WP_Error przy błędzie
 // ============================================================
 
@@ -212,9 +229,10 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 
 		$url = $base . 'rpc/' . $function_name;
 
+		$anon_key = tw_supabase_anon_key();
 		$default_headers = [
-			'apikey'        => tw_supabase_anon_key(),
-			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
 			'Content-Type'  => 'application/json',
 			'Accept'        => 'application/json',
 		];
@@ -293,7 +311,6 @@ if ( ! function_exists( 'tw_get_data' ) ) {
 
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
 	function get_character_equipped_items( string $character_id ): array {
-		// Poprawiony regex: pojedynczy backslash przed myślnikiem w klasie znaków.
 		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
 
 		if ( empty( $safe_id ) ) {
@@ -316,7 +333,7 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 }
 
 // ============================================================
-// tw_save_user_setting() — wymaga SERVICE KEY (pomija RLS)
+// tw_save_user_setting() — SERVICE KEY (pomija RLS)
 // ============================================================
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
@@ -326,8 +343,8 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 			return false;
 		}
 
-		// extra_args['headers'] jest mergowany w tw_supabase_request(),
-		// więc Prefer i service key nie giną — nadpisują tylko te klucze.
+		// tw_supabase_request() domyślnie już używa service key,
+		// ale przekazujemy Prefer header explicite dla upsert.
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_user_settings',
@@ -340,9 +357,7 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 			],
 			[
 				'headers' => [
-					'apikey'        => TW_SUPABASE_SERVICE_KEY,
-					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-					'Prefer'        => 'resolution=merge-duplicates',
+					'Prefer' => 'resolution=merge-duplicates',
 				],
 			]
 		);
@@ -357,7 +372,7 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 }
 
 // ============================================================
-// tw_get_user_setting() — wymaga SERVICE KEY
+// tw_get_user_setting() — SERVICE KEY
 // ============================================================
 
 if ( ! function_exists( 'tw_get_user_setting' ) ) {
@@ -402,7 +417,7 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 	function tw_ajax_save_user_setting(): void {
 		if ( ! is_user_logged_in() ) {
 			wp_send_json_error( [ 'message' => 'Unauthorized' ], 401 );
-			return; // NAPRAWIONE: brakowało return po wp_send_json_error
+			return;
 		}
 
 		check_ajax_referer( 'tw_user_setting', 'nonce' );
@@ -427,25 +442,26 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 		}
 	}
 }
+
 /**
  * Sprawdza czy postać należy do zalogowanego usera.
  */
 if ( ! function_exists( 'tw_user_owns_character' ) ) {
-    function tw_user_owns_character( string $char_id, int $user_id ): bool {
-        if ( empty( $char_id ) || $user_id <= 0 ) {
-            return false;
-        }
+	function tw_user_owns_character( string $char_id, int $user_id ): bool {
+		if ( empty( $char_id ) || $user_id <= 0 ) {
+			return false;
+		}
 
-        $result = tw_supabase_get(
-            'cyber_characters',
-            [
-                'id'         => 'eq.' . $char_id,
-                'wp_user_id' => 'eq.' . $user_id,
-                'select'     => 'id',
-                'limit'      => 1,
-            ]
-        );
+		$result = tw_supabase_get(
+			'cyber_characters',
+			[
+				'id'         => 'eq.' . $char_id,
+				'wp_user_id' => 'eq.' . $user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			]
+		);
 
-        return ! is_wp_error( $result ) && ! empty( $result );
-    }
+		return ! is_wp_error( $result ) && ! empty( $result );
+	}
 }
