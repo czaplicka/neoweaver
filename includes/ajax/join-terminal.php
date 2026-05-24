@@ -31,7 +31,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		}
 
 		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon = tw_supabase_anon_key();
+		$anon = tw_supabase_service_key();
 
 		$headers = array(
 			'apikey'        => $anon,
