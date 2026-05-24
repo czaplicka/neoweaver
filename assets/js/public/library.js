@@ -16,7 +16,7 @@
 
 		if ( ! activeContainer || ! libraryContainer || ! saveBtn ) return;
 
-		const cfg = ( typeof nwDeckConfig !== 'undefined' ) ? nwDeckConfig : {};
+		const cfg = window.NeoWeaverLibraryConfig || {};
 		const MIN = cfg.limits?.minActive ?? 20;
 		const MAX = cfg.limits?.maxActive ?? 50;
 
