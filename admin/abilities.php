@@ -457,17 +457,5 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 				</div>
 			</div>
 		</div>
-	<?php 
-										 global $wp_styles;
-
-if ( isset( $wp_styles->registered['nw-abilities-style'] ) ) {
-	echo '<pre style="background:#111;color:#adff00;padding:12px;margin-top:20px;">';
-	echo 'NW ABILITIES CSS SRC: ';
-	echo esc_html( $wp_styles->registered['nw-abilities-style']->src ?? 'BRAK' );
-	echo "\n";
-	echo 'NW ADMIN CORE CSS SRC: ';
-	echo esc_html( $wp_styles->registered['nw-admin-core']->src ?? 'BRAK' );
-	echo '</pre>';
-}
-										}
+	<?php }
 }
