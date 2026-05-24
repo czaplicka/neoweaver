@@ -36,10 +36,14 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 
 			$progress      = self::get_user_progress( $wp_user_id );
 			$terminal_done = ! empty( $progress['terminal'] );
-			$all_done      = ! empty( $progress['world'] )
-				&& ! empty( $progress['character'] )
-				&& ! empty( $progress['campaign'] )
-				&& ! empty( $progress['terminal'] );
+$all_done = ! empty( $progress['world'] )
+    && ! empty( $progress['character'] )
+    && ! empty( $progress['campaign'] )
+    && ! empty( $progress['terminal'] );
+
+if ( $all_done ) {
+    return '';
+}
 
 			if ( function_exists( 'tw_enqueue_onboarding_assets' ) ) {
 				tw_enqueue_onboarding_assets(
