@@ -71,14 +71,14 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		// 5. Zapis do cyber_chat_messages (service key przez tw_rest_ai_supa_post)
 		tw_rest_ai_supa_post( 'cyber_chat_messages', [
 			'channel_id'   => $channel_id,
-			'char_id'    => $char_id,
+			'char_id'      => $char_id,
 			'message_type' => 'player',
 			'content'      => $message,
 			'meta'         => wp_json_encode( [ 'protocol' => $protocol ] ),
 		] );
 		tw_rest_ai_supa_post( 'cyber_chat_messages', [
 			'channel_id'   => $channel_id,
-			'char_id'    => $char_id,
+			'char_id'      => $char_id,
 			'message_type' => 'gm',
 			'content'      => $gm_text,
 			'meta'         => wp_json_encode( [ 'protocol' => $protocol, 'tags' => $gm_tags ] ),
@@ -105,7 +105,11 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 // ============================================================
 
 if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
-	function tw_rest_ai_build_context( string $char_id ): array|WP_Error {
+	/**
+	 * @param string $char_id
+	 * @return array|WP_Error
+	 */
+	function tw_rest_ai_build_context( string $char_id ) {
 
 		$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char_id ) );
 
@@ -156,7 +160,9 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 				. '&order=created_at.desc&limit=14&select=message_type,content'
 		);
 
-		if ( empty( $rows ) ) return [];
+		if ( empty( $rows ) ) {
+			return [];
+		}
 
 		$rows    = array_reverse( $rows );
 		$history = [];
@@ -190,7 +196,9 @@ if ( ! function_exists( 'tw_rest_ai_protocol_extra' ) ) {
 				] );
 				if ( $exits ) {
 					$lines = [];
-					foreach ( $exits as $dir => $loc_id ) $lines[] = $dir . ':' . $loc_id;
+					foreach ( $exits as $dir => $loc_id ) {
+						$lines[] = $dir . ':' . $loc_id;
+					}
 					$extra = 'AVAILABLE_EXITS: ' . implode( ', ', $lines );
 				}
 				$extra .= "\nSATIETY_CURRENT: " . (int) ( $char['satiety'] ?? 0 ) . " (travel costs -1)";
@@ -226,11 +234,15 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 			switch ( $tag ) {
 				case 'HP_CHANGE':
 					$delta = (int) $val;
-					if ( $delta !== 0 ) tw_rest_ai_supa_rpc( 'fn_apply_hp_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					if ( $delta !== 0 ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_hp_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					}
 					break;
 				case 'GOLD_CHANGE':
 					$delta = (int) $val;
-					if ( $delta !== 0 ) tw_rest_ai_supa_rpc( 'fn_apply_gold_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					if ( $delta !== 0 ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_gold_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					}
 					break;
 				case 'LOC':
 					if ( $val ) {
@@ -241,10 +253,14 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 				case 'ENTROPY_UP':
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
-					if ( $delta !== 0 && $world_id ) tw_rest_ai_supa_rpc( 'fn_apply_entropy', [ 'p_world_id' => $world_id, 'p_delta' => $delta ] );
+					if ( $delta !== 0 && $world_id ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_entropy', [ 'p_world_id' => $world_id, 'p_delta' => $delta ] );
+					}
 					break;
 				case 'STATUS_ADD':
-					if ( $val ) tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $val ] );
+					if ( $val ) {
+						tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $val ] );
+					}
 					break;
 				default:
 					error_log( 'NeoWeaver ai-chat: nieobsługiwany tag ' . $tag . ':' . $val );
@@ -321,7 +337,12 @@ function tw_rest_ai_supa_post( string $table, array $body ): void {
 	}
 }
 
-function tw_rest_ai_supa_rpc( string $fn, array $params ): mixed {
+/**
+ * @param string $fn
+ * @param array  $params
+ * @return array|WP_Error|null
+ */
+function tw_rest_ai_supa_rpc( string $fn, array $params ) {
 	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/rpc/' . $fn;
 	$response = wp_remote_post( $url, [
 		'headers' => [
