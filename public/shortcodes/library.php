@@ -55,7 +55,7 @@ function tw_shortcode_deck_library( $atts ): string {
 	$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( (string) $selected_char_id ) );
 
 	$result = tw_supabase_rpc( 'cyber_init_play_cards', [
-    'p_character_id' => $char_id,
+    'p_character_id' => $safe_id,
 ] );
 
 	// ── 1. All cards owned by the character ────────────────────────────
