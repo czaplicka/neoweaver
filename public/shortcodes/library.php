@@ -125,12 +125,6 @@ function tw_shortcode_deck_library( $atts ): string {
 	}
 
 	// ── HTML ───────────────────────────────────────────────────────────
-	$test = tw_supabase_get( 'cyber_character_deck', [
-    'character_id' => 'eq.' . $safe_id,
-    'select'       => 'id,deck_id',
-] );
-echo '<pre>' . print_r( $test, true ) . '</pre>';
-die();
 	ob_start();
 	?>
 	<div class="deck-builder-wrap" data-deck-builder-root data-character-id="<?php echo esc_attr( $safe_id ); ?>">
@@ -155,7 +149,14 @@ die();
 		<div id="deck-warning" class="deck-warning"></div>
 
 		<div class="deck-builder-container">
-
+<?php
+		$test = tw_supabase_get( 'cyber_character_deck', [
+    'character_id' => 'eq.' . $safe_id,
+    'select'       => 'id,deck_id',
+] );
+echo '<pre>' . print_r( $test, true ) . '</pre>';
+die();
+	?>
 			<!-- ── Active deck ── -->
 			<div class="deck-section">
 				<h3>
