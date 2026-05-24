@@ -84,7 +84,7 @@ PROMPT;
             return [ 'error' => $result->get_error_message() ];
         }
 
-        $this->save_to_history( $char_id, $message, $result['content'], $ctx['world_id'] ?? null );
+        $this->save_to_history( $char_id, $message, $result['content'] );
         $this->log_tokens( $char_id, $ctx['world_id'] ?? null, $result['usage'], $protocol );
 
         $parsed = $this->parse_tags( $result['content'] );
@@ -239,13 +239,12 @@ PROMPT;
         }, $result );
     }
 
-    private function save_to_history( string $char_id, string $user_message, string $gm_message, ?string $world_id ): void {
+    private function save_to_history( string $char_id, string $user_message, string $gm_message ): void {
         $this->supabase_request(
             'POST',
             '/rest/v1/cyber_chat_messages',
             [
                 'char_id'      => $char_id,
-                'world_id'     => $world_id,
                 'message_type' => 'player',
                 'content'      => $user_message,
                 'created_at'   => gmdate( 'c' ),
@@ -258,7 +257,6 @@ PROMPT;
             '/rest/v1/cyber_chat_messages',
             [
                 'char_id'      => $char_id,
-                'world_id'     => $world_id,
                 'message_type' => 'gm',
                 'content'      => $gm_message,
                 'created_at'   => gmdate( 'c' ),
