@@ -207,28 +207,42 @@ PROMPT;
 	// TOKEN LOGGING
 	// Claude usage keys:  input_tokens / output_tokens
 	// Ledger column names: prompt_tokens / completion_tokens
-	// The client already provides both aliases — using prompt/completion here.
+	//
+	// Używamy bezpośredniego wp_remote_post z service key zamiast
+	// tw_supabase_request() (anon key) — cyber_token_ledger wymaga
+	// uprawnień serwera, nie gracza.
 	// =========================================================
+	private function log_tokens( array $usage, array $ctx, string $protocol ): void {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
+			return;
+		}
 
-private function log_tokens( array $usage, array $ctx, string $protocol ): void {
-    if ( ! function_exists( 'tw_supabase_request' ) ) return;
+		$url  = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_token_ledger';
+		$body = [
+			'wp_user_id'        => $ctx['wp_user_id']  ?? null,
+			'char_id'           => $ctx['char_id']     ?? null,
+			'session_id'        => $ctx['session_id']  ?? null,
+			'campaign_id'       => $ctx['campaign_id'] ?? null,
+			'channel_id'        => $ctx['channel_id']  ?? null,
+			'protocol'          => $protocol,
+			'model'             => $this->model,
+			'prompt_tokens'     => $usage['prompt_tokens']     ?? $usage['input_tokens']  ?? 0,
+			'completion_tokens' => $usage['completion_tokens'] ?? $usage['output_tokens'] ?? 0,
+		];
 
-    tw_supabase_request(
-        'POST',
-        'cyber_token_ledger',
-        [],  // query params (puste)
-        [    // body — tutaj był błąd, wcześniej szło do extra_args
-            'wp_user_id'        => $ctx['wp_user_id']  ?? null,
-            'char_id'           => $ctx['char_id']     ?? null,
-            'session_id'        => $ctx['session_id']  ?? null,
-            'campaign_id'       => $ctx['campaign_id'] ?? null,
-            'channel_id'        => $ctx['channel_id']  ?? null,
-            'protocol'          => $protocol,
-            'model'             => $this->model,
-            'prompt_tokens'     => $usage['prompt_tokens']     ?? 0,
-            'completion_tokens' => $usage['completion_tokens'] ?? 0,
-        ]
-        // extra_args: usunięte całkowicie — tw_supabase_request sam dodaje nagłówki auth
-    );
+		$response = wp_remote_post( $url, [
+			'headers' => [
+				'apikey'        => tw_supabase_service_key(),
+				'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+				'Content-Type'  => 'application/json',
+				'Prefer'        => 'return=minimal',
+			],
+			'body'    => wp_json_encode( $body ),
+			'timeout' => 5,
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			error_log( '[NeoWeaver NW_Chat_Claude] log_tokens failed: ' . $response->get_error_message() );
+		}
 	}
 }
