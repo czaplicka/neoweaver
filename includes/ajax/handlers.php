@@ -365,14 +365,19 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 
 // ============================================================
 // 3. LORE TIPS
+// Tylko zalogowani użytkownicy — nie rejestrujemy nopriv.
 // ============================================================
 
 if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 
 	add_action( 'wp_ajax_tw_get_lore_tips', 'tw_get_lore_tips' );
-	add_action( 'wp_ajax_nopriv_tw_get_lore_tips', 'tw_get_lore_tips' );
 
 	function tw_get_lore_tips(): void {
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized' ), 401 );
+			return;
+		}
+
 		$url = tw_supa_url(
 			'cyber_tips',
 			array(
