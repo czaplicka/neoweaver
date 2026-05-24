@@ -33,7 +33,7 @@ class NeoWeaver_Achievements_Admin extends NW_Base_Admin {
 
 	public function register_submenu(): void {
 		add_submenu_page(
-			'neo-weaver',
+			'neoweaver',
 			'NeoWeaver — Achievements',
 			'🏆 Achievements',
 			'manage_options',
