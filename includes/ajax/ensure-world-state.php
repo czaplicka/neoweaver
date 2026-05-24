@@ -35,38 +35,6 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			return;
 		}
 
-		$existing = tw_supabase_get(
-			'cyber_world_state',
-			[
-				'campaign_id' => 'eq.' . $campaign_id,
-				'select'      => 'campaign_id,current_hour,current_weather,next_weather,current_season',
-				'limit'       => 1,
-			]
-		);
-
-		if ( is_wp_error( $existing ) ) {
-			error_log( 'TW ensure_world_state check error: ' . $existing->get_error_message() . ' | campaign_id=' . $campaign_id );
-
-			wp_send_json_error(
-				[
-					'message' => 'World state check failed',
-					'error'   => $existing->get_error_message(),
-				],
-				502
-			);
-			return;
-		}
-
-		if ( ! empty( $existing ) ) {
-			wp_send_json_success(
-				[
-					'status' => 'exists',
-					'row'    => $existing[0],
-				]
-			);
-			return;
-		}
-
 		$payload = [
 			'campaign_id'     => $campaign_id,
 			'current_hour'    => 8,
@@ -89,35 +57,94 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			]
 		);
 
-		if ( is_wp_error( $insert ) ) {
-			$status  = (int) ( $insert->get_error_data()['status'] ?? 500 );
-			$body    = $insert->get_error_data()['body'] ?? '';
-			$message = $insert->get_error_message();
-
-			error_log(
-				'TW ensure_world_state insert error: '
-				. $message
-				. ' | status=' . $status
-				. ' | body=' . ( is_scalar( $body ) ? (string) $body : wp_json_encode( $body ) )
-				. ' | campaign_id=' . $campaign_id
-			);
-
-			wp_send_json_error(
+		if ( ! is_wp_error( $insert ) ) {
+			wp_send_json_success(
 				[
-					'message' => 'Insert failed',
-					'status'  => $status,
-					'error'   => $message,
-				],
-				$status > 0 ? $status : 500
+					'status' => 'created',
+					'row'    => $insert['data'][0] ?? null,
+				]
 			);
 			return;
 		}
 
-		wp_send_json_success(
+		$error_data = $insert->get_error_data();
+		$status     = (int) ( $error_data['status'] ?? 500 );
+		$body_raw   = (string) ( $error_data['body'] ?? '' );
+		$data       = $error_data['data'] ?? null;
+		$message    = $insert->get_error_message();
+
+		$sqlstate = '';
+		if ( is_array( $data ) ) {
+			$sqlstate = (string) ( $data['code'] ?? '' );
+		}
+
+		$is_unique_violation =
+			23505 === $status ||
+			'23505' === $sqlstate ||
+			false !== stripos( $body_raw, 'duplicate key value violates unique constraint' );
+
+		if ( $is_unique_violation ) {
+			$existing = tw_supabase_get(
+				'cyber_world_state',
+				[
+					'campaign_id' => 'eq.' . $campaign_id,
+					'select'      => 'campaign_id,current_hour,current_weather,next_weather,current_season',
+					'limit'       => 1,
+				]
+			);
+
+			if ( is_wp_error( $existing ) ) {
+				error_log(
+					'TW ensure_world_state unique-conflict fetch error: '
+					. $existing->get_error_message()
+					. ' | campaign_id=' . $campaign_id
+				);
+
+				wp_send_json_error(
+					[
+						'message' => 'World state exists but fetch failed',
+						'error'   => $existing->get_error_message(),
+					],
+					502
+				);
+				return;
+			}
+
+			if ( ! empty( $existing ) ) {
+				wp_send_json_success(
+					[
+						'status' => 'exists',
+						'row'    => $existing[0],
+					]
+				);
+				return;
+			}
+
+			wp_send_json_error(
+				[
+					'message' => 'World state conflict detected but existing row was not found',
+				],
+				409
+			);
+			return;
+		}
+
+		error_log(
+			'TW ensure_world_state insert error: '
+			. $message
+			. ' | status=' . $status
+			. ' | sqlstate=' . $sqlstate
+			. ' | body=' . $body_raw
+			. ' | campaign_id=' . $campaign_id
+		);
+
+		wp_send_json_error(
 			[
-				'status' => 'created',
-				'row'    => $insert['data'][0] ?? null,
-			]
+				'message' => 'Insert failed',
+				'status'  => $status,
+				'error'   => $message,
+			],
+			$status > 0 ? $status : 500
 		);
 	}
 }
