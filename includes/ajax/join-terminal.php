@@ -12,7 +12,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			return;
 		}
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			wp_send_json_error( array( 'message' => 'supabase_config_missing' ) );
 			return;
 		}
