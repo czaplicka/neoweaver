@@ -44,14 +44,12 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-	error_log( 'NW enqueue_assets HOOK: ' . $hook );
-	error_log( 'NW page_hook: ' . $this->page_hook );
-	error_log( 'NW GET page: ' . ( $_GET['page'] ?? 'brak' ) );
 
 	if ( $hook !== $this->page_hook ) {
 		return;
 	}
-
+error_log( 'NW CSS path: ' . NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' );
+error_log( 'NW CSS exists: ' . ( file_exists( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' ) ? 'YES' : 'NO' ) );
 	wp_enqueue_style( 'nw-font-chakra-petch' );
 
 	wp_enqueue_style(
