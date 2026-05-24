@@ -16,7 +16,6 @@ if ( class_exists( 'NW_Abilities_Admin', false ) ) {
 class NW_Abilities_Admin extends NW_Base_Admin {
 
 	private string $page_slug = 'nw-abilities';
-
 	private const ABILITY_TYPES = [ 'active', 'passive', 'reaction', 'aura' ];
 	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
