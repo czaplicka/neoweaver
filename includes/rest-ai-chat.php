@@ -114,9 +114,10 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 		$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char_id ) );
 
 		// Pobierz postać (service key — omija RLS)
+		// wp_user_id jest wymagany do do_action('tw_location_changed') — nie używamy get_current_user_id() w REST
 		$char = tw_rest_ai_supa_get(
 			'cyber_characters',
-			'id=eq.' . $safe_id . '&select=id,name,currenthp,maxhp,mp,satiety,hydration,gold,echo_tags,locationid,worldid,archetype,level&limit=1'
+			'id=eq.' . $safe_id . '&select=id,name,wp_user_id,currenthp,maxhp,mp,satiety,hydration,gold,echo_tags,locationid,worldid,archetype,level&limit=1'
 		)[0] ?? null;
 
 		if ( empty( $char ) ) {
@@ -247,7 +248,12 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 				case 'LOC':
 					if ( $val ) {
 						tw_rest_ai_supa_rpc( 'fn_move_character', [ 'p_char_id' => $char_id, 'p_location_id' => $val ] );
-						do_action( 'tw_location_changed', get_current_user_id(), [ 'char_id' => $char_id, 'location_id' => $val ] );
+
+						// Używamy wp_user_id z kontekstu postaci (pobranego z Supabase service key),
+						// zamiast get_current_user_id() — które może zwrócić 0 w REST przy niektórych
+						// konfiguracjach WP, jeśli determine_current_user nie odpaliło w odpowiednim czasie.
+						$wp_user_id = (int) ( $context['char']['wp_user_id'] ?? 0 );
+						do_action( 'tw_location_changed', $wp_user_id, [ 'char_id' => $char_id, 'location_id' => $val ] );
 					}
 					break;
 				case 'ENTROPY_UP':
