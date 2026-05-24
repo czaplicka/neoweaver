@@ -52,12 +52,12 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 
 	wp_enqueue_style( 'nw-font-chakra-petch' );
 
-	wp_enqueue_style(
-		'nw-admin-core',
-		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-		[ 'nw-font-chakra-petch' ],
-		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
-	);
+//	wp_enqueue_style(
+//		'nw-admin-core',
+//		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+//		[ 'nw-font-chakra-petch' ],
+//		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
+//	);
 
 	wp_enqueue_style(
 		'nw-abilities-style',
