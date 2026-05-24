@@ -39,6 +39,7 @@ if ( ! function_exists( 'neoweave_lobby_supabase_headers' ) ) {
 
 		$headers = [
 			'Content-Type' => 'application/json',
+			'Prefer' => 'return=minimal',
 		];
 
 		if ( '' !== $key ) {
