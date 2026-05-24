@@ -64,6 +64,9 @@ final class NeoWeaver_Core {
 			'includes/classes/class-nodes-creator.php',
 			'includes/classes/class-memory-parser.php',
 
+						// Public
+			'public/class-public.php',
+
 			// Pozostałe core
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
@@ -138,9 +141,6 @@ final class NeoWeaver_Core {
 			'includes/ajax/save-player-notes.php',
 			'includes/ajax/update-vehicle-module.php',
 			'includes/ajax/world-news.php',
-
-			// Public
-			'public/class-public.php',
 
 			// Shortcodes
 			'public/shortcodes/achievements.php',
