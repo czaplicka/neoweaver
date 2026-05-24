@@ -178,9 +178,9 @@ function tw_get_scenarios_ajax() {
 	}
 
 	if ( empty( $scenarios ) ) {
-		wp_send_json_error( [ 'message' => 'No scenarios available' ] );
+		wp_send_json_error( [ 'message' => 'No scenarios found' ] );
 		return;
 	}
 
-	wp_send_json_success( $scenarios );
+	wp_send_json_success( [ 'scenarios' => $scenarios ] );
 }
