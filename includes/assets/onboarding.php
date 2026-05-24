@@ -25,6 +25,11 @@ if ( ! function_exists( 'tw_register_onboarding_assets' ) ) {
 	}
 
 	add_action( 'wp_enqueue_scripts', 'tw_register_onboarding_assets', 5 );
+	add_action( 'wp_enqueue_scripts', function() {
+    tw_register_onboarding_assets();
+    wp_enqueue_style( 'neoweaver-onboarding' );
+    wp_enqueue_script( 'neoweaver-onboarding' );
+}, 10 );
 }
 
 if ( ! function_exists( 'tw_enqueue_onboarding_assets' ) ) {
