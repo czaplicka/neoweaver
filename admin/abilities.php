@@ -102,10 +102,10 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 private function is_uuid( string $value ): bool {
-    return (bool) preg_match(
-        '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i',
-        $value
-    );
+	return (bool) preg_match(
+		'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+		$value
+	);
 }
 
 	public function ajax_get_abilities(): void {
