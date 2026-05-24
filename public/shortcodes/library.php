@@ -9,7 +9,6 @@
  */
 
 add_shortcode( 'cyber_deck_library', 'tw_shortcode_deck_library' );
-
 function tw_shortcode_deck_library( $atts ): string {
 
 	$a = shortcode_atts( [
