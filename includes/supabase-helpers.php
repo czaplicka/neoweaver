@@ -58,8 +58,8 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 		}
 
 		$default_headers = [
-			'apikey'        => tw_supabase_anon_key(),
-			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+'apikey'        => defined('TW_SUPABASE_SERVICE_KEY') ? TW_SUPABASE_SERVICE_KEY : tw_supabase_anon_key(),
+'Authorization' => 'Bearer ' . ( defined('TW_SUPABASE_SERVICE_KEY') ? TW_SUPABASE_SERVICE_KEY : tw_supabase_anon_key() ),
 		];
 
 		// Merge nagłówków: extra_args['headers'] nadpisuje/rozszerza domyślne.
