@@ -138,10 +138,7 @@ if ( ! function_exists( 'render_player_achievements' ) ) {
 
 		$results = tw_get_player_achievements( $profile_user_id, $selected_char_id, $a['type'] );
 
-		if ( empty( $results ) ) {
-			return '<p>' . esc_html__( 'No achievements to display.', 'neoweaver' ) . '</p>';
-		}
-
+		// ── POPRAWKA: buduj output od razu, lista postaci zawsze widoczna ──
 		$output = '';
 
 		if ( ! empty( $characters ) ) {
@@ -174,6 +171,12 @@ if ( ! function_exists( 'render_player_achievements' ) ) {
 
 			$output .= '</select>';
 			$output .= '</form>';
+		}
+
+		// ── POPRAWKA: empty check po zbudowaniu formularza, zwracamy też formularz ──
+		if ( empty( $results ) ) {
+			$output .= '<p>' . esc_html__( 'No achievements to display.', 'neoweaver' ) . '</p>';
+			return $output;
 		}
 
 		$output .= '<div class="achievements-grid">';
