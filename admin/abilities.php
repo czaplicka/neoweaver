@@ -48,8 +48,7 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	if ( $hook !== $this->page_hook ) {
 		return;
 	}
-error_log( 'NW CSS path: ' . NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' );
-error_log( 'NW CSS exists: ' . ( file_exists( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' ) ? 'YES' : 'NO' ) );
+
 	wp_enqueue_style( 'nw-font-chakra-petch' );
 
 	wp_enqueue_style(
@@ -332,7 +331,16 @@ error_log( 'NW CSS exists: ' . ( file_exists( NEOWEAVER_PLUGIN_DIR . 'assets/css
 		wp_send_json_success( 'Reordered.' );
 	}
 
-	public function render_page(): void { ?>
+	public function render_page(): void {
+										 	global $wp_styles, $wp_scripts;
+
+	echo '<pre style="background:#111;color:#adff00;padding:12px;">';
+	echo 'STYLES QUEUED:' . "\n";
+	print_r( $wp_styles->queue ?? [] );
+	echo "\n\nSCRIPTS QUEUED:\n";
+	print_r( $wp_scripts->queue ?? [] );
+	echo '</pre>';
+	?>
 		<div class="wrap nw-panel" id="nw-abilities-panel">
 			<div class="nw-panel-header">
 				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Abilities</span></h1>
