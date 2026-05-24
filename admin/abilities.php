@@ -345,7 +345,30 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 				</div>
 			</div>
 
-			<div id="nw-abilities-list" class="nw-items-grid"></div>
+			<div class="nw-table-wrap">
+	<table class="nw-table">
+		<thead>
+			<tr>
+				<th class="nw-col-img">Img</th>
+				<th>Name</th>
+				<th>Type</th>
+				<th>Cost</th>
+				<th>Target</th>
+				<th>Range</th>
+				<th>Duration</th>
+				<th>Passive</th>
+				<th>Active</th>
+				<th>Tags</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody id="nw-abilities-tbody">
+			<tr class="nw-loading-row">
+				<td colspan="11"><div class="nw-spinner"></div> Loading abilities…</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
 
 			<div id="nw-ability-modal" class="nw-modal" style="display:none;">
 				<div class="nw-modal-backdrop"></div>
