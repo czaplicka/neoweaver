@@ -2,283 +2,357 @@ jQuery(function ($) {
 	'use strict';
 
 	var cfg = window.NWAbilities || {};
-	var ajaxurl = cfg.ajaxurl || (typeof window.ajaxurl !== 'undefined' ? window.ajaxurl : '');
+	var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
 	var nonce = cfg.nonce || '';
+	var noticeTimer = null;
 
-	var $list = $('#nw-abilities-list');
+	var $notice = $('#nw-notice');
+	var $tbody = $('#nw-abilities-tbody');
 	var $filterType = $('#nw-filter-type');
 	var $filterActive = $('#nw-filter-active');
 	var $search = $('#nw-search');
-
-	var $modal = $('#nw-ability-modal');
+	var $modalOverlay = $('#nw-ability-modal');
 	var $form = $('#nw-ability-form');
-	var $modalTitle = $('#nw-modal-title');
+	var $fieldId = $('#ability-id');
 
-	var $id = $('#ability-id');
-	var $name = $('#ability-name');
-	var $description = $('#ability-description');
-	var $abilityType = $('#ability-type');
-	var $targetType = $('#ability-target');
-	var $costType = $('#ability-cost-type');
-	var $costValue = $('#ability-cost-value');
-	var $rangeTiles = $('#ability-range');
-	var $durationTurns = $('#ability-duration');
-	var $tags = $('#ability-tags');
-	var $imgUrl = $('#ability-img');
-	var $source = $('#ability-source');
-	var $gmNotes = $('#ability-gm-notes');
-	var $isPassive = $('#ability-is-passive');
-	var $isActive = $('#ability-is-active');
+	var $fieldName = $('#ability-name');
+	var $fieldDescription = $('#ability-description');
+	var $fieldAbilityType = $('#ability-type');
+	var $fieldTargetType = $('#ability-target');
+	var $fieldCostType = $('#ability-cost-type');
+	var $fieldCostValue = $('#ability-cost-value');
+	var $fieldRangeTiles = $('#ability-range');
+	var $fieldDurationTurns = $('#ability-duration');
+	var $fieldTags = $('#ability-tags');
+	var $fieldImgUrl = $('#ability-img');
+	var $fieldSource = $('#ability-source');
+	var $fieldGmNotes = $('#ability-gm-notes');
+	var $fieldIsPassive = $('#ability-is-passive');
+	var $fieldIsActive = $('#ability-is-active');
 
-	var allAbilities = [];
+	var all = [];
+	var activeXhr = null;
 
-	function esc(value) {
-		return $('<div>').text(value == null ? '' : String(value)).html();
+	function esc(s) {
+		return $('<span>').text(s || '').html();
 	}
 
-	function normalizeTags(raw) {
+	function clearNoticeTimer() {
+		if (noticeTimer) {
+			clearTimeout(noticeTimer);
+			noticeTimer = null;
+		}
+	}
+
+	function notice(msg, type) {
+		if (!$notice.length) return;
+
+		var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
+
+		clearNoticeTimer();
+
+		$notice
+			.attr('class', 'nw-notice nw-notice-' + safeType)
+			.text(msg)
+			.stop(true, true)
+			.show();
+
+		noticeTimer = setTimeout(function () {
+			$notice.fadeOut(300);
+			noticeTimer = null;
+		}, 3500);
+	}
+
+	function debounce(fn, delay) {
+		var timer;
+		return function () {
+			var args = arguments;
+			var ctx = this;
+			clearTimeout(timer);
+			timer = setTimeout(function () {
+				fn.apply(ctx, args);
+			}, delay);
+		};
+	}
+
+	function tagsStr(tags) {
+		if (!tags) return '';
+		if (Array.isArray(tags)) return tags.join(', ');
+		if (typeof tags === 'string') return tags;
+		return '';
+	}
+
+	function parseTags(raw) {
 		if (!raw) return [];
 		if (Array.isArray(raw)) return raw;
+
 		if (typeof raw === 'string') {
+			try {
+				var parsed = JSON.parse(raw);
+				if (Array.isArray(parsed)) return parsed;
+			} catch (e) {}
+
 			return raw.split(',').map(function (t) {
 				return t.trim();
 			}).filter(Boolean);
 		}
+
 		return [];
 	}
 
-	function normalizeAbility(item) {
-		item = item || {};
-		return {
-			id: item.id || '',
-			name: item.name || '',
-			description: item.description || '',
-			ability_type: item.ability_type || 'active',
-			cost_type: item.cost_type || 'none',
-			cost_value: parseInt(item.cost_value || 0, 10) || 0,
-			target_type: item.target_type || 'self',
-			range_tiles: parseInt(item.range_tiles || 0, 10) || 0,
-			duration_turns: parseInt(item.duration_turns || 0, 10) || 0,
-			is_passive: item.is_passive === true || item.is_passive === 1 || item.is_passive === '1',
-			is_active: item.is_active === true || item.is_active === 1 || item.is_active === '1',
-			tags: normalizeTags(item.tags),
-			img_url: item.img_url || '',
-			source: item.source || '',
-			gm_notes: item.gm_notes || ''
-		};
+	function normalizeAbilities(data) {
+		var list = data;
+
+		if (typeof list === 'string') {
+			try {
+				list = JSON.parse(list);
+			} catch (e) {
+				list = [];
+			}
+		}
+
+		if (!Array.isArray(list)) {
+			list = (list && typeof list === 'object') ? Object.values(list) : [];
+		}
+
+		return list.map(function (item) {
+			return {
+				id: item.id || '',
+				name: item.name || '',
+				description: item.description || '',
+				ability_type: item.ability_type || 'active',
+				source: item.source || '',
+				gm_notes: item.gm_notes || '',
+				img_url: item.img_url || '',
+				tags: parseTags(item.tags),
+				cost_type: item.cost_type || 'none',
+				cost_value: item.cost_value != null ? item.cost_value : 0,
+				target_type: item.target_type || 'self',
+				range_tiles: item.range_tiles != null ? item.range_tiles : 1,
+				duration_turns: item.duration_turns != null ? item.duration_turns : 0,
+				is_passive: !!item.is_passive,
+				is_active: item.is_active != null ? !!item.is_active : true,
+				sort_order: item.sort_order != null ? item.sort_order : 0
+			};
+		});
 	}
 
-	function openModal(title) {
-		$modalTitle.text(title || 'Ability');
-		$modal.show();
+	function updateStats(data) {
+		var active = 0;
+		var passive = 0;
+
+		(data || []).forEach(function (a) {
+			if (a.is_active) active++;
+			if (a.is_passive) passive++;
+		});
+
+		$('#nw-total').text(data.length);
+		$('#nw-active').text(active);
+		$('#nw-passive').text(passive);
 	}
 
-	function closeModal() {
-		$modal.hide();
+	function bindImageFallbacks() {
+		$tbody.find('img[data-fallback]')
+			.off('error.nwFallback')
+			.on('error.nwFallback', function () {
+				$(this).hide();
+			});
 	}
 
-	function resetForm() {
-		$form[0].reset();
-		$id.val('');
-		$isActive.prop('checked', true);
-		$isPassive.prop('checked', false);
-	}
+	function renderTable(data) {
+		if (!$tbody.length) return;
 
-	function fillForm(item) {
-		$id.val(item.id);
-		$name.val(item.name);
-		$description.val(item.description);
-		$abilityType.val(item.ability_type);
-		$targetType.val(item.target_type);
-		$costType.val(item.cost_type);
-		$costValue.val(item.cost_value);
-		$rangeTiles.val(item.range_tiles);
-		$durationTurns.val(item.duration_turns);
-		$tags.val((item.tags || []).join(', '));
-		$imgUrl.val(item.img_url);
-		$source.val(item.source);
-		$gmNotes.val(item.gm_notes);
-		$isPassive.prop('checked', !!item.is_passive);
-		$isActive.prop('checked', !!item.is_active);
-	}
-
-	function renderList(items) {
-		if (!$list.length) {
+		if (!data.length) {
+			$tbody.html('<tr><td colspan="10" style="text-align:center;padding:32px;color:#555;">No abilities found.</td></tr>');
 			return;
 		}
 
-		if (!items.length) {
-			$list.html('<div class="nw-empty">No abilities found.</div>');
-			return;
-		}
+		$tbody.html(data.map(function (a) {
+			var safeId = esc(a.id);
+			var tags = Array.isArray(a.tags) ? a.tags : [];
 
-var html = items.map(function (a) {
-    var tagsHtml = (a.tags || []).map(function (tag) {
-        return '<span class="nw-tag">' + esc(tag) + '</span>';
-    }).join(' ');
+			var tagsH = tags.slice(0, 3).map(function (t) {
+				return '<span class="nw-tag">' + esc(t) + '</span>';
+			}).join('');
 
-    return ''
-        + '<article class="nw-item-card" data-id="' + esc(a.id) + '">'
-        +   '<div class="nw-item-main">'
-        +     '<div class="nw-item-row-top">'
-        +       '<h3 class="nw-item-title">' + esc(a.name || 'Untitled') + '</h3>'
-        +       '<span class="nw-item-type">' + esc(a.ability_type) + '</span>'
-        +     '</div>'
-        +     '<div class="nw-item-meta-line">'
-        +       '<span class="nw-item-meta-chip">Target: ' + esc(a.target_type) + '</span>'
-        +       '<span class="nw-item-meta-chip">Cost: ' + esc(a.cost_type) + (a.cost_value ? ' ' + esc(a.cost_value) : '') + '</span>'
-        +       '<span class="nw-item-meta-chip">Range: ' + esc(a.range_tiles) + '</span>'
-        +     '</div>'
-        +     '<p class="nw-item-desc">' + esc(a.description || '') + '</p>'
-        +     '<div class="nw-item-tags">' + tagsHtml + '</div>'
-        +   '</div>'
-        +   '<div class="nw-item-actions">'
-        +     '<button type="button" class="button nw-edit-ability" data-id="' + esc(a.id) + '">Edit</button>'
-        +     '<button type="button" class="button nw-toggle-ability" data-id="' + esc(a.id) + '" data-active="' + (a.is_active ? '1' : '0') + '">'
-        +       (a.is_active ? 'Disable' : 'Enable')
-        +     '</button>'
-        +   '</div>'
-        + '</article>';
-}).join('');
+			if (tags.length > 3) {
+				tagsH += '<span class="nw-tag">+' + (tags.length - 3) + '</span>';
+			}
 
-		$list.html(html);
+			var imgH = a.img_url
+				? '<img src="' + esc(a.img_url) + '" class="nw-ability-img" loading="lazy" data-fallback="1" alt="">'
+				: '<div class="nw-ability-img-placeholder">✦</div>';
+
+			var typeClass = 'nw-type-' + esc(a.ability_type);
+
+			var passiveH = a.is_passive
+				? '<span class="nw-state-pill is-passive">Passive</span>'
+				: '<span class="nw-state-pill is-not-passive">Active Skill</span>';
+
+			var activeH = a.is_active
+				? '<span class="nw-state-pill is-active">Yes</span>'
+				: '<span class="nw-state-pill is-inactive">No</span>';
+
+			var costH = a.cost_type && a.cost_type !== 'none'
+				? '<span class="nw-cost-value">' + esc(String(a.cost_value)) + ' ' + esc(a.cost_type) + '</span>'
+				: '—';
+
+			return '<tr data-id="' + safeId + '">'
+				+ '<td>' + imgH + '</td>'
+				+ '<td><div class="nw-ability-name">' + esc(a.name) + '</div>'
+				+ '<div class="nw-ability-desc">' + esc(a.description || '') + '</div></td>'
+				+ '<td><span class="nw-type-badge ' + typeClass + '">' + esc(a.ability_type) + '</span></td>'
+				+ '<td>' + costH + '</td>'
+				+ '<td><span class="nw-meta-pill">' + esc(a.target_type || '—') + '</span></td>'
+				+ '<td><span class="nw-range-value">' + esc(String(a.range_tiles)) + '</span></td>'
+				+ '<td><span class="nw-duration-value">' + esc(String(a.duration_turns)) + '</span></td>'
+				+ '<td>' + passiveH + '</td>'
+				+ '<td>' + activeH + '</td>'
+				+ '<td><div class="nw-tags">' + tagsH + '</div></td>'
+				+ '<td><div class="nw-row-actions"><button type="button" class="nw-action-btn nw-edit-btn" data-id="' + safeId + '">Edit</button></div></td>'
+				+ '</tr>';
+		}).join(''));
+
+		bindImageFallbacks();
 	}
 
 	function applyFilters() {
-		var type = ($filterType.val() || '').trim();
-		var active = ($filterActive.val() || '').trim();
-		var q = ($search.val() || '').toLowerCase().trim();
+		var q = String($search.val() || '').toLowerCase().trim();
+		var type = String($filterType.val() || '').trim();
+		var active = String($filterActive.val() || '').trim();
 
-		var filtered = allAbilities.filter(function (a) {
-			if (type && a.ability_type !== type) return false;
-			if (active === '1' && !a.is_active) return false;
-			if (active === '0' && a.is_active) return false;
+		var shown = all.filter(function (a) {
+			var tagMatch = (Array.isArray(a.tags) ? a.tags : []).some(function (t) {
+				return String(t).toLowerCase().indexOf(q) !== -1;
+			});
 
-			if (q) {
-				var haystack = [
-					a.id,
-					a.name,
-					a.description,
-					a.source,
-					(a.tags || []).join(' ')
-				].join(' ').toLowerCase();
+			var matchesSearch = !q
+				|| String(a.name || '').toLowerCase().indexOf(q) !== -1
+				|| String(a.description || '').toLowerCase().indexOf(q) !== -1
+				|| String(a.ability_type || '').toLowerCase().indexOf(q) !== -1
+				|| String(a.target_type || '').toLowerCase().indexOf(q) !== -1
+				|| tagMatch;
 
-				if (haystack.indexOf(q) === -1) return false;
-			}
+			var matchesType = !type || a.ability_type === type;
+			var matchesActive = !active || String(a.is_active ? '1' : '0') === active;
 
-			return true;
+			return matchesSearch && matchesType && matchesActive;
 		});
 
-		renderList(filtered);
+		renderTable(shown);
 	}
 
-	function loadAbilities() {
-		if (!ajaxurl || !nonce || !$list.length) {
+	function loadAll() {
+		if (!ajaxEndpoint) {
+			notice('Missing AJAX endpoint.', 'error');
 			return;
 		}
 
-		$list.html('<div class="nw-loading">Loading abilities...</div>');
+		if (!nonce) {
+			notice('Missing nonce.', 'error');
+			return;
+		}
 
-		$.post(ajaxurl, {
+		if (activeXhr && activeXhr.readyState !== 4) {
+			activeXhr.abort();
+		}
+
+		if ($tbody.length) {
+			$tbody.html('<tr class="nw-loading-row"><td colspan="10"><div class="nw-spinner"></div> Loading abilities…</td></tr>');
+		}
+
+		activeXhr = $.post(ajaxEndpoint, {
 			action: 'nw_abilities_get_all',
 			nonce: nonce
-		}).done(function (res) {
+		}, function (res) {
 			if (!res || !res.success) {
-				$list.html('<div class="nw-empty">Failed to load abilities.</div>');
+				notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
 				return;
 			}
 
-			allAbilities = (Array.isArray(res.data) ? res.data : []).map(normalizeAbility);
+			var rows = Array.isArray(res.data)
+				? res.data
+				: (res.data && typeof res.data === 'object' ? Object.values(res.data) : []);
+
+			all = normalizeAbilities(rows);
+			updateStats(all);
 			applyFilters();
-		}).fail(function () {
-			$list.html('<div class="nw-empty">Request failed.</div>');
+		}).fail(function (xhr, status) {
+			if (status !== 'abort') {
+				notice('Request failed (' + (xhr.status || status) + ').', 'error');
+			}
+		}).always(function () {
+			activeXhr = null;
 		});
 	}
 
-	function saveAbility() {
-		$.post(ajaxurl, {
-			action: 'nw_save_ability',
-			nonce: nonce,
-			id: $id.val(),
-			name: $name.val(),
-			description: $description.val(),
-			ability_type: $abilityType.val(),
-			target_type: $targetType.val(),
-			cost_type: $costType.val(),
-			cost_value: $costValue.val(),
-			range_tiles: $rangeTiles.val(),
-			duration_turns: $durationTurns.val(),
-			tags: $tags.val(),
-			img_url: $imgUrl.val(),
-			source: $source.val(),
-			gm_notes: $gmNotes.val(),
-			is_passive: $isPassive.is(':checked') ? '1' : '0',
-			is_active: $isActive.is(':checked') ? '1' : '0'
-		}).done(function (res) {
-			if (res && res.success) {
-				closeModal();
-				loadAbilities();
-			} else {
-				alert('Save failed');
+	function openModal(id) {
+		if ($form.length && $form[0]) {
+			$form[0].reset();
+		}
+
+		$fieldId.val('');
+		$fieldIsPassive.prop('checked', false);
+		$fieldIsActive.prop('checked', true);
+
+		if (id) {
+			var a = all.find(function (x) {
+				return x.id === id;
+			});
+
+			if (!a) {
+				notice('Ability data not loaded yet.', 'error');
+				return;
 			}
-		}).fail(function () {
-			alert('Save request failed');
-		});
+
+			$fieldId.val(a.id);
+			$fieldName.val(a.name || '');
+			$fieldDescription.val(a.description || '');
+			$fieldAbilityType.val(a.ability_type || 'active');
+			$fieldTargetType.val(a.target_type || 'self');
+			$fieldCostType.val(a.cost_type || 'none');
+			$fieldCostValue.val(a.cost_value != null ? a.cost_value : 0);
+			$fieldRangeTiles.val(a.range_tiles != null ? a.range_tiles : 1);
+			$fieldDurationTurns.val(a.duration_turns != null ? a.duration_turns : 0);
+			$fieldTags.val(tagsStr(a.tags));
+			$fieldImgUrl.val(a.img_url || '');
+			$fieldSource.val(a.source || '');
+			$fieldGmNotes.val(a.gm_notes || '');
+			$fieldIsPassive.prop('checked', !!a.is_passive);
+			$fieldIsActive.prop('checked', !!a.is_active);
+
+			$('#nw-modal-title').text('Edit Ability');
+		} else {
+			$fieldCostValue.val(0);
+			$fieldRangeTiles.val(1);
+			$fieldDurationTurns.val(0);
+			$('#nw-modal-title').text('New Ability');
+		}
+
+		$modalOverlay.fadeIn(150);
 	}
 
-	function toggleAbility(id, isActiveNow) {
-		$.post(ajaxurl, {
-			action: 'nw_abilities_toggle',
-			nonce: nonce,
-			ability_id: id,
-			is_active: isActiveNow ? '0' : '1'
-		}).done(function (res) {
-			if (res && res.success) {
-				loadAbilities();
-			} else {
-				alert('Toggle failed');
-			}
-		}).fail(function () {
-			alert('Toggle request failed');
-		});
-	}
+	$('#nw-modal-close, .nw-modal-cancel').on('click', function () {
+		$modalOverlay.fadeOut(150);
+	});
+
+	$modalOverlay.on('click', function (e) {
+		if ($(e.target).is('#nw-ability-modal') || $(e.target).is('.nw-modal-backdrop')) {
+			$modalOverlay.fadeOut(150);
+		}
+	});
+
+	$(document).on('click', '.nw-edit-btn', function () {
+		openModal($(this).data('id'));
+	});
 
 	$('#nw-add-ability').on('click', function () {
-		resetForm();
-		openModal('Add Ability');
+		openModal(null);
 	});
 
-	$('#nw-modal-close, .nw-modal-cancel, .nw-modal-backdrop').on('click', function () {
-		closeModal();
-	});
-
-	$form.on('submit', function (e) {
-		e.preventDefault();
-		saveAbility();
-	});
-
-	$(document).on('click', '.nw-edit-ability', function () {
-		var id = $(this).data('id');
-		var item = allAbilities.find(function (a) {
-			return a.id === id;
-		});
-
-		if (!item) return;
-
-		resetForm();
-		fillForm(item);
-		openModal('Edit Ability');
-	});
-
-	$(document).on('click', '.nw-toggle-ability', function () {
-		var id = $(this).data('id');
-		var isActiveNow = String($(this).data('active')) === '1';
-		toggleAbility(id, isActiveNow);
-	});
-
+	$search.on('input', debounce(applyFilters, 150));
 	$filterType.on('change', applyFilters);
 	$filterActive.on('change', applyFilters);
-	$search.on('input', applyFilters);
 
-	loadAbilities();
+	loadAll();
 });
