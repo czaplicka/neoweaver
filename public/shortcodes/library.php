@@ -62,7 +62,7 @@ function tw_shortcode_deck_library( $atts ): string {
 	if ( function_exists( 'tw_supabase_get' ) ) {
 		$raw = tw_supabase_get( 'cyber_character_deck', [
 			'character_id' => 'eq.' . $safe_id,
-			'select'       => 'id,deck_id,current_level,cyber_deck(id,name,img_url,deck_category,type,rarity,description,effect)',
+			'select' => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,deck_category,type,rarity,description,effect)',
 		] );
 		if ( is_array( $raw ) ) {
 			$all_assigned = $raw;
