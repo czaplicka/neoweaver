@@ -51,19 +51,19 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 
 	wp_enqueue_style( 'nw-font-chakra-petch' );
 
-	wp_enqueue_style(
-		'nw-admin-core',
-		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-		[ 'nw-font-chakra-petch' ],
-		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
-	);
+wp_enqueue_style(
+	'nw-admin-core',
+	NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?x=debug-core',
+	[ 'nw-font-chakra-petch' ],
+	null
+);
 
-	wp_enqueue_style(
-		'nw-abilities-style',
-		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
-		[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
-	);
+wp_enqueue_style(
+	'nw-abilities-style',
+	NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?x=debug-red-frame',
+	[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+	null
+);
 
 	wp_enqueue_script(
 		'nw-abilities-script',
