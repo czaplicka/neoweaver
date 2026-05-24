@@ -12,6 +12,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				401
 			);
+			return;
 		}
 
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
@@ -21,6 +22,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				500
 			);
+			return;
 		}
 
 		$world_id     = sanitize_text_field( (string) ( $_POST['world_id'] ?? '' ) );
@@ -36,6 +38,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				400
 			);
+			return;
 		}
 
 		$supa_url = trailingslashit( tw_supabase_url() );
@@ -48,6 +51,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				500
 			);
+			return;
 		}
 
 		$url = add_query_arg(
@@ -79,6 +83,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				500
 			);
+			return;
 		}
 
 		$status_code = wp_remote_retrieve_response_code( $response );
@@ -91,6 +96,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				),
 				$status_code
 			);
+			return;
 		}
 
 		$news = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -102,6 +108,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 					'unread_count' => 0,
 				)
 			);
+			return;
 		}
 
 		$unread_count = 0;
@@ -113,7 +120,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				$read_by = json_decode( $read_by, true );
 			}
 
-			$read_by = is_array( $read_by ) ? $read_by : array();
+			$read_by        = is_array( $read_by ) ? $read_by : array();
 			$item['is_new'] = ! in_array( $character_id, $read_by, true );
 
 			if ( $item['is_new'] ) {
