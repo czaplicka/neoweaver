@@ -116,28 +116,15 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		return;
 	}
 
-	// Tymczasowy test – bez Supabase, tylko sprawdzamy, czy AJAX/JS działają.
-	wp_send_json_success(
-		[
-			[
-				'id'           => '11111111-1111-1111-1111-111111111111',
-				'name'         => 'Debug Ability',
-				'description'  => 'If you see this, AJAX and JS work.',
-				'ability_type' => 'active',
-				'cost_type'    => 'none',
-				'cost_value'   => 0,
-				'target_type'  => 'self',
-				'range_tiles'  => 1,
-				'duration_turns' => 0,
-				'is_passive'   => false,
-				'is_active'    => true,
-				'tags'         => [ 'debug' ],
-				'img_url'      => '',
-				'source'       => 'debug',
-				'gm_notes'     => '',
-			],
-		]
-	);
+	$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
+
+	if ( ! $res['ok'] ) {
+		// Na czas debugowania zwróćmy szczegółowy błąd
+		wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
+		return;
+	}
+
+	wp_send_json_success( $res['data'] ?? [] );
 }
 
 	public function ajax_save_ability(): void {
