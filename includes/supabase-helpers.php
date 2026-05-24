@@ -17,10 +17,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Wszystkie wywołujące handlery sprawdzają is_wp_error() zanim użyją wyniku.
  *
  * KLUCZE:
- *   tw_supabase_get()     → anon key (odczyty, respektuje RLS z JWT usera)
- *   tw_supabase_request() → service key (serwer-side writes, omija RLS)
- *   tw_supabase_rpc()     → anon key (SECURITY DEFINER w Postgres omija RLS samo w sobie)
- *   Frontend JS           → zawsze anon key + JWT usera
+ *   tw_supabase_get()          → anon key (odczyty, respektuje RLS z JWT usera)
+ *   tw_supabase_get_admin()    → service key (server-side reads omijające RLS)
+ *   tw_supabase_request()      → service key (serwer-side writes, omija RLS)
+ *   tw_supabase_rpc()          → anon key (SECURITY DEFINER w Postgres omija RLS samo w sobie)
+ *   tw_user_owns_character()   → service key (security guard, MUSI być niezawodny)
+ *   Frontend JS                → zawsze anon key + JWT usera
  */
 
 // ============================================================
@@ -108,6 +110,33 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		return is_array( $data ) ? $data : [];
+	}
+}
+
+// ============================================================
+// tw_supabase_get_admin() — GET z SERVICE KEY (omija RLS)
+// Używaj tylko po stronie serwera: security guards, ownership checks,
+// admin lookups. Nigdy nie wysyłaj service key do przeglądarki.
+// Zwraca: array przy sukcesie, WP_Error przy błędzie
+// ============================================================
+
+if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
+	function tw_supabase_get_admin( string $endpoint, array $query = [] ) {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
+			error_log( 'TW tw_supabase_get_admin: TW_SUPABASE_SERVICE_KEY not defined.' );
+			return new WP_Error( 'tw_supabase_config', 'TW_SUPABASE_SERVICE_KEY not configured.' );
+		}
+
+		return tw_supabase_get(
+			$endpoint,
+			$query,
+			[
+				'headers' => [
+					'apikey'        => TW_SUPABASE_SERVICE_KEY,
+					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				],
+			]
+		);
 	}
 }
 
@@ -445,6 +474,10 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 
 /**
  * Sprawdza czy postać należy do zalogowanego usera.
+ *
+ * SECURITY: używa SERVICE KEY — anon key bez JWT byłby zablokowany przez RLS
+ * i zawsze zwracałby false, czyniąc ten guard bezużytecznym.
+ * tw_supabase_get_admin() nigdy nie wysyła service key do przeglądarki.
  */
 if ( ! function_exists( 'tw_user_owns_character' ) ) {
 	function tw_user_owns_character( string $char_id, int $user_id ): bool {
@@ -452,10 +485,15 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 			return false;
 		}
 
-		$result = tw_supabase_get(
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $char_id );
+		if ( empty( $safe_id ) ) {
+			return false;
+		}
+
+		$result = tw_supabase_get_admin(
 			'cyber_characters',
 			[
-				'id'         => 'eq.' . $char_id,
+				'id'         => 'eq.' . $safe_id,
 				'wp_user_id' => 'eq.' . $user_id,
 				'select'     => 'id',
 				'limit'      => 1,
