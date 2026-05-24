@@ -48,7 +48,14 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
 		$rows = array();
 
 		if ( function_exists( 'tw_supabase_rpc' ) ) {
-			$rows = tw_supabase_rpc( 'get_player_achievements', $params );
+			$extra = array();
+			if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+				$extra['headers'] = array(
+					'apikey'        => TW_SUPABASE_SERVICE_KEY,
+					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				);
+			}
+			$rows = tw_supabase_rpc( 'get_player_achievements', $params, $extra );
 		}
 
 		if ( ! is_array( $rows ) ) {
@@ -56,7 +63,6 @@ if ( ! function_exists( 'tw_get_player_achievements' ) ) {
 		}
 
 		$results = array();
-
 		foreach ( $rows as $row ) {
 			$results[] = (object) $row;
 		}
