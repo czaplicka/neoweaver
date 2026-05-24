@@ -75,9 +75,10 @@ function tw_supabase_first( string $table, array $params ): array {
 /**
  * Ensure a state row exists for the given campaign+character.
  * If missing, inserts defaults so the HUD always has something to show.
+ * Uses service key — server-side write that must bypass RLS.
  */
 function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp_user_id ): void {
-	if ( ! function_exists( 'tw_supabase_post' ) ) {
+	if ( ! function_exists( 'tw_supabase_request' ) ) {
 		return;
 	}
 
@@ -100,9 +101,16 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
 		return;
 	}
 
+	if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+		error_log( 'TW tw_ensure_state_row: TW_SUPABASE_SERVICE_KEY not defined — skipping insert.' );
+		return;
+	}
+
 	// Insert with all defaults from table definition.
-	tw_supabase_post(
+	$result = tw_supabase_request(
+		'POST',
 		'cyber_state_of_the_campaign',
+		[],
 		[
 			'campaign_id'  => $campaign_id,
 			'character_id' => $character_id,
@@ -114,8 +122,18 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
 			'xp'           => 0,
 			'current_day'  => 0,
 		],
-		[ 'Prefer' => 'return=minimal' ]
+		[
+			'headers' => [
+				'apikey'        => TW_SUPABASE_SERVICE_KEY,
+				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				'Prefer'        => 'return=minimal',
+			],
+		]
 	);
+
+	if ( is_wp_error( $result ) ) {
+		error_log( 'TW tw_ensure_state_row insert error: ' . $result->get_error_message() );
+	}
 }
 
 /**
