@@ -52,7 +52,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		$selected_char_id = $allowed_char_ids[0];
 	}
 
-	$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $selected_char_id );
+	$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( (string) $selected_char_id ) );
 
 	// ── 1. All cards owned by the character ────────────────────────────
 	// cyber_character_deck.id  = instance id (sent to JS as data-instance-id)
@@ -112,14 +112,6 @@ function tw_shortcode_deck_library( $atts ): string {
 			$library_cards[] = $card;
 		}
 	}
-	var_dump( $safe_id, $current_user_id, $characters );
-die();
-		$test = tw_supabase_get( 'cyber_character_deck', [
-    'character_id' => 'eq.' . $safe_id,
-    'select'       => 'id,deck_id',
-] );
-echo '<pre>' . print_r( $test, true ) . '</pre>';
-die();
 	
 	// ── Enqueue assets ─────────────────────────────────────────────────
 	if ( function_exists( 'tw_enqueue_library_assets' ) ) {
