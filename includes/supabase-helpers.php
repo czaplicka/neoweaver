@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * KLUCZE:
  *   tw_supabase_get()          → anon key (odczyty, respektuje RLS z JWT usera)
  *   tw_supabase_get_admin()    → service key (server-side reads omijające RLS)
- *   tw_supabase_request()      → service key (serwer-side writes, omija RLS)
+ *   tw_supabase_request()      → service key (serwer-side writes, omija RLS); fail-fast bez klucza
  *   tw_supabase_rpc()          → anon key (SECURITY DEFINER w Postgres omija RLS samo w sobie)
  *   tw_user_owns_character()   → service key (security guard, MUSI być niezawodny)
  *   Frontend JS                → zawsze anon key + JWT usera
@@ -142,7 +142,7 @@ if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 
 // ============================================================
 // tw_supabase_request() — POST / PATCH / PUT / DELETE
-// Domyślnie używa SERVICE KEY (server-side writes omijają RLS).
+// Wymaga SERVICE KEY — fail-fast jeśli nie jest skonfigurowany.
 // Aby użyć anon key, przekaż headers w $extra_args.
 // Zwraca: WP_Error przy błędzie sieci lub HTTP ≥ 300
 //         ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
@@ -160,15 +160,14 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 			return new WP_Error( 'tw_supabase_args', 'tw_supabase_request: empty endpoint.' );
 		}
 
-		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
-			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined — falling back to anon key for ' . $method . ' ' . $endpoint );
-			if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
-				return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
-			}
-			$write_key = tw_supabase_anon_key();
-		} else {
-			$write_key = TW_SUPABASE_SERVICE_KEY;
+		// Fail-fast: service key jest wymagany dla operacji zapisu.
+		// Nie ma silent fallback na anon key — to byłoby ciche obniżenie bezpieczeństwa.
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
+			error_log( 'TW tw_supabase_request: TW_SUPABASE_SERVICE_KEY not configured. Refusing ' . $method . ' ' . $endpoint . '.' );
+			return new WP_Error( 'tw_supabase_config', 'TW_SUPABASE_SERVICE_KEY not configured.' );
 		}
+
+		$write_key = TW_SUPABASE_SERVICE_KEY;
 
 		$url = $base . $endpoint;
 		if ( ! empty( $query ) ) {
@@ -367,13 +366,7 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
-		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
-			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined.' );
-			return false;
-		}
-
-		// tw_supabase_request() domyślnie już używa service key,
-		// ale przekazujemy Prefer header explicite dla upsert.
+		// tw_supabase_request() już robi fail-fast jeśli SERVICE_KEY nie jest skonfigurowany.
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_user_settings',
@@ -401,29 +394,19 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 }
 
 // ============================================================
-// tw_get_user_setting() — SERVICE KEY
+// tw_get_user_setting() — SERVICE KEY przez tw_supabase_get_admin()
 // ============================================================
 
 if ( ! function_exists( 'tw_get_user_setting' ) ) {
 	function tw_get_user_setting( int $wp_user_id, string $key ): ?string {
-		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
-			error_log( 'TW: TW_SUPABASE_SERVICE_KEY not defined.' );
-			return null;
-		}
-
-		$result = tw_supabase_get(
+		// tw_supabase_get_admin() robi fail-fast jeśli SERVICE_KEY nie jest skonfigurowany.
+		$result = tw_supabase_get_admin(
 			'cyber_user_settings',
 			[
 				'wp_user_id' => 'eq.' . $wp_user_id,
 				'key'        => 'eq.' . $key,
 				'select'     => 'value',
 				'limit'      => 1,
-			],
-			[
-				'headers' => [
-					'apikey'        => TW_SUPABASE_SERVICE_KEY,
-					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-				],
 			]
 		);
 
