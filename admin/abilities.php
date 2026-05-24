@@ -457,8 +457,8 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 				</div>
 			</div>
 		</div>
-	<?php }
-global $wp_styles;
+	<?php 
+										 global $wp_styles;
 
 if ( isset( $wp_styles->registered['nw-abilities-style'] ) ) {
 	echo '<pre style="background:#111;color:#adff00;padding:12px;margin-top:20px;">';
@@ -469,4 +469,5 @@ if ( isset( $wp_styles->registered['nw-abilities-style'] ) ) {
 	echo esc_html( $wp_styles->registered['nw-admin-core']->src ?? 'BRAK' );
 	echo '</pre>';
 }
+										}
 }
