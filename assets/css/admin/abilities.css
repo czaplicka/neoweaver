@@ -2,7 +2,12 @@
    NeoWeaver Admin — ABILITIES-SPECIFIC STYLES
    Extension for: admin-core.css
    ============================================================= */
-
+#nw-abilities-panel {
+	border: 4px solid red !important;
+	background: #111 !important;
+	color: #adff00 !important;
+	padding: 20px !important;
+}
 /* ---- Media & Visuals ---- */
 .nw-col-img { width: 50px; }
 
