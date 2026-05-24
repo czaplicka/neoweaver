@@ -16,6 +16,8 @@ if ( class_exists( 'NW_Abilities_Admin', false ) ) {
 class NW_Abilities_Admin extends NW_Base_Admin {
 
 	private string $page_slug = 'nw-abilities';
+	private string $page_hook = '';
+
 	private const ABILITY_TYPES = [ 'active', 'passive', 'reaction', 'aura' ];
 	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
@@ -31,7 +33,7 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function register_menu(): void {
-		add_submenu_page(
+		$this->page_hook = add_submenu_page(
 			'neoweaver',
 			'NeoWeaver — Abilities',
 			'⚡ Abilities',
@@ -42,7 +44,7 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
+		if ( $hook !== $this->page_hook ) {
 			return;
 		}
 
@@ -78,7 +80,6 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		);
 	}
 
-
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
 
@@ -100,33 +101,44 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		return array_values( array_filter( array_map( 'sanitize_text_field', $parts ) ) );
 	}
 
-private function is_uuid( string $value ): bool {
-	return (bool) preg_match(
-		'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
-		$value
-	);
-}
-
-	public function ajax_get_abilities(): void {
-	check_ajax_referer( 'neoweaver_abilities', 'nonce' );
-
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( 'Forbidden', 403 );
-		return;
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match(
+			'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+			$value
+		);
 	}
 
-	wp_send_json_success(
-		[
+	public function ajax_get_abilities(): void {
+		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		wp_send_json_success(
 			[
-				'id'           => 'test-id-1',
-				'name'         => 'Test Ability',
-				'ability_type' => 'active',
-				'is_active'    => true,
-				'tags'         => [ 'test' ],
-			],
-		]
-	);
-}
+				[
+					'id'           => 'test-id-1',
+					'name'         => 'Test Ability',
+					'description'  => 'Frontend test row.',
+					'ability_type' => 'active',
+					'cost_type'    => 'mana',
+					'cost_value'   => 2,
+					'target_type'  => 'single',
+					'range_tiles'  => 3,
+					'duration_turns' => 0,
+					'is_passive'   => false,
+					'is_active'    => true,
+					'tags'         => [ 'test', 'debug' ],
+					'img_url'      => '',
+					'source'       => 'debug',
+					'gm_notes'     => '',
+				],
+			]
+		);
+	}
+
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 
@@ -152,9 +164,10 @@ private function is_uuid( string $value ): bool {
 		$gm_notes       = sanitize_textarea_field( wp_unslash( $_POST['gm_notes'] ?? '' ) );
 
 		if ( empty( $name ) ) {
-    wp_send_json_error( 'Name is required.' );
-    return;
-}
+			wp_send_json_error( 'Name is required.' );
+			return;
+		}
+
 		if ( ! in_array( $ability_type, self::ABILITY_TYPES, true ) ) {
 			$ability_type = 'active';
 		}
@@ -349,24 +362,32 @@ private function is_uuid( string $value ): bool {
 					</button>
 				</div>
 			</div>
+
 			<div id="nw-abilities-list" class="nw-items-grid"></div>
+
 			<div id="nw-ability-modal" class="nw-modal" style="display:none;">
 				<div class="nw-modal-backdrop"></div>
 				<div class="nw-modal-box">
 					<div class="nw-modal-header">
 						<h2 class="nw-modal-title" id="nw-modal-title">Add Ability</h2>
-						<button class="nw-modal-close" id="nw-modal-close"><i data-lucide="x"></i></button>
+						<button class="nw-modal-close" id="nw-modal-close" type="button">
+							<i data-lucide="x"></i>
+						</button>
 					</div>
+
 					<form id="nw-ability-form" class="nw-form">
 						<input type="hidden" id="ability-id" name="id" />
+
 						<div class="nw-form-row">
 							<label for="ability-name">Name *</label>
 							<input type="text" id="ability-name" name="name" required />
 						</div>
+
 						<div class="nw-form-row">
 							<label for="ability-description">Description</label>
 							<textarea id="ability-description" name="description" rows="3"></textarea>
 						</div>
+
 						<div class="nw-form-row nw-form-row--half">
 							<div>
 								<label for="ability-type">Ability Type</label>
@@ -385,6 +406,7 @@ private function is_uuid( string $value ): bool {
 								</select>
 							</div>
 						</div>
+
 						<div class="nw-form-row nw-form-row--half">
 							<div>
 								<label for="ability-cost-type">Cost Type</label>
@@ -399,6 +421,7 @@ private function is_uuid( string $value ): bool {
 								<input type="number" id="ability-cost-value" name="cost_value" min="0" value="0" />
 							</div>
 						</div>
+
 						<div class="nw-form-row nw-form-row--half">
 							<div>
 								<label for="ability-range">Range (tiles)</label>
@@ -409,26 +432,32 @@ private function is_uuid( string $value ): bool {
 								<input type="number" id="ability-duration" name="duration_turns" min="0" value="0" />
 							</div>
 						</div>
+
 						<div class="nw-form-row">
 							<label for="ability-tags">Tags (comma-separated)</label>
 							<input type="text" id="ability-tags" name="tags" placeholder="fire, ranged, debuff" />
 						</div>
+
 						<div class="nw-form-row">
 							<label for="ability-img">Image URL</label>
 							<input type="url" id="ability-img" name="img_url" />
 						</div>
+
 						<div class="nw-form-row">
 							<label for="ability-source">Source</label>
 							<input type="text" id="ability-source" name="source" />
 						</div>
+
 						<div class="nw-form-row">
 							<label for="ability-gm-notes">GM Notes</label>
 							<textarea id="ability-gm-notes" name="gm_notes" rows="2"></textarea>
 						</div>
+
 						<div class="nw-form-row nw-form-row--checkboxes">
 							<label><input type="checkbox" name="is_passive" value="1" id="ability-is-passive" /> Passive</label>
 							<label><input type="checkbox" name="is_active" value="1" id="ability-is-active" checked /> Active</label>
 						</div>
+
 						<div class="nw-form-actions">
 							<button type="submit" class="button button-primary">Save</button>
 							<button type="button" class="button nw-modal-cancel">Cancel</button>
