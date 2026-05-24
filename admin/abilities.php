@@ -53,22 +53,27 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function print_admin_head_assets(): void {
-		$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
+	$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
 
-		if ( $page !== $this->page_slug ) {
-			return;
-		}
-
-		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '" />';
-		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '" />';
-		echo '<script>window.NWAbilities=' . wp_json_encode(
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
-			]
-		) . ';</script>';
-		echo '<script src="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '"></script>';
+	if ( $page !== $this->page_slug ) {
+		return;
 	}
+
+	// DEV: wymusza nowy URL przy każdym odświeżeniu
+	$dev_ver = (string) time();
+
+	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?dev=' . $dev_ver ) . '" />';
+	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?dev=' . $dev_ver ) . '" />';
+
+	echo '<script>window.NWAbilities=' . wp_json_encode(
+		[
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+		]
+	) . ';</script>';
+
+	echo '<script src="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js?dev=' . $dev_ver ) . '"></script>';
+}
 
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
