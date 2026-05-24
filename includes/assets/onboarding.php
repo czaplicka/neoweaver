@@ -11,7 +11,7 @@ if ( ! function_exists( 'tw_register_onboarding_assets' ) ) {
 		wp_register_style(
 			'neoweaver-onboarding',
 			NEOWEAVER_PLUGIN_URL . $css_rel,
-			array( 'neoweaver-public' ),
+			array( '' ),
 			file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION
 		);
 
