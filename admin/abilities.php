@@ -66,13 +66,13 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
 	);
 
-	wp_enqueue_script(
-		'nw-abilities-script',
-		NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
-		[ 'jquery' ],
-		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
-		true
-	);
+	// wp_enqueue_script(
+	//	'nw-abilities-script',
+	//	NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
+	//	[ 'jquery' ],
+	//	(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
+	//	true
+	// );
 
 	wp_localize_script(
 		'nw-abilities-script',
