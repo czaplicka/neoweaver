@@ -22,15 +22,16 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
 
-	public function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
-		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
-		add_action( 'wp_ajax_nw_save_ability', [ $this, 'ajax_save_ability' ] );
-		add_action( 'wp_ajax_nw_delete_ability', [ $this, 'ajax_delete_ability' ] );
-		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
-	}
+public function __construct() {
+	add_action( 'admin_menu', [ $this, 'register_menu' ] );
+	add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+	add_action( 'admin_head', [ $this, 'debug_admin_head_assets' ] );
+	add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
+	add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
+	add_action( 'wp_ajax_nw_save_ability', [ $this, 'ajax_save_ability' ] );
+	add_action( 'wp_ajax_nw_delete_ability', [ $this, 'ajax_delete_ability' ] );
+	add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
+}
 
 	public function register_menu(): void {
 		$this->page_hook = add_submenu_page(
@@ -83,6 +84,17 @@ wp_enqueue_style(
 	);
 }
 
+	public function debug_admin_head_assets(): void {
+	$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
+
+	if ( $page !== $this->page_slug ) {
+		return;
+	}
+
+	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?manual=1' ) . '" />';
+	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?manual=1' ) . '" />';
+}
+	
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
 
