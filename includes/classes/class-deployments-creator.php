@@ -35,11 +35,44 @@ class Neoweaver_Deployments_Creator {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Standard Supabase REST request headers.
+	 * Supabase REST headers using SERVICE KEY for server-side writes.
+	 *
+	 * All methods in this class perform server-side INSERTs that must bypass
+	 * RLS. The service key is used exclusively here on the PHP/server side and
+	 * is never exposed to the browser.
+	 *
+	 * Falls back to anon key with an error_log warning if the service key
+	 * constant is not defined (misconfigured wp-config.php).
 	 *
 	 * @return array<string,string>
 	 */
 	private function headers(): array {
+		if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
+			$key = TW_SUPABASE_SERVICE_KEY;
+		} elseif ( function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW Deployments_Creator: TW_SUPABASE_SERVICE_KEY not defined, falling back to anon key.' );
+			$key = tw_supabase_anon_key();
+		} else {
+			error_log( 'TW Deployments_Creator: No Supabase key available.' );
+			$key = '';
+		}
+
+		return [
+			'apikey'        => $key,
+			'Authorization' => 'Bearer ' . $key,
+			'Content-Type'  => 'application/json',
+		];
+	}
+
+	/**
+	 * Read-only headers using ANON KEY for GET requests.
+	 *
+	 * GET requests (existence checks, fetches) should use the anon key so
+	 * that RLS read policies apply normally.
+	 *
+	 * @return array<string,string>
+	 */
+	private function read_headers(): array {
 		$key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
 		return [
 			'apikey'        => $key,
@@ -63,13 +96,14 @@ class Neoweaver_Deployments_Creator {
 
 	/**
 	 * Execute a GET and return the decoded JSON body as an array.
+	 * Uses anon key — reads respect RLS policies.
 	 * Returns [] and logs on any error.
 	 *
 	 * @param string $url
 	 * @return array
 	 */
 	private function get_json( string $url ): array {
-		$res = wp_remote_get( $url, [ 'headers' => $this->headers(), 'timeout' => 15 ] );
+		$res = wp_remote_get( $url, [ 'headers' => $this->read_headers(), 'timeout' => 15 ] );
 		if ( is_wp_error( $res ) ) {
 			error_log( 'TW Deployments GET error [' . $url . ']: ' . $res->get_error_message() );
 			return [];
@@ -85,6 +119,7 @@ class Neoweaver_Deployments_Creator {
 
 	/**
 	 * Execute a POST with a JSON body and return the first row of the response.
+	 * Uses service key — server-side INSERTs bypass RLS.
 	 * Uses `Prefer: return=representation` so Supabase echoes the new row back.
 	 * Returns null on any failure.
 	 *
