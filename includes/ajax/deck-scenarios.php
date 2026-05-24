@@ -63,7 +63,7 @@ function tw_localize_deck_vars() {
 			error_log( 'tw_localize_deck_vars: campaign lookup error: ' . $result->get_error_message() );
 		} elseif ( ! empty( $result[0]['id'] ) ) {
 			$campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $result[0]['id'] );
-			error_log( 'tw_localize_deck_vars: found campaign_id=' . $campaign_id . ' for user ' . $user_id );
+			error_log( 'tw_localize_deck_vars: found campaign_id=' . $campaign_id . ' dla user ' . $user_id );
 		} else {
 			error_log( 'tw_localize_deck_vars: no campaign found for user ' . $user_id );
 		}
@@ -77,7 +77,7 @@ function tw_localize_deck_vars() {
 		[
 			'ajaxurl'     => admin_url( 'admin-ajax.php' ),
 			'nonce'       => wp_create_nonce( 'tw_deck_nonce' ),
-			'campaign_id' => $campaign_id,   // UUID string, not int
+			'campaign_id' => $campaign_id,
 			'user_id'     => (int) $user_id,
 		]
 	);
@@ -85,28 +85,32 @@ function tw_localize_deck_vars() {
 
 // ---------------------------------------------------------------------------
 // 2. AJAX: get available scenarios for a campaign
+// Tylko zalogowani użytkownicy — nie rejestrujemy nopriv.
 // ---------------------------------------------------------------------------
 
-add_action( 'wp_ajax_tw_get_scenarios_ajax',        'tw_get_scenarios_ajax' );
-add_action( 'wp_ajax_nopriv_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax' );
+add_action( 'wp_ajax_tw_get_scenarios_ajax', 'tw_get_scenarios_ajax' );
 
-function tw_get_scenarios_ajax() {
+function tw_get_scenarios_ajax(): void {
+
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( [ 'message' => 'Unauthorized' ], 401 );
+		return;
+	}
 
 	if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
-		wp_send_json_error( [ 'message' => 'Security check failed' ] );
+		wp_send_json_error( [ 'message' => 'Security check failed' ], 403 );
 		return;
 	}
 
 	// cyber_campaign.id is a UUID — never cast to int.
-	$campaign_id_raw = $_POST['campaign_id'] ?? '';
-	$campaign_id     = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $campaign_id_raw );
-
-	error_log( 'tw_get_scenarios_ajax: received campaign_id=' . $campaign_id );
+	$campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['campaign_id'] ?? '' ) );
 
 	if ( ! $campaign_id ) {
-		wp_send_json_error( [ 'message' => 'Missing campaign_id' ] );
+		wp_send_json_error( [ 'message' => 'Missing campaign_id' ], 400 );
 		return;
 	}
+
+	error_log( 'tw_get_scenarios_ajax: campaign_id=' . $campaign_id );
 
 	// 1. Campaign row.
 	$campaigns = tw_supabase_get(
@@ -119,12 +123,12 @@ function tw_get_scenarios_ajax() {
 	);
 
 	if ( is_wp_error( $campaigns ) ) {
-		wp_send_json_error( [ 'message' => 'Campaign fetch failed', 'error' => $campaigns->get_error_message() ] );
+		wp_send_json_error( [ 'message' => 'Campaign fetch failed', 'error' => $campaigns->get_error_message() ], 502 );
 		return;
 	}
 
 	if ( empty( $campaigns ) ) {
-		wp_send_json_error( [ 'message' => 'Campaign not found' ] );
+		wp_send_json_error( [ 'message' => 'Campaign not found' ], 404 );
 		return;
 	}
 
@@ -143,7 +147,7 @@ function tw_get_scenarios_ajax() {
 	);
 
 	if ( is_wp_error( $played ) ) {
-		wp_send_json_error( [ 'message' => 'Played scenarios fetch failed', 'error' => $played->get_error_message() ] );
+		wp_send_json_error( [ 'message' => 'Played scenarios fetch failed', 'error' => $played->get_error_message() ], 502 );
 		return;
 	}
 
@@ -173,12 +177,12 @@ function tw_get_scenarios_ajax() {
 	$scenarios = tw_supabase_get( 'cyber_scenarios', $query );
 
 	if ( is_wp_error( $scenarios ) ) {
-		wp_send_json_error( [ 'message' => 'Scenarios fetch failed', 'error' => $scenarios->get_error_message() ] );
+		wp_send_json_error( [ 'message' => 'Scenarios fetch failed', 'error' => $scenarios->get_error_message() ], 502 );
 		return;
 	}
 
 	if ( empty( $scenarios ) ) {
-		wp_send_json_error( [ 'message' => 'No scenarios found' ] );
+		wp_send_json_error( [ 'message' => 'No scenarios found' ], 404 );
 		return;
 	}
 
