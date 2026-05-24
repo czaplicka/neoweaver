@@ -101,12 +101,12 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		return array_values( array_filter( array_map( 'sanitize_text_field', $parts ) ) );
 	}
 
-	private function is_uuid( string $value ): bool {
-		return (bool) preg_match(
-			'/^[0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[1-5][0-9a-fA-F]{3}\\-[89abAB][0-9a-fA-F]{3}\\-[0-9a-fA-F]{12}$/',
-			$value
-		);
-	}
+private function is_uuid( string $value ): bool {
+    return (bool) preg_match(
+        '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i',
+        $value
+    );
+}
 
 	public function ajax_get_abilities(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
