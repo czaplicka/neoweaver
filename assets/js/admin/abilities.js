@@ -112,39 +112,34 @@ jQuery(function ($) {
 			return;
 		}
 
-		var html = items.map(function (a) {
-			var tagsHtml = (a.tags || []).map(function (tag) {
-				return '<span class="nw-tag">' + esc(tag) + '</span>';
-			}).join(' ');
+var html = items.map(function (a) {
+    var tagsHtml = (a.tags || []).map(function (tag) {
+        return '<span class="nw-tag">' + esc(tag) + '</span>';
+    }).join(' ');
 
-			var thumb = a.img_url
-				? '<div class="nw-item-thumb"><img src="' + esc(a.img_url) + '" alt=""></div>'
-				: '';
-
-			return ''
-				+ '<article class="nw-item-card" data-id="' + esc(a.id) + '">'
-				+   thumb
-				+   '<div class="nw-item-body">'
-				+     '<div class="nw-item-top">'
-				+       '<h3 class="nw-item-title">' + esc(a.name || 'Untitled') + '</h3>'
-				+       '<span class="nw-item-type">' + esc(a.ability_type) + '</span>'
-				+     '</div>'
-				+     '<div class="nw-item-meta">'
-				+       '<span>Target: ' + esc(a.target_type) + '</span>'
-				+       '<span>Cost: ' + esc(a.cost_type) + (a.cost_value ? ' ' + esc(a.cost_value) : '') + '</span>'
-				+       '<span>Range: ' + esc(a.range_tiles) + '</span>'
-				+     '</div>'
-				+     '<p class="nw-item-desc">' + esc(a.description || '') + '</p>'
-				+     '<div class="nw-item-tags">' + tagsHtml + '</div>'
-				+     '<div class="nw-item-actions">'
-				+       '<button type="button" class="button nw-edit-ability" data-id="' + esc(a.id) + '">Edit</button>'
-				+       '<button type="button" class="button nw-toggle-ability" data-id="' + esc(a.id) + '" data-active="' + (a.is_active ? '1' : '0') + '">'
-				+         (a.is_active ? 'Disable' : 'Enable')
-				+       '</button>'
-				+     '</div>'
-				+   '</div>'
-				+ '</article>';
-		}).join('');
+    return ''
+        + '<article class="nw-item-card" data-id="' + esc(a.id) + '">'
+        +   '<div class="nw-item-main">'
+        +     '<div class="nw-item-row-top">'
+        +       '<h3 class="nw-item-title">' + esc(a.name || 'Untitled') + '</h3>'
+        +       '<span class="nw-item-type">' + esc(a.ability_type) + '</span>'
+        +     '</div>'
+        +     '<div class="nw-item-meta-line">'
+        +       '<span class="nw-item-meta-chip">Target: ' + esc(a.target_type) + '</span>'
+        +       '<span class="nw-item-meta-chip">Cost: ' + esc(a.cost_type) + (a.cost_value ? ' ' + esc(a.cost_value) : '') + '</span>'
+        +       '<span class="nw-item-meta-chip">Range: ' + esc(a.range_tiles) + '</span>'
+        +     '</div>'
+        +     '<p class="nw-item-desc">' + esc(a.description || '') + '</p>'
+        +     '<div class="nw-item-tags">' + tagsHtml + '</div>'
+        +   '</div>'
+        +   '<div class="nw-item-actions">'
+        +     '<button type="button" class="button nw-edit-ability" data-id="' + esc(a.id) + '">Edit</button>'
+        +     '<button type="button" class="button nw-toggle-ability" data-id="' + esc(a.id) + '" data-active="' + (a.is_active ? '1' : '0') + '">'
+        +       (a.is_active ? 'Disable' : 'Enable')
+        +     '</button>'
+        +   '</div>'
+        + '</article>';
+}).join('');
 
 		$list.html(html);
 	}
