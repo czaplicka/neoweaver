@@ -39,19 +39,36 @@ if ( ! function_exists( 'cyber_is_valid_uuid' ) ) {
 
 /**
  * Helper: call a Supabase RPC function via wp_remote_post().
+ *
+ * Uses SERVICE KEY — mutating RPCs (cyber_sync_deck, cyber_sync_draw,
+ * cyber_upgrade_buffer_card) run server-side and must bypass RLS.
+ * Caller is responsible for ownership/auth checks before invoking.
  */
 if ( ! function_exists( 'cyber_call_rpc' ) ) {
 	function cyber_call_rpc( string $function_name, array $params = [] ): ?array {
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-			error_log( 'TW cyber_call_rpc: Supabase helpers not available.' );
+		if ( ! function_exists( 'tw_supabase_url' ) ) {
+			error_log( 'TW cyber_call_rpc: tw_supabase_url() not available.' );
 			return null;
 		}
 
-		$key          = tw_supabase_anon_key();
 		$supabase_url = tw_supabase_url();
+		if ( empty( $supabase_url ) ) {
+			error_log( 'TW cyber_call_rpc: Missing Supabase URL.' );
+			return null;
+		}
 
-		if ( empty( $key ) || empty( $supabase_url ) ) {
-			error_log( 'TW cyber_call_rpc: Missing Supabase URL or key.' );
+		if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
+			$key = TW_SUPABASE_SERVICE_KEY;
+		} elseif ( function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW cyber_call_rpc: TW_SUPABASE_SERVICE_KEY not defined, falling back to anon key.' );
+			$key = tw_supabase_anon_key();
+		} else {
+			error_log( 'TW cyber_call_rpc: No Supabase key available.' );
+			return null;
+		}
+
+		if ( empty( $key ) ) {
+			error_log( 'TW cyber_call_rpc: Empty Supabase key.' );
 			return null;
 		}
 
@@ -100,11 +117,14 @@ if ( ! function_exists( 'cyber_call_rpc' ) ) {
 
 /**
  * Helper: PATCH a card location in cyber_character_buffer.
+ *
+ * Uses SERVICE KEY — server-side write; ownership is verified by
+ * handle_use_buffer_card() before this is called.
  */
 if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 	function cyber_update_supabase_location( string $instance_id, string $location ): bool {
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-			error_log( 'TW cyber_update_supabase_location: Supabase helpers not available.' );
+		if ( ! function_exists( 'tw_supabase_url' ) ) {
+			error_log( 'TW cyber_update_supabase_location: tw_supabase_url() not available.' );
 			return false;
 		}
 
@@ -113,11 +133,24 @@ if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 			return false;
 		}
 
-		$key          = tw_supabase_anon_key();
 		$supabase_url = tw_supabase_url();
+		if ( empty( $supabase_url ) ) {
+			error_log( 'TW cyber_update_supabase_location: Missing Supabase URL.' );
+			return false;
+		}
 
-		if ( empty( $key ) || empty( $supabase_url ) ) {
-			error_log( 'TW cyber_update_supabase_location: Missing Supabase URL or key.' );
+		if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
+			$key = TW_SUPABASE_SERVICE_KEY;
+		} elseif ( function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW cyber_update_supabase_location: TW_SUPABASE_SERVICE_KEY not defined, falling back to anon key.' );
+			$key = tw_supabase_anon_key();
+		} else {
+			error_log( 'TW cyber_update_supabase_location: No Supabase key available.' );
+			return false;
+		}
+
+		if ( empty( $key ) ) {
+			error_log( 'TW cyber_update_supabase_location: Empty Supabase key.' );
 			return false;
 		}
 
