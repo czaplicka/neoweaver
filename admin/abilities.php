@@ -331,16 +331,7 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 		wp_send_json_success( 'Reordered.' );
 	}
 
-	public function render_page(): void {
-										 	global $wp_styles, $wp_scripts;
-
-	echo '<pre style="background:#111;color:#adff00;padding:12px;">';
-	echo 'STYLES QUEUED:' . "\n";
-	print_r( $wp_styles->queue ?? [] );
-	echo "\n\nSCRIPTS QUEUED:\n";
-	print_r( $wp_scripts->queue ?? [] );
-	echo '</pre>';
-	?>
+	public function render_page(): void {	?>
 		<div class="wrap nw-panel" id="nw-abilities-panel">
 			<div class="nw-panel-header">
 				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Abilities</span></h1>
@@ -467,4 +458,15 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 			</div>
 		</div>
 	<?php }
+global $wp_styles;
+
+if ( isset( $wp_styles->registered['nw-abilities-style'] ) ) {
+	echo '<pre style="background:#111;color:#adff00;padding:12px;margin-top:20px;">';
+	echo 'NW ABILITIES CSS SRC: ';
+	echo esc_html( $wp_styles->registered['nw-abilities-style']->src ?? 'BRAK' );
+	echo "\n";
+	echo 'NW ADMIN CORE CSS SRC: ';
+	echo esc_html( $wp_styles->registered['nw-admin-core']->src ?? 'BRAK' );
+	echo '</pre>';
+}
 }
