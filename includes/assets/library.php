@@ -11,7 +11,7 @@ if ( ! function_exists( 'tw_register_library_assets' ) ) {
 		wp_register_style(
 			'neoweaver-library',
 			NEOWEAVER_PLUGIN_URL . $css_rel,
-			array( 'neoweaver-achievements' ),
+			array(),
 			file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION
 		);
 
