@@ -22,16 +22,16 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	private const COST_TYPES    = [ 'none', 'mana', 'stamina', 'hp', 'gold', 'action' ];
 	private const TARGET_TYPES  = [ 'self', 'single', 'aoe', 'line', 'cone', 'all' ];
 
-public function __construct() {
-	add_action( 'admin_menu', [ $this, 'register_menu' ] );
-	add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-	add_action( 'admin_head', [ $this, 'debug_admin_head_assets' ] );
-	add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
-	add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
-	add_action( 'wp_ajax_nw_save_ability', [ $this, 'ajax_save_ability' ] );
-	add_action( 'wp_ajax_nw_delete_ability', [ $this, 'ajax_delete_ability' ] );
-	add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
-}
+	public function __construct() {
+		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'admin_head', [ $this, 'print_admin_head_assets' ] );
+		add_action( 'wp_ajax_nw_abilities_get_all', [ $this, 'ajax_get_abilities' ] );
+		add_action( 'wp_ajax_nw_abilities_toggle', [ $this, 'ajax_toggle_ability' ] );
+		add_action( 'wp_ajax_nw_save_ability', [ $this, 'ajax_save_ability' ] );
+		add_action( 'wp_ajax_nw_delete_ability', [ $this, 'ajax_delete_ability' ] );
+		add_action( 'wp_ajax_nw_reorder_abilities', [ $this, 'ajax_reorder_abilities' ] );
+	}
 
 	public function register_menu(): void {
 		$this->page_hook = add_submenu_page(
@@ -45,56 +45,31 @@ public function __construct() {
 	}
 
 	public function enqueue_assets( string $hook ): void {
+		$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
 
-	if ( $hook !== $this->page_hook ) {
-		return;
+		if ( $page !== $this->page_slug ) {
+			return;
+		}
 	}
 
-	wp_enqueue_style( 'nw-font-chakra-petch' );
+	public function print_admin_head_assets(): void {
+		$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
 
-wp_enqueue_style(
-	'nw-admin-core',
-	NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?x=debug-core',
-	[ 'nw-font-chakra-petch' ],
-	null
-);
+		if ( $page !== $this->page_slug ) {
+			return;
+		}
 
-wp_enqueue_style(
-	'nw-abilities-style',
-	NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?x=debug-red-frame',
-	[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-	null
-);
-
-	wp_enqueue_script(
-		'nw-abilities-script',
-		NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js',
-		[ 'jquery' ],
-		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/abilities.js' ),
-		true
-	);
-
-	wp_localize_script(
-		'nw-abilities-script',
-		'NWAbilities',
-		[
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
-		]
-	);
-}
-
-	public function debug_admin_head_assets(): void {
-	$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
-
-	if ( $page !== $this->page_slug ) {
-		return;
+		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '" />';
+		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '" />';
+		echo '<script>window.NWAbilities=' . wp_json_encode(
+			[
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'neoweaver_abilities' ),
+			]
+		) . ';</script>';
+		echo '<script src="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/js/admin/abilities.js?ver=' . rawurlencode( NEOWEAVER_VERSION ) ) . '"></script>';
 	}
 
-	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?manual=1' ) . '" />';
-	echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css?manual=1' ) . '" />';
-}
-	
 	private function normalize_tags( $raw ): array {
 		$raw = wp_unslash( $raw );
 
@@ -124,23 +99,22 @@ wp_enqueue_style(
 	}
 
 	public function ajax_get_abilities(): void {
-	check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_send_json_error( 'Forbidden', 403 );
-		return;
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
+			return;
+		}
+
+		wp_send_json_success( $res['data'] ?? [] );
 	}
-
-	$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
-
-	if ( ! $res['ok'] ) {
-		// Na czas debugowania zwróćmy szczegółowy błąd
-		wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
-		return;
-	}
-
-	wp_send_json_success( $res['data'] ?? [] );
-}
 
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
@@ -343,7 +317,7 @@ wp_enqueue_style(
 		wp_send_json_success( 'Reordered.' );
 	}
 
-	public function render_page(): void {	?>
+	public function render_page(): void { ?>
 		<div class="wrap nw-panel" id="nw-abilities-panel">
 			<div class="nw-panel-header">
 				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Abilities</span></h1>
