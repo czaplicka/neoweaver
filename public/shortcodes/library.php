@@ -112,11 +112,9 @@ function tw_shortcode_deck_library( $atts ): string {
 			$library_cards[] = $card;
 		}
 	}
-	$test = tw_supabase_get( 'cyber_character_deck', [
-    'character_id' => 'eq.5e95adc8-388d-4e8d-8235-783cd8f0082e',
-    'select'       => 'id,deck_id',
-] );
-var_dump( $test );
+$current_user_id = get_current_user_id();
+$characters = tw_get_user_characters( $current_user_id );
+var_dump( $current_user_id, $characters );
 die();
 	// ── Enqueue assets ─────────────────────────────────────────────────
 	if ( function_exists( 'tw_enqueue_library_assets' ) ) {
