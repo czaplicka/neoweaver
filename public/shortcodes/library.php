@@ -113,7 +113,13 @@ function tw_shortcode_deck_library( $atts ): string {
 			$library_cards[] = $card;
 		}
 	}
-
+		$test = tw_supabase_get( 'cyber_character_deck', [
+    'character_id' => 'eq.' . $safe_id,
+    'select'       => 'id,deck_id',
+] );
+echo '<pre>' . print_r( $test, true ) . '</pre>';
+die();
+	
 	// ── Enqueue assets ─────────────────────────────────────────────────
 	if ( function_exists( 'tw_enqueue_library_assets' ) ) {
 		tw_enqueue_library_assets( [
@@ -149,14 +155,6 @@ function tw_shortcode_deck_library( $atts ): string {
 		<div id="deck-warning" class="deck-warning"></div>
 
 		<div class="deck-builder-container">
-<?php
-		$test = tw_supabase_get( 'cyber_character_deck', [
-    'character_id' => 'eq.' . $safe_id,
-    'select'       => 'id,deck_id',
-] );
-echo '<pre>' . print_r( $test, true ) . '</pre>';
-die();
-	?>
 			<!-- ── Active deck ── -->
 			<div class="deck-section">
 				<h3>
