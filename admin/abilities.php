@@ -109,35 +109,22 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function ajax_get_abilities(): void {
-		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
+	check_ajax_referer( 'neoweaver_abilities', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		wp_send_json_success(
-			[
-				[
-					'id'           => 'test-id-1',
-					'name'         => 'Test Ability',
-					'description'  => 'Frontend test row.',
-					'ability_type' => 'active',
-					'cost_type'    => 'mana',
-					'cost_value'   => 2,
-					'target_type'  => 'single',
-					'range_tiles'  => 3,
-					'duration_turns' => 0,
-					'is_passive'   => false,
-					'is_active'    => true,
-					'tags'         => [ 'test', 'debug' ],
-					'img_url'      => '',
-					'source'       => 'debug',
-					'gm_notes'     => '',
-				],
-			]
-		);
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Forbidden', 403 );
+		return;
 	}
+
+	$res = $this->supa( 'GET', 'cyber_abilities?select=*&order=sort_order.asc,id.asc' );
+
+	if ( ! $res['ok'] ) {
+		wp_send_json_error( $res['error'] ?? 'Failed to fetch abilities.' );
+		return;
+	}
+
+	wp_send_json_success( $res['data'] ?? [] );
+}
 
 	public function ajax_save_ability(): void {
 		check_ajax_referer( 'neoweaver_abilities', 'nonce' );
