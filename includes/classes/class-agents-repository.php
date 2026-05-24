@@ -4,7 +4,13 @@
  *
  * Low-level data-access layer for Field Agents stored in Supabase.
  * All reads go through the Supabase REST API using the helpers
- * tw_supabase_url() and tw_supabase_anon_key() defined in wp-config.
+ * tw_supabase_url() and tw_supabase_service_key() defined in wp-config.
+ *
+ * WHY SERVICE KEY:
+ * cyber_characters RLS policies require `authenticated` role — the anon key
+ * without a JWT is blocked by every SELECT policy. Server-side PHP reads
+ * (security guards, session lookups, roster fetches) must use the service key
+ * to bypass RLS. The service key is never sent to the browser.
  *
  * ARCHITECTURAL RULES (do not violate):
  *  - This class NEVER mutates game state. Pure read queries only.
@@ -29,15 +35,28 @@ class Neoweaver_Agents_Repository {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Build the standard Supabase REST request headers.
+	 * Build the standard Supabase REST request headers using SERVICE KEY.
+	 *
+	 * All queries in this class are server-side reads that must bypass RLS
+	 * (policies require `authenticated` role — anon key without JWT is blocked).
+	 * Falls back to anon key with a warning if service key is not configured.
 	 *
 	 * @return array<string,string>
 	 */
 	private function headers(): array {
-		$anon_key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+		if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
+			$key = TW_SUPABASE_SERVICE_KEY;
+		} elseif ( function_exists( 'tw_supabase_anon_key' ) ) {
+			error_log( 'TW Agents_Repository: TW_SUPABASE_SERVICE_KEY not defined, falling back to anon key. Server-side reads may be blocked by RLS.' );
+			$key = tw_supabase_anon_key();
+		} else {
+			error_log( 'TW Agents_Repository: No Supabase key available.' );
+			$key = '';
+		}
+
 		return [
-			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . $anon_key,
+			'apikey'        => $key,
+			'Authorization' => 'Bearer ' . $key,
 			'Content-Type'  => 'application/json',
 		];
 	}
@@ -421,6 +440,11 @@ class Neoweaver_Agents_Repository {
 	 *
 	 * Must be called before any AJAX action that mutates agent data, to prevent
 	 * one Operator from modifying another's character.
+	 *
+	 * Uses service key so the ownership check is never blocked by RLS
+	 * (all policies on cyber_characters require `authenticated` role —
+	 * a PHP server-side call without a JWT would always return false with
+	 * the anon key, making this guard silently ineffective).
 	 *
 	 * @param int        $wp_user_id
 	 * @param string|int $character_id
