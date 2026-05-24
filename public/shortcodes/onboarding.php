@@ -155,61 +155,35 @@ if ( ! class_exists( 'TW_Onboarding_Shortcode' ) ) {
 		}
 
 		protected static function get_user_progress( int $wp_user_id ): array {
-			if ( ! function_exists( 'tw_supabase_get' ) ) {
-				return array(
-					'world'     => false,
-					'character' => false,
-					'campaign'  => false,
-					'terminal'  => false,
-				);
-			}
+    if ( ! function_exists( 'tw_supabase_get' ) ) {
+        return [ 'world' => false, 'character' => false, 'campaign' => false, 'terminal' => false ];
+    }
 
-			$wp_user_id = (int) $wp_user_id;
+    if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+        return [ 'world' => false, 'character' => false, 'campaign' => false, 'terminal' => false ];
+    }
 
-			$worlds = tw_supabase_get(
-				'cyber_worlds',
-				array(
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				)
-			);
+    $service_headers = [
+        'headers' => [
+            'apikey'        => TW_SUPABASE_SERVICE_KEY,
+            'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+        ],
+    ];
 
-			$characters = tw_supabase_get(
-				'cyber_characters',
-				array(
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				)
-			);
+    $wp_user_id = (int) $wp_user_id;
 
-			$campaigns = tw_supabase_get(
-				'cyber_campaign',
-				array(
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id',
-					'limit'      => 1,
-				)
-			);
+    $worlds     = tw_supabase_get( 'cyber_worlds',       [ 'wp_user_id' => 'eq.' . $wp_user_id, 'select' => 'id', 'limit' => 1 ], $service_headers );
+    $characters = tw_supabase_get( 'cyber_characters',   [ 'wp_user_id' => 'eq.' . $wp_user_id, 'select' => 'id', 'limit' => 1 ], $service_headers );
+    $campaigns  = tw_supabase_get( 'cyber_campaign',     [ 'wp_user_id' => 'eq.' . $wp_user_id, 'select' => 'id', 'limit' => 1 ], $service_headers );
+    $sessions   = tw_supabase_get( 'cyber_game_sessions',[ 'wp_user_id' => 'eq.' . $wp_user_id, 'select' => 'id', 'status' => 'eq.active', 'limit' => 1 ], $service_headers );
 
-			$terminal_sessions = tw_supabase_get(
-				'cyber_game_sessions',
-				array(
-					'wp_user_id' => 'eq.' . $wp_user_id,
-					'select'     => 'id,status,campaign_id,character_id,world_id',
-					'status'     => 'eq.active',
-					'limit'      => 1,
-				)
-			);
-
-			return array(
-				'world'     => ! empty( $worlds ),
-				'character' => ! empty( $characters ),
-				'campaign'  => ! empty( $campaigns ),
-				'terminal'  => ! empty( $terminal_sessions ),
-			);
-		}
+    return [
+        'world'     => ! is_wp_error( $worlds )     && ! empty( $worlds ),
+        'character' => ! is_wp_error( $characters ) && ! empty( $characters ),
+        'campaign'  => ! is_wp_error( $campaigns )  && ! empty( $campaigns ),
+        'terminal'  => ! is_wp_error( $sessions )   && ! empty( $sessions ),
+    ];
+}
 	}
 
 	TW_Onboarding_Shortcode::init();
