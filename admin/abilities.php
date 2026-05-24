@@ -62,13 +62,8 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	wp_enqueue_style(
 		'nw-abilities-style',
 		NEOWEAVER_PLUGIN_URL . 'assets/css/admin/abilities.css',
-		[ 'nw-font-chakra-petch', 'nw-admin-core' ],
+		[],
 		(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/abilities.css' )
-	);
-
-	wp_add_inline_style(
-		'nw-abilities-style',
-		'#nw-abilities-panel{border:4px solid red !important;background:#111 !important;color:#adff00 !important;padding:20px !important;}'
 	);
 
 	wp_enqueue_script(
@@ -338,19 +333,6 @@ class NW_Abilities_Admin extends NW_Base_Admin {
 	}
 
 	public function render_page(): void { ?>
-										 <style>
-		#nw-abilities-panel {
-			border: 4px solid red !important;
-			background: #111 !important;
-			color: #adff00 !important;
-			padding: 20px !important;
-		}
-		#nw-abilities-panel input,
-		#nw-abilities-panel select,
-		#nw-abilities-panel textarea {
-			border: 2px solid #adff00 !important;
-		}
-	</style>
 		<div class="wrap nw-panel" id="nw-abilities-panel">
 			<div class="nw-panel-header">
 				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Abilities</span></h1>
