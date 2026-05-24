@@ -1,83 +1,324 @@
 /* =============================================================
-   NeoWeaver Admin — ABILITIES-SPECIFIC STYLES
-   Extension for: admin-core.css
+   NeoWeaver Admin — ABILITIES
+   Layout for current abilities screen
+   Depends on: admin-core.css
    ============================================================= */
+
 #nw-abilities-panel {
-	border: 4px solid red !important;
-	background: #111 !important;
-	color: #adff00 !important;
-	padding: 20px !important;
-}
-/* ---- Media & Visuals ---- */
-.nw-col-img { width: 50px; }
-
-.nw-ability-img, 
-.nw-ability-img-placeholder {
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    border: 1px solid #2e2e2e;
-    background: #1a1a1a;
+	max-width: 1280px;
 }
 
-.nw-ability-img { object-fit: cover; }
-
-.nw-ability-img-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 20px;
+/* Header button */
+#nw-add-ability {
+	white-space: nowrap;
 }
 
-/* ---- Text Content ---- */
-.nw-ability-name { font-weight: 600; color: #fff; }
-
-.nw-ability-desc,
-.nw-source {
-    font-size: 11px;
-    color: #666;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+/* Grid */
+#nw-abilities-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 16px;
+	margin-top: 20px;
 }
 
-.nw-ability-desc { margin-top: 3px; max-width: 300px; }
-.nw-source { max-width: 160px; }
-
-/* ---- Badges & Tags ---- */
-.nw-type-badge {
-    display: inline-block;
-    font-size: 10px;
-    padding: 2px 9px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    font-weight: 700;
-    white-space: nowrap;
+/* Card */
+.nw-item-card {
+	background: #111;
+	border: 1px solid #2a2a2a;
+	border-radius: 10px;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.03);
+	transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-/* Badge Variants — Energy Alignments */
-.nw-type-active   { background: #1a2800; border: 1px solid #adff00; color: #adff00; }
-.nw-type-passive  { background: #001a3a; border: 1px solid #4da6ff; color: #4da6ff; }
-.nw-type-reaction { background: #2a1a00; border: 1px solid #ff9f00; color: #ff9f00; }
-.nw-type-ultimate { background: #2a0020; border: 1px solid #ff4da6; color: #ff4da6; }
-.nw-type-racial   { background: #1a0a2a; border: 1px solid #b04dff; color: #b04dff; }
-.nw-type-class    { background: #0a2a2a; border: 1px solid #4dffee; color: #4dffee; }
-.nw-type-item     { background: #2a2000; border: 1px solid #e8af34; color: #e8af34; }
-.nw-type-special  { background: #1a1a1a; border: 1px solid #888;    color: #aaa;    }
+.nw-item-card:hover {
+	border-color: #adff00;
+	transform: translateY(-1px);
+	box-shadow: 0 0 0 1px rgba(173, 255, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.22);
+}
 
-/* Cost & Metadata Tags */
-.nw-cost-badge,
+/* Top */
+.nw-item-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.nw-item-title {
+	margin: 0;
+	font-size: 16px;
+	line-height: 1.25;
+	font-weight: 700;
+	color: #fff;
+	word-break: break-word;
+}
+
+/* Type badge */
+.nw-item-type {
+	display: inline-block;
+	font-size: 10px;
+	padding: 3px 9px;
+	border-radius: 999px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-weight: 700;
+	white-space: nowrap;
+	background: #1a2800;
+	border: 1px solid #adff00;
+	color: #adff00;
+}
+
+/* Meta */
+.nw-item-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	font-size: 11px;
+	color: #888;
+}
+
+.nw-item-meta span {
+	background: #181818;
+	border: 1px solid #242424;
+	border-radius: 999px;
+	padding: 3px 8px;
+}
+
+/* Description */
+.nw-item-desc {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+	color: #cfcfcf;
+}
+
+/* Tags */
+.nw-item-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
 .nw-tag {
-    font-size: 10px;
-    padding: 2px 7px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    border-radius: 3px;
-    white-space: nowrap;
+	display: inline-block;
+	font-size: 10px;
+	padding: 3px 8px;
+	background: #1d1d1d;
+	border: 1px solid #2d2d2d;
+	border-radius: 999px;
+	color: #9a9a9a;
+	white-space: nowrap;
 }
 
-.nw-cost-badge { font-size: 11px; padding: 2px 8px; color: #aaa; }
-.nw-tag { color: #888; }
-.nw-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Actions */
+.nw-item-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.nw-item-actions .button {
+	font-family: 'Chakra Petch', sans-serif !important;
+	border-radius: 5px;
+}
+
+/* Empty / loading */
+.nw-empty,
+.nw-loading {
+	padding: 18px 20px;
+	background: #111;
+	border: 1px solid #242424;
+	border-radius: 10px;
+	color: #888;
+}
+
+/* Modal shell */
+#nw-ability-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+}
+
+#nw-ability-modal[style*="display:none"] {
+	pointer-events: none;
+}
+
+.nw-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.74);
+}
+
+.nw-modal-box {
+	position: relative;
+	z-index: 2;
+	width: min(860px, calc(100vw - 32px));
+	max-height: calc(100vh - 48px);
+	overflow-y: auto;
+	margin: 24px auto;
+	background: #111;
+	border: 1px solid #2a2a2a;
+	border-radius: 12px;
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+/* Modal header */
+.nw-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 18px 20px 14px;
+	border-bottom: 1px solid #1f1f1f;
+	position: sticky;
+	top: 0;
+	background: #111;
+	z-index: 2;
+}
+
+.nw-modal-title {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 700;
+	color: #adff00;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.nw-modal-close {
+	background: transparent;
+	border: 1px solid #2a2a2a;
+	color: #888;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.nw-modal-close:hover {
+	border-color: #adff00;
+	color: #adff00;
+	background: #171717;
+}
+
+/* Form */
+.nw-form {
+	padding: 18px 20px 20px;
+}
+
+.nw-form-row {
+	margin-bottom: 14px;
+}
+
+.nw-form-row label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #888;
+	font-weight: 700;
+}
+
+.nw-form-row input[type="text"],
+.nw-form-row input[type="url"],
+.nw-form-row input[type="number"],
+.nw-form-row textarea,
+.nw-form-row select {
+	width: 100%;
+	background: #0d0d0d;
+	border: 1px solid #2a2a2a;
+	border-radius: 6px;
+	color: #e0e0e0;
+	padding: 9px 10px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nw-form-row input:focus,
+.nw-form-row textarea:focus,
+.nw-form-row select:focus {
+	outline: none;
+	border-color: #adff00;
+	box-shadow: 0 0 0 2px rgba(173, 255, 0, 0.12);
+}
+
+.nw-form-row textarea {
+	resize: vertical;
+	min-height: 84px;
+}
+
+.nw-form-row--half {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+.nw-form-row--checkboxes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	padding-top: 4px;
+}
+
+.nw-form-row--checkboxes label {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	font-size: 12px;
+	letter-spacing: 0.02em;
+	text-transform: none;
+	color: #ccc;
+	font-weight: 600;
+}
+
+/* Footer actions */
+.nw-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	padding-top: 8px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+	.nw-panel-header {
+		align-items: flex-start;
+	}
+
+	.nw-header-actions {
+		width: 100%;
+	}
+
+	.nw-search-input {
+		width: 100%;
+		min-width: 0;
+	}
+}
+
+@media (max-width: 782px) {
+	#nw-abilities-list {
+		grid-template-columns: 1fr;
+	}
+
+	.nw-form-row--half {
+		grid-template-columns: 1fr;
+	}
+
+	.nw-modal-box {
+		width: calc(100vw - 20px);
+		margin: 10px auto;
+		max-height: calc(100vh - 20px);
+	}
+}
