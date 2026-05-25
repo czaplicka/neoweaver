@@ -13,7 +13,7 @@ if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 			return '<p class="tw-error">TERMINAL ERROR: No User Sync Detected.</p>';
 		}
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			return '<p class="tw-error">API Config missing.</p>';
 		}
 
@@ -32,15 +32,12 @@ if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 			);
 		}
 
-		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon_key = tw_supabase_anon_key();
-		$jwt      = function_exists( 'tw_supabase_get_current_user_token' )
-			? tw_supabase_get_current_user_token()
-			: null;
+		$url_base    = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+		$service_key = tw_supabase_service_key();
 
 		$headers = array(
-			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . ( $jwt ?: $anon_key ),
+			'apikey'        => $service_key,
+			'Authorization' => 'Bearer ' . $service_key,
 		);
 
 		$supa_get = static function ( string $endpoint, array $params, int $timeout = 15 ) use ( $url_base, $headers ): array {
@@ -335,7 +332,6 @@ if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 							'conf_side_1'  => (string) ( $w['conflict_race_1_name'] ?? '' ),
 							'conf_side_2'  => (string) ( $w['conflict_race_2_name'] ?? '' ),
 						);
-					error_log( 'NW DEBUG jwt=' . ( tw_supabase_get_current_user_token() ?: 'NULL' ) );
 						?>
 						<div
 							class="tw-world-card"
