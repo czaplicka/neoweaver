@@ -63,7 +63,7 @@ class NeoWeaver_Admin {
 			return;
 		}
 
-		$plugin_url = defined( 'NEOWEAVERPLUGINURL' ) ? NEOWEAVERPLUGINURL : plugin_dir_url( __DIR__ );
+		$plugin_url = defined( 'NEOWEAVER_PLUGIN_URL' ) ? NEOWEAVER_PLUGIN_URL : plugin_dir_url( __DIR__ );
 
 		$version = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
 			: ( defined( 'NW_VERSION' ) ? NW_VERSION : null );
@@ -94,7 +94,7 @@ wp_enqueue_style(
 wp_enqueue_script(
 	'nw-dashboard-script',
 	$plugin_url . 'assets/js/admin/dashboard.js',
-	[ 'jquery', 'apexcharts' ],
+	[ 'jquery' ],
 	$version,
 	true
 );
