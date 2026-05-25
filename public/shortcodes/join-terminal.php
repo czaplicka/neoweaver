@@ -43,11 +43,14 @@ if ( ! function_exists( 'neoweave_join_terminal_shortcode' ) ) {
 			$available_chars = json_decode( wp_remote_retrieve_body( $chars_resp ), true ) ?: array();
 		}
 
+		$ajax_url = admin_url( 'admin-ajax.php' );
+		$nonce    = wp_create_nonce( 'tw_join_nonce' );
+
 		if ( function_exists( 'tw_enqueue_join_terminal_assets' ) ) {
 			tw_enqueue_join_terminal_assets(
 				array(
-					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-					'nonce'   => wp_create_nonce( 'tw_join_nonce' ),
+					'ajaxUrl' => $ajax_url,
+					'nonce'   => $nonce,
 					'action'  => 'tw_join_campaign',
 				)
 			);
@@ -55,7 +58,9 @@ if ( ! function_exists( 'neoweave_join_terminal_shortcode' ) ) {
 
 		ob_start();
 		?>
-		<div class="neoweave-terminal" id="neoweave-join-terminal">
+		<div class="neoweave-terminal" id="neoweave-join-terminal"
+			data-ajax-url="<?php echo esc_url( $ajax_url ); ?>"
+			data-nonce="<?php echo esc_attr( $nonce ); ?>">
 			<div class="terminal-header">
 				<div class="terminal-title">NEURAL LINK JOIN TERMINAL</div>
 				<div class="terminal-status">
