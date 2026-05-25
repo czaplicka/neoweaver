@@ -1,6 +1,6 @@
 jQuery(function ($) {
     'use strict';
-
+console.log('NWAchievements cfg:', window.NWAchievements);
     const cfg = window.NWAchievements || {};
     const ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     const nonce = cfg.nonce || '';
