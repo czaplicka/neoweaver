@@ -14,7 +14,7 @@ if ( ! function_exists( 'neoweave_join_terminal_shortcode' ) ) {
 		}
 
 		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon_key      = tw_supabase_service_key();
+		$anon_key      = nw_supabase_service_key();
 
 		$chars_url = add_query_arg(
 			array(
