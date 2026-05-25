@@ -273,10 +273,11 @@ class NWAbilitiesAdmin {
 
 		$rows = $this->cached_get_all( $this->table, 'sort_order' );
 
-		if ( isset( $rows['error'] ) ) {
-			wp_send_json_error( $rows['error'] );
-			return;
-		}
+if ( isset( $rows['error'] ) ) {
+	error_log( 'NW abilities load error: ' . print_r( $rows, true ) );
+	wp_send_json_error( $rows['error'] );
+	return;
+}
 
 		wp_send_json_success( $rows );
 	}
