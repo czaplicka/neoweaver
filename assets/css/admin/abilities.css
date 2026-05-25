@@ -1,10 +1,10 @@
 /* ============================================================
-   NeoWeaver Admin — ABILITIES PANEL
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+NeoWeaver Admin — ABILITIES PANEL
+Module-specific styles (extension for admin-core.css)
+============================================================ */
 
-/* ---- Table: Ability Visuals & Identity ---- */
-#nw-abilities-panel .nw-col-img { width: 52px; }
+/* ---- Table: Ability Visuals ---- */
+#nw-abilities-panel .nw-col-img { width: 56px; }
 
 #nw-abilities-panel .nw-ability-img,
 #nw-abilities-panel .nw-ability-img-placeholder {
@@ -25,10 +25,10 @@
 	justify-content: center;
 	background: #1a1a1a;
 	font-size: 18px;
-	color: #555;
+	color: #777;
 }
 
-/* ---- Typography & Details ---- */
+/* ---- Typography ---- */
 #nw-abilities-panel .nw-ability-name {
 	font-weight: 600;
 	color: #adff00;
@@ -40,108 +40,114 @@
 	font-size: 11px;
 	color: #666;
 	margin-top: 2px;
-	max-width: 320px;
+	max-width: 300px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-/* ---- Type Badges ---- */
-.nw-type-badge {
-	display: inline-block;
-	font-size: 10px;
-	padding: 2px 9px;
-	border-radius: 20px;
-	text-transform: uppercase;
-	letter-spacing: .5px;
-	font-weight: 700;
-	white-space: nowrap;
+/* ---- Tags ---- */
+#nw-abilities-panel .nw-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
 }
 
-.nw-type-active   { background: #1a2800; border: 1px solid #adff00; color: #adff00; }
-.nw-type-passive  { background: #001a3a; border: 1px solid #4da6ff; color: #4da6ff; }
-.nw-type-reaction { background: #2a1a00; border: 1px solid #ff9f00; color: #ff9f00; }
-.nw-type-aura     { background: #1a0a2a; border: 1px solid #b04dff; color: #b04dff; }
+#nw-abilities-panel .nw-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 10px;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	border: 1px solid #2a2a2a;
+	background: #161616;
+	color: #aaa;
+}
 
-/* ---- Generic pills ---- */
-.nw-meta-pill,
-.nw-state-pill {
+/* ---- Badges ---- */
+#nw-abilities-panel .nw-badge {
 	display: inline-block;
 	padding: 2px 8px;
 	border-radius: 20px;
 	font-size: 11px;
 	font-weight: 600;
-	letter-spacing: .4px;
-	border: 1px solid #2a2a2a;
-	background: rgba(255,255,255,.04);
-	color: #aaa;
+	text-transform: uppercase;
+	letter-spacing: .5px;
+	border: 1px solid transparent;
 }
 
-.nw-state-pill.is-active {
+#nw-abilities-panel .nw-badge-type {
+	background: rgba(173, 255, 0, .10);
+	color: #adff00;
+	border-color: rgba(173, 255, 0, .25);
+}
+
+#nw-abilities-panel .nw-badge-target {
+	background: rgba(68, 170, 255, .10);
+	color: #44aaff;
+	border-color: rgba(68, 170, 255, .25);
+}
+
+#nw-abilities-panel .nw-badge-cost {
+	background: rgba(255, 214, 0, .10);
+	color: #ffd700;
+	border-color: rgba(255, 214, 0, .20);
+}
+
+#nw-abilities-panel .nw-active-badge.is-active {
 	background: rgba(173, 255, 0, .15);
 	color: #adff00;
 	border: 1px solid rgba(173, 255, 0, .35);
 }
 
-.nw-state-pill.is-inactive {
+#nw-abilities-panel .nw-active-badge.is-inactive {
 	background: rgba(255, 255, 255, .05);
 	color: #555;
 	border: 1px solid #2a2a2a;
 }
 
-.nw-state-pill.is-passive {
-	background: rgba(77, 166, 255, .14);
+#nw-abilities-panel .nw-passive-badge {
+	background: rgba(77, 166, 255, .12);
 	color: #4da6ff;
-	border: 1px solid rgba(77, 166, 255, .35);
+	border: 1px solid rgba(77, 166, 255, .25);
 }
 
-.nw-state-pill.is-not-passive {
-	background: rgba(255, 255, 255, .05);
-	color: #777;
-	border: 1px solid #2a2a2a;
-}
-
-/* ---- Cost / range values ---- */
-.nw-cost-value {
+/* ---- Values ---- */
+#nw-abilities-panel .nw-range-value,
+#nw-abilities-panel .nw-duration-value,
+#nw-abilities-panel .nw-sort-value {
 	font-family: 'Chakra Petch', sans-serif;
+	font-size: 12px;
+	color: #ddd;
+}
+
+#nw-abilities-panel .nw-cost-value {
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 12px;
 	color: #ffd700;
+}
+
+/* ---- Filters row responsiveness ---- */
+#nw-abilities-panel .nw-header-actions {
+	row-gap: 10px;
+}
+
+#nw-abilities-panel .nw-header-actions .nw-select-filter {
+	min-width: 130px;
+}
+
+/* ---- Preview ---- */
+#nw-abilities-panel #nw-img-preview {
+	max-width: 240px;
+	border: 1px solid #2a2a2a;
+	background: #0d0d0d;
+	padding: 4px;
+}
+
+/* ---- Empty state ---- */
+#nw-abilities-panel .nw-empty-note {
+	color: #666;
 	font-size: 12px;
-}
-
-.nw-range-value {
-	font-size: 12px;
-	color: #8fd3ff;
-}
-
-.nw-duration-value {
-	font-size: 12px;
-	color: #ffb36b;
-}
-
-/* ---- Tags ---- */
-.nw-tags {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-}
-
-.nw-tag {
-	font-size: 10px;
-	padding: 2px 7px;
-	background: #1e1e1e;
-	border: 1px solid #2e2e2e;
-	border-radius: 3px;
-	white-space: nowrap;
-	color: #888;
-}
-#nw-ability-modal {
-	position: fixed;
-	inset: 0;
-	z-index: 99999;
-	display: none;
-}
-.nw-modal-backdrop {
-	position: absolute;
-	inset: 0;
-	background: rgba(0,0,0,.74);
 }
