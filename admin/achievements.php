@@ -77,7 +77,7 @@ class NeoWeaver_Achievements_Admin extends NW_Base_Admin {
 	/*  HELPERS                                                          */
 	/* ---------------------------------------------------------------- */
 
-	private function is_uuid( string $v ): bool {
+	protected function is_uuid( string $v ): bool {
 		return (bool) preg_match(
 			'/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
 			$v
