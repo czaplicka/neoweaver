@@ -34,10 +34,13 @@ if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 
 		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 		$anon_key = tw_supabase_anon_key();
+		$jwt      = function_exists( 'tw_supabase_get_current_user_token' )
+			? tw_supabase_get_current_user_token()
+			: null;
 
 		$headers = array(
 			'apikey'        => $anon_key,
-			'Authorization' => 'Bearer ' . $anon_key,
+			'Authorization' => 'Bearer ' . ( $jwt ?: $anon_key ),
 		);
 
 		$supa_get = static function ( string $endpoint, array $params, int $timeout = 15 ) use ( $url_base, $headers ): array {
