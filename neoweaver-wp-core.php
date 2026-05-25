@@ -109,12 +109,11 @@ final class NeoWeaver_Core {
 			'includes/quick-actions.php',
 			'includes/scenarios-loader.php',
 			'includes/shortcodes-tags.php',
+
+			'public/class-public.php',
 		];
 
 		$frontend_only = [
-			// Public bootstrap.
-			'public/class-public.php',
-
 			// Frontend assets.
 			'includes/assets/vendors.php',
 			'includes/assets/adventure.php',
