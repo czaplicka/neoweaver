@@ -122,10 +122,7 @@ if ( ! function_exists( 'tw_connect_campaign_world_render' ) ) {
 					<div class="tw-sidebar-card" style="margin-top:16px;">
 						<h4><i class="dashicons dashicons-plus-alt"></i> NEW DEPLOYMENT</h4>
 						<p>No deployment yet? Initialize a new mission thread first.</p>
-						<a
-							href="/new-deployment/"
-							class="tw-btn-deploy"
-							style="display:inline-block; margin-top:10px; text-align:center; text-decoration:none; font-size:0.75rem; padding:10px 20px;">
+						<a href="/new-deployment/" class="tw-btn-outline">
 							+ NEW DEPLOYMENT
 						</a>
 					</div>
