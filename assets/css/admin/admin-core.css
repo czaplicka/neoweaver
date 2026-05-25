@@ -3,7 +3,7 @@
    Shared across all admin panels (achievements, abilities, tags)
    Font: Chakra Petch | Accent: #adff00
    ============================================================= */
-
+.gvt-activation-notice { display:none; }
 /* ------------------------------------------------------------- */
 /*  Base layout                                                  */
 /* ------------------------------------------------------------- */
