@@ -3,7 +3,6 @@
  * NeoWeaver Admin — Bootstrap
  *
  * Ładuje root menu i wszystkie ekrany admina, a potem porządkuje submenu.
- *
  * @package NeoWeaver
  */
 
