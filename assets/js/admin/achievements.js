@@ -1,376 +1,226 @@
 jQuery(function ($) {
-    'use strict';
-console.log('NWAchievements cfg:', window.NWAchievements);
-    const cfg = window.NWAchievements || {};
-    const ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-    const nonce = cfg.nonce || '';
-    let editId = null;
-    let allRows = [];
-    let noticeTimer = null;
+	'use strict';
 
-    /* ---------------------------------------------------------------- */
-    /*  Lucide icons init                                                */
-    /* ---------------------------------------------------------------- */
+	const cfg = window.NWAchievements || {};
+	const ajaxurl = cfg.ajaxurl || '';
+	const nonce = cfg.nonce || '';
 
-    function initIcons() {
-        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    }
+	let rows = [];
+	let currentId = null;
 
-    /* ---------------------------------------------------------------- */
-    /*  Helpers                                                          */
-    /* ---------------------------------------------------------------- */
+	function initIcons() {
+		if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+			lucide.createIcons();
+		}
+	}
 
-    function escH(s) {
-        return $('<div>').text(String(s || '')).html();
-    }
+	function esc(s) {
+		return $('<div>').text(String(s || '')).html();
+	}
 
-    function safeClassSuffix(value) {
-        return String(value || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]/g, '');
-    }
+	function openModal(item = null) {
+		currentId = item && item.id ? item.id : null;
 
-    function clearNoticeTimer() {
-        if (noticeTimer) {
-            clearTimeout(noticeTimer);
-            noticeTimer = null;
-        }
-    }
+		$('#nw-modal-title').text(currentId ? 'Edit Achievement' : 'Add Achievement');
+		$('#achievement-id').val(currentId || '');
+		$('#ach-name').val(item?.name || '');
+		$('#ach-description').val(item?.description || '');
+		$('#ach-cond-type').val(item?.condition_type || '');
+		$('#ach-cond-value').val(item?.condition_value || '');
+		$('#ach-reward-xp').val(item?.reward_xp || 0);
+		$('#ach-icon').val(item?.icon_url || '');
+		$('#ach-reward-items').val(item?.reward_items ? JSON.stringify(item.reward_items) : '[]');
+		$('#ach-is-active').prop('checked', item ? !!item.is_active : true);
 
-    function showNotice(type, msg) {
-        clearNoticeTimer();
+		$('#nw-achievement-modal').show();
+		initIcons();
+	}
 
-        $('#nw-notice')
-            .removeClass('nw-notice-success nw-notice-error')
-            .addClass('nw-notice-' + safeClassSuffix(type))
-            .text(msg || '')
-            .show();
+	function closeModal() {
+		currentId = null;
+		$('#nw-achievement-form')[0].reset();
+		$('#achievement-id').val('');
+		$('#ach-reward-items').val('[]');
+		$('#ach-is-active').prop('checked', true);
+		$('#nw-achievement-modal').hide();
+	}
 
-        noticeTimer = setTimeout(function () {
-            $('#nw-notice').fadeOut();
-            noticeTimer = null;
-        }, 4000);
-    }
+	function filteredRows() {
+		const search = ($('#nw-search').val() || '').toLowerCase().trim();
+		const activeFilter = $('#nw-filter-active').val();
 
-    /* ---------------------------------------------------------------- */
-    /*  Load                                                             */
-    /* ---------------------------------------------------------------- */
+		return rows.filter(function (row) {
+			if (activeFilter === '1' && !row.is_active) return false;
+			if (activeFilter === '0' && row.is_active) return false;
 
-    function load() {
-        const cat = $('#nw-filter-category').val();
-        const scope = $('#nw-filter-scope').val();
+			if (search) {
+				const hay = [
+					row.name || '',
+					row.description || '',
+					row.condition_type || '',
+					row.condition_value || ''
+				].join(' ').toLowerCase();
 
-        if (!ajaxEndpoint) {
-            showNotice('error', 'Missing AJAX endpoint.');
-            return;
-        }
+				if (!hay.includes(search)) return false;
+			}
 
-        if (!nonce) {
-            showNotice('error', 'Missing nonce.');
-            return;
-        }
+			return true;
+		});
+	}
 
-        $('#nw-achievements-tbody').html(
-            '<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;">'
-            + '<div class="nw-spinner"></div> Loading&hellip;</td></tr>'
-        );
+	function render() {
+		const list = $('#nw-achievements-list');
+		const data = filteredRows();
 
-        $.post(ajaxEndpoint, {
-            action: 'nw_achievements_get_all',
-            nonce: nonce,
-            filter_category: cat,
-            filter_scope: scope
-        }, function (r) {
-            if (!r || !r.success) {
-                showNotice('error', (r && r.data) || 'Load failed.');
-                return;
-            }
+		if (!data.length) {
+			list.html('<div class="nw-empty-state">No achievements found.</div>');
+			return;
+		}
 
-            allRows = r.data || [];
-            renderTable(applyClientFilters(allRows));
-        }).fail(function (xhr) {
-            showNotice('error', 'Request failed (' + (xhr.status || 'network') + ').');
-        });
-    }
+		const html = data.map(function (row) {
+			const rewardItems = Array.isArray(row.reward_items) ? row.reward_items.length : 0;
 
-    /* ---------------------------------------------------------------- */
-    /*  Client-side filters                                              */
-    /* ---------------------------------------------------------------- */
+			return `
+				<div class="nw-item-card ${row.is_active ? '' : 'is-inactive'}" data-id="${esc(row.id)}">
+					<div class="nw-item-card-header">
+						<div>
+							<h3>${esc(row.name)}</h3>
+							<div class="nw-item-meta">${esc(row.condition_type || '—')} / ${esc(row.condition_value || '—')}</div>
+						</div>
+						<div class="nw-item-status">${row.is_active ? 'Active' : 'Inactive'}</div>
+					</div>
 
-    function applyClientFilters(rows) {
-        const active = $('#nw-filter-active').val();
-        const hidden = $('#nw-filter-hidden').val();
-        const search = ($('#nw-search').val() || '').toLowerCase().trim();
+					<div class="nw-item-card-body">
+						<p>${esc(row.description || 'No description')}</p>
+						<div><strong>XP:</strong> ${esc(row.reward_xp || 0)}</div>
+						<div><strong>Items:</strong> ${esc(rewardItems)}</div>
+					</div>
 
-        return rows.filter(function (a) {
-            if (active === '1' && !a.is_active) return false;
-            if (active === '0' && a.is_active) return false;
-            if (hidden === '1' && !a.hidden_until_earned) return false;
-            if (hidden === '0' && a.hidden_until_earned) return false;
+					<div class="nw-item-card-actions">
+						<button type="button" class="button nw-edit-achievement" data-id="${esc(row.id)}">Edit</button>
+						<button type="button" class="button nw-toggle-achievement" data-id="${esc(row.id)}" data-active="${row.is_active ? 1 : 0}">
+							${row.is_active ? 'Deactivate' : 'Activate'}
+						</button>
+						<button type="button" class="button button-link-delete nw-delete-achievement" data-id="${esc(row.id)}">Delete</button>
+					</div>
+				</div>
+			`;
+		}).join('');
 
-            if (search) {
-                const haystack = String((a.id || '') + ' ' + (a.title || '')).toLowerCase();
-                if (haystack.indexOf(search) === -1) return false;
-            }
+		list.html(html);
+		initIcons();
+	}
 
-            return true;
-        });
-    }
+	function loadAchievements() {
+		if (!ajaxurl || !nonce) {
+			console.error('Missing ajaxurl or nonce');
+			return;
+		}
 
-    /* ---------------------------------------------------------------- */
-    /*  Render table                                                     */
-    /* ---------------------------------------------------------------- */
+		$('#nw-achievements-list').html('<div class="nw-loading">Loading achievements…</div>');
 
-    function renderTable(rows) {
-        let total = 0;
-        let active = 0;
-        let inactive = 0;
-        let account = 0;
-        let character = 0;
-        let hidden = 0;
-        let html = '';
+		$.post(ajaxurl, {
+			action: 'nw_achievements_get_all',
+			nonce: nonce
+		}, function (res) {
+			if (!res || !res.success) {
+				console.error('Load failed', res);
+				$('#nw-achievements-list').html('<div class="nw-error">Failed to load achievements.</div>');
+				return;
+			}
 
-        if (!rows.length) {
-            html = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#555;">No achievements found.</td></tr>';
-        }
+			rows = Array.isArray(res.data) ? res.data : [];
+			render();
+		}).fail(function (xhr) {
+			console.error('AJAX fail', xhr.status, xhr.responseText);
+			$('#nw-achievements-list').html('<div class="nw-error">AJAX request failed.</div>');
+		});
+	}
 
-        $.each(rows, function (_, a) {
-            total++;
-            if (a.is_active) {
-                active++;
-            } else {
-                inactive++;
-            }
+	$('#nw-add-achievement').on('click', function () {
+		openModal();
+	});
 
-            if (a.scope === 'account') account++;
-            if (a.scope === 'character') character++;
-            if (a.hidden_until_earned) hidden++;
+	$('#nw-modal-close, .nw-modal-cancel, .nw-modal-backdrop').on('click', function () {
+		closeModal();
+	});
 
-            const catSafe = safeClassSuffix(a.category);
-            const scopeSafe = safeClassSuffix(a.scope);
-            const catCls = catSafe ? ' nw-cat-' + catSafe : '';
-            const scopeCls = scopeSafe ? ' nw-scope-' + scopeSafe : '';
-            const catLabel = a.category ? a.category.charAt(0).toUpperCase() + a.category.slice(1) : '—';
-            const scpLabel = a.scope ? a.scope.charAt(0).toUpperCase() + a.scope.slice(1) : '—';
+	$('#nw-search, #nw-filter-active').on('input change', function () {
+		render();
+	});
 
-            const iconHtml = '<div class="nw-ach-icon" style="background:' + escH(a.bg_color || '#2c3e50') + '">'
-                + '<i data-lucide="' + escH(a.icon_slug || 'trophy') + '"></i></div>';
+	$(document).on('click', '.nw-edit-achievement', function () {
+		const id = $(this).data('id');
+		const item = rows.find(r => r.id === id);
+		if (item) openModal(item);
+	});
 
-            html += '<tr data-id="' + escH(a.id) + '" class="' + (a.is_active ? '' : 'nw-row-inactive') + '">'
-                + '<td>' + iconHtml + '</td>'
-                + '<td><div class="nw-ach-id">' + escH(a.id) + '</div>'
-                + '<div class="nw-ach-title">' + escH(a.title) + '</div></td>'
-                + '<td><span class="nw-cat-badge' + catCls + '">' + escH(catLabel) + '</span></td>'
-                + '<td><span class="nw-scope-badge' + scopeCls + '">' + escH(scpLabel) + '</span></td>'
-                + '<td>' + escH(a.goal || 1) + '</td>'
-                + '<td>' + (a.hidden_until_earned ? '<span style="color:#ff9f43">&#128274;</span>' : '<span style="color:#333">—</span>') + '</td>'
-                + '<td><label class="nw-toggle"><input type="checkbox" class="nw-toggle-active" data-id="' + escH(a.id) + '"' + (a.is_active ? ' checked' : '') + '>'
-                + '<span class="nw-toggle-slider"></span></label></td>'
-                + '<td><div class="nw-row-actions">'
-                + '<button type="button" class="nw-action-btn nw-edit-btn" data-id="' + escH(a.id) + '">Edit</button>'
-                + '</div></td>'
-                + '</tr>';
-        });
+	$(document).on('click', '.nw-toggle-achievement', function () {
+		const id = $(this).data('id');
+		const current = String($(this).data('active')) === '1';
 
-        $('#nw-achievements-tbody').html(html);
-        $('#nw-total').text(total);
-        $('#nw-active').text(active);
-        $('#nw-inactive').text(inactive);
-        $('#nw-count-account').text(account);
-        $('#nw-count-character').text(character);
-        $('#nw-count-hidden').text(hidden);
+		$.post(ajaxurl, {
+			action: 'nw_achievements_toggle',
+			nonce: nonce,
+			id: id,
+			is_active: current ? 0 : 1
+		}, function (res) {
+			if (!res || !res.success) {
+				console.error('Toggle failed', res);
+				return;
+			}
+			loadAchievements();
+		}).fail(function (xhr) {
+			console.error('Toggle AJAX fail', xhr.status, xhr.responseText);
+		});
+	});
 
-        initIcons();
-    }
+	$(document).on('click', '.nw-delete-achievement', function () {
+		const id = $(this).data('id');
+		if (!window.confirm('Delete this achievement?')) return;
 
-    /* ---------------------------------------------------------------- */
-    /*  Modal                                                            */
-    /* ---------------------------------------------------------------- */
+		$.post(ajaxurl, {
+			action: 'nw_achievements_delete',
+			nonce: nonce,
+			id: id
+		}, function (res) {
+			if (!res || !res.success) {
+				console.error('Delete failed', res);
+				return;
+			}
+			loadAchievements();
+		}).fail(function (xhr) {
+			console.error('Delete AJAX fail', xhr.status, xhr.responseText);
+		});
+	});
 
-    function openModal(ach) {
-        editId = ach ? ach.id : null;
-        $('#nw-modal-title').text(ach ? 'Edit Achievement' : 'New Achievement');
-        $('#nw-save-label').text(ach ? 'Save Achievement' : 'Create Achievement');
-        $('#nw-delete-btn').toggle(!!ach);
+	$('#nw-achievement-form').on('submit', function (e) {
+		e.preventDefault();
 
-        $('#nw-field-original_id').val(ach ? ach.id : '');
-        $('#nw-field-id').val(ach ? ach.id : '');
-        $('#nw-field-title').val(ach ? ach.title : '');
-        $('#nw-field-description').val(ach ? ach.description || '' : '');
-        $('#nw-field-icon_slug').val(ach ? ach.icon_slug || 'trophy' : 'trophy');
-        $('#nw-field-bg_color').val(ach ? ach.bg_color || '#2c3e50' : '#2c3e50');
-        $('#nw-field-bg_color_picker').val(ach ? ach.bg_color || '#2c3e50' : '#2c3e50');
-        $('#nw-field-scope').val(ach ? ach.scope || 'account' : 'account');
-        $('#nw-field-category').val(ach ? ach.category || '' : '');
-        $('#nw-field-goal').val(ach ? ach.goal || 1 : 1);
-        $('#nw-field-hidden_until_earned').prop('checked', ach ? !!ach.hidden_until_earned : false);
-        $('#nw-field-is_active').prop('checked', ach ? !!ach.is_active : true);
+		$.post(ajaxurl, {
+			action: 'nw_achievements_save',
+			nonce: nonce,
+			id: $('#achievement-id').val(),
+			name: $('#ach-name').val(),
+			description: $('#ach-description').val(),
+			condition_type: $('#ach-cond-type').val(),
+			condition_value: $('#ach-cond-value').val(),
+			reward_xp: $('#ach-reward-xp').val(),
+			icon_url: $('#ach-icon').val(),
+			reward_items: $('#ach-reward-items').val(),
+			is_active: $('#ach-is-active').is(':checked') ? 1 : 0
+		}, function (res) {
+			if (!res || !res.success) {
+				console.error('Save failed', res);
+				return;
+			}
+			closeModal();
+			loadAchievements();
+		}).fail(function (xhr) {
+			console.error('Save AJAX fail', xhr.status, xhr.responseText);
+		});
+	});
 
-        updateBadgePreview();
-        $('#nw-modal-overlay').show();
-        initIcons();
-    }
-
-    function closeModal() {
-        $('#nw-modal-overlay').hide();
-        editId = null;
-    }
-
-    function updateBadgePreview() {
-        const title = $('#nw-field-title').val() || 'Achievement Title';
-        const desc = $('#nw-field-description').val() || 'Description…';
-        const iconSlug = $('#nw-field-icon_slug').val() || 'trophy';
-        const bgColor = $('#nw-field-bg_color').val() || '#2c3e50';
-
-        $('#nw-preview-title').text(title);
-        $('#nw-preview-desc').text(desc);
-        $('#nw-badge-icon')
-            .css('background', bgColor)
-            .html('<i data-lucide="' + escH(iconSlug) + '"></i>');
-        $('#nw-icon-preview').html('<i data-lucide="' + escH(iconSlug) + '"></i>');
-
-        initIcons();
-    }
-
-    /* ---------------------------------------------------------------- */
-    /*  Save                                                             */
-    /* ---------------------------------------------------------------- */
-
-    function save() {
-        const isEditing = !!editId;
-        const restoreLabel = isEditing ? 'Save Achievement' : 'Create Achievement';
-
-        const payload = {
-            action: 'nw_achievements_save',
-            nonce: nonce,
-            original_id: $('#nw-field-original_id').val() || '',
-            id: $('#nw-field-id').val() || '',
-            title: $('#nw-field-title').val() || '',
-            description: $('#nw-field-description').val() || '',
-            icon_slug: $('#nw-field-icon_slug').val() || 'trophy',
-            bg_color: $('#nw-field-bg_color').val() || '#2c3e50',
-            scope: $('#nw-field-scope').val() || 'account',
-            category: $('#nw-field-category').val() || '',
-            goal: $('#nw-field-goal').val() || '1',
-            hidden_until_earned: $('#nw-field-hidden_until_earned').is(':checked') ? '1' : '0',
-            is_active: $('#nw-field-is_active').is(':checked') ? '1' : '0'
-        };
-
-        $('#nw-save-btn').prop('disabled', true);
-        $('#nw-save-label').text('Saving…');
-
-        $.post(ajaxEndpoint, payload, function (r) {
-            if (!r || !r.success) {
-                showNotice('error', (r && r.data) || 'Save failed.');
-                return;
-            }
-
-            showNotice('success', isEditing ? 'Achievement updated.' : 'Achievement created.');
-            closeModal();
-            load();
-        }).fail(function (xhr) {
-            showNotice('error', 'Request failed (' + (xhr.status || 'network') + ').');
-        }).always(function () {
-            $('#nw-save-btn').prop('disabled', false);
-            $('#nw-save-label').text(restoreLabel);
-        });
-    }
-
-    /* ---------------------------------------------------------------- */
-    /*  Events                                                           */
-    /* ---------------------------------------------------------------- */
-
-    $('#nw-add-btn').on('click', function () { openModal(null); });
-    $('#nw-refresh-btn').on('click', load);
-    $('#nw-filter-category, #nw-filter-scope').on('change', load);
-    $('#nw-filter-active, #nw-filter-hidden').on('change', function () {
-        renderTable(applyClientFilters(allRows));
-    });
-    $('#nw-search').on('input', function () {
-        renderTable(applyClientFilters(allRows));
-    });
-
-    $('#nw-modal-close, #nw-cancel-btn').on('click', closeModal);
-    $('#nw-modal-overlay').on('click', function (e) {
-        if ($(e.target).is('#nw-modal-overlay')) {
-            closeModal();
-        }
-    });
-
-    $('#nw-save-btn').on('click', save);
-
-    $('#nw-field-title, #nw-field-description, #nw-field-icon_slug').on('input', updateBadgePreview);
-    $('#nw-field-bg_color').on('input', function () {
-        $('#nw-field-bg_color_picker').val($(this).val());
-        updateBadgePreview();
-    });
-    $('#nw-field-bg_color_picker').on('input', function () {
-        $('#nw-field-bg_color').val($(this).val());
-        updateBadgePreview();
-    });
-
-    $(document).on('change', '.nw-toggle-active', function () {
-        const id = $(this).data('id');
-        const state = $(this).is(':checked');
-
-        $.post(ajaxEndpoint, {
-            action: 'nw_achievements_toggle',
-            nonce: nonce,
-            achievement_id: id,
-            is_active: state ? 1 : 0
-        }, function (r) {
-            if (!r || !r.success) {
-                showNotice('error', (r && r.data) || 'Toggle failed.');
-                load();
-                return;
-            }
-
-            $('tr[data-id="' + id + '"]').toggleClass('nw-row-inactive', !state);
-        }).fail(function (xhr) {
-            showNotice('error', 'Request failed (' + (xhr.status || 'network') + ').');
-            load();
-        });
-    });
-
-    $(document).on('click', '.nw-edit-btn', function () {
-        const id = $(this).data('id');
-        const ach = allRows.find(function (a) {
-            return a.id === id;
-        });
-
-        if (ach) {
-            openModal(ach);
-        }
-    });
-
-    $('#nw-delete-btn').on('click', function () {
-        if (!editId || !window.confirm('Delete this achievement? This cannot be undone.')) {
-            return;
-        }
-
-        $.post(ajaxEndpoint, {
-            action: 'nw_achievements_delete',
-            nonce: nonce,
-            achievement_id: editId
-        }, function (r) {
-            if (!r || !r.success) {
-                showNotice('error', (r && r.data) || 'Delete failed.');
-                return;
-            }
-
-            showNotice('success', 'Achievement deleted.');
-            closeModal();
-            load();
-        }).fail(function (xhr) {
-            showNotice('error', 'Request failed (' + (xhr.status || 'network') + ').');
-        });
-    });
-
-    /* ---------------------------------------------------------------- */
-    /*  Init                                                             */
-    /* ---------------------------------------------------------------- */
-
-    load();
+	loadAchievements();
+	initIcons();
 });
