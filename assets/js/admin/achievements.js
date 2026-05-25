@@ -1,4 +1,3 @@
-/* global jQuery, NWAch, lucide, ajaxurl */
 jQuery(function ($) {
     'use strict';
 
