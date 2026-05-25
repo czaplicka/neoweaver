@@ -63,7 +63,7 @@ class NeoWeaver_Admin {
 			return;
 		}
 
-		$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+		$plugin_url = defined( 'NEOWEAVERPLUGINURL' ) ? NEOWEAVERPLUGINURL : plugin_dir_url( __DIR__ );
 
 		$version = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION
 			: ( defined( 'NW_VERSION' ) ? NW_VERSION : null );
@@ -89,14 +89,6 @@ wp_enqueue_style(
 	$plugin_url . 'assets/css/admin/dashboard.css',
 	[ 'chakra-petch', 'nw-admin-core' ],
 	$version
-);
-
-wp_enqueue_script(
-	'apexcharts',
-	'https://cdn.jsdelivr.net/npm/apexcharts',
-	[],
-	'3.49.1',
-	true
 );
 
 wp_enqueue_script(
