@@ -134,3 +134,14 @@
 	white-space: nowrap;
 	color: #888;
 }
+#nw-ability-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	display: none;
+}
+.nw-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0,0,0,.74);
+}
