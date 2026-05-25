@@ -3,6 +3,11 @@ if (!defined('ABSPATH')) exit;
 
 require_once __DIR__ . '/class-neoweaver-claude-client.php';
 
+// ── Fallback constant (in case wp-config.php is missing it) ───────────────
+if ( ! defined( 'NEOWEAVER_MODEL_ROUTER' ) ) {
+    define( 'NEOWEAVER_MODEL_ROUTER', 'claude-haiku-4-5-20251001' );
+}
+
 class NeoWeaver_Intent_Router {
 
     /**
@@ -16,7 +21,7 @@ class NeoWeaver_Intent_Router {
         $rules = [
             'META'   => '/^(status|hp|mp|stats|ekwipunek|inventory|karty|hand|mapa|map)\b/i',
             'COMBAT' => '/\b(atakuję|atak|attack|use card|zagraj kartę|walcz|fight|strike|shoot|cast)\b/i',
-            'TRAVEL' => '/\b(idę|idę do|move|go to|north|south|east|west|północ|południe|wschód|zachód|travel|wejdź|enter|wyjdź)\b/i',
+            'TRAVEL' => '/\b(idę|idę do|move|go to|north|south|east|west|północ|południe|wschód|zachód|travel|wejdź|enter|wyjśdź)\b/i',
             'TRADE'  => '/\b(kup|kupuję|sprzedaj|sprzedaję|buy|sell|trade|handel|ile kosztuje|price|cena|shop|sklep)\b/i',
             'REST'   => '/\b(odpoczywa|śpię|rest|sleep|camp|nocleg|odpoczynek|czekam|wait)\b/i',
             'DECK'   => '/\b(dobierz|dobierz kartę|talia|deck|draw|karty|hand|shuffle|przetasuj)\b/i',
