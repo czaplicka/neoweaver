@@ -369,10 +369,11 @@ jQuery(function ($) {
 			action: 'nw_abilities_load',
 			nonce: nonce
 		}, function (res) {
-			if (!res || !res.success) {
-				notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
-				return;
-			}
+	console.log('nw_abilities_load response:', res);
+	if (!res || !res.success) {
+		notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
+		return;
+	}
 
 			var rows = Array.isArray(res.data)
 				? res.data
