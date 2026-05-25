@@ -1,7 +1,7 @@
 jQuery(function ($) {
     'use strict';
 
-    const cfg = window.NWAch || {};
+    const cfg = window.NWAchievements || {};
     const ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     const nonce = cfg.nonce || '';
     let editId = null;
