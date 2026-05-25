@@ -155,6 +155,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/kingdom-info.php',
 			'public/shortcodes/library.php',
 			'public/shortcodes/list-campaigns.php',
+			'public/shortcodes/list-worlds.php',
 			'public/shortcodes/lobby.php',
 			'public/shortcodes/map.php',
 			'public/shortcodes/quests.php',
