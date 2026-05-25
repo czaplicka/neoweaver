@@ -333,7 +333,7 @@ jQuery(function ($) {
 	}
 
 	$('#nw-modal-close, .nw-modal-cancel').on('click', function () {
-		$modalOverlay.fadeOut(150);
+		$modalOverlay.stop(true, true).css('display', 'block').hide().fadeIn(150);
 	});
 
 	$modalOverlay.on('click', function (e) {
