@@ -1,6 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
-
+error_log( 'NW DEBUG jwt=' . ( tw_supabase_get_current_user_token() ?: 'NULL' ) );
 /**
  * SHORTCODE: [tw_list_worlds]
  */
