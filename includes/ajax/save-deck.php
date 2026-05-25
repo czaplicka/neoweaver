@@ -6,14 +6,14 @@
  * POST params:
  *   nonce        — wp nonce 'cyber_deck_builder'
  *   character_id — UUID of the character
- *   active       — comma-separated cyber_character_deck.id values
+ *   active       — comma-separated cyber_character_deck.id values (integers)
  */
 
 add_action( 'wp_ajax_tw_save_deck', 'tw_ajax_save_deck' );
 
 function tw_ajax_save_deck(): void {
 
-	// ── Auth & nonce ───────────────────────────────────────────────────
+	// ── Auth & nonce ──────────────────────────────────────────────────
 	if ( ! check_ajax_referer( 'cyber_deck_builder', 'nonce', false ) ) {
 		wp_send_json_error( 'Invalid nonce', 403 );
 		return;
@@ -25,24 +25,52 @@ function tw_ajax_save_deck(): void {
 		return;
 	}
 
-	// ── Character ownership check ──────────────────────────────────────
+	// ── Character ownership check ──────────────────────────────────
 	$char_id = sanitize_text_field( wp_unslash( $_POST['character_id'] ?? '' ) );
 	if ( empty( $char_id ) ) {
 		wp_send_json_error( 'Missing character_id', 400 );
 		return;
 	}
 
-	$characters  = function_exists( 'tw_get_user_characters' )
-		? tw_get_user_characters( $current_user_id )
-		: [];
-	$allowed_ids = array_map( static fn( $c ) => (string) ( $c->id ?? '' ), (array) $characters );
+	// Verify character belongs to current user via direct Supabase query.
+	// tw_get_user_characters() does not exist in this codebase.
+	$base    = function_exists( 'tw_supabase_url' ) ? trailingslashit( tw_supabase_url() ) . 'rest/v1/' : '';
+	$anon_key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
 
-	if ( ! in_array( $char_id, $allowed_ids, true ) ) {
+	if ( ! $base || ! $anon_key ) {
+		wp_send_json_error( 'Supabase config missing', 500 );
+		return;
+	}
+
+	$char_check_url = add_query_arg( [
+		'id'         => 'eq.' . $char_id,
+		'wp_user_id' => 'eq.' . $current_user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_characters' );
+
+	$char_resp = wp_remote_get( $char_check_url, [
+		'headers' => [
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
+			'Content-Type'  => 'application/json',
+		],
+		'timeout' => 10,
+	] );
+
+	if ( is_wp_error( $char_resp ) || wp_remote_retrieve_response_code( $char_resp ) >= 300 ) {
+		wp_send_json_error( 'Character lookup failed', 500 );
+		return;
+	}
+
+	$char_rows = json_decode( wp_remote_retrieve_body( $char_resp ), true ) ?: [];
+	if ( empty( $char_rows[0]['id'] ) ) {
 		wp_send_json_error( 'Access denied', 403 );
 		return;
 	}
 
 	// ── Parse active ids ───────────────────────────────────────────────
+	// cyber_character_deck.id is integer — intval() is correct here.
 	$raw_active = (string) ( $_POST['active'] ?? '' );
 	$active_ids = array_values(
 		array_filter(
@@ -50,7 +78,7 @@ function tw_ajax_save_deck(): void {
 		)
 	);
 
-	// ── Validate limit 20–50 ──────────────────────────────────────────
+	// ── Validate limit 20–50 ─────────────────────────────────────────────
 	$total = count( $active_ids );
 	if ( $total < 20 || $total > 50 ) {
 		wp_send_json_error(
@@ -73,8 +101,8 @@ function tw_ajax_save_deck(): void {
 		return;
 	}
 
-	$all_deck_ids   = array_map( static fn( $r ) => (int) $r['id'], $all_assigned );
-	$valid_active   = array_values( array_intersect( $active_ids, $all_deck_ids ) );
+	$all_deck_ids = array_map( static fn( $r ) => (int) $r['id'], $all_assigned );
+	$valid_active = array_values( array_intersect( $active_ids, $all_deck_ids ) );
 
 	if ( count( $valid_active ) < 20 ) {
 		wp_send_json_error(
@@ -84,7 +112,7 @@ function tw_ajax_save_deck(): void {
 		return;
 	}
 
-	// ── Call RPC cyber_sync_deck ──────────────────────────────────────
+	// ── Call RPC cyber_sync_deck ───────────────────────────────────────
 	if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 		wp_send_json_error( 'tw_supabase_rpc() not available', 500 );
 		return;
