@@ -250,40 +250,44 @@ class NeoWeaver_Stats_Widget {
     }
 
     private function get_widget_js(): string {
+        $ajax_url = admin_url( 'admin-ajax.php' );
         return "
-        jQuery(function($){
-            $('#nw-refresh-btn').on('click', function(e){
-                e.preventDefault();
-                var btn   = $(this);
-                var nonce = btn.data('nonce');
+        (function($){
+            /* Ensure ajaxurl is available (defined by WP on admin pages, but guard anyway) */
+            var nwAjaxUrl = (typeof ajaxurl !== 'undefined') ? ajaxurl : " . wp_json_encode( $ajax_url ) . ";
 
-                btn.prop('disabled', true).text('↻ Loading…');
-                $('.nw-stat-count').addClass('nw-loading');
+            $(function(){
+                $('#nw-refresh-btn').on('click', function(e){
+                    e.preventDefault();
+                    var btn   = $(this);
+                    var nonce = btn.data('nonce');
 
-                $.post(ajaxurl, {
-                    action: 'neoweaver_refresh_stats',
-                    nonce:  nonce
-                }, function(response){
-                    if (response.success) {
-                        var d = response.data;
-                        var counts = [d.worlds, d.agents, d.campaigns];
-                        $('.nw-stat-count').each(function(i){
-                            $(this).text(counts[i]).removeClass('nw-loading');
-                        });
-                        var now = new Date();
-                        var h = String(now.getHours()).padStart(2,'0');
-                        var m = String(now.getMinutes()).padStart(2,'0');
-                        $('.nw-stats-updated').text('Updated: ' + h + ':' + m);
-                    }
-                    btn.prop('disabled', false).text('↻ Refresh');
-                }).fail(function(){
-                    btn.prop('disabled', false).text('↻ Refresh');
-                    $('.nw-stat-count').removeClass('nw-loading');
+                    btn.prop('disabled', true).text('↻ Loading…');
+                    $('.nw-stat-count').addClass('nw-loading');
+
+                    $.post(nwAjaxUrl, {
+                        action: 'neoweaver_refresh_stats',
+                        nonce:  nonce
+                    }, function(response){
+                        if (response.success) {
+                            var d = response.data;
+                            var counts = [d.worlds, d.agents, d.campaigns];
+                            $('.nw-stat-count').each(function(i){
+                                $(this).text(counts[i]).removeClass('nw-loading');
+                            });
+                            var now = new Date();
+                            var h = String(now.getHours()).padStart(2,'0');
+                            var m = String(now.getMinutes()).padStart(2,'0');
+                            $('.nw-stats-updated').text('Updated: ' + h + ':' + m);
+                        }
+                        btn.prop('disabled', false).text('↻ Refresh');
+                    }).fail(function(){
+                        btn.prop('disabled', false).text('↻ Refresh');
+                        $('.nw-stat-count').removeClass('nw-loading');
+                    });
                 });
             });
-        });
+        }(jQuery));
         ";
     }
 }
-
-new NeoWeaver_Stats_Widget();
