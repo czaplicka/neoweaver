@@ -23,7 +23,7 @@ function tw_supabase_on_wp_login( string $user_login, WP_User $user ): void {
 
 add_action( 'init', 'tw_supabase_ensure_token_for_current_user' );
 function tw_supabase_ensure_token_for_current_user(): void {
-	if ( ! is_user_logged_in() ) {
+	if ( ! function_exists( 'is_user_logged_in' ) || ! is_user_logged_in() ) {
 		return;
 	}
 	$user = wp_get_current_user();
@@ -57,7 +57,7 @@ function tw_supabase_get_cached_token( int $wp_user_id ): ?string {
 }
 
 function tw_supabase_get_current_user_token(): ?string {
-	if ( ! is_user_logged_in() ) {
+	if ( ! function_exists( 'is_user_logged_in' ) || ! is_user_logged_in() ) {
 		return null;
 	}
 	return tw_supabase_get_cached_token( get_current_user_id() );
