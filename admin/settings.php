@@ -12,6 +12,9 @@
  *  3. Moderation        — report system, auto-hide, banned-user policy
  *  4. Operations        — maintenance mode, debug logging, log retention, cleanup
  *  5. Analytics         — platform stats dashboard, DAU tracking, audit log
+ *
+ * Instantiation: handled exclusively by NW_Admin_Bootstrap via MODULES.
+ * Do NOT add a bare `new NeoWeaver_Settings()` here.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -33,20 +36,20 @@ if ( ! class_exists( 'NeoWeaver_Settings', false ) ) {
 		public static function defaults(): array {
 			return [
 				// Platform Access
-				'allow_registration'   => 1,
-				'require_approval'     => 0,
-				'allow_public_profiles'=> 1,
-				'allow_public_worlds'  => 1,
+				'allow_registration'    => 1,
+				'require_approval'      => 0,
+				'allow_public_profiles' => 1,
+				'allow_public_worlds'   => 1,
 				'allow_public_campaigns'=> 0,
-				'allow_invite_codes'   => 1,
+				'allow_invite_codes'    => 1,
 
 				// Limits (0 = unlimited)
-				'max_worlds_per_user'       => 0,
-				'max_campaigns_per_world'   => 0,
-				'max_characters_per_world'  => 0,
-				'max_active_campaigns'      => 0,
-				'max_chat_messages_per_hour'=> 0,
-				'max_ai_gens_per_day'       => 0,
+				'max_worlds_per_user'        => 0,
+				'max_campaigns_per_world'    => 0,
+				'max_characters_per_world'   => 0,
+				'max_active_campaigns'       => 0,
+				'max_chat_messages_per_hour' => 0,
+				'max_ai_gens_per_day'        => 0,
 
 				// Moderation
 				'enable_reports'          => 1,
@@ -73,13 +76,9 @@ if ( ! class_exists( 'NeoWeaver_Settings', false ) ) {
 		/* ------------------------------------------------------------------ */
 
 		public function __construct() {
-			if ( ! is_admin() ) {
-				return;
-			}
-
-			add_action( 'admin_menu',    [ $this, 'register_submenu' ] );
-			add_action( 'admin_init',    [ $this, 'register_settings' ] );
-			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+			add_action( 'admin_menu',            [ $this, 'register_submenu'  ] );
+			add_action( 'admin_init',            [ $this, 'register_settings' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'    ] );
 		}
 
 		/* ------------------------------------------------------------------ */
@@ -438,7 +437,7 @@ if ( ! class_exists( 'NeoWeaver_Settings', false ) ) {
 				$clean[ $key ] = isset( $input[ $key ] ) ? 1 : 0;
 			}
 
-			// Numbers (≥0)
+			// Numbers (>=0)
 			$numbers = [
 				'max_worlds_per_user', 'max_campaigns_per_world', 'max_characters_per_world',
 				'max_active_campaigns', 'max_chat_messages_per_hour', 'max_ai_gens_per_day',
@@ -535,8 +534,4 @@ if ( ! class_exists( 'NeoWeaver_Settings', false ) ) {
 			<?php
 		}
 	}
-}
-
-if ( is_admin() && ! isset( $GLOBALS['neoweaver_settings_instance'] ) ) {
-	$GLOBALS['neoweaver_settings_instance'] = new NeoWeaver_Settings();
 }
