@@ -16,16 +16,42 @@ abstract class NW_Base_Admin {
 	/**
 	 * Jedyny dozwolony service key dla warstwy admin.
 	 */
-	protected function sk(): array {
-		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
-			return [];
+protected function sk(): array {
+	if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
+		return [];
+	}
+
+	return [
+		'apikey'        => TW_SUPABASE_SERVICE_KEY,
+		'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+	];
+}
+
+protected function raw_query_to_array( string $qs ): array {
+	$query = [];
+
+	if ( '' === trim( $qs ) ) {
+		return $query;
+	}
+
+	foreach ( explode( '&', $qs ) as $pair ) {
+		$pair = trim( $pair );
+
+		if ( '' === $pair ) {
+			continue;
 		}
 
-		return [
-			'apikey'        => TW_SUPABASE_SERVICE_KEY,
-			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-		];
+		$chunks = explode( '=', $pair, 2 );
+		$key    = rawurldecode( (string) $chunks[0] );
+		$value  = isset( $chunks[1] ) ? rawurldecode( (string) $chunks[1] ) : '';
+
+		if ( '' !== $key ) {
+			$query[ $key ] = $value;
+		}
 	}
+
+	return $query;
+}
 
 	/**
 	 * Rozdziela endpoint na tabelę i raw query string bez parse_str().
