@@ -77,21 +77,44 @@ class NeoWeaver_Admin {
 			);
 		}
 
-		wp_enqueue_style(
-			'nw-dashboard-style',
-			$plugin_url . 'assets/css/admin/dashboard.css',
-			[ 'chakra-petch' ],
-			$version
-		);
+		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+	wp_enqueue_style(
+		'chakra-petch',
+		'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+		[],
+		null
+	);
+}
 
-		wp_enqueue_script(
-			'nw-dashboard-script',
-			$plugin_url . 'assets/js/admin/dashboard.js',
-			[ 'jquery' ],
-			$version,
-			true
-		);
+wp_enqueue_style(
+	'nw-admin-core',
+	$plugin_url . 'assets/css/admin/admin-core.css',
+	[ 'chakra-petch' ],
+	$version
+);
 
+wp_enqueue_style(
+	'nw-dashboard-style',
+	$plugin_url . 'assets/css/admin/dashboard.css',
+	[ 'chakra-petch', 'nw-admin-core' ],
+	$version
+);
+
+wp_enqueue_script(
+	'apexcharts',
+	'https://cdn.jsdelivr.net/npm/apexcharts',
+	[],
+	'3.49.1',
+	true
+);
+
+wp_enqueue_script(
+	'nw-dashboard-script',
+	$plugin_url . 'assets/js/admin/dashboard.js',
+	[ 'jquery', 'apexcharts' ],
+	$version,
+	true
+);
 		wp_localize_script(
 			'nw-dashboard-script',
 			'NWDashData',
