@@ -1,8 +1,54 @@
 /* =============================================================================
    TW CHARACTER PANEL – tw-char-panel.css
-   All rules scoped under #charPanel to prevent collision with any other
-   component that uses generic class names like .tw-progress-fill.
+   Scoped under #charPanel / #twSideNav
+   Aesthetic: Glassmorphism + CRT Terminal + Holographic HUD
    ============================================================================= */
+
+/* ---------------------------------------------------------------------------
+   CRT EFFECTS – shared keyframes & scanline overlay
+   --------------------------------------------------------------------------- */
+@keyframes tw-scanlines {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+@keyframes tw-crt-flicker {
+  0%, 100% { opacity: 1; }
+  92%       { opacity: 1; }
+  93%       { opacity: 0.94; }
+  94%       { opacity: 1; }
+  96%       { opacity: 0.97; }
+  97%       { opacity: 1; }
+}
+
+@keyframes tw-phosphor-glow {
+  0%, 100% { text-shadow: 0 0 4px rgba(173, 255, 0, 0.6), 0 0 10px rgba(173, 255, 0, 0.3); }
+  50%       { text-shadow: 0 0 6px rgba(173, 255, 0, 0.9), 0 0 16px rgba(173, 255, 0, 0.5), 0 0 30px rgba(173, 255, 0, 0.2); }
+}
+
+@keyframes tw-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes tw-boot-line {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+@keyframes tw-sync-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(239, 68, 68, 0.8); }
+  50%       { opacity: 0.5; box-shadow: 0 0 2px rgba(239, 68, 68, 0.4); }
+}
+
+@keyframes tw-panel-glitch {
+  0%   { clip-path: inset(0 0 95% 0); transform: translateX(0); }
+  20%  { clip-path: inset(30% 0 50% 0); transform: translateX(-2px); filter: hue-rotate(45deg); }
+  40%  { clip-path: inset(60% 0 20% 0); transform: translateX(2px); }
+  60%  { clip-path: inset(10% 0 80% 0); transform: translateX(-1px); filter: hue-rotate(-45deg); }
+  80%  { clip-path: inset(45% 0 35% 0); transform: translateX(1px); }
+  100% { clip-path: inset(0); transform: translateX(0); }
+}
 
 /* ---------------------------------------------------------------------------
    1. SIDE NAV
@@ -13,32 +59,58 @@
     bottom: 80px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     z-index: 1100;
     padding: 6px 4px;
-    background: rgba(3, 7, 18, 0.85);
-    border: 1px solid rgba(173, 255, 0, 0.25);
+
+    /* Glass panel */
+    background: rgba(3, 7, 18, 0.45);
+    backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+    -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.1);
+
+    /* CRT border glow */
+    border: 1px solid rgba(173, 255, 0, 0.3);
     border-right: none;
-    border-radius: 8px 0 0 8px;
-    backdrop-filter: blur(8px);
+    border-radius: 10px 0 0 10px;
+
+    box-shadow:
+        inset 1px 0 0 rgba(173, 255, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        -4px 0 24px rgba(173, 255, 0, 0.08),
+        0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 #twSideNav .tw-nav-btn {
     background: transparent;
     border: none;
-    color: #94a3b8;
+    color: rgba(148, 163, 184, 0.7);
     cursor: pointer;
     padding: 8px 10px;
     border-radius: 6px;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
+    position: relative;
+    letter-spacing: 0;
 }
+
+#twSideNav .tw-nav-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background: rgba(173, 255, 0, 0);
+    transition: background 0.15s ease;
+}
+
 #twSideNav .tw-nav-btn:hover,
 #twSideNav .tw-nav-btn.active {
-    background: rgba(173, 255, 0, 0.12);
     color: #adff00;
-    box-shadow: 0 0 8px rgba(173, 255, 0, 0.3);
+    background: rgba(173, 255, 0, 0.07);
+    box-shadow:
+        0 0 10px rgba(173, 255, 0, 0.25),
+        inset 0 0 8px rgba(173, 255, 0, 0.06);
+    text-shadow: 0 0 8px rgba(173, 255, 0, 0.8);
 }
 
 /* ---------------------------------------------------------------------------
@@ -46,23 +118,74 @@
    --------------------------------------------------------------------------- */
 #charPanel.tw-character-panel-container {
     position: fixed;
-    right: 44px;          /* sits left of the side nav */
+    right: 44px;
     bottom: 20px;
     width: 340px;
     max-height: calc(100vh - 100px);
-    display: none;        /* hidden until .is-visible */
+    display: none;
     flex-direction: column;
     z-index: 1099;
     border-radius: 14px;
-    border: 1px solid rgba(173, 255, 0, 0.35);
-    background: rgba(3, 7, 18, 0.94);
-    backdrop-filter: blur(16px);
+
+    /* Deep glass */
+    background:
+        linear-gradient(
+            135deg,
+            rgba(12, 20, 8, 0.75) 0%,
+            rgba(3, 7, 18, 0.88) 40%,
+            rgba(5, 10, 20, 0.92) 100%
+        );
+    backdrop-filter: blur(24px) saturate(160%) brightness(0.95);
+    -webkit-backdrop-filter: blur(24px) saturate(160%) brightness(0.95);
+
+    /* HUD border stack */
+    border: 1px solid rgba(173, 255, 0, 0.25);
     box-shadow:
-        0 0 30px rgba(0, 0, 0, 0.7),
-        0 0 20px rgba(173, 255, 0, 0.08);
-    font-family: 'Chakra Petch', sans-serif;
-    color: #f0f0f0;
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(0, 0, 0, 0.8),
+        0 0 20px rgba(173, 255, 0, 0.06),
+        inset 0 1px 0 rgba(173, 255, 0, 0.12),
+        inset 0 -1px 0 rgba(173, 255, 0, 0.04),
+        inset 1px 0 0 rgba(255, 255, 255, 0.03);
+
+    font-family: 'Chakra Petch', monospace;
+    color: #e0e8d0;
     overflow: hidden;
+
+    /* Subtle CRT flicker */
+    animation: tw-crt-flicker 8s linear infinite;
+}
+
+/* Scanline overlay */
+#charPanel.tw-character-panel-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.06) 2px,
+        rgba(0, 0, 0, 0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+    animation: tw-scanlines 0.12s linear infinite;
+}
+
+/* Corner bracket HUD decoration – top-left */
+#charPanel.tw-character-panel-container::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 16px;
+    height: 16px;
+    border-top: 1px solid rgba(173, 255, 0, 0.5);
+    border-left: 1px solid rgba(173, 255, 0, 0.5);
+    pointer-events: none;
+    z-index: 11;
 }
 
 #charPanel.tw-character-panel-container.is-visible {
@@ -77,78 +200,127 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    position: relative;
 }
 
-/* Header: avatar + name/class */
+/* Corner bracket bottom-right */
+#charPanel .tw-character-card::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 12px;
+    height: 12px;
+    border-bottom: 1px solid rgba(173, 255, 0, 0.3);
+    border-right: 1px solid rgba(173, 255, 0, 0.3);
+    pointer-events: none;
+    z-index: 11;
+}
+
+/* Header */
 #charPanel .tw-char-header {
     display: flex;
     gap: 12px;
     align-items: center;
     padding: 14px 14px 10px;
-    border-bottom: 1px solid rgba(173, 255, 0, 0.15);
+    border-bottom: 1px solid rgba(173, 255, 0, 0.1);
     flex-shrink: 0;
+    background: rgba(173, 255, 0, 0.03);
+    position: relative;
 }
 
+/* Header bottom glow line */
+#charPanel .tw-char-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(173, 255, 0, 0.4), transparent);
+}
+
+/* Avatar */
 #charPanel .tw-char-avatar {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
+    width: 52px;
+    height: 52px;
+    border-radius: 6px;
     flex-shrink: 0;
     background-size: cover;
     background-position: center;
-    border: 2px solid #adff00;
-    box-shadow: 0 0 12px rgba(173, 255, 0, 0.4);
-    background-color: #0a0f0a;
+    background-color: #060d06;
+
+    /* HUD-style square frame, not circle */
+    border: 1px solid rgba(173, 255, 0, 0.45);
+    box-shadow:
+        0 0 0 2px rgba(3, 7, 18, 0.9),
+        0 0 12px rgba(173, 255, 0, 0.25),
+        inset 0 0 8px rgba(0, 0, 0, 0.5);
+
+    /* Corner cuts via clip-path */
+    clip-path: polygon(6px 0%, 100% 0%, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0% 100%, 0% 6px);
 }
 
-#charPanel .tw-char-info {
-    flex: 1;
-    min-width: 0;
-}
+#charPanel .tw-char-info { flex: 1; min-width: 0; }
 
+/* Level badge */
 #charPanel .tw-lvl-frame {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 2px;
     color: #adff00;
-    background: rgba(173, 255, 0, 0.1);
-    border: 1px solid rgba(173, 255, 0, 0.3);
-    padding: 2px 8px;
-    border-radius: 3px;
+    background: rgba(173, 255, 0, 0.08);
+    border: 1px solid rgba(173, 255, 0, 0.25);
+    padding: 2px 8px 2px 6px;
+    border-radius: 2px;
     margin-bottom: 4px;
+    text-transform: uppercase;
+    position: relative;
+    animation: tw-phosphor-glow 3s ease-in-out infinite;
 }
 
+#charPanel .tw-lvl-frame::before {
+    content: '▮';
+    font-size: 7px;
+    animation: tw-cursor-blink 1.2s step-end infinite;
+}
+
+/* Name */
 #charPanel .tw-char-name {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    color: #fff;
+    color: #e8f5d0;
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-#charPanel .tw-char-class-line {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    margin-top: 2px;
-    text-transform: uppercase;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.3);
     letter-spacing: 0.5px;
 }
 
+#charPanel .tw-char-class-line {
+    font-size: 0.68rem;
+    color: rgba(148, 163, 184, 0.8);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
 #charPanel .tw-char-class-line .highlight {
     color: #adff00;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.5);
 }
 
 #charPanel .tw-char-gold-line {
-    font-size: 0.72rem;
-    color: #94a3b8;
+    font-size: 0.68rem;
+    color: rgba(148, 163, 184, 0.7);
     margin-top: 3px;
 }
 
 #charPanel .tw-gold-label {
-    color: rgba(173, 255, 0, 0.6);
+    color: rgba(173, 255, 0, 0.55);
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-right: 4px;
@@ -162,21 +334,20 @@
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: rgba(173, 255, 0, 0.3) transparent;
+    scrollbar-color: rgba(173, 255, 0, 0.2) transparent;
 }
-#charPanel .tw-panel-scroll-area::-webkit-scrollbar { width: 4px; }
+#charPanel .tw-panel-scroll-area::-webkit-scrollbar { width: 3px; }
 #charPanel .tw-panel-scroll-area::-webkit-scrollbar-thumb {
-    background: rgba(173, 255, 0, 0.3);
-    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(173, 255, 0, 0.3), rgba(173, 255, 0, 0.1));
+    border-radius: 3px;
 }
 
 #charPanel .tw-tab-content {
     display: none;
     padding: 12px 14px 16px;
+    position: relative;
 }
-#charPanel .tw-tab-content.active {
-    display: block;
-}
+#charPanel .tw-tab-content.active { display: block; }
 
 /* ---------------------------------------------------------------------------
    5. STAT BARS BLOCK
@@ -198,83 +369,132 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #94a3b8;
+    letter-spacing: 1.5px;
+    color: rgba(148, 163, 184, 0.7);
 }
 #charPanel .tw-stat-label.main-label {
-    font-size: 0.72rem;
-    color: #cbd5e1;
+    font-size: 0.7rem;
+    color: rgba(203, 213, 225, 0.9);
 }
 #charPanel .tw-stat-label.small-label {
-    font-size: 0.62rem;
-    color: #64748b;
+    font-size: 0.6rem;
+    color: rgba(100, 116, 139, 0.8);
 }
 
-/* Progress bar track */
+/* Progress track – glass trough */
 #charPanel .tw-progress-bg {
     width: 100%;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 2px;
     overflow: hidden;
     position: relative;
-    /* Height defined per size variant below — never inherits a screen-filling default */
 }
 
-#charPanel .tw-progress-bg.big-bar {
-    height: 10px;
-}
-
-#charPanel .tw-progress-bg.small-bar {
-    height: 6px;
-}
+#charPanel .tw-progress-bg.big-bar   { height: 10px; }
+#charPanel .tw-progress-bg.small-bar { height: 5px; }
 
 #charPanel .tw-progress-bg.bordered {
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.25);
 }
 
-/* The fill — constrained to 100% of its parent track, never the viewport */
+/* Scanline overlay on bars */
+#charPanel .tw-progress-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.15) 3px,
+        rgba(0, 0, 0, 0.15) 4px
+    );
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Fill */
 #charPanel .tw-progress-fill {
     height: 100%;
-    width: 0;                    /* start at 0; inline style sets actual value */
-    max-width: 100%;             /* hard cap: can never escape the track */
-    border-radius: 4px;
-    transition: width 0.6s ease;
-    display: block;              /* block, not a screen-filler */
+    width: 0;
+    max-width: 100%;
+    border-radius: 2px;
+    transition: width 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+    display: block;
     position: relative;
 }
 
-/* HP colours */
-#charPanel .tw-progress-fill.hp-green  { background: linear-gradient(90deg, #22c55e, #16a34a); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
-#charPanel .tw-progress-fill.hp-yellow { background: linear-gradient(90deg, #eab308, #ca8a04); box-shadow: 0 0 8px rgba(234,179,8,0.5); }
-#charPanel .tw-progress-fill.hp-red    { background: linear-gradient(90deg, #ef4444, #b91c1c); box-shadow: 0 0 8px rgba(239,68,68,0.6); }
-
-/* MP */
-#charPanel .tw-progress-fill.mp-blue   { background: linear-gradient(90deg, #3b82f6, #1d4ed8); box-shadow: 0 0 8px rgba(59,130,246,0.5); }
-
-/* Sync-rate */
-#charPanel .tw-progress-fill.sync-stable   { background: linear-gradient(90deg, #adff00, #7ec800); box-shadow: 0 0 8px rgba(173,255,0,0.5); }
-#charPanel .tw-progress-fill.sync-warning  { background: linear-gradient(90deg, #f59e0b, #d97706); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
-#charPanel .tw-progress-fill.sync-critical { background: linear-gradient(90deg, #ef4444, #991b1b); box-shadow: 0 0 8px rgba(239,68,68,0.7); animation: tw-sync-pulse 1s infinite; }
-
-@keyframes tw-sync-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
+/* Glossy top edge on fill */
+#charPanel .tw-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px 2px 0 0;
 }
 
-/* Survival bars */
-#charPanel .tw-progress-fill.satiety-orange  { background: linear-gradient(90deg, #f97316, #ea580c); }
-#charPanel .tw-progress-fill.hydration-cyan  { background: linear-gradient(90deg, #06b6d4, #0891b2); }
-#charPanel .tw-progress-fill.rest-purple     { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+/* HP */
+#charPanel .tw-progress-fill.hp-green  {
+    background: linear-gradient(90deg, #16a34a 0%, #22c55e 60%, #4ade80 100%);
+    box-shadow: 0 0 6px rgba(34,197,94,0.6), 0 0 16px rgba(34,197,94,0.2);
+}
+#charPanel .tw-progress-fill.hp-yellow {
+    background: linear-gradient(90deg, #ca8a04 0%, #eab308 60%, #fde047 100%);
+    box-shadow: 0 0 6px rgba(234,179,8,0.6), 0 0 12px rgba(234,179,8,0.2);
+}
+#charPanel .tw-progress-fill.hp-red {
+    background: linear-gradient(90deg, #b91c1c 0%, #ef4444 60%, #f87171 100%);
+    box-shadow: 0 0 6px rgba(239,68,68,0.7), 0 0 14px rgba(239,68,68,0.3);
+}
+
+/* MP */
+#charPanel .tw-progress-fill.mp-blue {
+    background: linear-gradient(90deg, #1d4ed8 0%, #3b82f6 60%, #93c5fd 100%);
+    box-shadow: 0 0 6px rgba(59,130,246,0.6), 0 0 14px rgba(59,130,246,0.2);
+}
+
+/* Sync */
+#charPanel .tw-progress-fill.sync-stable {
+    background: linear-gradient(90deg, #7ec800 0%, #adff00 70%, #d4ff6a 100%);
+    box-shadow: 0 0 8px rgba(173,255,0,0.6), 0 0 20px rgba(173,255,0,0.25);
+}
+#charPanel .tw-progress-fill.sync-warning {
+    background: linear-gradient(90deg, #d97706 0%, #f59e0b 60%, #fcd34d 100%);
+    box-shadow: 0 0 6px rgba(245,158,11,0.6), 0 0 14px rgba(245,158,11,0.2);
+}
+#charPanel .tw-progress-fill.sync-critical {
+    background: linear-gradient(90deg, #991b1b 0%, #ef4444 60%, #fca5a5 100%);
+    box-shadow: 0 0 8px rgba(239,68,68,0.8), 0 0 20px rgba(239,68,68,0.4);
+    animation: tw-sync-pulse 0.9s ease-in-out infinite;
+}
+
+/* Survival */
+#charPanel .tw-progress-fill.satiety-orange  {
+    background: linear-gradient(90deg, #ea580c, #f97316, #fb923c);
+    box-shadow: 0 0 5px rgba(249,115,22,0.5);
+}
+#charPanel .tw-progress-fill.hydration-cyan  {
+    background: linear-gradient(90deg, #0891b2, #06b6d4, #67e8f9);
+    box-shadow: 0 0 5px rgba(6,182,212,0.5);
+}
+#charPanel .tw-progress-fill.rest-purple     {
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #d8b4fe);
+    box-shadow: 0 0 5px rgba(168,85,247,0.5);
+}
 
 /* Glitch border on sync track */
 #charPanel .tw-progress-bg.glitch-border {
-    border-color: rgba(173, 255, 0, 0.3);
+    border-color: rgba(173, 255, 0, 0.35);
+    box-shadow: inset 0 0 4px rgba(173, 255, 0, 0.1);
 }
 
-/* Survival bars row */
 #charPanel .tw-survival-bars {
     display: flex;
     flex-direction: column;
@@ -283,116 +503,141 @@
 }
 
 /* ---------------------------------------------------------------------------
-   6. ACCORDION (attributes / skills / bio)
+   6. ACCORDION
    --------------------------------------------------------------------------- */
 #charPanel .tw-accordion-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 #charPanel .tw-accordion-group details {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(173, 255, 0, 0.12);
-    border-radius: 6px;
+    background: rgba(173, 255, 0, 0.025);
+    border: 1px solid rgba(173, 255, 0, 0.1);
+    border-radius: 4px;
     overflow: hidden;
+    transition: border-color 0.2s;
+}
+#charPanel .tw-accordion-group details[open] {
+    border-color: rgba(173, 255, 0, 0.2);
+    background: rgba(173, 255, 0, 0.04);
 }
 
 #charPanel .tw-accordion-group details > div,
 #charPanel .tw-accordion-group details > p {
     padding: 10px 12px 12px;
+    border-top: 1px solid rgba(173, 255, 0, 0.08);
 }
 
 #charPanel .tw-accordion-group summary {
-    padding: 8px 12px;
-    font-size: 0.72rem;
+    padding: 7px 10px;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #adff00;
+    letter-spacing: 2px;
+    color: rgba(173, 255, 0, 0.8);
     cursor: pointer;
     list-style: none;
     user-select: none;
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
+#charPanel .tw-accordion-group summary:hover { color: #adff00; }
 #charPanel .tw-accordion-group summary::-webkit-details-marker { display: none; }
 #charPanel .tw-accordion-group summary::before {
-    content: '▶ ';
-    font-size: 0.6rem;
+    content: '▶';
+    font-size: 0.55rem;
+    display: inline-block;
+    transition: transform 0.2s ease;
+    color: rgba(173, 255, 0, 0.5);
 }
 #charPanel .tw-accordion-group details[open] summary::before {
-    content: '▼ ';
+    transform: rotate(90deg);
+    color: rgba(173, 255, 0, 0.8);
 }
 
 /* Attribute grid */
 #charPanel .tw-attr-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 5px;
 }
 
 #charPanel .tw-attr-box {
-    background: rgba(173, 255, 0, 0.06);
-    border: 1px solid rgba(173, 255, 0, 0.18);
-    border-radius: 6px;
-    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(173, 255, 0, 0.12);
+    border-radius: 4px;
+    padding: 8px 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    clip-path: polygon(4px 0%, 100% 0%, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0% 100%, 0% 4px);
+}
+#charPanel .tw-attr-box:hover {
+    border-color: rgba(173, 255, 0, 0.3);
+    box-shadow: 0 0 8px rgba(173, 255, 0, 0.1);
 }
 
 #charPanel .tw-at-l {
-    font-size: 0.6rem;
-    letter-spacing: 1px;
-    color: #94a3b8;
+    font-size: 0.58rem;
+    letter-spacing: 1.5px;
+    color: rgba(148, 163, 184, 0.6);
     text-transform: uppercase;
 }
 
 #charPanel .tw-at-v {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: #adff00;
     line-height: 1;
+    text-shadow: 0 0 8px rgba(173, 255, 0, 0.5);
+    font-variant-numeric: tabular-nums;
 }
 
-/* Skills list */
+/* Skills */
 #charPanel .tw-skills-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 #charPanel .tw-skill-chip {
     position: relative;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 3px;
+    padding: 5px 10px;
     text-align: left;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-family: 'Chakra Petch', sans-serif;
-    font-size: 0.72rem;
-    color: #e2e8f0;
-    transition: all 0.2s;
+    font-family: 'Chakra Petch', monospace;
+    font-size: 0.7rem;
+    color: rgba(224, 232, 208, 0.9);
+    transition: all 0.15s;
 }
 #charPanel .tw-skill-chip:hover {
-    border-color: rgba(173, 255, 0, 0.4);
-    background: rgba(173, 255, 0, 0.06);
+    border-color: rgba(173, 255, 0, 0.3);
+    background: rgba(173, 255, 0, 0.05);
+    box-shadow: inset 0 0 8px rgba(173, 255, 0, 0.04);
 }
-
-#charPanel .tw-skill-chip-name { font-weight: 600; }
+#charPanel .tw-skill-chip-name { font-weight: 600; letter-spacing: 0.3px; }
 #charPanel .tw-skill-chip-cost {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     color: #adff00;
-    background: rgba(173, 255, 0, 0.12);
-    border: 1px solid rgba(173, 255, 0, 0.25);
-    border-radius: 3px;
+    background: rgba(173, 255, 0, 0.1);
+    border: 1px solid rgba(173, 255, 0, 0.2);
+    border-radius: 2px;
     padding: 1px 5px;
     margin-left: 6px;
     flex-shrink: 0;
+    text-shadow: 0 0 4px rgba(173, 255, 0, 0.4);
+    font-variant-numeric: tabular-nums;
 }
 
 /* Skill tooltip */
@@ -402,36 +647,39 @@
     bottom: calc(100% + 6px);
     left: 0;
     width: 220px;
-    background: rgba(3, 7, 18, 0.97);
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    border-radius: 8px;
+    background: rgba(3, 7, 18, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(173, 255, 0, 0.3);
+    border-radius: 6px;
     padding: 10px 12px;
     z-index: 2000;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.7),
+        0 0 20px rgba(173, 255, 0, 0.06),
+        inset 0 1px 0 rgba(173, 255, 0, 0.1);
 }
-#charPanel .tw-skill-chip:hover .tw-skill-tooltip {
-    display: block;
-}
+#charPanel .tw-skill-chip:hover .tw-skill-tooltip { display: block; }
+
 #charPanel .tw-skill-tooltip-header {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: #adff00;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     margin-bottom: 6px;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.4);
 }
 #charPanel .tw-skill-tooltip-body {
-    font-size: 0.68rem;
-    color: #94a3b8;
-    line-height: 1.5;
+    font-size: 0.65rem;
+    color: rgba(148, 163, 184, 0.85);
+    line-height: 1.55;
 }
 
-/* Bio text */
+/* Bio */
 #charPanel .tw-bio-text {
-    font-size: 0.72rem;
-    line-height: 1.6;
-    color: #94a3b8;
-    padding: 4px 0;
+    font-size: 0.7rem;
+    line-height: 1.65;
+    color: rgba(148, 163, 184, 0.75);
 }
 
 /* ---------------------------------------------------------------------------
@@ -455,37 +703,39 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    opacity: 0.35;
+    opacity: 0.25;
     display: block;
+    filter: saturate(0) brightness(1.4) sepia(0.3) hue-rotate(40deg);
 }
 
 #charPanel .inv-slot {
     position: absolute;
     width: 44px;
     height: 44px;
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    border-radius: 6px;
-    background: rgba(3, 7, 18, 0.7);
+    border: 1px solid rgba(173, 255, 0, 0.3);
+    border-radius: 4px;
+    background: rgba(3, 7, 18, 0.65);
+    backdrop-filter: blur(6px);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    clip-path: polygon(4px 0%, 100% 0%, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0% 100%, 0% 4px);
 }
-#charPanel .inv-slot.tiny {
-    width: 32px;
-    height: 32px;
-}
+#charPanel .inv-slot.tiny { width: 32px; height: 32px; }
 #charPanel .inv-slot:hover {
-    border-color: #adff00;
-    box-shadow: 0 0 8px rgba(173, 255, 0, 0.4);
+    border-color: rgba(173, 255, 0, 0.7);
+    box-shadow:
+        0 0 10px rgba(173, 255, 0, 0.3),
+        inset 0 0 6px rgba(173, 255, 0, 0.06);
 }
 
 #charPanel .slot-label {
-    font-size: 0.45rem;
-    letter-spacing: 0.5px;
-    color: rgba(173, 255, 0, 0.6);
+    font-size: 0.42rem;
+    letter-spacing: 0.8px;
+    color: rgba(173, 255, 0, 0.5);
     text-transform: uppercase;
     line-height: 1;
     margin-bottom: 2px;
@@ -503,7 +753,7 @@
     max-width: 90%;
     max-height: 90%;
     object-fit: contain;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 #charPanel .corner-stat {
@@ -511,8 +761,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-size: 0.58rem;
-    color: #64748b;
+    font-size: 0.55rem;
+    color: rgba(100, 116, 139, 0.8);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     top: 0;
@@ -520,9 +770,11 @@
 #charPanel .corner-stat.stat-left  { left: 0; }
 #charPanel .corner-stat.stat-right { right: 0; }
 #charPanel .corner-stat .stat-value {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: #adff00;
     font-weight: 700;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.4);
+    font-variant-numeric: tabular-nums;
 }
 
 #charPanel .belt-section {
@@ -534,24 +786,21 @@
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    font-size: 0.45rem;
-    color: rgba(173, 255, 0, 0.5);
-    letter-spacing: 1px;
+    font-size: 0.42rem;
+    color: rgba(173, 255, 0, 0.45);
+    letter-spacing: 1.5px;
     text-transform: uppercase;
 }
-#charPanel .belt-slots {
-    display: flex;
-    gap: 4px;
-}
+#charPanel .belt-slots { display: flex; gap: 4px; }
 
-/* Carried items list */
+/* Carried items */
 #charPanel .tw-inv-title {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 700;
-    color: #adff00;
+    color: rgba(173, 255, 0, 0.8);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid rgba(173, 255, 0, 0.2);
+    letter-spacing: 1.5px;
+    border-bottom: 1px solid rgba(173, 255, 0, 0.15);
     padding-bottom: 4px;
     margin-bottom: 6px;
 }
@@ -564,60 +813,75 @@
 }
 
 #charPanel .tw-item-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
     padding: 5px 8px;
     cursor: grab;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s;
 }
 #charPanel .tw-item-card:hover {
-    border-color: rgba(173, 255, 0, 0.35);
+    border-color: rgba(173, 255, 0, 0.25);
+    background: rgba(173, 255, 0, 0.03);
 }
 #charPanel .tw-item-card.dragging {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: grabbing;
 }
 
 #charPanel .tw-item-name {
-    font-size: 0.72rem;
-    color: #e2e8f0;
+    font-size: 0.7rem;
+    color: rgba(224, 232, 208, 0.85);
     display: block;
+    letter-spacing: 0.3px;
 }
 
 /* ---------------------------------------------------------------------------
-   8. LOGS
+   8. LOGS – terminal-style
    --------------------------------------------------------------------------- */
 #charPanel .tw-logs-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 #charPanel .tw-log-entry {
-    background: rgba(255, 255, 255, 0.03);
-    border-left: 2px solid rgba(173, 255, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 0 4px 4px 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 2px solid rgba(173, 255, 0, 0.2);
+    padding: 5px 10px;
+    border-radius: 0 3px 3px 0;
+    position: relative;
+}
+
+/* Terminal prompt prefix */
+#charPanel .tw-log-entry::before {
+    content: '>';
+    position: absolute;
+    left: -10px;
+    top: 5px;
+    font-size: 0.6rem;
+    color: rgba(173, 255, 0, 0.4);
+    line-height: 1;
 }
 
 #charPanel .tw-log-date {
-    font-size: 0.6rem;
-    color: #64748b;
-    letter-spacing: 0.5px;
+    font-size: 0.58rem;
+    color: rgba(100, 116, 139, 0.7);
+    letter-spacing: 0.8px;
     display: block;
     margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
 }
 
 #charPanel .tw-log-text {
-    font-size: 0.7rem;
-    color: #94a3b8;
+    font-size: 0.68rem;
+    color: rgba(148, 163, 184, 0.8);
     line-height: 1.5;
     margin: 0;
 }
 
 /* ---------------------------------------------------------------------------
-   9. NOTES
+   9. NOTES – terminal textarea
    --------------------------------------------------------------------------- */
 #charPanel .tw-notes-tab-container {
     display: flex;
@@ -630,56 +894,63 @@
     width: 100%;
     flex: 1;
     min-height: 200px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(173, 255, 0, 0.2);
-    border-radius: 6px;
-    color: #e2e8f0;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(173, 255, 0, 0.15);
+    border-radius: 4px;
+    color: rgba(173, 255, 0, 0.9);
     font-family: 'Chakra Petch', monospace;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     padding: 10px;
     resize: vertical;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    caret-color: #adff00;
+    line-height: 1.6;
+}
+#charPanel .tw-notes-area::placeholder {
+    color: rgba(148, 163, 184, 0.3);
 }
 #charPanel .tw-notes-area:focus {
-    border-color: rgba(173, 255, 0, 0.5);
+    border-color: rgba(173, 255, 0, 0.4);
+    box-shadow:
+        0 0 12px rgba(173, 255, 0, 0.08),
+        inset 0 0 8px rgba(173, 255, 0, 0.03);
 }
 
 #charPanel .tw-save-notes-btn {
-    background: rgba(173, 255, 0, 0.1);
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    color: #adff00;
+    background: rgba(173, 255, 0, 0.07);
+    border: 1px solid rgba(173, 255, 0, 0.3);
+    color: rgba(173, 255, 0, 0.9);
     font-family: 'Chakra Petch', monospace;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     padding: 8px 0;
-    border-radius: 6px;
+    border-radius: 3px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s;
     width: 100%;
+    clip-path: polygon(6px 0%, 100% 0%, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0% 100%, 0% 6px);
 }
 #charPanel .tw-save-notes-btn:hover {
-    background: rgba(173, 255, 0, 0.2);
-    box-shadow: 0 0 10px rgba(173, 255, 0, 0.3);
+    background: rgba(173, 255, 0, 0.14);
+    box-shadow:
+        0 0 16px rgba(173, 255, 0, 0.2),
+        inset 0 0 8px rgba(173, 255, 0, 0.05);
+    color: #adff00;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.5);
 }
 #charPanel .tw-save-notes-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
 /* ---------------------------------------------------------------------------
-   10. GLITCH EFFECTS (applied by JS based on sync_rate)
+   10. GLITCH (JS-triggered)
    --------------------------------------------------------------------------- */
 #charPanel.glitch-active {
-    animation: tw-panel-glitch 0.15s steps(1) infinite;
-}
-
-@keyframes tw-panel-glitch {
-    0%   { clip-path: inset(0 0 95% 0); }
-    25%  { clip-path: inset(30% 0 50% 0); filter: hue-rotate(45deg); }
-    50%  { clip-path: inset(60% 0 20% 0); }
-    75%  { clip-path: inset(10% 0 80% 0); filter: hue-rotate(-45deg); }
-    100% { clip-path: inset(0); }
+    animation:
+        tw-panel-glitch 0.12s steps(1) infinite,
+        tw-crt-flicker 0.2s linear infinite;
 }
