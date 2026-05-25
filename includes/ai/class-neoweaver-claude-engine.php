@@ -6,6 +6,14 @@ require_once __DIR__ . '/class-neoweaver-context-builder.php';
 require_once __DIR__ . '/class-neoweaver-claude-client.php';
 require_once dirname(__DIR__) . '/supabase-config.php';
 
+// ── Fallback constants (in case wp-config.php is missing them) ──────────────
+if ( ! defined( 'NEOWEAVER_MODEL_GM' ) ) {
+    define( 'NEOWEAVER_MODEL_GM', 'claude-sonnet-4-5-20251001' );
+}
+if ( ! defined( 'NEOWEAVER_TOKENS_GM' ) ) {
+    define( 'NEOWEAVER_TOKENS_GM', 1024 );
+}
+
 /**
  * NeoWeaver Claude Engine
  * Uses Anthropic Claude API via NeoWeaver_Claude_Client.
