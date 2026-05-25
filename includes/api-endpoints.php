@@ -208,6 +208,65 @@ function neoweaver_list_worlds( WP_REST_Request $request ) {
 	return rest_ensure_response( [ 'success' => true, 'data' => $worlds ] );
 }
 
+// ===========================================================================
+// WORLD DELETE ENDPOINT
+// ===========================================================================
+
+/**
+ * POST /wp-json/neoweaver/v1/worlds/delete
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_delete_world( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$world_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'world_id' ) ?? '' ) );
+	if ( ! $world_id ) {
+		return new WP_Error( 'missing_world_id', 'Missing world_id.', [ 'status' => 400 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Verify ownership before deleting
+	$check_url = add_query_arg( [
+		'id'         => 'eq.' . $world_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_worlds' );
+
+	$check = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $check ) || empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'World not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Call RPC fn_delete_world (handles cascading deletes)
+	$rpc_resp = wp_remote_post( $base . 'rpc/fn_delete_world', [
+		'headers' => nw_supabase_service_headers(),
+		'body'    => wp_json_encode( [ 'p_world_id' => $world_id ] ),
+		'timeout' => 20,
+	] );
+
+	if ( is_wp_error( $rpc_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $rpc_resp );
+	if ( $code < 200 || $code >= 300 ) {
+		error_log( 'TW_WORLD_DELETE: RPC HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $rpc_resp ) );
+		return new WP_Error( 'delete_failed', 'Delete failed. HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	error_log( 'TW_WORLD_DELETE: SUCCESS world_id=' . $world_id );
+	return rest_ensure_response( [ 'success' => true, 'data' => [ 'world_id' => $world_id ] ] );
+}
+
 /**
  * @return WP_REST_Response|WP_Error
  */
@@ -409,6 +468,302 @@ function neoweaver_create_campaign( WP_REST_Request $request ) {
 			'campaign_id' => $campaign_id,
 			'message'     => 'Campaign created successfully.',
 		],
+	] );
+}
+
+// ===========================================================================
+// CAMPAIGN DELETE ENDPOINT
+// ===========================================================================
+
+/**
+ * POST /wp-json/neoweaver/v1/campaigns/delete
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_delete_campaign( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$campaign_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'campaign_id' ) ?? '' ) );
+	if ( ! $campaign_id ) {
+		return new WP_Error( 'missing_campaign_id', 'Missing campaign_id.', [ 'status' => 400 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Verify ownership
+	$check_url = add_query_arg( [
+		'id'         => 'eq.' . $campaign_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_campaign' );
+
+	$check = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $check ) || empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'Campaign not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Call RPC fn_delete_campaign (handles cascading deletes)
+	$rpc_resp = wp_remote_post( $base . 'rpc/fn_delete_campaign', [
+		'headers' => nw_supabase_service_headers(),
+		'body'    => wp_json_encode( [ 'p_campaign_id' => $campaign_id ] ),
+		'timeout' => 20,
+	] );
+
+	if ( is_wp_error( $rpc_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $rpc_resp );
+	if ( $code < 200 || $code >= 300 ) {
+		error_log( 'TW_CAMPAIGN_DELETE: RPC HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $rpc_resp ) );
+		return new WP_Error( 'delete_failed', 'Delete failed. HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	error_log( 'TW_CAMPAIGN_DELETE: SUCCESS campaign_id=' . $campaign_id );
+	return rest_ensure_response( [ 'success' => true, 'data' => [ 'campaign_id' => $campaign_id ] ] );
+}
+
+// ===========================================================================
+// CAMPAIGN SIGNUP ENDPOINT (multiplayer)
+// ===========================================================================
+
+/**
+ * POST /wp-json/neoweaver/v1/campaigns/signup
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_campaign_signup( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$campaign_id  = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'campaign_id' )  ?? '' ) );
+	$character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'character_id' ) ?? '' ) );
+
+	if ( ! $campaign_id || ! $character_id ) {
+		return new WP_Error( 'missing_params', 'campaign_id and character_id are required.', [ 'status' => 400 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Check if already signed up
+	$check_url = add_query_arg( [
+		'campaign_id' => 'eq.' . $campaign_id,
+		'wp_user_id'  => 'eq.' . $user_id,
+		'select'      => 'id',
+		'limit'       => 1,
+	], $base . 'cyber_campaign_signups' );
+
+	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$check_rows = json_decode( wp_remote_retrieve_body( $check ), true ) ?: [];
+
+	if ( ! empty( $check_rows ) ) {
+		// Already signed up — just return success
+		return rest_ensure_response( [ 'success' => true, 'data' => [ 'message' => 'Already signed up.' ] ] );
+	}
+
+	// Insert signup
+	$insert_resp = wp_remote_post( $base . 'cyber_campaign_signups', [
+		'headers' => nw_supabase_service_headers( true ),
+		'body'    => wp_json_encode( [
+			'campaign_id'  => $campaign_id,
+			'character_id' => $character_id,
+			'wp_user_id'   => $user_id,
+		] ),
+		'timeout' => 15,
+	] );
+
+	if ( is_wp_error( $insert_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $insert_resp );
+	if ( $code < 200 || $code >= 300 ) {
+		error_log( 'TW_CAMPAIGN_SIGNUP: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $insert_resp ) );
+		return new WP_Error( 'signup_failed', 'Signup failed. HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	error_log( 'TW_CAMPAIGN_SIGNUP: SUCCESS user=' . $user_id . ' campaign=' . $campaign_id );
+	return rest_ensure_response( [ 'success' => true, 'data' => [ 'message' => 'Signup successful.' ] ] );
+}
+
+// ===========================================================================
+// CAMPAIGNS LIST-UNLINKED ENDPOINT
+// ===========================================================================
+
+/**
+ * GET /wp-json/neoweaver/v1/campaigns/list-unlinked
+ * Returns campaigns that have NOT yet been assigned to any world.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_list_unlinked_campaigns( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Fetch all user campaigns
+	$all_url = add_query_arg( [
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id,name,world_type',
+		'order'      => 'created_at.desc',
+	], $base . 'cyber_campaign' );
+
+	$all_resp = wp_remote_get( $all_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 15 ] );
+	if ( is_wp_error( $all_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+	$all_camps = json_decode( wp_remote_retrieve_body( $all_resp ), true ) ?: [];
+
+	// Fetch already-linked campaign IDs
+	$linked_url = add_query_arg( [
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'campaign_id',
+	], $base . 'cyber_campaign_worlds' );
+
+	$linked_resp = wp_remote_get( $linked_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$linked_rows = is_wp_error( $linked_resp ) ? [] : ( json_decode( wp_remote_retrieve_body( $linked_resp ), true ) ?: [] );
+	$linked_ids  = array_map( fn( $r ) => (string) $r['campaign_id'], $linked_rows );
+
+	$unlinked = array_values( array_filter( $all_camps, fn( $c ) => ! in_array( (string) $c['id'], $linked_ids, true ) ) );
+
+	return rest_ensure_response( [ 'success' => true, 'data' => $unlinked ] );
+}
+
+// ===========================================================================
+// DEPLOYMENTS LIST ENDPOINT
+// ===========================================================================
+
+/**
+ * GET /wp-json/neoweaver/v1/deployments/list
+ * Returns all campaign↔world links for the logged-in user.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_list_deployments( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	$url = add_query_arg( [
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'campaign_id,world_id',
+	], $base . 'cyber_campaign_worlds' );
+
+	$response = wp_remote_get( $url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 15 ] );
+	if ( is_wp_error( $response ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $response );
+	if ( $code < 200 || $code >= 300 ) {
+		return new WP_Error( 'http_error', 'Supabase HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	$rows = json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
+	return rest_ensure_response( [ 'success' => true, 'data' => $rows ] );
+}
+
+// ===========================================================================
+// DEPLOYMENTS CREATE ENDPOINT
+// ===========================================================================
+
+/**
+ * POST /wp-json/neoweaver/v1/deployments/create
+ * Links a campaign to a world.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_create_deployment( WP_REST_Request $request ) {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$campaign_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'campaign_id' ) ?? '' ) );
+	$world_id    = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'world_id' )    ?? '' ) );
+
+	if ( ! $campaign_id || ! $world_id ) {
+		return new WP_Error( 'missing_params', 'campaign_id and world_id are required.', [ 'status' => 400 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Verify campaign belongs to this user
+	$camp_check_url = add_query_arg( [
+		'id'         => 'eq.' . $campaign_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_campaign' );
+	$camp_check = wp_remote_get( $camp_check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $camp_check ) || empty( json_decode( wp_remote_retrieve_body( $camp_check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'Campaign not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Verify world belongs to this user
+	$world_check_url = add_query_arg( [
+		'id'         => 'eq.' . $world_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_worlds' );
+	$world_check = wp_remote_get( $world_check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $world_check ) || empty( json_decode( wp_remote_retrieve_body( $world_check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'World not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Insert link
+	$insert_resp = wp_remote_post( $base . 'cyber_campaign_worlds', [
+		'headers' => nw_supabase_service_headers( true ),
+		'body'    => wp_json_encode( [
+			'campaign_id' => $campaign_id,
+			'world_id'    => $world_id,
+			'wp_user_id'  => $user_id,
+		] ),
+		'timeout' => 15,
+	] );
+
+	if ( is_wp_error( $insert_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $insert_resp );
+	if ( $code < 200 || $code >= 300 ) {
+		error_log( 'TW_DEPLOYMENT_CREATE: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $insert_resp ) );
+		return new WP_Error( 'create_failed', 'Deployment failed. HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	error_log( 'TW_DEPLOYMENT_CREATE: SUCCESS campaign=' . $campaign_id . ' world=' . $world_id );
+	return rest_ensure_response( [
+		'success' => true,
+		'data'    => [ 'campaign_id' => $campaign_id, 'world_id' => $world_id ],
 	] );
 }
 
@@ -836,6 +1191,18 @@ add_action( 'rest_api_init', function () {
 	] );
 
 	// -----------------------------------------------------------------------
+	// /worlds/delete
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/worlds/delete', [
+		'methods'             => 'POST',
+		'callback'            => 'neoweaver_delete_world',
+		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'world_id' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+		],
+	] );
+
+	// -----------------------------------------------------------------------
 	// /character/create
 	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/character/create', [
@@ -893,6 +1260,62 @@ add_action( 'rest_api_init', function () {
 			'customize'   => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field' ],
 			'world_id'    => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 			'character_id' => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+		],
+	] );
+
+	// -----------------------------------------------------------------------
+	// /campaigns/delete
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/campaigns/delete', [
+		'methods'             => 'POST',
+		'callback'            => 'neoweaver_delete_campaign',
+		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'campaign_id' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+		],
+	] );
+
+	// -----------------------------------------------------------------------
+	// /campaigns/signup
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/campaigns/signup', [
+		'methods'             => 'POST',
+		'callback'            => 'neoweaver_campaign_signup',
+		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'campaign_id'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'character_id' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+		],
+	] );
+
+	// -----------------------------------------------------------------------
+	// /campaigns/list-unlinked
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/campaigns/list-unlinked', [
+		'methods'             => 'GET',
+		'callback'            => 'neoweaver_list_unlinked_campaigns',
+		'permission_callback' => 'neoweaver_user_can_play',
+	] );
+
+	// -----------------------------------------------------------------------
+	// /deployments/list
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/deployments/list', [
+		'methods'             => 'GET',
+		'callback'            => 'neoweaver_list_deployments',
+		'permission_callback' => 'neoweaver_user_can_play',
+	] );
+
+	// -----------------------------------------------------------------------
+	// /deployments/create
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/deployments/create', [
+		'methods'             => 'POST',
+		'callback'            => 'neoweaver_create_deployment',
+		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'campaign_id' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'world_id'    => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 		],
 	] );
 
