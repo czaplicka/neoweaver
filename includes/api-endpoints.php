@@ -13,10 +13,31 @@ if ( ! function_exists( 'neoweaver_user_can_play' ) ) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Supabase header builder
+// Shared Supabase header builders
 // ---------------------------------------------------------------------------
+
+/**
+ * Anon key — use for READ operations (GET) only.
+ */
 function nw_supabase_headers( bool $with_prefer = false ): array {
 	$key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+	$headers = [
+		'apikey'        => $key,
+		'Authorization' => 'Bearer ' . $key,
+		'Content-Type'  => 'application/json',
+	];
+	if ( $with_prefer ) {
+		$headers['Prefer'] = 'return=representation';
+	}
+	return $headers;
+}
+
+/**
+ * Service role key — use for all server-side WRITE operations (POST, PATCH, DELETE).
+ * Bypasses RLS so mutations are never silently blocked.
+ */
+function nw_supabase_service_headers( bool $with_prefer = false ): array {
+	$key     = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : '';
 	$headers = [
 		'apikey'        => $key,
 		'Authorization' => 'Bearer ' . $key,
@@ -78,8 +99,9 @@ function neoweaver_create_world( WP_REST_Request $request ) {
 		return new WP_Error( 'missing_name', 'World name is required.', [ 'status' => 400 ] );
 	}
 
+	// WRITE — service key
 	$insert = wp_remote_post( $base . 'cyber_worlds', [
-		'headers' => nw_supabase_headers( true ),
+		'headers' => nw_supabase_service_headers( true ),
 		'body'    => wp_json_encode( $payload ),
 		'timeout' => 15,
 	] );
@@ -106,12 +128,12 @@ function neoweaver_create_world( WP_REST_Request $request ) {
 	$safe_world_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $world_id );
 
 	$rpc_base  = nw_supabase_base() . 'rpc/';
-	$rpc_hdrs  = nw_supabase_headers();
 	$world_arg = wp_json_encode( [ 'p_world_id' => $safe_world_id ] );
 
+	// RPC calls are writes — service key
 	foreach ( [ 'fn_seed_complete_world_rpc', 'fn_seed_world_tags', 'fn_world_tags_to_globals_random' ] as $rpc ) {
 		$rpc_res = wp_remote_post( $rpc_base . $rpc, [
-			'headers' => $rpc_hdrs,
+			'headers' => nw_supabase_service_headers(),
 			'body'    => $world_arg,
 			'timeout' => 45,
 		] );
@@ -252,9 +274,10 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 			] );
 			if ( ! empty( $upload['url'] ) ) {
 				$patch_url = add_query_arg( [ 'id' => 'eq.' . $agent_id ], $base . 'cyber_characters' );
+				// WRITE — service key
 				wp_remote_request( $patch_url, [
 					'method'  => 'PATCH',
-					'headers' => nw_supabase_headers(),
+					'headers' => nw_supabase_service_headers(),
 					'body'    => wp_json_encode( [ 'avatar' => $upload['url'] ] ),
 					'timeout' => 10,
 				] );
@@ -371,6 +394,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
+	// WRITE — pause other sessions — service key
 	$pause_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'status'      => 'eq.active',
@@ -379,7 +403,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 
 	$pause_resp = wp_remote_request( $pause_url, [
 		'method'  => 'PATCH',
-		'headers' => nw_supabase_headers(),
+		'headers' => nw_supabase_service_headers(),
 		'body'    => wp_json_encode( [ 'status' => 'paused' ] ),
 		'timeout' => 10,
 	] );
@@ -393,6 +417,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		}
 	}
 
+	// READ — check for paused session — anon key is fine
 	$resume_check_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'campaign_id' => 'eq.' . $campaign_id,
@@ -414,10 +439,11 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 				? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $paused_rows[0]['world_id'] )
 				: null;
 
+			// WRITE — reactivate — service key
 			$reactivate_url = add_query_arg( [ 'id' => 'eq.' . $session_id ], $base . 'cyber_game_sessions' );
 			$reactivate_resp = wp_remote_request( $reactivate_url, [
 				'method'  => 'PATCH',
-				'headers' => nw_supabase_headers(),
+				'headers' => nw_supabase_service_headers(),
 				'body'    => wp_json_encode( [ 'status' => 'active' ] ),
 				'timeout' => 10,
 			] );
@@ -459,6 +485,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		}
 	}
 
+	// READ — campaign lookup — anon key is fine
 	$query_url = add_query_arg( [
 		'id'         => 'eq.' . $campaign_id,
 		'wp_user_id' => 'eq.' . $user_id,
@@ -491,6 +518,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 	$safe_world_id     = $world_id ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $world_id ) : null;
 	$safe_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id );
 
+	// READ — start location — anon key is fine
 	$start_location_id = null;
 	if ( $safe_world_id ) {
 		$loc_url  = add_query_arg( [
@@ -520,8 +548,9 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		'status'       => 'active',
 	];
 
+	// WRITE — create session — service key
 	$session_resp = wp_remote_post( $base . 'cyber_game_sessions', [
-		'headers' => nw_supabase_headers( true ),
+		'headers' => nw_supabase_service_headers( true ),
 		'body'    => wp_json_encode( $session_body ),
 		'timeout' => 15,
 	] );
@@ -601,6 +630,7 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
+	// READ — find active session — anon key is fine
 	$lookup_url = add_query_arg( [
 		'wp_user_id'  => 'eq.' . $user_id,
 		'campaign_id' => 'eq.' . $campaign_id,
@@ -629,9 +659,10 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 
 	$patch_url = add_query_arg( [ 'id' => 'eq.' . $safe_session_id ], $base . 'cyber_game_sessions' );
 
+	// WRITE — end session — service key
 	$response = wp_remote_request( $patch_url, [
 		'method'  => 'PATCH',
-		'headers' => nw_supabase_headers(),
+		'headers' => nw_supabase_service_headers(),
 		'body'    => wp_json_encode( [ 'status' => 'finished', 'scenario_status' => 'completed' ] ),
 		'timeout' => 10,
 	] );
