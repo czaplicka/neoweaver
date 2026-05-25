@@ -1,0 +1,137 @@
+/* ============================================================
+   NeoWeaver Admin — ACTION TAGS PANEL
+   Extension for admin-core.css
+   ============================================================ */
+
+/* ---- Tab nav ------------------------------------------- */
+.nw-tab-nav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 0;
+}
+
+.nw-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 10px 18px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+}
+
+.nw-tab-btn:hover {
+    color: #ccc;
+}
+
+.nw-tab-btn.nw-tab-active {
+    color: #adff00;
+    border-bottom-color: #adff00;
+}
+
+.nw-tab-count {
+    font-size: 10px;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+    border-radius: 20px;
+    padding: 1px 7px;
+    color: #888;
+    font-weight: 600;
+}
+
+.nw-tab-btn.nw-tab-active .nw-tab-count {
+    background: rgba(173, 255, 0, 0.12);
+    border-color: rgba(173, 255, 0, 0.3);
+    color: #adff00;
+}
+
+/* ---- Tag name & desc ----------------------------------- */
+.nw-at-tag-name {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.nw-at-tag-desc {
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Internal name code cell --------------------------- */
+.nw-at-code {
+    font-family: 'Chakra Petch', monospace;
+    font-size: 11px;
+    color: #888;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+/* ---- Sentiment ----------------------------------------- */
+.nw-at-sentiment {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+/* ---- Impact -------------------------------------------- */
+.nw-at-impact {
+    font-family: 'Chakra Petch', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+}
+
+.nw-at-impact-pos {
+    color: #adff00;
+}
+
+.nw-at-impact-neg {
+    color: #ff5050;
+}
+
+/* ---- HUD badge ----------------------------------------- */
+.nw-at-hud-badge {
+    display: inline-block;
+    font-size: 11px;
+    color: #44aaff;
+    border: 1px solid rgba(68, 170, 255, 0.3);
+    border-radius: 4px;
+    padding: 1px 7px;
+    background: rgba(68, 170, 255, 0.07);
+}
+
+/* ---- Duplicate button (copy icon) ---------------------- */
+.nw-tags-dup-btn,
+.nw-cats-dup-btn {
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.nw-tags-dup-btn:hover,
+.nw-cats-dup-btn:hover {
+    background: rgba(255, 159, 0, 0.12) !important;
+    border-color: #ff9f00 !important;
+    color: #ff9f00 !important;
+}
+
+/* ---- Tab panels --------------------------------------- */
+.nw-tab-panel {
+    padding-top: 0;
+}
