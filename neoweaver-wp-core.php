@@ -15,7 +15,6 @@ defined( 'NEOWEAVER_VERSION' )     || define( 'NEOWEAVER_VERSION', '0.7.4' );
 defined( 'NEOWEAVER_PLUGIN_FILE' ) || define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 defined( 'NEOWEAVER_PLUGIN_DIR' )  || define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 defined( 'NEOWEAVER_PLUGIN_URL' )  || define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-
 defined( 'NW_VERSION' )     || define( 'NW_VERSION', NEOWEAVER_VERSION );
 defined( 'NW_PLUGIN_FILE' ) || define( 'NW_PLUGIN_FILE', NEOWEAVER_PLUGIN_FILE );
 defined( 'NW_PLUGIN_DIR' )  || define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
