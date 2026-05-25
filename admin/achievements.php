@@ -38,7 +38,7 @@ class NW_Achievements_Admin {
         add_submenu_page(
             'neoweaver',                     // parent slug (menu główne NeoWeaver)
             __( 'Achievements', 'neoweaver' ),
-            __( 'Achievements', 'neoweaver' ),
+            __( '🏆 Achievements', 'neoweaver' ),
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
