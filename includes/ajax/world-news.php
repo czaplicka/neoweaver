@@ -10,7 +10,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 			return;
 		}
 
-		if ( ! function_exists( 'tw_supabase_get' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 			wp_send_json_error( [ 'message' => 'Supabase config missing.' ], 500 );
 			return;
 		}
@@ -26,9 +26,10 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 			return;
 		}
 
-		// Use service key — server-side read, user is already authenticated via WP session.
-		// Anon key would silently return empty results if RLS requires authenticated access.
-		$news = tw_supabase_get(
+		// tw_supabase_get_admin() uses service key — server-side read bypassing RLS.
+		// tw_supabase_get() (anon key) would silently return empty results if RLS
+		// requires authenticated access and no JWT is forwarded.
+		$news = tw_supabase_get_admin(
 			'cyber_world_news',
 			[
 				'world_id'        => 'eq.' . $world_id,
@@ -36,8 +37,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 				'clearance_level' => 'lte.' . $clearance,
 				'or'              => '(game_day.lt.' . $current_day . ',and(game_day.eq.' . $current_day . ',game_hour.lte.' . $current_hour . '))',
 				'order'           => 'game_day.desc,game_hour.desc',
-			],
-			'service' // pass key type so tw_supabase_get uses tw_supabase_service_key() internally
+			]
 		);
 
 		if ( is_wp_error( $news ) ) {
