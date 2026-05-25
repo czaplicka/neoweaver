@@ -16,23 +16,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( class_exists( 'NeoWeaver_Achievements_Admin', false ) ) {
 	return;
 }
-
 class NeoWeaver_Achievements_Admin extends NW_Base_Admin {
 
 	private string $table     = 'cyber_achievements';
-	private string $page_slug = 'neo-weaver-achievements';
+	private string $page_slug = 'nw-achievements';
+	private string $page_hook = '';
 
 	public function __construct() {
-		add_action( 'admin_menu',            [ $this, 'register_submenu' ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets'   ] );
-		add_action( 'wp_ajax_nw_achievements_get_all',   [ $this, 'ajax_get'    ] );
-		add_action( 'wp_ajax_nw_achievements_save',      [ $this, 'ajax_save'   ] );
-		add_action( 'wp_ajax_nw_achievements_delete',    [ $this, 'ajax_delete' ] );
-		add_action( 'wp_ajax_nw_achievements_toggle',    [ $this, 'ajax_toggle' ] );
+		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'admin_head', [ $this, 'print_admin_head_assets' ] );
+
+		add_action( 'wp_ajax_nw_achievements_get_all', [ $this, 'ajax_get' ] );
+		add_action( 'wp_ajax_nw_achievements_save', [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_achievements_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_achievements_toggle', [ $this, 'ajax_toggle' ] );
 	}
 
-	public function register_submenu(): void {
-		add_submenu_page(
+	public function register_menu(): void {
+		$this->page_hook = add_submenu_page(
 			'neoweaver',
 			'NeoWeaver — Achievements',
 			'🏆 Achievements',
@@ -43,36 +45,33 @@ class NeoWeaver_Achievements_Admin extends NW_Base_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
+		$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
+
+		if ( $page !== $this->page_slug ) {
 			return;
 		}
-		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/admin-core.css' )
-		);
-		wp_enqueue_style(
-			'nw-achievements-admin',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/achievements.css',
-			[ 'nw-admin-core' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/css/admin/achievements.css' )
-		);
-		wp_enqueue_script(
-			'nw-achievements-admin',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/achievements.js',
-			[ 'jquery' ],
-			(string) filemtime( NEOWEAVER_PLUGIN_DIR . 'assets/js/admin/achievements.js' ),
-			true
-		);
-		wp_localize_script(
-			'nw-achievements-admin',
-			'NWAchievements',
+	}
+
+	public function print_admin_head_assets(): void {
+		$page = sanitize_text_field( wp_unslash( $_GET['page'] ?? '' ) );
+
+		if ( $page !== $this->page_slug ) {
+			return;
+		}
+
+		$dev_ver = (string) time();
+
+		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css?dev=' . $dev_ver ) . '" />';
+		echo '<link rel="stylesheet" href="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/css/admin/achievements.css?dev=' . $dev_ver ) . '" />';
+
+		echo '<script>window.NWAchievements=' . wp_json_encode(
 			[
 				'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'nw_achievements' ),
 			]
-		);
+		) . ';</script>';
+
+		echo '<script src="' . esc_url( NEOWEAVER_PLUGIN_URL . 'assets/js/admin/achievements.js?dev=' . $dev_ver ) . '"></script>';
 	}
 	/* ---------------------------------------------------------------- */
 	/*  HELPERS                                                          */
