@@ -25,12 +25,18 @@ function tw_get_session_state_handler(): void {
 		return;
 	}
 
+	// Ownership enforced at query level: wp_user_id filter is part of the WHERE clause.
+	// If the session belongs to another user, Supabase returns an empty result —
+	// the PHP layer never sees the row, so no data can leak regardless of RLS state.
+	$wp_user_id = get_current_user_id();
+
 	$rows = tw_supabase_get(
 		'cyber_game_sessions',
 		[
-			'id'     => 'eq.' . $session_id,
-			'select' => 'id,campaign_id,character_id,wp_user_id,world_id,location_id,status,chat_channel_id',
-			'limit'  => 1,
+			'id'          => 'eq.' . $session_id,
+			'wp_user_id'  => 'eq.' . $wp_user_id,
+			'select'      => 'id,campaign_id,character_id,wp_user_id,world_id,location_id,status,chat_channel_id',
+			'limit'       => 1,
 		]
 	);
 
@@ -39,14 +45,10 @@ function tw_get_session_state_handler(): void {
 		return;
 	}
 
+	// Empty result means either session doesn't exist or belongs to a different user.
+	// Return 404 in both cases — don't reveal whether the session exists at all.
 	if ( empty( $rows[0] ) ) {
 		wp_send_json_error( [ 'message' => 'Session not found' ], 404 );
-		return;
-	}
-
-	// Ownership check — po pobraniu danych, kiedy $rows[0] już istnieje.
-	if ( (int) $rows[0]['wp_user_id'] !== get_current_user_id() ) {
-		wp_send_json_error( [ 'message' => 'Forbidden' ], 403 );
 		return;
 	}
 
