@@ -735,33 +735,150 @@ function neoweaver_end_game_session( WP_REST_Request $request ) {
 }
 
 add_action( 'rest_api_init', function () {
+
+	// -----------------------------------------------------------------------
+	// /world/create
+	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/world/create', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_create_world',
 		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'nonce' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			],
+			'name' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'minLength'         => 1,
+			],
+			'description' => [
+				'required'          => false,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_textarea_field',
+			],
+			'size'       => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'wealth'     => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'difficulty' => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'magic'      => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'gods'       => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'technology' => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'relations'  => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'moral'      => [ 'required' => false, 'type' => 'integer', 'minimum' => 1, 'maximum' => 3 ],
+			'customize'  => [
+				'required'          => false,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_textarea_field',
+			],
+		],
 	] );
 
+	// -----------------------------------------------------------------------
+	// /character/create
+	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/character/create', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_create_character',
 		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'nonce' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			],
+			'character_name' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'minLength'         => 1,
+			],
+			'race'  => [ 'required' => true,  'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'class' => [ 'required' => true,  'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'pronouns' => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'backstory' => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field' ],
+			'node_id'   => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'attr_body'   => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'attr_reflex' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'attr_mind'   => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+			'attr_spirit' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+		],
 	] );
 
+	// -----------------------------------------------------------------------
+	// /campaign/create
+	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/campaign/create', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_create_campaign',
 		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'nonce' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			],
+			'name' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'minLength'         => 1,
+			],
+			'game_mode'   => [ 'required' => false, 'type' => 'integer', 'minimum' => 1 ],
+			'world_type'  => [ 'required' => false, 'type' => 'integer', 'minimum' => 1 ],
+			'game_length' => [ 'required' => false, 'type' => 'integer', 'minimum' => 1 ],
+			'priority'    => [ 'required' => false, 'type' => 'integer', 'minimum' => 1 ],
+			'gm_style'    => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'customize'   => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field' ],
+			'world_id'    => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'character_id' => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+		],
 	] );
 
+	// -----------------------------------------------------------------------
+	// /session/start
+	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/session/start', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_start_game_session',
 		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'security' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			],
+			'campaign_id' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'minLength'         => 1,
+			],
+		],
 	] );
 
+	// -----------------------------------------------------------------------
+	// /session/end
+	// -----------------------------------------------------------------------
 	register_rest_route( 'neoweaver/v1', '/session/end', [
 		'methods'             => 'POST',
 		'callback'            => 'neoweaver_end_game_session',
 		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'security' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			],
+			'campaign_id' => [
+				'required'          => true,
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'minLength'         => 1,
+			],
+		],
 	] );
+
 } );
