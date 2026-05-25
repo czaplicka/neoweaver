@@ -77,15 +77,6 @@ class NeoWeaver_Admin {
 			);
 		}
 
-		if ( ! wp_style_is( 'chakra-petch', 'registered' ) && ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
-	wp_enqueue_style(
-		'chakra-petch',
-		'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-		[],
-		null
-	);
-}
-
 wp_enqueue_style(
 	'nw-admin-core',
 	$plugin_url . 'assets/css/admin/admin-core.css',
