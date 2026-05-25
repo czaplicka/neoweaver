@@ -9,12 +9,12 @@ if ( ! function_exists( 'neoweave_join_terminal_shortcode' ) ) {
 
 		$user_id = get_current_user_id();
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'nw_supabase_service_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			return '<div class="neoweave-terminal">ERROR: SUPABASE CONFIG MISSING.</div>';
 		}
 
 		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon_key      = nw_supabase_service_key();
+		$anon_key = tw_supabase_service_key();
 
 		$chars_url = add_query_arg(
 			array(
