@@ -23,7 +23,7 @@ private const PARENT_SLUG = 'neoweaver';
 	 */
 	private const MODULES = [
 		[
-			'file' => 'admin.php',
+			'file' => 'admin-dashboard.php',
 			'class' => 'NeoWeaver_Admin',
 			'slug' => 'neoweaver',
 			'root' => true,
