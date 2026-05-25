@@ -44,10 +44,11 @@ if ( ! function_exists( 'tw_enqueue_connect_campaign_world_assets' ) ) {
 
 		$done = true;
 
+		// Tylko REST — service key zostaje po stronie serwera PHP, nie trafia do JS.
 		$config = [
-			'url' => function_exists( 'tw_supabase_url' ) ? trailingslashit( tw_supabase_url() ) : '',
-			'key' => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
-			'uid' => get_current_user_id(),
+			'restUrl' => esc_url_raw( rest_url( 'neoweaver/v1/' ) ),
+			'nonce'   => wp_create_nonce( 'wp_rest' ),
+			'uid'     => get_current_user_id(),
 		];
 
 		wp_add_inline_script(

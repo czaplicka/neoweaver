@@ -41,9 +41,19 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 
 		$done = true;
 
+		// Przekazujemy tylko REST URL i nonce — zero kluczy Supabase w JS.
+		$data = array_merge(
+			array(
+				'restUrl' => esc_url_raw( rest_url( 'neoweaver/v1/' ) ),
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
+				'uid'     => get_current_user_id(),
+			),
+			$config
+		);
+
 		wp_add_inline_script(
 			'neoweaver-list-campaigns',
-			'window.twCampaignData = ' . wp_json_encode( $config ) . ';',
+			'window.twCampaignData = ' . wp_json_encode( $data ) . ';',
 			'before'
 		);
 	}
