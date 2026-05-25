@@ -9,10 +9,14 @@ jQuery(function ($) {
 	let currentId = null;
 
 	function initIcons() {
-		if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-			lucide.createIcons();
-		}
+	if (typeof window.lucide === 'undefined') {
+		console.warn('Lucide not loaded');
+		return;
 	}
+	if (typeof window.lucide.createIcons === 'function') {
+		window.lucide.createIcons();
+	}
+}
 
 	function esc(s) {
 		return $('<div>').text(String(s || '')).html();
@@ -110,6 +114,7 @@ jQuery(function ($) {
 		list.html(html);
 		initIcons();
 	}
+	console.log('Rendered achievements:', rows.length);
 
 	function loadAchievements() {
 		if (!ajaxurl || !nonce) {
