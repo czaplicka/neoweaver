@@ -50,12 +50,6 @@
 			return;
 		}
 
-		if (!window.twSupabase) {
-			window.alert(cfg.supabaseOffline || 'SUPABASE CLIENT OFFLINE.');
-			return;
-		}
-
-		const client = window.twSupabase;
 		const btnCard = document.getElementById('tw-world-card-' + worldId);
 
 		if (btnCard) {
@@ -72,18 +66,26 @@
 		}
 
 		try {
-			const { error } = await client.rpc('fn_delete_world', { p_world_id: worldId });
+			const res = await fetch(cfg.restUrl + 'worlds/delete', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-WP-Nonce': cfg.nonce
+				},
+				body: JSON.stringify({ world_id: worldId }),
+				credentials: 'same-origin'
+			});
 
-			if (error) {
-				console.error('SUPABASE RPC WORLD DELETE ERROR', error);
-				window.alert((cfg.deleteFailed || 'Deletion failed:') + ' ' + (error.message || 'Grid denied execution.'));
+			const json = await res.json();
+
+			if (!res.ok || !json.success) {
+				const msg = (json.data && json.data.message) || json.message || 'Grid denied execution.';
+				window.alert((cfg.deleteFailed || 'Deletion failed:') + ' ' + msg);
 
 				if (btnCard) {
 					btnCard.style.pointerEvents = '';
 					const ov = btnCard.querySelector('.tw-delete-overlay');
-					if (ov) {
-						ov.remove();
-					}
+					if (ov) ov.remove();
 				}
 				return;
 			}
@@ -92,11 +94,8 @@
 				const ov = btnCard.querySelector('.tw-delete-overlay');
 				if (ov) {
 					const label = ov.querySelector('.tw-delete-label');
-					if (label) {
-						label.innerText = cfg.erasedLabel || 'NODE ERASED';
-					}
+					if (label) label.innerText = cfg.erasedLabel || 'NODE ERASED';
 				}
-
 				btnCard.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
 				btnCard.style.opacity = '0';
 				btnCard.style.transform = 'scale(0.92)';
@@ -105,6 +104,7 @@
 			window.setTimeout(function () {
 				window.location.reload();
 			}, Number(cfg.reloadDelayMs || 700));
+
 		} catch (e) {
 			console.error('WORLD DELETE EXCEPTION', e);
 			window.alert(cfg.deleteException || 'Deletion failed: client exception.');
@@ -112,18 +112,14 @@
 			if (btnCard) {
 				btnCard.style.pointerEvents = '';
 				const ov = btnCard.querySelector('.tw-delete-overlay');
-				if (ov) {
-					ov.remove();
-				}
+				if (ov) ov.remove();
 			}
 		}
 	}
 
 	function bindInitBannerRefresh() {
 		const banner = document.querySelector('[data-tw-init-banner="1"]');
-		if (!banner) {
-			return;
-		}
+		if (!banner) return;
 
 		const cfg = getConfig();
 		window.setTimeout(function () {
@@ -136,20 +132,16 @@
 
 	function bindWorldCards() {
 		document.querySelectorAll('[data-world-card="1"]').forEach(function (card) {
-			if (card.dataset.twBound === '1') {
-				return;
-			}
+			if (card.dataset.twBound === '1') return;
 
 			card.addEventListener('click', function () {
 				const raw = card.dataset.worldModal || '{}';
 				let data = {};
-
 				try {
 					data = JSON.parse(raw);
 				} catch (e) {
 					console.error('World modal payload parse error', e);
 				}
-
 				openWorldModal(data);
 			});
 
@@ -159,9 +151,7 @@
 
 	function bindWorldActions() {
 		document.querySelectorAll('[data-world-action]').forEach(function (btn) {
-			if (btn.dataset.twBound === '1') {
-				return;
-			}
+			if (btn.dataset.twBound === '1') return;
 
 			btn.addEventListener('click', function (event) {
 				event.preventDefault();
@@ -178,10 +168,8 @@
 
 				if (action === 'assign-agent' && worldId && campaignId) {
 					window.location.href =
-						'/agents/?world_id=' +
-						encodeURIComponent(worldId) +
-						'&campaign_id=' +
-						encodeURIComponent(campaignId);
+						'/agents/?world_id=' + encodeURIComponent(worldId) +
+						'&campaign_id=' + encodeURIComponent(campaignId);
 					return;
 				}
 
@@ -207,36 +195,24 @@
 		const modalBox = modal?.querySelector('[data-world-modal-box="1"]');
 
 		document.querySelectorAll('[data-world-modal-close="1"]').forEach(function (btn) {
-			if (btn.dataset.twBound === '1') {
-				return;
-			}
-
-			btn.addEventListener('click', function () {
-				closeWorldModal();
-			});
-
+			if (btn.dataset.twBound === '1') return;
+			btn.addEventListener('click', function () { closeWorldModal(); });
 			btn.dataset.twBound = '1';
 		});
 
 		if (modal && !modal.dataset.twBound) {
-			modal.addEventListener('click', function () {
-				closeWorldModal();
-			});
+			modal.addEventListener('click', function () { closeWorldModal(); });
 			modal.dataset.twBound = '1';
 		}
 
 		if (modalBox && !modalBox.dataset.twBound) {
-			modalBox.addEventListener('click', function (event) {
-				event.stopPropagation();
-			});
+			modalBox.addEventListener('click', function (event) { event.stopPropagation(); });
 			modalBox.dataset.twBound = '1';
 		}
 
 		if (!document.body.dataset.twWorldEscBound) {
 			document.addEventListener('keydown', function (event) {
-				if (event.key === 'Escape') {
-					closeWorldModal();
-				}
+				if (event.key === 'Escape') closeWorldModal();
 			});
 			document.body.dataset.twWorldEscBound = '1';
 		}

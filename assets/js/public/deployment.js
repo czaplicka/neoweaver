@@ -1,11 +1,10 @@
 /* NeoWeaver — Deployment connector (campaign ↔ world)
  * Config injected via wp_localize_script as window.twDeploymentCfg
- * v20: fix wp_user_id column name (was user_wp_id / creator_wp_id)
+ * v21: replaced direct Supabase REST calls with WP REST API endpoints
  */
 (function () {
     'use strict';
 
-    /* Wait for DOM — shortcode renders inline, so DOMContentLoaded is safe */
     document.addEventListener('DOMContentLoaded', function () {
 
         const cfg   = window.twDeploymentCfg || {};
@@ -17,18 +16,12 @@
         const audio = document.getElementById('tw-glitch-sound');
         const root  = document.getElementById('tw-deployment-root');
 
-        /* ── Auto-scroll if URL contains #tw-deployment-root ──
-         * Browser tries to scroll before JS renders the section.
-         * We override that by scrolling manually after DOM is ready.
-         */
         if (root && window.location.hash === '#tw-deployment-root') {
-            /* Small delay ensures theme/WP scripts finish rendering */
             setTimeout(function () {
                 root.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 300);
         }
 
-        /* Bail silently if shortcode not on this page */
         if (!selC || !selW || !btn || !log || !form) return;
 
         let dataStore     = { camps: [], worlds: [] };
@@ -38,10 +31,7 @@
         /* ── Helpers ── */
         function debounce(fn, ms) {
             let t;
-            return function (...args) {
-                clearTimeout(t);
-                t = setTimeout(() => fn.apply(this, args), ms);
-            };
+            return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
         }
 
         function setLog(msg, color) {
@@ -49,14 +39,19 @@
             log.innerText   = msg;
         }
 
-        /* ── Render a <select> list ── */
+        /* ── WP REST headers (nonce zamiast anon key) ── */
+        function restHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce':   cfg.nonce
+            };
+        }
+
+        /* ── Render <select> list ── */
         function renderList(type, list, filter) {
             const el      = type === 'camp' ? selC : selW;
             const filterL = (filter || '').toLowerCase().trim();
-
-            const filtered = list.filter(i =>
-                (i.name || '').toLowerCase().includes(filterL)
-            );
+            const filtered = list.filter(i => (i.name || '').toLowerCase().includes(filterL));
 
             el.innerHTML = '';
 
@@ -76,7 +71,7 @@
             el.appendChild(frag);
         }
 
-        /* ── Live latency stat animation ── */
+        /* ── Live latency animation ── */
         function simulateLiveStats() {
             const latencyEl = document.getElementById('stat-latency');
             if (!latencyEl) return;
@@ -89,75 +84,56 @@
             }, 1200);
         }
 
-        window.addEventListener('beforeunload', () => {
-            if (statsInterval) clearInterval(statsInterval);
-        });
+        window.addEventListener('beforeunload', () => { if (statsInterval) clearInterval(statsInterval); });
 
         /* ── Button state ── */
         function updateButtonState() {
             btn.disabled = !(selC.value && selW.value);
-            if (!btn.disabled) {
-                setLog('> System: Link established. Ready for Anchor.');
-            }
+            if (!btn.disabled) setLog('> System: Link established. Ready for Anchor.');
         }
         selC.addEventListener('change', updateButtonState);
         selW.addEventListener('change', updateButtonState);
 
         /* ── Filter inputs ── */
         document.getElementById('f-camp').addEventListener(
-            'input',
-            debounce(e => renderList('camp',  dataStore.camps,  e.target.value), 50)
+            'input', debounce(e => renderList('camp',  dataStore.camps,  e.target.value), 50)
         );
         document.getElementById('f-world').addEventListener(
-            'input',
-            debounce(e => renderList('world', dataStore.worlds, e.target.value), 50)
+            'input', debounce(e => renderList('world', dataStore.worlds, e.target.value), 50)
         );
 
-        /* ── Init: fetch campaigns, worlds, already-linked ── */
+        /* ── Init: fetch via WP REST (nie bezpośrednio Supabase) ── */
         async function init() {
             setLog('> System: Calibrating Uplink with The Weave...');
 
-            const h = {
-                'apikey':        cfg.key,
-                'Authorization': 'Bearer ' + cfg.key
-            };
-
             try {
                 const [rC, rW, rLinked] = await Promise.all([
-                    fetch(
-                        cfg.url + 'rest/v1/cyber_campaign' +
-                        '?select=id,name,world_type' +
-                        '&wp_user_id=eq.' + cfg.uid +
-                        '&order=created_at.desc',
-                        { headers: h }
-                    ),
-                    fetch(
-                        cfg.url + 'rest/v1/cyber_worlds' +
-                        '?select=id,name' +
-                        '&wp_user_id=eq.' + cfg.uid +
-                        '&order=created_at.desc',
-                        { headers: h }
-                    ),
-                    fetch(
-                        cfg.url + 'rest/v1/cyber_campaign_worlds' +
-                        '?select=campaign_id' +
-                        '&wp_user_id=eq.' + cfg.uid,
-                        { headers: h }
-                    )
+                    fetch(cfg.restUrl + 'campaigns/list-unlinked', {
+                        headers: restHeaders(), credentials: 'same-origin'
+                    }),
+                    fetch(cfg.restUrl + 'worlds/list', {
+                        headers: restHeaders(), credentials: 'same-origin'
+                    }),
+                    fetch(cfg.restUrl + 'deployments/list', {
+                        headers: restHeaders(), credentials: 'same-origin'
+                    })
                 ]);
 
                 if (!rC.ok || !rW.ok || !rLinked.ok) {
                     const statuses = [rC.status, rW.status, rLinked.status];
                     console.error('Fetch error statuses:', statuses);
-                    setLog('> Error: Supabase HTTP ' + statuses.join(' / '), '#ff0055');
+                    setLog('> Error: REST HTTP ' + statuses.join(' / '), '#ff0055');
                     return;
                 }
 
-                const [allCamps, allWorlds, linkedRows] = await Promise.all([
+                const [jsonC, jsonW, jsonLinked] = await Promise.all([
                     rC.json(), rW.json(), rLinked.json()
                 ]);
 
-                /* Filter out campaigns already assigned to a world */
+                const allCamps  = (jsonC.data    || jsonC);
+                const allWorlds = (jsonW.data    || jsonW);
+                const linkedRows = (jsonLinked.data || jsonLinked);
+
                 const linkedIds = new Set(linkedRows.map(r => String(r.campaign_id)));
                 dataStore.camps  = allCamps.filter(c => !linkedIds.has(String(c.id)));
                 dataStore.worlds = allWorlds;
@@ -174,7 +150,7 @@
             }
         }
 
-        /* ── Submit: POST to cyber_campaign_worlds ── */
+        /* ── Submit: anchor campaign ↔ world via WP REST ── */
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (isSubmitting) return;
@@ -183,30 +159,22 @@
             btn.disabled = true;
             setLog('> System: Weaving Splot threads...');
 
-            const payload = {
-                campaign_id: selC.value,
-                world_id:    selW.value,
-                wp_user_id:  parseInt(cfg.uid, 10)
-            };
-
-            const apiHeaders = {
-                'apikey':        cfg.key,
-                'Authorization': 'Bearer ' + cfg.key,
-                'Content-Type':  'application/json',
-                'Prefer':        'return=minimal'
-            };
-
             try {
-                const res = await fetch(cfg.url + 'rest/v1/cyber_campaign_worlds', {
+                const res = await fetch(cfg.restUrl + 'deployments/create', {
                     method:  'POST',
-                    headers: apiHeaders,
-                    body:    JSON.stringify(payload)
+                    headers: restHeaders(),
+                    body:    JSON.stringify({
+                        campaign_id: selC.value,
+                        world_id:    selW.value
+                    }),
+                    credentials: 'same-origin'
                 });
 
-                if (!res.ok) {
-                    const txt = await res.text();
-                    console.error('World anchor error:', res.status, txt);
-                    throw new Error('World link failed: ' + res.status);
+                const json = await res.json();
+
+                if (!res.ok || !json.success) {
+                    const msg = (json.data && json.data.message) || json.message || 'Unknown error';
+                    throw new Error('World link failed: ' + msg);
                 }
 
                 if (audio) audio.play().catch(() => {});
@@ -220,8 +188,8 @@
             } catch (err) {
                 console.error('ANCHOR SUBMIT ERROR', err);
                 setLog('> Error: Deployment failed. ' + err.message, '#ff0055');
-                btn.disabled  = false;
-                isSubmitting  = false;
+                btn.disabled = false;
+                isSubmitting = false;
             }
         });
 
