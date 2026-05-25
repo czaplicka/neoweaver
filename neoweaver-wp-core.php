@@ -29,33 +29,64 @@ final class NeoWeaver_Core {
 
 		add_action( 'plugins_loaded', [ __CLASS__, 'load_admin_files' ] );
 		add_action( 'plugins_loaded', [ __CLASS__, 'register_page_templates' ] );
-		add_action( 'plugins_loaded', [ __CLASS__, 'bootstrap_game_classes' ] );
+
+		// Public bootstrap tylko dla realnego frontu.
+		add_action( 'init', [ __CLASS__, 'bootstrap_game_classes' ], 20 );
 	}
 
-	// ── File loading ─────────────────────────────────────────────
+	/* ---------------------------------------------------------------- */
+	/* Request context helpers                                          */
+	/* ---------------------------------------------------------------- */
+
+	private static function is_ajax_request(): bool {
+		return function_exists( 'wp_doing_ajax' ) && wp_doing_ajax();
+	}
+
+	private static function is_rest_request(): bool {
+		return defined( 'REST_REQUEST' ) && REST_REQUEST;
+	}
+
+	private static function is_cron_request(): bool {
+		return function_exists( 'wp_doing_cron' ) && wp_doing_cron();
+	}
+
+	private static function is_cli_request(): bool {
+		return defined( 'WP_CLI' ) && WP_CLI;
+	}
+
+	private static function is_frontend_page_request(): bool {
+		if ( self::is_ajax_request() || self::is_rest_request() || self::is_cron_request() || self::is_cli_request() ) {
+			return false;
+		}
+
+		return ! is_admin();
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* File loading                                                     */
+	/* ---------------------------------------------------------------- */
 
 	private static function load_files(): void {
 
-		// ✅ OPTYMALIZACJA: pliki pogrupowane według tego, kiedy są potrzebne
 		$always = [
-			// Supabase — musi być pierwsza, reszta zależy
+			// Supabase — musi być pierwsza, reszta zależy.
 			'includes/supabase-config.php',
 			'includes/supabase-helpers.php',
 			'includes/supabase-auth.php',
 			'includes/supabase-global.php',
 
-			// AI engine — nowy, zunifikowany stack
+			// AI engine.
 			'includes/ai/class-neoweaver-claude-client.php',
 			'includes/ai/class-neoweaver-intent-router.php',
 			'includes/ai/class-neoweaver-context-builder.php',
 			'includes/ai/class-neoweaver-claude-engine.php',
 
-			// REST + AJAX — rejestrują hooki, muszą być wcześnie
+			// REST + API.
 			'includes/rest-ai-chat.php',
 			'includes/api-endpoints.php',
 			'includes/api-endpoints-character-data.php',
 
-			// Klasy game-core
+			// Shared classes / repositories.
 			'includes/classes/class-supabase.php',
 			'includes/classes/class-loader.php',
 			'includes/classes/class-agents-repository.php',
@@ -64,10 +95,7 @@ final class NeoWeaver_Core {
 			'includes/classes/class-nodes-creator.php',
 			'includes/classes/class-memory-parser.php',
 
-						// Public
-			'public/class-public.php',
-
-			// Pozostałe core
+			// Shared core.
 			'includes/trait-transient-cache.php',
 			'includes/adventure-data.php',
 			'includes/assets.php',
@@ -84,8 +112,11 @@ final class NeoWeaver_Core {
 			'includes/shortcodes-tags.php',
 		];
 
-		// ✅ OPTYMALIZACJA: assety i shortcody tylko na frontendzie
 		$frontend_only = [
+			// Public bootstrap.
+			'public/class-public.php',
+
+			// Frontend assets.
 			'includes/assets/vendors.php',
 			'includes/assets/adventure.php',
 			'includes/assets/agents-list.php',
@@ -125,24 +156,7 @@ final class NeoWeaver_Core {
 			'includes/assets/world-creator.php',
 			'includes/assets/world-news.php',
 
-			// AJAX handlers
-			'includes/ajax/buffer.php',
-			'includes/ajax/chat-gm.php',
-			'includes/ajax/deck-scenarios.php',
-			'includes/ajax/ensure-world-state.php',
-			'includes/ajax/get-char-state.php',
-			'includes/ajax/get-scenarios.php',
-			'includes/ajax/get-session-state.php',
-			'includes/ajax/handlers.php',
-			'includes/ajax/join-terminal.php',
-			'includes/ajax/lobby-heartbeat.php',
-			'includes/ajax/public-profile.php',
-			'includes/ajax/save-deck.php',
-			'includes/ajax/save-player-notes.php',
-			'includes/ajax/update-vehicle-module.php',
-			'includes/ajax/world-news.php',
-
-			// Shortcodes
+			// Frontend shortcodes.
 			'public/shortcodes/achievements.php',
 			'public/shortcodes/adventure-terminal.php',
 			'public/shortcodes/agents-list.php',
@@ -181,17 +195,48 @@ final class NeoWeaver_Core {
 			'public/shortcodes/world-news.php',
 		];
 
+		$ajax_only = [
+			'includes/ajax/buffer.php',
+			'includes/ajax/chat-gm.php',
+			'includes/ajax/deck-scenarios.php',
+			'includes/ajax/ensure-world-state.php',
+			'includes/ajax/get-char-state.php',
+			'includes/ajax/get-scenarios.php',
+			'includes/ajax/get-session-state.php',
+			'includes/ajax/handlers.php',
+			'includes/ajax/join-terminal.php',
+			'includes/ajax/lobby-heartbeat.php',
+			'includes/ajax/public-profile.php',
+			'includes/ajax/save-deck.php',
+			'includes/ajax/save-player-notes.php',
+			'includes/ajax/update-vehicle-module.php',
+			'includes/ajax/world-news.php',
+		];
+
 		foreach ( $always as $file ) {
 			$path = NEOWEAVER_PLUGIN_DIR . $file;
+
 			if ( file_exists( $path ) ) {
 				require_once $path;
 			}
 		}
 
-		// ✅ Shortcody i assety ładowane tylko na frontendzie + AJAX
-		if ( ! is_admin() || wp_doing_ajax() ) {
+		// Tylko normalny frontend page request.
+		if ( self::is_frontend_page_request() ) {
 			foreach ( $frontend_only as $file ) {
 				$path = NEOWEAVER_PLUGIN_DIR . $file;
+
+				if ( file_exists( $path ) ) {
+					require_once $path;
+				}
+			}
+		}
+
+		// Tylko requesty AJAX.
+		if ( self::is_ajax_request() ) {
+			foreach ( $ajax_only as $file ) {
+				$path = NEOWEAVER_PLUGIN_DIR . $file;
+
 				if ( file_exists( $path ) ) {
 					require_once $path;
 				}
@@ -199,34 +244,44 @@ final class NeoWeaver_Core {
 		}
 	}
 
-	// ── Admin files ───────────────────────────────────────────────
+	/* ---------------------------------------------------------------- */
+	/* Admin files                                                      */
+	/* ---------------------------------------------------------------- */
 
 	public static function load_admin_files(): void {
 		if ( ! is_admin() ) {
 			return;
 		}
 
-		foreach ( [ 'admin/admin-dashboard.php', 'admin/class-admin-bootstrap.php' ] as $f ) {
-			$path = NW_PLUGIN_DIR . $f;
-			if ( file_exists( $path ) ) require_once $path;
+		foreach ( [ 'admin/admin-dashboard.php', 'admin/class-admin-bootstrap.php' ] as $file ) {
+			$path = NW_PLUGIN_DIR . $file;
+
+			if ( file_exists( $path ) ) {
+				require_once $path;
+			}
 		}
 	}
 
-	// ── Page templates ────────────────────────────────────────────
+	/* ---------------------------------------------------------------- */
+	/* Page templates                                                   */
+	/* ---------------------------------------------------------------- */
 
 	public static function register_page_templates(): void {
 		add_filter( 'theme_page_templates', [ __CLASS__, 'filter_page_templates' ] );
-		add_filter( 'template_include',     [ __CLASS__, 'include_plugin_template' ] );
+		add_filter( 'template_include', [ __CLASS__, 'include_plugin_template' ] );
 	}
 
 	public static function filter_page_templates( array $templates ): array {
 		$templates['templates/public-character-profile.php'] = __( 'Public Character Profile', 'neoweaver' );
 		$templates['templates/adventure.php']                = __( 'NeoWeaver Adventure', 'neoweaver' );
+
 		return $templates;
 	}
 
 	public static function include_plugin_template( string $template ): string {
-		if ( ! is_page() ) return $template;
+		if ( ! is_page() ) {
+			return $template;
+		}
 
 		$slug = get_page_template_slug( get_queried_object_id() );
 		$map  = [
@@ -239,9 +294,33 @@ final class NeoWeaver_Core {
 			: $template;
 	}
 
-	// ── Game class bootstrap ──────────────────────────────────────
+	/* ---------------------------------------------------------------- */
+	/* Public bootstrap                                                 */
+	/* ---------------------------------------------------------------- */
 
 	public static function bootstrap_game_classes(): void {
+		static $bootstrapped = false;
+
+		if ( $bootstrapped ) {
+			return;
+		}
+
+		if ( ! self::is_frontend_page_request() ) {
+			return;
+		}
+
+		if ( ! class_exists( 'Neoweaver_Public', false ) ) {
+			$public_class = NEOWEAVER_PLUGIN_DIR . 'public/class-public.php';
+
+			if ( file_exists( $public_class ) ) {
+				require_once $public_class;
+			}
+		}
+
+		if ( ! class_exists( 'Neoweaver_Public', false ) ) {
+			return;
+		}
+
 		$repo = new Neoweaver_Agents_Repository();
 		$list = new Neoweaver_Agents_List( $repo );
 
@@ -250,6 +329,8 @@ final class NeoWeaver_Core {
 			new Neoweaver_Deployments_Creator(),
 			new Neoweaver_Nodes_Creator()
 		);
+
+		$bootstrapped = true;
 	}
 }
 
