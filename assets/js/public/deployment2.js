@@ -103,60 +103,36 @@ const config = {
         }
 
         /* ── Initialise ── */
-        async function init() {
+        function init() {
             store = { campaigns: [], characters: [] };
             setBtn(false);
-            setStatus('> System: Calibrating Uplink with The Weave...');
 
-            const headers = {
-                'apikey':        config.key,
-                'Authorization': `Bearer ${config.key}`
-            };
+            const initialData = (twDeploymentConfig.initialData) || {};
+            const rawCamps    = Array.isArray(initialData.campaigns)  ? initialData.campaigns  : [];
+            const rawChars    = Array.isArray(initialData.characters) ? initialData.characters : [];
 
-            try {
-                const [rC, rCh] = await Promise.all([
-                    fetch(
-                        config.url + 'rest/v1/cyber_campaigns_ready_for_agent?select=id,name,world_id&order=created_at.desc',
-                        { headers }
-                    ),
-                    fetch(
-                        config.url + 'rest/v1/cyber_characters?select=id,name,race_id,class_id,cyber_races(name),cyber_classes(name)&wp_user_id=eq.' + config.uid,
-                        { headers }
-                    )
-                ]);
+            store.campaigns = rawCamps.map(item => ({
+                id:       String(item.id),
+                name:     item.name,
+                world_id: item.world_id != null ? String(item.world_id) : null
+            }));
 
-                if (!rC.ok || !rCh.ok) {
-                    const cText  = !rC.ok  ? await rC.text()  : '';
-                    const chText = !rCh.ok ? await rCh.text() : '';
-                    console.error('Supabase error campaigns:',  rC.status,  cText);
-                    console.error('Supabase error characters:', rCh.status, chText);
-                    setStatus('> Error: Supabase HTTP ' + rC.status + ' / ' + rCh.status, '#ff0055');
-                    return;
-                }
+            store.characters = rawChars.map(ch => ({
+                id:         String(ch.id),
+                name:       ch.name,
+                race_id:    ch.race_id,
+                class_id:   ch.class_id,
+                race_name:  ch.race_name  || null,
+                class_name: ch.class_name || null
+            }));
 
-                const rawCamps = await rC.json();
-                store.campaigns = rawCamps.map(item => ({
-                    id:       String(item.id),
-                    name:     item.name,
-                    world_id: item.world_id != null ? String(item.world_id) : null
-                }));
+            render('camp', store.campaigns);
+            render('char', store.characters);
 
-                const rawChars = await rCh.json();
-                store.characters = rawChars.map(ch => ({
-                    id:         String(ch.id),
-                    name:       ch.name,
-                    race_id:    ch.race_id,
-                    class_id:   ch.class_id,
-                    race_name:  ch.cyber_races   ? ch.cyber_races.name   : null,
-                    class_name: ch.cyber_classes ? ch.cyber_classes.name : null
-                }));
-
-                render('camp', store.campaigns);
-                render('char', store.characters);
+            if (store.campaigns.length === 0 && store.characters.length === 0) {
+                setStatus('> Warning: No assets found in The Weave. Log in or create data first.', '#ff9900');
+            } else {
                 setStatus('> System: Assets synchronized. Ready for Injection.');
-            } catch (e) {
-                console.error('INIT ERROR', e);
-                setStatus('> Error: Uplink rejected. Interference detected.', '#ff0055');
             }
         }
 
@@ -330,8 +306,6 @@ const config = {
                     console.warn('World-node sync timeout – redirecting anyway.');
                 }
 
-                /* FIX #13: Play sound FIRST, then wait 1200 ms before redirect
-                 * so the glitch audio is audible before the page navigates away. */
                 root.classList.add('tw-glitch-shake');
                 setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
                 spnMsg.textContent = confirmed
