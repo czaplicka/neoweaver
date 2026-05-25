@@ -44,16 +44,64 @@ if ( ! function_exists( 'tw_enqueue_connect_character_campaign_assets' ) ) {
 
 		$done = true;
 
+		$user_id      = get_current_user_id();
 		$supabase_url = function_exists( 'tw_supabase_url' ) ? trailingslashit( tw_supabase_url() ) : '';
 		$anon_key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
 
+		// Load campaigns and characters server-side using service key (bypasses RLS).
+		$campaigns  = [];
+		$characters = [];
+
+		if ( $user_id && function_exists( 'tw_supabase_get_admin' ) ) {
+			$raw_camps = tw_supabase_get_admin(
+				'cyber_campaigns_ready_for_agent',
+				[
+					'select' => 'id,name,world_id',
+					'order'  => 'created_at.desc',
+				]
+			);
+			if ( is_array( $raw_camps ) ) {
+				foreach ( $raw_camps as $c ) {
+					$campaigns[] = [
+						'id'       => (string) ( $c['id'] ?? '' ),
+						'name'     => (string) ( $c['name'] ?? '' ),
+						'world_id' => isset( $c['world_id'] ) ? (string) $c['world_id'] : null,
+					];
+				}
+			}
+
+			$raw_chars = tw_supabase_get_admin(
+				'cyber_characters',
+				[
+					'wp_user_id' => 'eq.' . $user_id,
+					'select'     => 'id,name,race_id,class_id,cyber_races(name),cyber_classes(name)',
+				]
+			);
+			if ( is_array( $raw_chars ) ) {
+				foreach ( $raw_chars as $ch ) {
+					$characters[] = [
+						'id'         => (string) ( $ch['id'] ?? '' ),
+						'name'       => (string) ( $ch['name'] ?? '' ),
+						'race_id'    => $ch['race_id'] ?? null,
+						'class_id'   => $ch['class_id'] ?? null,
+						'race_name'  => is_array( $ch['cyber_races'] ?? null ) ? ( $ch['cyber_races']['name'] ?? null ) : null,
+						'class_name' => is_array( $ch['cyber_classes'] ?? null ) ? ( $ch['cyber_classes']['name'] ?? null ) : null,
+					];
+				}
+			}
+		}
+
 		$config = [
-			'userId'         => get_current_user_id(),
+			'userId'         => $user_id,
 			'supabaseUrl'    => $supabase_url,
 			'supabaseKey'    => $anon_key,
 			'restNonce'      => wp_create_nonce( 'wp_rest' ),
 			'nonce'          => wp_create_nonce( 'tw_deployment_nonce' ),
 			'deploymentsUrl' => home_url( '/deployments/' ),
+			'initialData'    => [
+				'campaigns'  => $campaigns,
+				'characters' => $characters,
+			],
 		];
 
 		wp_add_inline_script(
