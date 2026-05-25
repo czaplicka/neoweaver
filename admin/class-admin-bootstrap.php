@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class NW_Admin_Bootstrap {
 
-	private const PARENT_SLUG = 'neoweaver';
+private const PARENT_SLUG = 'neoweaver';
 
 	/**
 	 * Finalny, pojedynczy rejestr modułów admin.
