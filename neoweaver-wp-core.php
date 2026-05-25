@@ -63,6 +63,7 @@ final class NeoWeaver_Core {
 			'includes/classes/class-deployments-creator.php',
 			'includes/classes/class-nodes-creator.php',
 			'includes/classes/class-memory-parser.php',
+			'includes/classes/class-base-admin.php',
 
 						// Public
 			'public/class-public.php',
