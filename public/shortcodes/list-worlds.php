@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 	function tw_list_worlds_v14(): string {
-		error_log( 'NW DEBUG jwt=' . ( tw_supabase_get_current_user_token() ?: 'NULL' ) );
+
 		$user_id = get_current_user_id();
 
 		if ( ! $user_id ) {
@@ -335,6 +335,7 @@ if ( ! function_exists( 'tw_list_worlds_v14' ) ) {
 							'conf_side_1'  => (string) ( $w['conflict_race_1_name'] ?? '' ),
 							'conf_side_2'  => (string) ( $w['conflict_race_2_name'] ?? '' ),
 						);
+					error_log( 'NW DEBUG jwt=' . ( tw_supabase_get_current_user_token() ?: 'NULL' ) );
 						?>
 						<div
 							class="tw-world-card"
