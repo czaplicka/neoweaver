@@ -23,7 +23,7 @@ function tw_get_char_state() {
 	}
 
 	// 2. Nonce.
-	if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+	if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 		wp_send_json_error( 'Security check failed' );
 		return;
 	}
