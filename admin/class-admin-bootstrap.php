@@ -48,7 +48,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'classes.php',
-			'class' => 'NWClassesAdmin',
+			'class' => 'NW_Classes_Admin',
 			'slug'  => 'nw-classes',
 			'root'  => false,
 		],
