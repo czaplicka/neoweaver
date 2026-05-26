@@ -72,7 +72,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'races.php',
-			'class' => 'NeoWeaver_Races_Admin',
+			'class' => 'NWRacesAdmin',
 			'slug'  => 'nw-races',
 			'root'  => false,
 		],
