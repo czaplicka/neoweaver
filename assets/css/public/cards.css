@@ -2,42 +2,90 @@
  * cards.css — NeoWeaver unified card component
  * Used in: library, foundry, buffer (gameplay deck)
  *
+ * COLOUR SYSTEM:
+ *   Card border/glow  → rarity   (set via --nw-card-color on the element)
+ *   Top stripe        → deck_category  (CSS class modifier)
+ *   Type icon         → Lucide icon rendered in .nw-card__type-icon
+ *
  * Base class:   .nw-card
- * Modifiers:    .nw-card--action   (action cards)
- *               .nw-card--spell    (spell/magic cards)
- *               .nw-card--event    (event/scenario cards)
- *               .nw-card--item     (item/equipment cards)
- *               .nw-card--ready    (can be upgraded / playable)
- *               .nw-card--dim      (owned but not playable now)
- *               .nw-card--ghost    (not owned / locked)
- * Context mods: .nw-card--library  (library view — larger, info-rich)
- *               .nw-card--foundry  (foundry view — upgrade focus)
- *               .nw-card--hand     (in-game hand — compact, horizontal strip)
+ *
+ * Rarity modifiers (add to .nw-card):
+ *   .nw-card--common     grey
+ *   .nw-card--uncommon   green
+ *   .nw-card--rare       blue
+ *   .nw-card--epic       purple
+ *   .nw-card--legendary  gold + glow
+ *
+ * Category stripe modifiers (add to .nw-card):
+ *   .nw-card--magic      navy
+ *   .nw-card--combat     red
+ *   .nw-card--action     orange
+ *   .nw-card--social     green
+ *   .nw-card--equipment  brown
+ *   .nw-card--tech       grey
+ *
+ * State modifiers:
+ *   .nw-card--ready      playable / upgradable
+ *   .nw-card--dim        owned but inactive
+ *   .nw-card--ghost      locked / not owned
+ *
+ * Context modifiers:
+ *   .nw-card--library    library view
+ *   .nw-card--foundry    foundry / upgrade view
+ *   .nw-card--hand       in-game hand (compact)
  */
 
 /* ============================================================
    TOKENS
    ============================================================ */
 :root {
-  --nw-card-bg:          #0d0d0d;
-  --nw-card-border:      #adff00;
-  --nw-card-border-dim:  #2a2a2a;
-  --nw-card-glow:        rgba(173, 255, 0, 0.18);
-  --nw-card-glow-ready:  rgba(173, 255, 0, 0.45);
-  --nw-card-radius:      6px;
-  --nw-card-font:        'Chakra Petch', monospace;
+  --nw-card-bg:         #0d0d0d;
+  --nw-card-border-dim: #2a2a2a;
+  --nw-card-radius:     6px;
+  --nw-card-font:       'Chakra Petch', monospace;
 
-  /* type accent colours */
-  --nw-card-action-accent: #adff00;
-  --nw-card-spell-accent:  #7b4fff;
-  --nw-card-event-accent:  #ff6b35;
-  --nw-card-item-accent:   #00d4ff;
+  /* --- rarity colours --- */
+  --nw-rarity-common:    #888888;
+  --nw-rarity-uncommon:  #4caf50;
+  --nw-rarity-rare:      #2196f3;
+  --nw-rarity-epic:      #9c27b0;
+  --nw-rarity-legendary: #ffc107;
 
-  /* rarity */
-  --nw-rarity-common:    #888;
-  --nw-rarity-uncommon:  #adff00;
-  --nw-rarity-rare:      #00d4ff;
-  --nw-rarity-legendary: #ff9900;
+  /* --- category stripe colours --- */
+  --nw-cat-magic:     #1a237e;  /* navy      */
+  --nw-cat-combat:    #c62828;  /* red       */
+  --nw-cat-action:    #e65100;  /* orange    */
+  --nw-cat-social:    #2e7d32;  /* green     */
+  --nw-cat-equipment: #5d4037;  /* brown     */
+  --nw-cat-tech:      #546e7a;  /* slate     */
+
+  /* fallback accent (when no rarity class) */
+  --nw-card-color:      var(--nw-rarity-common);
+  --nw-card-glow-alpha: rgba(136,136,136,0.2);
+}
+
+/* ============================================================
+   RARITY — set --nw-card-color per card
+   ============================================================ */
+.nw-card--common {
+  --nw-card-color:      var(--nw-rarity-common);
+  --nw-card-glow-alpha: rgba(136,136,136,0.18);
+}
+.nw-card--uncommon {
+  --nw-card-color:      var(--nw-rarity-uncommon);
+  --nw-card-glow-alpha: rgba(76,175,80,0.22);
+}
+.nw-card--rare {
+  --nw-card-color:      var(--nw-rarity-rare);
+  --nw-card-glow-alpha: rgba(33,150,243,0.25);
+}
+.nw-card--epic {
+  --nw-card-color:      var(--nw-rarity-epic);
+  --nw-card-glow-alpha: rgba(156,39,176,0.28);
+}
+.nw-card--legendary {
+  --nw-card-color:      var(--nw-rarity-legendary);
+  --nw-card-glow-alpha: rgba(255,193,7,0.35);
 }
 
 /* ============================================================
@@ -61,40 +109,89 @@
 }
 
 .nw-card:hover {
-  border-color: var(--nw-card-border);
-  box-shadow: 0 0 12px var(--nw-card-glow);
+  border-color: var(--nw-card-color);
+  box-shadow: 0 0 14px var(--nw-card-glow-alpha);
   transform: translateY(-2px);
 }
 
-/* top accent stripe — colour changes per type */
+/* ============================================================
+   CATEGORY STRIPE (top bar)
+   ============================================================ */
 .nw-card::before {
   content: '';
   display: block;
-  height: 3px;
+  height: 4px;
   width: 100%;
-  background: var(--nw-card-border-dim);
-  transition: background 0.18s ease;
+  background: var(--nw-cat-stripe, var(--nw-card-border-dim));
+  transition: filter 0.18s ease;
 }
 
-.nw-card:hover::before,
-.nw-card--ready::before {
-  background: var(--nw-card-border);
+.nw-card:hover::before {
+  filter: brightness(1.25);
 }
 
-/* type accent stripes */
-.nw-card--spell::before  { background: var(--nw-card-spell-accent);  }
-.nw-card--event::before  { background: var(--nw-card-event-accent);  }
-.nw-card--item::before   { background: var(--nw-card-item-accent);   }
-.nw-card--action::before { background: var(--nw-card-action-accent); }
+/* category stripe colour via modifier */
+.nw-card--magic     { --nw-cat-stripe: var(--nw-cat-magic);     }
+.nw-card--combat    { --nw-cat-stripe: var(--nw-cat-combat);    }
+.nw-card--action    { --nw-cat-stripe: var(--nw-cat-action);    }
+.nw-card--social    { --nw-cat-stripe: var(--nw-cat-social);    }
+.nw-card--equipment { --nw-cat-stripe: var(--nw-cat-equipment); }
+.nw-card--tech      { --nw-cat-stripe: var(--nw-cat-tech);      }
+
+/* ============================================================
+   STATE: READY (playable / upgradable)
+   ============================================================ */
+.nw-card--ready {
+  border-color: var(--nw-card-color);
+  box-shadow: 0 0 10px var(--nw-card-glow-alpha);
+}
+
+/* ============================================================
+   STATE: DIM (owned, not usable now)
+   ============================================================ */
+.nw-card--dim {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+.nw-card--dim:hover {
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================================
+   STATE: GHOST (locked / not owned)
+   ============================================================ */
+.nw-card--ghost {
+  opacity: 0.25;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+
+/* ============================================================
+   LEGENDARY extras
+   ============================================================ */
+.nw-card--legendary {
+  box-shadow: 0 0 6px rgba(255,193,7,0.2);
+}
+.nw-card--legendary::before {
+  background: linear-gradient(90deg, #b8860b, #ffd700, #b8860b);
+  background-size: 200% 100%;
+  animation: nw-legend-shimmer 3s linear infinite;
+}
+@keyframes nw-legend-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* ============================================================
    CARD HEADER
    ============================================================ */
 .nw-card__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
+  padding: 9px 12px 5px;
   gap: 6px;
 }
 
@@ -111,14 +208,44 @@
   text-overflow: ellipsis;
 }
 
+/* type icon (Lucide) */
+.nw-card__type-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--nw-cat-stripe, #555);
+  opacity: 0.85;
+}
+.nw-card__type-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2;
+}
+
+/* level badge */
 .nw-card__level {
-  font-size: 0.65rem;
-  color: var(--nw-card-border);
-  border: 1px solid var(--nw-card-border);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--nw-card-color);
+  border: 1px solid var(--nw-card-color);
   border-radius: 3px;
   padding: 1px 5px;
   white-space: nowrap;
   flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* rarity dot */
+.nw-card__rarity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--nw-card-color);
+  box-shadow: 0 0 4px var(--nw-card-glow-alpha);
+}
+.nw-card--legendary .nw-card__rarity-dot {
+  box-shadow: 0 0 8px var(--nw-rarity-legendary);
 }
 
 /* ============================================================
@@ -134,7 +261,7 @@
 
 .nw-card__desc {
   font-size: 0.7rem;
-  color: #888;
+  color: #777;
   line-height: 1.45;
 }
 
@@ -147,27 +274,23 @@
 }
 
 .nw-card__tag {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(173, 255, 0, 0.08);
-  border: 1px solid rgba(173, 255, 0, 0.25);
-  color: #adff00;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #888;
 }
 
-.nw-card__tag--spell  { background: rgba(123,79,255,0.1); border-color: rgba(123,79,255,0.35); color: #a67cff; }
-.nw-card__tag--event  { background: rgba(255,107,53,0.1); border-color: rgba(255,107,53,0.35); color: #ff8f65; }
-.nw-card__tag--item   { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.3);   color: #4de0ff; }
-
-/* stats row (optional — e.g. dmg / range / cost) */
+/* stats row */
 .nw-card__stats {
   display: flex;
   gap: 10px;
   margin-top: auto;
   padding-top: 6px;
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid #1c1c1c;
 }
 
 .nw-card__stat {
@@ -180,50 +303,59 @@
 .nw-card__stat-val {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #e8e8e8;
+  color: #e0e0e0;
 }
 
 .nw-card__stat-lbl {
   font-size: 0.55rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #555;
+  color: #444;
 }
 
 /* ============================================================
-   CARD FOOTER (action area)
+   CARD FOOTER
    ============================================================ */
 .nw-card__footer {
-  padding: 8px 12px;
-  border-top: 1px solid #1a1a1a;
+  padding: 7px 12px;
+  border-top: 1px solid #1c1c1c;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
+.nw-card__costs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .nw-card__cost {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  color: #888;
+  gap: 3px;
+  font-size: 0.65rem;
+  color: #666;
 }
 
-.nw-card__cost svg,
-.nw-card__cost .nw-icon-gold {
-  width: 13px;
-  height: 13px;
+.nw-card__cost svg {
+  width: 11px;
+  height: 11px;
   flex-shrink: 0;
   color: #adff00;
 }
 
+.nw-card__cost--ap svg  { color: #ffc107; }
+.nw-card__cost--mp svg  { color: #7b4fff; }
+.nw-card__cost--time svg { color: #2196f3; }
+
 /* ============================================================
-   CARD BUTTON (unified action btn inside card)
+   CARD BUTTON
    ============================================================ */
 .nw-card__btn {
   font-family: var(--nw-card-font);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -231,82 +363,33 @@
   border-radius: 3px;
   border: 1px solid var(--nw-card-border-dim);
   background: transparent;
-  color: #666;
+  color: #444;
   cursor: not-allowed;
   transition:
-    background    0.15s ease,
-    border-color  0.15s ease,
-    color         0.15s ease,
-    box-shadow    0.15s ease;
+    background   0.15s ease,
+    border-color 0.15s ease,
+    color        0.15s ease,
+    box-shadow   0.15s ease;
   white-space: nowrap;
 }
 
 .nw-card__btn:not(:disabled) {
-  border-color: var(--nw-card-border);
-  color: var(--nw-card-border);
+  border-color: var(--nw-card-color);
+  color: var(--nw-card-color);
   cursor: pointer;
 }
 
 .nw-card__btn:not(:disabled):hover {
-  background: var(--nw-card-border);
+  background: var(--nw-card-color);
   color: #000;
-  box-shadow: 0 0 8px var(--nw-card-glow-ready);
+  box-shadow: 0 0 8px var(--nw-card-glow-alpha);
 }
 
 /* ============================================================
-   STATE: READY
-   ============================================================ */
-.nw-card--ready {
-  border-color: rgba(173, 255, 0, 0.5);
-  box-shadow: 0 0 8px var(--nw-card-glow);
-}
-
-/* ============================================================
-   STATE: DIM (owned, not usable right now)
-   ============================================================ */
-.nw-card--dim {
-  opacity: 0.5;
-  filter: grayscale(0.4);
-}
-
-.nw-card--dim:hover {
-  opacity: 0.65;
-  transform: none;
-  box-shadow: none;
-}
-
-/* ============================================================
-   STATE: GHOST (not owned / locked)
-   ============================================================ */
-.nw-card--ghost {
-  opacity: 0.3;
-  filter: grayscale(1);
-  pointer-events: none;
-}
-
-/* ============================================================
-   RARITY DOT
-   ============================================================ */
-.nw-card__rarity {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--nw-rarity-common);
-}
-
-.nw-card__rarity--uncommon  { background: var(--nw-rarity-uncommon);  }
-.nw-card__rarity--rare      { background: var(--nw-rarity-rare);      }
-.nw-card__rarity--legendary {
-  background: var(--nw-rarity-legendary);
-  box-shadow: 0 0 6px var(--nw-rarity-legendary);
-}
-
-/* ============================================================
-   PROGRESS BAR (foundry / upgrade)
+   PROGRESS BAR (foundry XP)
    ============================================================ */
 .nw-card__progress {
-  height: 4px;
+  height: 3px;
   background: #1a1a1a;
   border-radius: 2px;
   overflow: hidden;
@@ -314,82 +397,61 @@
 
 .nw-card__progress-fill {
   height: 100%;
-  background: var(--nw-card-border);
+  background: var(--nw-card-color);
   border-radius: 2px;
   transition: width 0.4s ease;
 }
 
 .nw-card__progress-label {
-  font-size: 0.6rem;
-  color: #555;
+  font-size: 0.57rem;
+  color: #444;
   margin-top: 2px;
+  display: flex;
+  justify-content: space-between;
 }
 
 /* ============================================================
-   CONTEXT: LIBRARY (larger, 2-col info)
+   CONTEXT: LIBRARY
    ============================================================ */
 .nw-card--library {
   min-width: 200px;
   max-width: 260px;
 }
-
-.nw-card--library .nw-card__name {
-  font-size: 0.85rem;
-}
-
-.nw-card--library .nw-card__desc {
-  font-size: 0.72rem;
-}
+.nw-card--library .nw-card__name { font-size: 0.85rem; }
+.nw-card--library .nw-card__desc { font-size: 0.72rem; }
 
 /* ============================================================
-   CONTEXT: FOUNDRY (upgrade-centric layout)
+   CONTEXT: FOUNDRY
    ============================================================ */
 .nw-card--foundry {
   min-width: 180px;
 }
-
-.nw-card--foundry .nw-card__body {
-  gap: 8px;
-}
+.nw-card--foundry .nw-card__body { gap: 8px; }
 
 /* ============================================================
-   CONTEXT: HAND / IN-GAME (compact horizontal)
+   CONTEXT: HAND (in-game compact)
    ============================================================ */
 .nw-card--hand {
-  width: 90px;
-  min-height: 120px;
-  font-size: 0.7rem;
+  width: 88px;
+  min-height: 118px;
   flex-shrink: 0;
 }
-
-.nw-card--hand .nw-card__header {
-  padding: 8px 8px 4px;
-}
-
-.nw-card--hand .nw-card__name {
-  font-size: 0.68rem;
-}
-
-.nw-card--hand .nw-card__body {
-  padding: 2px 8px 8px;
-}
-
-.nw-card--hand .nw-card__desc {
-  display: none; /* too small for description */
-}
+.nw-card--hand .nw-card__header { padding: 7px 8px 4px; }
+.nw-card--hand .nw-card__name   { font-size: 0.65rem; }
+.nw-card--hand .nw-card__body   { padding: 2px 8px 8px; }
+.nw-card--hand .nw-card__desc   { display: none; }
+.nw-card--hand .nw-card__stats  { display: none; }
+.nw-card--hand .nw-card__footer { padding: 5px 8px; }
 
 /* ============================================================
-   GRID LAYOUTS (container classes)
+   GRID LAYOUTS
    ============================================================ */
-
-/* library / foundry grid */
 .nw-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
 }
 
-/* in-game hand (horizontal strip) */
 .nw-cards-hand {
   display: flex;
   flex-wrap: nowrap;
@@ -399,10 +461,9 @@
   scrollbar-width: thin;
   scrollbar-color: #adff00 #111;
 }
-
-.nw-cards-hand::-webkit-scrollbar { height: 4px; }
-.nw-cards-hand::-webkit-scrollbar-track { background: #111; }
-.nw-cards-hand::-webkit-scrollbar-thumb { background: #adff00; border-radius: 2px; }
+.nw-cards-hand::-webkit-scrollbar        { height: 4px; }
+.nw-cards-hand::-webkit-scrollbar-track  { background: #111; }
+.nw-cards-hand::-webkit-scrollbar-thumb  { background: #adff00; border-radius: 2px; }
 
 /* ============================================================
    EMPTY STATE
@@ -415,7 +476,7 @@
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #333;
+  color: #2a2a2a;
 }
 
 /* ============================================================
@@ -423,10 +484,9 @@
    ============================================================ */
 @media (max-width: 600px) {
   .nw-cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
     gap: 10px;
   }
-
   .nw-card--library {
     min-width: 0;
     max-width: 100%;
