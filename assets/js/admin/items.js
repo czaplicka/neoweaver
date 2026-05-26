@@ -1,193 +1,208 @@
-/**
- * NeoWeaver Admin — Items (cyber_items)
- * Works with the updated items.php backend.
- */
-/* global NWItems, jQuery, ajaxurl */
+/* NeoWeaver Admin — Items JS */
+/* global NWItems, jQuery */
+
 (function ($) {
 	'use strict';
 
-	var cfg = window.NWItems || {};
-	var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-	var nonce = cfg.nonce || '';
-	var allItems = [];
-	var editingId = null;
-	var filterType = '';
-	var filterRarity = '';
-	var noticeTimer = null;
+	const ajax = NWItems.ajaxurl;
+	const nonce = NWItems.nonce;
 
-	function esc(str) {
-		return $('<div>').text(str == null ? '' : String(str)).html();
-	}
+	let allItems = [];
+	let archetypeMap = {}; // uuid -> name
 
-	function boolVal(v) {
-		return v === true || v === 1 || v === '1' || v === 'true';
-	}
+	// ── DOM refs ──────────────────────────────────────────────────────────────
+	const $tbody        = $('#nw-items-tbody');
+	const $search       = $('#nw-search');
+	const $filterType   = $('#nw-filter-type');
+	const $filterRarity = $('#nw-filter-rarity');
+	const $filterSlot   = $('#nw-filter-slot');
+	const $overlay      = $('#nw-modal-overlay');
+	const $modalTitle   = $('#nw-modal-title');
+	const $formNotice   = $('#nw-form-notice');
+	const $deleteBtn    = $('#nw-delete-btn');
+	const $archetypeSel = $('#nw-field-restricted-archetype');
+	const $archLoading  = $('#nw-archetype-loading');
 
-	function debounce(fn, delay) {
-		var timer = null;
-		return function () {
-			var ctx = this;
-			var args = arguments;
-			clearTimeout(timer);
-			timer = setTimeout(function () {
-				fn.apply(ctx, args);
-			}, delay || 150);
-		};
-	}
+	// ── Rarity colour map ─────────────────────────────────────────────────────
+	const rarityColor = {
+		common:    '#9ca3af',
+		uncommon:  '#4ade80',
+		rare:      '#60a5fa',
+		epic:      '#c084fc',
+		legendary: '#fbbf24',
+	};
 
-	function clearNoticeTimer() {
-		if (noticeTimer) {
-			clearTimeout(noticeTimer);
-			noticeTimer = null;
-		}
-	}
+	// ── Init ──────────────────────────────────────────────────────────────────
+	loadItems();
+	loadArchetypes();
 
-	function notice(msg, type) {
-		var safeType = String(type || 'info').replace(/[^a-z-]/g, '');
-		var isError = safeType === 'error';
+	$('#nw-refresh-btn').on('click', () => { allItems = []; loadItems(); });
+	$('#nw-add-btn').on('click', openAdd);
+	$('#nw-modal-close, #nw-cancel-btn').on('click', closeModal);
+	$('#nw-save-btn').on('click', saveItem);
+	$('#nw-delete-btn').on('click', deleteItem);
 
-		clearNoticeTimer();
+	$search.on('input', renderTable);
+	$filterType.on('change', renderTable);
+	$filterRarity.on('change', renderTable);
+	$filterSlot.on('change', renderTable);
 
-		$('#nw-notice')
-			.stop(true, true)
-			.text(msg || '')
-			.css('background', isError ? '#5c0000' : '#1a3300')
-			.css('color', isError ? '#ff8080' : '#adff00')
-			.show();
-
-		noticeTimer = setTimeout(function () {
-			$('#nw-notice').fadeOut(200);
-			noticeTimer = null;
-		}, 3000);
-	}
-
-	function rarityBadge(r) {
-		var rarity = r || 'common';
-		return '<span class="nw-rarity nw-rarity--' + esc(rarity) + '">' + esc(rarity) + '</span>';
-	}
-
-	function typeBadge(t) {
-		var type = t || '—';
-		return '<span class="nw-item-type">' + esc(type) + '</span>';
-	}
-
-	function thumbHtml(url) {
+	// Image preview
+	$('#nw-field-img-url').on('input blur', function () {
+		const url = $(this).val().trim();
 		if (url) {
-			return '<img class="nw-item-thumb" src="' + esc(url) + '" alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:8px;background:#111;border:1px solid #2b2b2b;" />';
+			$('#nw-item-image-preview').attr('src', url);
+			$('#nw-item-image-preview-wrap').show();
+		} else {
+			$('#nw-item-image-preview-wrap').hide();
 		}
-		return '<div class="nw-item-thumb--empty" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:#111;border:1px solid #2b2b2b;color:#666;">⚙</div>';
+	});
+
+	// ── Load archetypes ───────────────────────────────────────────────────────
+	function loadArchetypes() {
+		$archLoading.show();
+		$.post(ajax, { action: 'nw_items_get_archetypes', nonce })
+			.done(function (res) {
+				if (res.success && Array.isArray(res.data)) {
+					archetypeMap = {};
+					res.data.forEach(a => { archetypeMap[a.id] = a.name; });
+					populateArchetypeSelect(res.data);
+				}
+			})
+			.always(() => $archLoading.hide());
 	}
 
-	function syncFilterStateFromUi() {
-		filterType = $('#nw-filter-type').val() || '';
-		filterRarity = $('#nw-filter-rarity').val() || '';
+	function populateArchetypeSelect(archetypes) {
+		$archetypeSel.find('option:not(:first)').remove();
+		archetypes.forEach(a => {
+			$archetypeSel.append(
+				$('<option>').val(a.id).text(a.name)
+			);
+		});
 	}
 
-	function updateTypeFilterOptions(items) {
-		var types = [];
-		var html = '<option value="">All types</option>';
+	// ── Load items ────────────────────────────────────────────────────────────
+	function loadItems() {
+		$tbody.html('<tr><td colspan="10" style="text-align:center;padding:32px;">Loading…</td></tr>');
 
-		(items || []).forEach(function (item) {
-			var t = (item.type || '').trim();
-			if (t && types.indexOf(t) === -1) {
-				types.push(t);
-			}
-		});
-
-		types.sort(function (a, b) {
-			return a.localeCompare(b);
-		});
-
-		types.forEach(function (type) {
-			html += '<option value="' + esc(type) + '">' + esc(type) + '</option>';
-		});
-
-		$('#nw-filter-type').html(html);
-
-		if (filterType && types.indexOf(filterType) === -1) {
-			filterType = '';
-		}
-
-		$('#nw-filter-type').val(filterType);
-		$('#nw-filter-rarity').val(filterRarity);
+		$.post(ajax, { action: 'nw_items_load', nonce })
+			.done(function (res) {
+				if (!res.success) { showNotice(res.data || 'Load failed', 'error'); return; }
+				allItems = res.data || [];
+				buildTypeFilter();
+				renderTable();
+			})
+			.fail(() => showNotice('Request failed', 'error'));
 	}
 
-	function renderTable(items) {
-		syncFilterStateFromUi();
+	function buildTypeFilter() {
+		const types = [...new Set(allItems.map(i => i.type).filter(Boolean))].sort();
+		$filterType.find('option:not(:first)').remove();
+		types.forEach(t => $filterType.append($('<option>').val(t).text(t)));
+	}
 
-		var search = ($('#nw-search').val() || '').toLowerCase().trim();
+	// ── Render table ──────────────────────────────────────────────────────────
+	function renderTable() {
+		const q       = $search.val().toLowerCase();
+		const typeVal = $filterType.val();
+		const rarVal  = $filterRarity.val();
+		const slotVal = $filterSlot.val();
 
-		var filtered = (items || []).filter(function (item) {
-			var name = (item.name || '').toLowerCase();
-			var desc = (item.description || '').toLowerCase();
-
-			if (filterType && (item.type || '') !== filterType) {
-				return false;
-			}
-
-			if (filterRarity && (item.rarity || '') !== filterRarity) {
-				return false;
-			}
-
-			if (search && name.indexOf(search) === -1 && desc.indexOf(search) === -1) {
-				return false;
-			}
-
+		const filtered = allItems.filter(item => {
+			if (q       && !(item.name || '').toLowerCase().includes(q)) return false;
+			if (typeVal && item.type !== typeVal)   return false;
+			if (rarVal  && item.rarity !== rarVal)  return false;
+			if (slotVal && item.slot !== slotVal)   return false;
 			return true;
 		});
 
-		var activeCount = filtered.filter(function (item) {
-			return boolVal(item.is_active);
-		}).length;
-
-		$('#nw-total').text(filtered.length);
-		$('#nw-active-count').text(activeCount);
+		$('#nw-total').text(allItems.length);
+		$('#nw-active-count').text(allItems.filter(i => i.is_active).length);
+		$('#nw-restricted-count').text(allItems.filter(i => i.restricted_to_archetype).length);
 
 		if (!filtered.length) {
-			$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">No items found.</td></tr>');
+			$tbody.html('<tr><td colspan="10" style="text-align:center;padding:32px;color:#888;">No items found.</td></tr>');
 			return;
 		}
 
-		var rows = filtered.map(function (item) {
-			var active = boolVal(item.is_active);
+		const rows = filtered.map(item => {
+			const imgHtml = item.img_url
+				? `<img src="${escHtml(item.img_url)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #2b2b2b;">`
+				: '<span style="color:#555;font-size:10px;">—</span>';
 
-			return ''
-				+ '<tr data-id="' + esc(item.id) + '">'
-				+ '<td>' + thumbHtml(item.img_url) + '</td>'
-				+ '<td><strong>' + esc(item.name) + '</strong>'
-				+ (item.description ? '<br><small style="color:#888;">' + esc(item.description.length > 80 ? item.description.slice(0, 80) + '…' : item.description) + '</small>' : '')
-				+ '</td>'
-				+ '<td>' + typeBadge(item.type) + '</td>'
-				+ '<td>' + rarityBadge(item.rarity) + '</td>'
-				+ '<td>' + esc(item.slot || 'none') + '</td>'
-				+ '<td>' + esc(item.size || 'medium') + '</td>'
-				+ '<td>' + esc(item.price || 0) + '</td>'
-				+ '<td><button type="button" class="nw-toggle nw-toggle--' + (active ? 'on' : 'off') + '" data-id="' + esc(item.id) + '" data-active="' + (active ? '1' : '0') + '">' + (active ? '✔' : '✖') + '</button></td>'
-				+ '<td><button type="button" class="button button-small nw-edit-btn" data-id="' + esc(item.id) + '">Edit</button></td>'
-				+ '</tr>';
-		}).join('');
+			const rarColor = rarityColor[item.rarity] || '#888';
+			const rarBadge = `<span style="color:${rarColor};font-weight:600;text-transform:capitalize;">${escHtml(item.rarity)}</span>`;
 
-		$('#nw-items-tbody').html(rows);
+			const archName = item.restricted_to_archetype
+				? (archetypeMap[item.restricted_to_archetype]
+					? `<span class="nw-badge nw-badge-purple">${escHtml(archetypeMap[item.restricted_to_archetype])}</span>`
+					: `<span class="nw-badge nw-badge-warn" title="${escHtml(item.restricted_to_archetype)}">unknown UUID</span>`)
+				: '<span style="color:#555;font-size:11px;">all</span>';
+
+			const activeToggle = `<label class="nw-toggle">
+				<input type="checkbox" data-id="${escHtml(item.id)}" class="nw-toggle-active" ${item.is_active ? 'checked' : ''}>
+				<span class="nw-toggle-slider"></span>
+			</label>`;
+
+			return `<tr>
+				<td>${imgHtml}</td>
+				<td><strong>${escHtml(item.name)}</strong></td>
+				<td>${escHtml(item.type || '—')}</td>
+				<td>${rarBadge}</td>
+				<td><span class="nw-badge nw-badge-slot">${escHtml(item.slot || '—')}</span></td>
+				<td>${escHtml(item.size || '—')}</td>
+				<td>${item.price ?? 0}</td>
+				<td>${archName}</td>
+				<td>${activeToggle}</td>
+				<td>
+					<button class="button button-small nw-edit-btn" data-id="${escHtml(item.id)}">Edit</button>
+				</td>
+			</tr>`;
+		});
+
+		$tbody.html(rows.join(''));
+
+		// Bind events
+		$tbody.find('.nw-edit-btn').on('click', function () {
+			openEdit($(this).data('id'));
+		});
+		$tbody.find('.nw-toggle-active').on('change', function () {
+			toggleItem($(this).data('id'), this.checked);
+		});
 	}
 
-	function updateImagePreview() {
-		var url = ($('#nw-field-img-url').val() || '').trim();
-		var $wrap = $('#nw-item-image-preview-wrap');
-		var $img = $('#nw-item-image-preview');
-
-		if (!url) {
-			$img.attr('src', '');
-			$wrap.hide();
-			return;
-		}
-
-		$img.attr('src', url);
-		$wrap.show();
+	// ── Modal open/close ──────────────────────────────────────────────────────
+	function openAdd() {
+		resetForm();
+		$modalTitle.text('Add Item');
+		$deleteBtn.hide();
+		$overlay.show();
 	}
 
+	function openEdit(id) {
+		resetForm();
+		$modalTitle.text('Edit Item');
+		$deleteBtn.show().data('id', id);
+		$formNotice.html('<em style="color:#888;">Loading…</em>');
+
+		$.post(ajax, { action: 'nw_items_get', nonce, id })
+			.done(function (res) {
+				$formNotice.html('');
+				if (!res.success || !res.data) { $formNotice.html('<span style="color:#f87171;">Item not found.</span>'); return; }
+				fillForm(res.data);
+			})
+			.fail(() => $formNotice.html('<span style="color:#f87171;">Request failed.</span>'));
+
+		$overlay.show();
+	}
+
+	function closeModal() {
+		$overlay.hide();
+		resetForm();
+	}
+
+	// ── Form helpers ──────────────────────────────────────────────────────────
 	function resetForm() {
-		editingId = null;
-
 		$('#nw-field-id').val('');
 		$('#nw-field-name').val('');
 		$('#nw-field-description').val('');
@@ -208,274 +223,143 @@
 		$('#nw-field-restricted-archetype').val('');
 		$('#nw-field-is-container').prop('checked', false);
 		$('#nw-field-active').prop('checked', true);
-
-		$('#nw-item-image-preview').attr('src', '');
 		$('#nw-item-image-preview-wrap').hide();
-
-		$('#nw-modal-title').text('Add Item');
-		$('#nw-delete-btn').hide();
-		$('#nw-form-notice').empty();
+		$formNotice.html('');
 	}
 
-	function openModal(title, item) {
-		resetForm();
+	function fillForm(item) {
+		$('#nw-field-id').val(item.id || '');
+		$('#nw-field-name').val(item.name || '');
+		$('#nw-field-description').val(item.description || '');
+		$('#nw-field-type').val(item.type || '');
+		$('#nw-field-rarity').val(item.rarity || 'common');
+		$('#nw-field-slot').val(item.slot || 'none');
+		$('#nw-field-size').val(item.size || 'medium');
+		$('#nw-field-price').val(item.price ?? 0);
+		$('#nw-field-power-value').val(item.power_value ?? 0);
+		$('#nw-field-mass').val(item.mass ?? 1);
+		$('#nw-field-stack-limit').val(item.stack_limit ?? 1);
+		$('#nw-field-img-url').val(item.img_url || '');
+		$('#nw-field-sound-url').val(item.sound_url || '');
 
-		if (item) {
-			editingId = item.id || null;
+		// Tags: jsonb array → comma string
+		const tags = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
+		$('#nw-field-tags').val(tags);
 
-			$('#nw-field-id').val(item.id || '');
-			$('#nw-field-name').val(item.name || '');
-			$('#nw-field-description').val(item.description || '');
-			$('#nw-field-type').val(item.type || '');
-			$('#nw-field-rarity').val(item.rarity || 'common');
-			$('#nw-field-slot').val(item.slot || 'none');
-			$('#nw-field-size').val(item.size || 'medium');
-			$('#nw-field-price').val(item.price || 0);
-			$('#nw-field-power-value').val(item.power_value || 0);
-			$('#nw-field-mass').val(item.mass || 1);
-			$('#nw-field-stack-limit').val(item.stack_limit || 1);
-			$('#nw-field-img-url').val(item.img_url || '');
-			$('#nw-field-sound-url').val(item.sound_url || '');
-			$('#nw-field-tags').val(Array.isArray(item.tags) ? item.tags.join(', ') : '');
-			$('#nw-field-min-tech').val(item.min_kingdom_tech || 0);
-			$('#nw-field-min-magic').val(item.min_kingdom_magic || 0);
-			$('#nw-field-min-wealth').val(item.min_kingdom_wealth || 0);
-			$('#nw-field-restricted-archetype').val(item.restricted_to_archetype || '');
-			$('#nw-field-is-container').prop('checked', boolVal(item.is_container));
-			$('#nw-field-active').prop('checked', boolVal(item.is_active));
+		$('#nw-field-min-tech').val(item.min_kingdom_tech ?? 0);
+		$('#nw-field-min-magic').val(item.min_kingdom_magic ?? 0);
+		$('#nw-field-min-wealth').val(item.min_kingdom_wealth ?? 0);
+		$('#nw-field-is-container').prop('checked', !!item.is_container);
+		$('#nw-field-active').prop('checked', item.is_active !== false);
 
-			$('#nw-delete-btn').show();
+		// Archetype dropdown
+		const arch = item.restricted_to_archetype || '';
+		if (arch && $archetypeSel.find(`option[value="${arch}"]`).length === 0) {
+			// UUID exists but not in dropdown (e.g. archetype deleted) — add temp option
+			$archetypeSel.append($('<option>').val(arch).text(`[${arch.substring(0, 8)}…]`));
 		}
+		$archetypeSel.val(arch);
 
-		$('#nw-modal-title').text(title || 'Item');
-		updateImagePreview();
-		$('#nw-modal-overlay').show();
-		$('#nw-field-name').trigger('focus');
-	}
-
-	function closeModal() {
-		$('#nw-modal-overlay').hide();
-		editingId = null;
-	}
-
-	function loadItems() {
-		if (!ajax || !nonce) {
-			notice('Missing AJAX config.', 'error');
-			return;
+		// Image preview
+		if (item.img_url) {
+			$('#nw-item-image-preview').attr('src', item.img_url);
+			$('#nw-item-image-preview-wrap').show();
 		}
-
-		syncFilterStateFromUi();
-
-		$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Loading…</td></tr>');
-
-		$.post(ajax, {
-			action: 'nw_items_load',
-			nonce: nonce
-		}, function (res) {
-			if (!res || !res.success) {
-				notice((res && res.data) || 'Load failed', 'error');
-				$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Load failed.</td></tr>');
-				return;
-			}
-
-			allItems = Array.isArray(res.data) ? res.data : [];
-			updateTypeFilterOptions(allItems);
-			renderTable(allItems);
-		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-			$('#nw-items-tbody').html('<tr><td colspan="9" style="text-align:center;color:#777;padding:32px;">Request failed.</td></tr>');
-		});
 	}
 
-	function loadSingle(id) {
-		if (!id) {
-			notice('Missing item ID.', 'error');
-			return;
-		}
+	// ── Save ──────────────────────────────────────────────────────────────────
+	function saveItem() {
+		const id = $('#nw-field-id').val().trim();
 
-		$.post(ajax, {
-			action: 'nw_items_get',
-			nonce: nonce,
-			id: String(id)
-		}, function (res) {
-			if (!res || !res.success || !res.data) {
-				notice((res && res.data) || 'Item not found.', 'error');
-				return;
-			}
-
-			openModal('Edit Item', res.data);
-		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-		});
-	}
-
-	function collectPayload() {
-		return {
-			action: 'nw_items_save',
-			nonce: nonce,
-			id: ($('#nw-field-id').val() || '').trim(),
-			name: ($('#nw-field-name').val() || '').trim(),
-			description: ($('#nw-field-description').val() || '').trim(),
-			type: ($('#nw-field-type').val() || '').trim(),
-			rarity: $('#nw-field-rarity').val(),
-			slot: $('#nw-field-slot').val(),
-			size: $('#nw-field-size').val(),
-			price: $('#nw-field-price').val(),
-			power_value: $('#nw-field-power-value').val(),
-			mass: $('#nw-field-mass').val(),
-			stack_limit: $('#nw-field-stack-limit').val(),
-			img_url: ($('#nw-field-img-url').val() || '').trim(),
-			sound_url: ($('#nw-field-sound-url').val() || '').trim(),
-			tags: ($('#nw-field-tags').val() || '').trim(),
-			min_kingdom_tech: $('#nw-field-min-tech').val(),
-			min_kingdom_magic: $('#nw-field-min-magic').val(),
-			min_kingdom_wealth: $('#nw-field-min-wealth').val(),
-			restricted_to_archetype: ($('#nw-field-restricted-archetype').val() || '').trim(),
-			is_container: $('#nw-field-is-container').is(':checked') ? '1' : '0',
-			is_active: $('#nw-field-active').is(':checked') ? '1' : '0'
+		const data = {
+			action:                  'nw_items_save',
+			nonce,
+			id,
+			name:                    $('#nw-field-name').val().trim(),
+			description:             $('#nw-field-description').val().trim(),
+			type:                    $('#nw-field-type').val().trim(),
+			rarity:                  $('#nw-field-rarity').val(),
+			slot:                    $('#nw-field-slot').val(),
+			size:                    $('#nw-field-size').val(),
+			price:                   $('#nw-field-price').val(),
+			power_value:             $('#nw-field-power-value').val(),
+			mass:                    $('#nw-field-mass').val(),
+			stack_limit:             $('#nw-field-stack-limit').val(),
+			img_url:                 $('#nw-field-img-url').val().trim(),
+			sound_url:               $('#nw-field-sound-url').val().trim(),
+			tags:                    $('#nw-field-tags').val().trim(),
+			min_kingdom_tech:        $('#nw-field-min-tech').val(),
+			min_kingdom_magic:       $('#nw-field-min-magic').val(),
+			min_kingdom_wealth:      $('#nw-field-min-wealth').val(),
+			restricted_to_archetype: $archetypeSel.val() || '',
+			is_container:            $('#nw-field-is-container').is(':checked') ? '1' : '0',
+			is_active:               $('#nw-field-active').is(':checked') ? '1' : '0',
 		};
+
+		if (!data.name) { $formNotice.html('<span style="color:#f87171;">Name is required.</span>'); return; }
+
+		$('#nw-save-btn').prop('disabled', true).text('Saving…');
+
+		$.post(ajax, data)
+			.done(function (res) {
+				if (!res.success) { $formNotice.html(`<span style="color:#f87171;">${escHtml(res.data || 'Save failed.')}</span>`); return; }
+				showNotice(id ? 'Item updated.' : 'Item created.', 'success');
+				closeModal();
+				allItems = [];
+				loadItems();
+			})
+			.fail(() => $formNotice.html('<span style="color:#f87171;">Request failed.</span>'))
+			.always(() => $('#nw-save-btn').prop('disabled', false).text('Save Item'));
 	}
 
-	var debouncedRender = debounce(function () {
-		renderTable(allItems);
-	}, 150);
+	// ── Toggle ────────────────────────────────────────────────────────────────
+	function toggleItem(id, is_active) {
+		$.post(ajax, { action: 'nw_items_toggle', nonce, id, is_active: is_active ? '1' : '0' })
+			.done(function (res) {
+				if (!res.success) { showNotice(res.data || 'Toggle failed', 'error'); loadItems(); return; }
+				const idx = allItems.findIndex(i => i.id === id);
+				if (idx !== -1) allItems[idx].is_active = is_active;
+				$('#nw-active-count').text(allItems.filter(i => i.is_active).length);
+			})
+			.fail(() => { showNotice('Request failed', 'error'); loadItems(); });
+	}
 
-	$(document).on('click', '#nw-add-btn', function () {
-		openModal('Add Item', null);
-	});
-
-	$(document).on('click', '#nw-refresh-btn', function () {
-		loadItems();
-	});
-
-	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', function () {
-		closeModal();
-	});
-
-	$(document).on('click', '#nw-modal-overlay', function (e) {
-		if ($(e.target).is('#nw-modal-overlay')) {
-			closeModal();
-		}
-	});
-
-	$(document).on('input', '#nw-search', debouncedRender);
-
-	$(document).on('change', '#nw-filter-type', function () {
-		filterType = $(this).val() || '';
-		renderTable(allItems);
-	});
-
-	$(document).on('change', '#nw-filter-rarity', function () {
-		filterRarity = $(this).val() || '';
-		renderTable(allItems);
-	});
-
-	$(document).on('input change blur', '#nw-field-img-url', function () {
-		updateImagePreview();
-	});
-
-	$(document).on('click', '.nw-edit-btn', function () {
-		var id = $(this).data('id');
+	// ── Delete ────────────────────────────────────────────────────────────────
+	function deleteItem() {
+		const id = $deleteBtn.data('id');
 		if (!id) return;
-		loadSingle(id);
-	});
+		if (!confirm('Delete this item? This cannot be undone.')) return;
 
-	$(document).on('click', '.nw-toggle', function () {
-		var $btn = $(this);
-		var id = $btn.data('id');
-		var current = String($btn.data('active')) === '1';
-		var next = !current;
+		$.post(ajax, { action: 'nw_items_delete', nonce, id })
+			.done(function (res) {
+				if (!res.success) { $formNotice.html(`<span style="color:#f87171;">${escHtml(res.data || 'Delete failed.')}</span>`); return; }
+				showNotice('Item deleted.', 'success');
+				closeModal();
+				allItems = [];
+				loadItems();
+			})
+			.fail(() => $formNotice.html('<span style="color:#f87171;">Request failed.</span>'));
+	}
 
-		$.post(ajax, {
-			action: 'nw_items_toggle',
-			nonce: nonce,
-			id: String(id),
-			is_active: next ? '1' : '0'
-		}, function (res) {
-			if (!res || !res.success) {
-				notice((res && res.data) || 'Toggle failed.', 'error');
-				return;
-			}
-
-			allItems = allItems.map(function (item) {
-				if (String(item.id) === String(id)) {
-					return $.extend({}, item, {
-						is_active: next
-					});
-				}
-				return item;
+	// ── Utils ─────────────────────────────────────────────────────────────────
+	function showNotice(msg, type) {
+		const $n = $('#nw-notice');
+		$n.text(msg)
+			.css({
+				display:    'block',
+				background: type === 'success' ? '#14532d' : '#7f1d1d',
+				color:      '#fff',
+				border:     type === 'success' ? '1px solid #16a34a' : '1px solid #dc2626',
 			});
+		setTimeout(() => $n.fadeOut(), 3500);
+	}
 
-			renderTable(allItems);
-			notice('Item updated.', 'success');
-		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-		});
-	});
-
-	$(document).on('click', '#nw-save-btn', function () {
-		var payload = collectPayload();
-		var $btn = $(this);
-		var originalText = $btn.text();
-
-		if (!ajax || !nonce) {
-			notice('Missing AJAX config.', 'error');
-			return;
-		}
-
-		if (!payload.name) {
-			notice('Name is required.', 'error');
-			return;
-		}
-
-		$btn.prop('disabled', true).text('Saving…');
-
-		$.post(ajax, payload, function (res) {
-			$btn.prop('disabled', false).text(originalText);
-
-			if (!res || !res.success) {
-				notice((res && res.data) || 'Save failed.', 'error');
-				return;
-			}
-
-			notice('Saved.', 'success');
-			closeModal();
-			loadItems();
-		}).fail(function (xhr) {
-			$btn.prop('disabled', false).text(originalText);
-			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-		});
-	});
-
-	$(document).on('click', '#nw-delete-btn', function () {
-		var id = ($('#nw-field-id').val() || '').trim();
-
-		if (!id) {
-			return;
-		}
-
-		if (!window.confirm('Delete this item? This cannot be undone.')) {
-			return;
-		}
-
-		$.post(ajax, {
-			action: 'nw_items_delete',
-			nonce: nonce,
-			id: id
-		}, function (res) {
-			if (!res || !res.success) {
-				notice((res && res.data) || 'Delete failed.', 'error');
-				return;
-			}
-
-			notice('Deleted.', 'success');
-			closeModal();
-			loadItems();
-		}).fail(function (xhr) {
-			notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-		});
-	});
-
-	loadItems();
+	function escHtml(str) {
+		return String(str ?? '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+	}
 
 })(jQuery);
