@@ -3,6 +3,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Upewniamy się, że tw_prepare_character_data() i tw_prepare_tactical_data() są dostępne.
+if ( ! function_exists( 'tw_prepare_character_data' ) ) {
+	require_once NEOWEAVER_PLUGIN_DIR . 'includes/adventure-data.php';
+}
+
 if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 
 	class TW_Adventure_Terminal_Shortcode {
@@ -24,12 +29,13 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 				? get_user_game_data_from_supabase( $user_id )
 				: ( function_exists( 'tw_game_data_defaults' ) ? tw_game_data_defaults() : [] );
 
+			// active_location_id to UUID — nigdy nie castuj na int
 			$adventure_payload = [
 				'active_session_id'   => (string) ( $game_data['active_session_id'] ?? '' ),
 				'active_campaign_id'  => (string) ( $game_data['active_campaign_id'] ?? '' ),
 				'active_character_id' => (string) ( $game_data['active_character_id'] ?? '' ),
 				'active_world_id'     => (string) ( $game_data['active_world_id'] ?? '' ),
-				'active_location_id'  => (int) ( $game_data['active_location_id'] ?? 0 ),
+				'active_location_id'  => (string) ( $game_data['active_location_id'] ?? '' ),
 				'char_name'           => $game_data['char_name'] ?? 'Unknown',
 				'char_tags'           => $game_data['char_tags'] ?? [],
 				'nonce'               => wp_create_nonce( 'tw_adventure_nonce' ),
@@ -42,20 +48,6 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 			$tactical_data = function_exists( 'tw_prepare_tactical_data' )
 				? tw_prepare_tactical_data( $game_data, $user_id )
 				: [];
-
-if ( wp_script_is( 'tw-adventure', 'enqueued' ) ) {
-				wp_add_inline_script(
-					'tw-adventure',
-					'window.twAdventureData = ' . wp_json_encode( $adventure_payload ) . ';',
-					'before'
-				);
-
-				wp_add_inline_script(
-					'tw-adventure',
-					'window.twTacticalData = ' . wp_json_encode( $tactical_data ) . ';',
-					'before'
-				);
-			}
 
 			$char = function_exists( 'tw_prepare_character_data' )
 				? tw_prepare_character_data( $game_data )
@@ -70,7 +62,15 @@ if ( wp_script_is( 'tw-adventure', 'enqueued' ) ) {
 			$c_xp      = $char['c_xp'] ?? 0;
 			$c_status  = $char['c_status'] ?? '';
 
+			// Dane JS wstrzykiwane bezpośrednio w HTML shortcode’a.
+			// wp_add_inline_script() nie działa po wp_head() — używamy <script> w outpucie.
+			$inline_js = '<script id="tw-adventure-data-js">';
+			$inline_js .= 'window.twAdventureData = ' . wp_json_encode( $adventure_payload ) . ';';
+			$inline_js .= 'window.twTacticalData = ' . wp_json_encode( $tactical_data ) . ';';
+			$inline_js .= '</script>';
+
 			ob_start();
+			echo $inline_js;
 			?>
 			<div class="adventure-shell chat-only" id="adventure-shell">
 				<section class="chat-panel">
@@ -167,7 +167,8 @@ if ( wp_script_is( 'tw-adventure', 'enqueued' ) ) {
 
 			<aside id="scenario-panel" class="scenario-panel">
 				<div class="scenario-panel-body">
-					<div id="deck-panel" class="is-open">
+					<!-- ID zmienione z deck-panel na deck-panel-terminal, żeby uniknąć konfliktu z [tw_deck_panel] -->
+					<div id="deck-panel-terminal" class="deck-panel is-open">
 						<div class="deck-tabs-wrapper">
 							<button class="panel-tab is-active" data-tab="tab-scenarios">Mission</button>
 							<button class="panel-tab" data-tab="tab-hand">Augments</button>
@@ -216,34 +217,34 @@ if ( wp_script_is( 'tw-adventure', 'enqueued' ) ) {
 			</aside>
 
 			<?php
-			$character_card_path = NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php';
+			$character_card_path   = NEOWEAVER_PLUGIN_DIR . 'templates/parts/character-card.php';
 			$tactical_overlay_path = NEOWEAVER_PLUGIN_DIR . 'templates/parts/tactical-overlay.php';
 
-if ( file_exists( $character_card_path ) ) {
-	$args = array(
-		'char_id'              => (string) ( $game_data['active_character_id'] ?? '' ),
-		'char_data'            => $char['char_data'] ?? array(),
-		'c_hp'                 => (int) ( $char['c_hp'] ?? 0 ),
-		'm_hp'                 => (int) ( $char['m_hp'] ?? 0 ),
-		'hp_class'             => (string) ( $char['hp_class'] ?? '' ),
-		'c_mp'                 => (int) ( $char['c_mp'] ?? 0 ),
-		'm_mp'                 => (int) ( $char['m_mp'] ?? 0 ),
-		'mp_p'                 => (int) ( $char['mp_p'] ?? 0 ),
-		'sync_p'               => (int) ( $char['sync_p'] ?? 0 ),
-		'sync_class'           => (string) ( $char['sync_class'] ?? '' ),
-		'c_satiety'            => (int) ( $char['c_satiety'] ?? 0 ),
-		'c_hydration'          => (int) ( $char['c_hydration'] ?? 0 ),
-		'c_rest'               => (int) ( $char['c_rest'] ?? 0 ),
-		'skills_and_abilities' => $char['skills_and_abilities'] ?? array(),
-		'inventory'            => $char['inventory'] ?? array(),
-		'logs_data'            => $char['logs_data'] ?? array(),
-		'total_mass'           => $char['total_mass'] ?? 0,
-		'mass_limit'           => $char['mass_limit'] ?? 0,
-		'total_power'          => $char['total_power'] ?? 0,
-	);
+			if ( file_exists( $character_card_path ) ) {
+				$args = [
+					'char_id'              => (string) ( $game_data['active_character_id'] ?? '' ),
+					'char_data'            => $char['char_data'] ?? [],
+					'c_hp'                 => (int) ( $char['c_hp'] ?? 0 ),
+					'm_hp'                 => (int) ( $char['m_hp'] ?? 0 ),
+					'hp_class'             => (string) ( $char['hp_class'] ?? '' ),
+					'c_mp'                 => (int) ( $char['c_mp'] ?? 0 ),
+					'm_mp'                 => (int) ( $char['m_mp'] ?? 0 ),
+					'mp_p'                 => (int) ( $char['mp_p'] ?? 0 ),
+					'sync_p'               => (int) ( $char['sync_p'] ?? 0 ),
+					'sync_class'           => (string) ( $char['sync_class'] ?? '' ),
+					'c_satiety'            => (int) ( $char['c_satiety'] ?? 0 ),
+					'c_hydration'          => (int) ( $char['c_hydration'] ?? 0 ),
+					'c_rest'               => (int) ( $char['c_rest'] ?? 0 ),
+					'skills_and_abilities' => $char['skills_and_abilities'] ?? [],
+					'inventory'            => $char['inventory'] ?? [],
+					'logs_data'            => $char['logs_data'] ?? [],
+					'total_mass'           => $char['total_mass'] ?? 0,
+					'mass_limit'           => $char['mass_limit'] ?? 0,
+					'total_power'          => $char['total_power'] ?? 0,
+				];
 
-	include $character_card_path;
-}
+				include $character_card_path;
+			}
 
 			if ( file_exists( $tactical_overlay_path ) ) {
 				include $tactical_overlay_path;
