@@ -9,7 +9,7 @@ if ( ! function_exists( 'tw_signal_quality_shortcode' ) ) {
 
 		$template = get_page_template_slug( get_queried_object_id() );
 
-		if ( 'page-adventure.php' !== $template ) {
+		if ( 'templates/adventure.php' !== $template ) {
 			return '';
 		}
 
