@@ -362,31 +362,6 @@ class NW_Items_Admin {
 		delete_transient( $this->get_cache_key( $scope . '_all' ) );
 	}
 
-	private function cached_get_all( string $table, string $order_by = 'name' ): array {
-		$cache_key = $this->get_cache_key( $table . '_all' );
-		$cached    = get_transient( $cache_key );
-		if ( false !== $cached && is_array( $cached ) ) {
-			return $cached;
-		}
-
-		// ↓ KLUCZOWA ZMIANA: dodajemy $this->sk()
-		$res = $this->supa(
-			'GET',
-			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.asc',
-			[],
-			$this->sk()   // <── to było brakujące
-		);
-
-		if ( ! $res['ok'] ) {
-			return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
-		}
-
-		$rows = is_array( $res['data'] ) ? $res['data'] : [];
-		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
-		return $rows;
-	}
-
-
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
