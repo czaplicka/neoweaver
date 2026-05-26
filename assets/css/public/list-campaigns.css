@@ -1,365 +1,382 @@
-:root {
-	--neon: #adff00;
-	--cyan: #00c8ff;
-	--dark: #0a0a0a;
-	--gray: #151515;
-}
+/* ============================================================
+   NEOWEAVER — LIST CAMPAIGNS  (redesign v2)
+   Brak pasków, duże zaokrąglenia, karty zamiast tabeli
+   ============================================================ */
 
+/* ---------- Wrapper ---------- */
 .tw-campaigns-wrap {
-	font-family: 'Chakra Petch', sans-serif;
+  width: 100%;
+  padding: 8px 0 32px;
 }
 
-/* ── EMPTY STATE ── */
-.tw-campaigns-empty {
-	text-align: center;
-	padding: 100px 0;
-}
-.tw-campaigns-empty-icon { font-size: 40px; margin-bottom: 20px; opacity: 0.3; line-height: 1; }
-.tw-campaigns-empty-main { font-size: 1rem; color: var(--neon); margin: 0 0 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-.tw-campaigns-empty-sub  { display: block; font-size: 0.85rem; color: #fff; margin: 0 0 28px; }
-.tw-campaigns-empty-actions { display: flex; justify-content: center; gap: 10px; }
-.tw-campaigns-empty-actions .tw-btn-sync {
-	display: inline-block; background: var(--neon); color: #000 !important; border: none;
-	padding: 10px 22px; font-weight: 900; border-radius: 4px; cursor: pointer;
-	text-transform: uppercase; font-family: 'Chakra Petch', sans-serif;
-	font-size: 11px; letter-spacing: 0.05em; text-decoration: none;
-	transition: background 0.2s, box-shadow 0.2s;
-}
-.tw-campaigns-empty-actions .tw-btn-sync:hover { background: #fff; box-shadow: 0 0 15px var(--neon); color: #000 !important; }
-
-/* ═══════════════════════════════════════
-   GRID — 2 kolumny
-═══════════════════════════════════════ */
+/* ---------- Grid ---------- */
 .tw-campaigns-grid {
-	display: grid;
-	grid-template-columns: repeat(2, 1fr);
-	gap: 24px;
-	font-family: 'Chakra Petch', sans-serif;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  gap: 20px;
 }
 
-/* ═══════════════════════════════════════
-   KARTA
-═══════════════════════════════════════ */
+/* ---------- Karta kampanii ---------- */
 .tw-campaign-card {
-	position: relative;
-	background: linear-gradient(160deg, #0d0d0d 0%, #0f150f 55%, #0a0e10 100%);
-	padding: 0;
-	color: white;
-	display: flex;
-	flex-direction: column;
-	overflow: visible; /* żeby ikona wystawała */
-	transition: transform 0.22s ease, box-shadow 0.3s ease;
-	border-radius: 2px;
-	/* gradient border neon→cyan */
-	box-shadow:
-		0 0 0 1px rgba(173,255,0,0.18),
-		0 0 0 1px rgba(0,200,255,0.06),
-		0 4px 28px rgba(0,0,0,0.7),
-		inset 0 1px 0 rgba(173,255,0,0.07);
-}
-
-/* gradient border pseudo */
-.tw-campaign-card::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	padding: 1px;
-	background: linear-gradient(135deg,
-		rgba(173,255,0,0.6) 0%,
-		rgba(0,200,255,0.4) 40%,
-		rgba(173,255,0,0.08) 100%);
-	-webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-	-webkit-mask-composite: xor;
-	mask-composite: exclude;
-	pointer-events: none;
-	z-index: 0;
-}
-
-/* ambient glow */
-.tw-campaign-card::after {
-	content: '';
-	position: absolute;
-	inset: -2px;
-	border-radius: inherit;
-	box-shadow:
-		0 0 24px rgba(173,255,0,0.06),
-		0 0 50px rgba(0,200,255,0.03);
-	pointer-events: none;
-	z-index: 0;
-	transition: box-shadow 0.3s ease;
+  position: relative;
+  background: #0f1117;
+  border: 1px solid rgba(173,255,0,.10);
+  border-radius: 24px;
+  overflow: hidden;
+  transition:
+    transform .22s cubic-bezier(.16,1,.3,1),
+    box-shadow .22s cubic-bezier(.16,1,.3,1),
+    border-color .22s ease;
 }
 
 .tw-campaign-card:hover {
-	transform: translateY(-3px);
-	box-shadow:
-		0 0 0 1px rgba(173,255,0,0.35),
-		0 0 0 1px rgba(0,200,255,0.12),
-		0 12px 40px rgba(0,0,0,0.8),
-		inset 0 1px 0 rgba(173,255,0,0.12);
-}
-.tw-campaign-card:hover::after {
-	box-shadow:
-		0 0 36px rgba(173,255,0,0.13),
-		0 0 70px rgba(0,200,255,0.07);
+  transform: translateY(-3px);
+  border-color: rgba(173,255,0,.32);
+  box-shadow:
+    0 0 0 1px rgba(173,255,0,.10),
+    0 20px 48px rgba(0,0,0,.38);
 }
 
-/* wewnętrzny clip żeby scan-line był w środku */
+/* Wewnętrzny kontener */
 .tw-card-inner {
-	position: relative;
-	overflow: hidden;
-	border-radius: inherit;
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	z-index: 1;
+  position: relative;
+  padding: 22px 22px 18px;
 }
 
-/* ── SCAN LINE ── */
+/* ---------- Pasek scan-line (dekoracja) ---------- */
 .tw-card-scan-line {
-	position: absolute;
-	top: -2px; left: 0; right: 0;
-	height: 1px;
-	background: linear-gradient(90deg,
-		transparent 0%,
-		rgba(173,255,0,0.8) 25%,
-		rgba(0,200,255,0.6) 60%,
-		transparent 100%);
-	animation: nw-scan 3s linear infinite;
-	opacity: 0;
-	transition: opacity 0.3s;
-	pointer-events: none;
-	z-index: 4;
-}
-.tw-campaign-card:hover .tw-card-scan-line { opacity: 1; }
-@keyframes nw-scan {
-	0%   { top: -2px;  opacity: 0; }
-	4%   { opacity: 1; }
-	96%  { opacity: 1; }
-	100% { top: 100%;  opacity: 0; }
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--threat-color, #adff00) 40%,
+    var(--threat-color, #adff00) 60%,
+    transparent 100%
+  );
+  opacity: .55;
+  border-radius: 24px 24px 0 0;
 }
 
-/* ═══════════════════════════════════════
-   FLOATING MODE ICON — wystaje z karty
-═══════════════════════════════════════ */
+/* ---------- Badge trybu (SOLO / TEAM) ---------- */
 .tw-card-mode-badge {
-	position: absolute;
-	top: -14px;
-	left: 16px;
-	z-index: 10;
-	width: 36px;
-	height: 36px;
-	border-radius: 50%;
-	background: #0d0d0d;
-	border: 1px solid rgba(173,255,0,0.5);
-	box-shadow:
-		0 0 0 3px #0a0a0a,
-		0 0 12px rgba(173,255,0,0.3);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--neon);
-	transition: box-shadow 0.3s ease;
+  position: absolute;
+  top: 16px; right: 16px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 50%;
+  color: rgba(255,255,255,.5);
+  transition: background .18s, color .18s;
 }
 .tw-campaign-card:hover .tw-card-mode-badge {
-	border-color: rgba(173,255,0,0.8);
-	box-shadow:
-		0 0 0 3px #0a0a0a,
-		0 0 20px rgba(173,255,0,0.5);
-}
-.tw-card-mode-badge svg {
-	width: 16px;
-	height: 16px;
+  background: rgba(173,255,0,.10);
+  color: #adff00;
 }
 
-/* ═══════════════════════════════════════
-   HEADER — nazwa + world + badges
-═══════════════════════════════════════ */
+/* ---------- Header karty ---------- */
 .tw-card-header {
-	padding: 24px 16px 12px 16px; /* top duży bo ikona wystaje */
-	border-bottom: 1px solid rgba(173,255,0,0.07);
-	background: linear-gradient(180deg, rgba(173,255,0,0.035) 0%, transparent 100%);
+  padding-right: 44px;
+  margin-bottom: 16px;
 }
+
 .tw-card-title {
-	font-size: 0.92rem;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	color: #fff;
-	margin: 0 0 5px 0;
-	line-height: 1.2;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: .02em;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .tw-card-world-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
+
 .tw-card-world-name {
-	font-size: 9px;
-	text-transform: uppercase;
-	letter-spacing: 0.12em;
-	color: rgba(173,255,0,0.5);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	flex: 1;
+  font-size: .88rem;
+  color: rgba(255,255,255,.45);
+  letter-spacing: .04em;
 }
-.tw-card-unset { color: #333; font-style: italic; }
 
-/* badges po prawej w world-row */
+/* ---------- Pills / badges ---------- */
 .tw-card-badges {
-	display: flex;
-	gap: 5px;
-	flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
-.tw-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 3px;
-	font-size: 8px;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	padding: 2px 6px;
-	border: 1px solid;
-	border-radius: 2px;
-	white-space: nowrap;
-}
-.tw-pill svg { width: 9px; height: 9px; }
-.tw-pill--length { color: rgba(173,255,0,0.7); border-color: rgba(173,255,0,0.2); }
 
-/* ═══════════════════════════════════════
-   BODY — 2-kolumnowy grid danych
-═══════════════════════════════════════ */
+.tw-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(173,255,0,.22);
+  color: #adff00;
+  font-size: .75rem;
+  font-family: 'Chakra Petch', sans-serif;
+  letter-spacing: .06em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.tw-pill--length {
+  border-color: rgba(255,255,255,.14);
+  color: rgba(255,255,255,.5);
+}
+
+/* ---------- Body — 2×2 data chips ---------- */
 .tw-card-body {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 0;
-	flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-bottom: 18px;
+}
+
+.tw-card-body-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: rgba(255,255,255,.05);
+  margin: 6px 0;
 }
 
 .tw-card-cell {
-	padding: 10px 14px;
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
+  background: rgba(255,255,255,.03);
+  border-radius: 14px;
+  padding: 11px 14px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  transition: background .18s;
 }
-.tw-card-cell + .tw-card-cell {
-	border-left: 1px solid rgba(255,255,255,0.04);
+
+.tw-campaign-card:hover .tw-card-cell {
+  background: rgba(255,255,255,.05);
 }
+
 .tw-card-cell-label {
-	font-size: 7.5px;
-	text-transform: uppercase;
-	letter-spacing: 0.12em;
-	color: #383838;
-	line-height: 1;
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.3);
+  font-family: 'Chakra Petch', sans-serif;
 }
+
 .tw-card-cell-value {
-	font-size: 0.78rem;
-	color: #ccc;
-	font-weight: 600;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	line-height: 1.3;
+  font-size: .95rem;
+  font-weight: 600;
+  color: rgba(255,255,255,.85);
+  font-family: 'Chakra Petch', sans-serif;
 }
-.tw-card-cell-value.tw-card-unset { color: #2e2e2e; font-weight: 400; }
+
 .tw-card-cell-sub {
-	font-size: 8.5px;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: #3a3a3a;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+  font-size: .75rem;
+  color: rgba(255,255,255,.35);
+  letter-spacing: .03em;
 }
 
-/* ikony w cell-value */
+.tw-card-unset,
+.tw-card-cell-value.tw-card-unset {
+  color: rgba(255,255,255,.2);
+  font-weight: 400;
+}
+
+/* ikona + tekst w komórce */
 .tw-cell-icon {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-}
-.tw-cell-icon svg { width: 11px; height: 11px; opacity: 0.65; flex-shrink: 0; }
-
-/* separator poziomy między wierszami body */
-.tw-card-body-row {
-	display: contents; /* żeby grid-template działał przez .tw-card-body */
-}
-.tw-card-body-divider {
-	grid-column: 1 / -1;
-	height: 1px;
-	background: rgba(255,255,255,0.04);
-	margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* ═══════════════════════════════════════
-   HASH
-═══════════════════════════════════════ */
-.tw-campaign-hash {
-	padding: 8px 14px;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
-	border-top: 1px solid rgba(0,200,255,0.08);
-	background: rgba(0,200,255,0.02);
-}
-.tw-campaign-hash-label { font-size: 7.5px; text-transform: uppercase; color: #2e2e2e; letter-spacing: 0.12em; }
-.tw-campaign-hash-code  { font-size: 11px; color: var(--cyan); font-weight: 700; letter-spacing: 0.2em; word-break: break-all; }
-
-/* ═══════════════════════════════════════
-   ACTIONS
-═══════════════════════════════════════ */
+/* ---------- Actions ---------- */
 .tw-campaign-actions {
-	display: flex;
-	gap: 0;
-	border-top: 1px solid rgba(173,255,0,0.07);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.tw-campaign-actions .tw-btn {
-	flex: 1 1 0;
-	border-radius: 0;
-	border: none;
-	border-right: 1px solid rgba(173,255,0,0.08);
-	padding: 9px 8px;
-}
-.tw-campaign-actions .tw-btn:last-child { border-right: none; }
 
-/* ── BUTTONS ── */
+/* Główny przycisk */
 .tw-btn {
-	background: transparent;
-	border: 1px solid var(--neon);
-	color: var(--neon);
-	padding: 8px 10px;
-	cursor: pointer;
-	font-family: 'Chakra Petch', sans-serif;
-	font-size: 10px;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-	text-align: center;
-	text-decoration: none;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  min-height: 44px;
+  border-radius: 14px;
+  background: rgba(173,255,0,.12);
+  border: 1px solid rgba(173,255,0,.28);
+  color: #adff00;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background .18s,
+    border-color .18s,
+    color .18s,
+    box-shadow .18s;
+  white-space: nowrap;
 }
-.tw-btn svg { width: 11px; height: 11px; }
-.tw-btn:hover { background: var(--neon); color: #000; box-shadow: 0 0 10px rgba(173,255,0,0.3); }
-.tw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.tw-btn-danger { color: rgba(255,59,59,0.7); }
-.tw-btn-danger:hover { background: #ff3b3b; color: #000; box-shadow: 0 0 10px rgba(255,59,59,0.3); }
-.tw-btn-ghost { color: #444; }
-.tw-btn-ghost:hover { background: #1e1e1e; color: #888; box-shadow: none; }
 
-.enter-matrix { background: var(--neon); color: #000 !important; font-weight: 900; }
-.enter-matrix:hover { background: #fff; color: #000 !important; box-shadow: 0 0 18px rgba(173,255,0,0.45); }
+.tw-btn:hover {
+  background: rgba(173,255,0,.22);
+  border-color: rgba(173,255,0,.55);
+  box-shadow: 0 0 14px rgba(173,255,0,.15);
+  color: #adff00;
+  text-decoration: none;
+}
 
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-	.tw-campaigns-grid { grid-template-columns: 1fr; }
+/* Ghost */
+.tw-btn.tw-btn-ghost {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.12);
+  color: rgba(255,255,255,.55);
+}
+.tw-btn.tw-btn-ghost:hover {
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.22);
+  color: rgba(255,255,255,.85);
+  box-shadow: none;
+}
+
+/* Danger (delete) */
+.tw-btn.tw-btn-danger {
+  background: transparent;
+  border-color: rgba(239,68,68,.20);
+  color: rgba(239,68,68,.55);
+  padding: 10px 12px;
+  margin-left: auto;
+}
+.tw-btn.tw-btn-danger:hover {
+  background: rgba(239,68,68,.10);
+  border-color: rgba(239,68,68,.45);
+  color: #ef4444;
+  box-shadow: none;
+}
+
+/* Sync alias */
+.tw-btn-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  min-height: 44px;
+  border-radius: 14px;
+  background: rgba(173,255,0,.14);
+  border: 1px solid rgba(173,255,0,.30);
+  color: #adff00;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .18s, border-color .18s, box-shadow .18s;
+}
+.tw-btn-sync:hover {
+  background: rgba(173,255,0,.24);
+  border-color: rgba(173,255,0,.55);
+  box-shadow: 0 0 14px rgba(173,255,0,.14);
+}
+
+/* Outline alias */
+.tw-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  min-height: 44px;
+  border-radius: 14px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.55);
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .18s, border-color .18s;
+}
+.tw-btn-outline:hover {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.25);
+  color: rgba(255,255,255,.85);
+}
+
+/* ---------- Empty state ---------- */
+.tw-campaigns-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px;
+  gap: 12px;
+}
+
+.tw-campaigns-empty-icon {
+  font-size: 2.5rem;
+  opacity: .6;
+}
+
+.tw-campaigns-empty-main {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  color: rgba(255,255,255,.55);
+}
+
+.tw-campaigns-empty-sub {
+  font-size: .85rem;
+  color: rgba(255,255,255,.3);
+  max-width: 36ch;
+  line-height: 1.6;
+}
+
+.tw-campaigns-empty-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* ---------- Error ---------- */
+.tw-error {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .88rem;
+  color: #ef4444;
+  letter-spacing: .06em;
+  padding: 16px;
+  border: 1px solid rgba(239,68,68,.2);
+  border-radius: 14px;
+  background: rgba(239,68,68,.05);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 500px) {
+  .tw-campaigns-grid {
+    grid-template-columns: 1fr;
+  }
+  .tw-card-body {
+    grid-template-columns: 1fr;
+  }
+  .tw-card-body-divider {
+    display: none;
+  }
 }
