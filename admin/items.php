@@ -23,18 +23,19 @@ class NW_Items_Admin {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
-		add_action( 'wp_ajax_nw_items_load',   [ $this, 'ajax_load' ] );
-		add_action( 'wp_ajax_nw_items_get',    [ $this, 'ajax_get' ] );
-		add_action( 'wp_ajax_nw_items_save',   [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_items_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_items_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_items_load',             [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_items_get',              [ $this, 'ajax_get' ] );
+		add_action( 'wp_ajax_nw_items_save',             [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_items_toggle',           [ $this, 'ajax_toggle' ] );
+		add_action( 'wp_ajax_nw_items_delete',           [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_items_get_archetypes',   [ $this, 'ajax_get_archetypes' ] );
 	}
 
 	public function register_menu(): void {
 		add_submenu_page(
 			'neoweaver',
 			'Items',
-			'🧰 Items',
+			'<span data-lucide-menu="sword"></span> Items',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
@@ -96,6 +97,12 @@ class NW_Items_Admin {
 						<option value="<?php echo esc_attr( $rarity ); ?>"><?php echo esc_html( ucfirst( $rarity ) ); ?></option>
 					<?php endforeach; ?>
 				</select>
+				<select id="nw-filter-slot">
+					<option value="">All slots</option>
+					<?php foreach ( self::SLOTS as $slot ) : ?>
+						<option value="<?php echo esc_attr( $slot ); ?>"><?php echo esc_html( $slot ); ?></option>
+					<?php endforeach; ?>
+				</select>
 				<button id="nw-refresh-btn" class="button">Refresh</button>
 				<button id="nw-add-btn" class="button button-primary">+ Add Item</button>
 			</div>
@@ -103,6 +110,7 @@ class NW_Items_Admin {
 			<div style="display:flex;gap:16px;margin-bottom:16px;">
 				<div><strong>Total:</strong> <span id="nw-total">0</span></div>
 				<div><strong>Active:</strong> <span id="nw-active-count">0</span></div>
+				<div><strong>Restricted:</strong> <span id="nw-restricted-count">0</span></div>
 			</div>
 
 			<table class="wp-list-table widefat striped" id="nw-items-table">
@@ -115,15 +123,17 @@ class NW_Items_Admin {
 						<th>Slot</th>
 						<th>Size</th>
 						<th>Price</th>
+						<th>Archetype</th>
 						<th>Active</th>
 						<th>Actions</th>
 					</tr>
 				</thead>
 				<tbody id="nw-items-tbody">
-					<tr><td colspan="9" style="text-align:center;padding:32px;">Loading…</td></tr>
+					<tr><td colspan="10" style="text-align:center;padding:32px;">Loading…</td></tr>
 				</tbody>
 			</table>
 
+			<!-- MODAL -->
 			<div id="nw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;overflow-y:auto;padding:24px;">
 				<div style="max-width:980px;margin:24px auto;background:#050505;color:#f3f3f3;border:1px solid #2b2b2b;border-radius:14px;padding:24px;position:relative;">
 					<button id="nw-modal-close" style="position:absolute;right:12px;top:12px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer;">✕</button>
@@ -210,24 +220,40 @@ class NW_Items_Admin {
 							<th><label for="nw-field-tags">Tags</label></th>
 							<td><input type="text" id="nw-field-tags" class="large-text" placeholder="comma,separated,tags"></td>
 						</tr>
+
+						<!-- Kingdom requirements -->
+						<tr><th colspan="2"><hr style="border-color:#333;margin:4px 0;"><strong style="color:#adff00;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Kingdom Requirements</strong></th></tr>
 						<tr>
-							<th><label for="nw-field-min-tech">Min Kingdom Tech</label></th>
+							<th><label for="nw-field-min-tech">Min Tech</label></th>
 							<td><input type="number" id="nw-field-min-tech" class="small-text" min="0" value="0"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-field-min-magic">Min Kingdom Magic</label></th>
+							<th><label for="nw-field-min-magic">Min Magic</label></th>
 							<td><input type="number" id="nw-field-min-magic" class="small-text" min="0" value="0"></td>
 						</tr>
 						<tr>
-							<th><label for="nw-field-min-wealth">Min Kingdom Wealth</label></th>
+							<th><label for="nw-field-min-wealth">Min Wealth</label></th>
 							<td><input type="number" id="nw-field-min-wealth" class="small-text" min="0" value="0"></td>
 						</tr>
+
+						<!-- Archetype restriction -->
+						<tr><th colspan="2"><hr style="border-color:#333;margin:4px 0;"><strong style="color:#adff00;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Archetype Restriction</strong></th></tr>
 						<tr>
-							<th><label for="nw-field-restricted-archetype">Restricted Archetype ID</label></th>
-							<td><input type="text" id="nw-field-restricted-archetype" class="regular-text" placeholder="UUID or empty"></td>
+							<th><label for="nw-field-restricted-archetype">Restricted to Archetype</label></th>
+							<td>
+								<select id="nw-field-restricted-archetype">
+									<option value="">— No restriction —</option>
+									<!-- populated via JS -->
+								</select>
+								<p class="description" style="color:#aaa;margin-top:4px;">Leave empty = available to all archetypes.</p>
+								<div id="nw-archetype-loading" style="display:none;color:#888;font-size:12px;margin-top:4px;">Loading archetypes…</div>
+							</td>
 						</tr>
+
+						<!-- Flags -->
+						<tr><th colspan="2"><hr style="border-color:#333;margin:4px 0;"><strong style="color:#adff00;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Flags</strong></th></tr>
 						<tr>
-							<th>Flags</th>
+							<th>Options</th>
 							<td>
 								<label><input type="checkbox" id="nw-field-is-container"> Is container</label><br>
 								<label><input type="checkbox" id="nw-field-active" checked> Is active</label>
@@ -247,6 +273,8 @@ class NW_Items_Admin {
 		</div>
 		<?php
 	}
+
+	// ── Helpers ────────────────────────────────────────────────────────────────
 
 	private function parse_tags( $value ): array {
 		if ( is_array( $value ) ) {
@@ -415,6 +443,8 @@ class NW_Items_Admin {
 		];
 	}
 
+	// ── AJAX handlers ──────────────────────────────────────────────────────────
+
 	public function ajax_load(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
 
@@ -462,6 +492,32 @@ class NW_Items_Admin {
 		wp_send_json_success( $item );
 	}
 
+	/**
+	 * Fetch archetypes list for the dropdown.
+	 * Returns id + name from cyber_archetypes (or cyber_classes depending on actual table).
+	 */
+	public function ajax_get_archetypes(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+
+		$res = $this->supa(
+			'GET',
+			'cyber_classes?select=id,name&order=name.asc'
+		);
+
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Failed to fetch archetypes.' );
+			return;
+		}
+
+		$rows = is_array( $res['data'] ) ? $res['data'] : [];
+		wp_send_json_success( $rows );
+	}
+
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
 
@@ -470,26 +526,26 @@ class NW_Items_Admin {
 			return;
 		}
 
-		$id                    = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name                  = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$description           = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
-		$type                  = sanitize_text_field( wp_unslash( $_POST['type'] ?? '' ) );
-		$rarity                = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
-		$slot                  = sanitize_text_field( wp_unslash( $_POST['slot'] ?? 'none' ) );
-		$size                  = sanitize_text_field( wp_unslash( $_POST['size'] ?? 'medium' ) );
-		$price                 = max( 0, intval( $_POST['price'] ?? 0 ) );
-		$power_value           = max( 0, intval( $_POST['power_value'] ?? 0 ) );
-		$mass                  = max( 1, intval( $_POST['mass'] ?? 1 ) );
-		$stack_limit           = max( 1, intval( $_POST['stack_limit'] ?? 1 ) );
-		$img_url               = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null;
-		$sound_url             = esc_url_raw( wp_unslash( $_POST['sound_url'] ?? '' ) ) ?: null;
-		$tags                  = $this->parse_tags( wp_unslash( $_POST['tags'] ?? '' ) );
-		$is_container          = filter_var( $_POST['is_container'] ?? false, FILTER_VALIDATE_BOOLEAN );
-		$is_active             = filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN );
-		$min_kingdom_tech      = max( 0, intval( $_POST['min_kingdom_tech'] ?? 0 ) );
-		$min_kingdom_magic     = max( 0, intval( $_POST['min_kingdom_magic'] ?? 0 ) );
-		$min_kingdom_wealth    = max( 0, intval( $_POST['min_kingdom_wealth'] ?? 0 ) );
-		$restricted_archetype  = $this->maybe_uuid( wp_unslash( $_POST['restricted_to_archetype'] ?? '' ) );
+		$id                   = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		$name                 = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$description          = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$type                 = sanitize_text_field( wp_unslash( $_POST['type'] ?? '' ) );
+		$rarity               = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
+		$slot                 = sanitize_text_field( wp_unslash( $_POST['slot'] ?? 'none' ) );
+		$size                 = sanitize_text_field( wp_unslash( $_POST['size'] ?? 'medium' ) );
+		$price                = max( 0, intval( $_POST['price'] ?? 0 ) );
+		$power_value          = max( 0, intval( $_POST['power_value'] ?? 0 ) );
+		$mass                 = max( 1, intval( $_POST['mass'] ?? 1 ) );
+		$stack_limit          = max( 1, intval( $_POST['stack_limit'] ?? 1 ) );
+		$img_url              = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null;
+		$sound_url            = esc_url_raw( wp_unslash( $_POST['sound_url'] ?? '' ) ) ?: null;
+		$tags                 = $this->parse_tags( wp_unslash( $_POST['tags'] ?? '' ) );
+		$is_container         = filter_var( $_POST['is_container'] ?? false, FILTER_VALIDATE_BOOLEAN );
+		$is_active            = filter_var( $_POST['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN );
+		$min_kingdom_tech     = max( 0, intval( $_POST['min_kingdom_tech'] ?? 0 ) );
+		$min_kingdom_magic    = max( 0, intval( $_POST['min_kingdom_magic'] ?? 0 ) );
+		$min_kingdom_wealth   = max( 0, intval( $_POST['min_kingdom_wealth'] ?? 0 ) );
+		$restricted_archetype = $this->maybe_uuid( wp_unslash( $_POST['restricted_to_archetype'] ?? '' ) );
 
 		if ( ! $name ) {
 			wp_send_json_error( 'Name is required' );
@@ -512,25 +568,25 @@ class NW_Items_Admin {
 		}
 
 		$payload = [
-			'name'                   => $name,
-			'description'            => $description ?: null,
-			'type'                   => $type ?: null,
-			'tags'                   => $tags,
-			'slot'                   => $slot,
-			'power_value'            => $power_value,
-			'price'                  => $price,
-			'img_url'                => $img_url,
-			'sound_url'              => $sound_url,
-			'rarity'                 => $rarity,
-			'size'                   => $size,
-			'mass'                   => $mass,
-			'stack_limit'            => $stack_limit,
-			'is_container'           => $is_container,
-			'is_active'              => $is_active,
-			'min_kingdom_tech'       => $min_kingdom_tech,
-			'min_kingdom_magic'      => $min_kingdom_magic,
-			'min_kingdom_wealth'     => $min_kingdom_wealth,
-			'restricted_to_archetype'=> $restricted_archetype,
+			'name'                    => $name,
+			'description'             => $description ?: null,
+			'type'                    => $type ?: null,
+			'tags'                    => $tags,
+			'slot'                    => $slot,
+			'power_value'             => $power_value,
+			'price'                   => $price,
+			'img_url'                 => $img_url,
+			'sound_url'               => $sound_url,
+			'rarity'                  => $rarity,
+			'size'                    => $size,
+			'mass'                    => $mass,
+			'stack_limit'             => $stack_limit,
+			'is_container'            => $is_container,
+			'is_active'               => $is_active,
+			'min_kingdom_tech'        => $min_kingdom_tech,
+			'min_kingdom_magic'       => $min_kingdom_magic,
+			'min_kingdom_wealth'      => $min_kingdom_wealth,
+			'restricted_to_archetype' => $restricted_archetype,
 		];
 
 		if ( $id ) {
