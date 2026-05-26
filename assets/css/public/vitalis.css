@@ -1,35 +1,64 @@
 .tw-vitalis-grid-6 {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 10px;
+	gap: 8px;
 	width: 100%;
 }
 
 .tw-vitalis-tile {
 	position: relative;
-	min-height: 110px;
-	padding: 10px 10px 9px;
-	border-radius: 10px;
-	border: 1px solid rgba(173, 255, 0, 0.18);
+	min-height: 104px;
+	padding: 9px 10px 8px;
+	border-radius: 8px;
+	border: 1px solid rgba(173, 255, 0, 0.14);
 	background:
-		linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.025) 100%),
-		rgba(9, 16, 20, 0.62);
+		linear-gradient(135deg, rgba(8, 12, 16, 0.62) 0%, rgba(3, 7, 18, 0.82) 100%);
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.05),
-		0 0 18px rgba(0, 0, 0, 0.28);
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
+		inset 0 1px 0 rgba(173, 255, 0, 0.04),
+		inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+		0 0 16px rgba(0, 0, 0, 0.26);
+	backdrop-filter: blur(10px) saturate(140%);
+	-webkit-backdrop-filter: blur(10px) saturate(140%);
 	overflow: hidden;
+}
+
+/* scanlines */
+.tw-vitalis-tile::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(
+		0deg,
+		transparent,
+		transparent 2px,
+		rgba(0, 0, 0, 0.05) 2px,
+		rgba(0, 0, 0, 0.05) 4px
+	);
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+/* HUD corner mark */
+.tw-vitalis-tile::after {
+	content: '';
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	width: 10px;
+	height: 10px;
+	border-top: 1px solid rgba(173, 255, 0, 0.22);
+	border-left: 1px solid rgba(173, 255, 0, 0.22);
+	pointer-events: none;
 }
 
 .tw-vitalis-tile__chrome {
 	position: absolute;
 	top: 0;
-	left: 0;
-	right: 0;
+	left: 10px;
+	right: 10px;
 	height: 1px;
-	background: linear-gradient(90deg, transparent 0%, rgba(173, 255, 0, 0.55) 50%, transparent 100%);
-	opacity: 0.7;
+	background: linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%);
+	opacity: 0.28;
 	pointer-events: none;
 }
 
@@ -37,38 +66,43 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 8px;
+	margin-bottom: 7px;
+	position: relative;
+	z-index: 1;
 }
 
 .tw-vitalis-tile__label {
-	font-size: 0.66rem;
-	letter-spacing: 0.16em;
+	font-size: 0.6rem;
+	letter-spacing: 0.18em;
 	text-transform: uppercase;
-	color: rgba(230, 255, 230, 0.92);
+	color: rgba(220, 235, 220, 0.82);
 	font-weight: 700;
 }
 
 .tw-vitalis-tile__main {
 	display: grid;
-	grid-template-columns: 48px 1fr;
+	grid-template-columns: 44px 1fr;
 	align-items: center;
-	column-gap: 10px;
-	margin-bottom: 9px;
+	column-gap: 9px;
+	margin-bottom: 8px;
+	position: relative;
+	z-index: 1;
 }
 
 .tw-vitalis-ring {
 	position: relative;
-	width: 48px;
-	height: 48px;
+	width: 44px;
+	height: 44px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
 .tw-vitalis-ring-svg {
-	width: 48px;
-	height: 48px;
+	width: 44px;
+	height: 44px;
 	transform: rotate(-90deg);
+	filter: drop-shadow(0 0 4px currentColor);
 }
 
 .tw-vitalis-ring-bg,
@@ -78,7 +112,7 @@
 }
 
 .tw-vitalis-ring-bg {
-	stroke: rgba(255, 255, 255, 0.10);
+	stroke: rgba(255, 255, 255, 0.08);
 }
 
 .tw-vitalis-ring-fg {
@@ -90,10 +124,11 @@
 
 .tw-vitalis-ring-center {
 	position: absolute;
-	font-size: 0.72rem;
+	font-size: 0.66rem;
 	font-weight: 700;
 	line-height: 1;
 	color: #f2f7f2;
+	text-shadow: 0 0 6px rgba(255, 255, 255, 0.12);
 }
 
 .tw-vitalis-readout {
@@ -101,26 +136,37 @@
 }
 
 .tw-vitalis-readout__value {
-	font-size: 1rem;
+	font-size: 0.94rem;
 	font-weight: 700;
 	line-height: 1.1;
 	color: #f5f7f5;
+	text-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
+	font-variant-numeric: tabular-nums;
 }
 
 .tw-vitalis-readout__state {
 	margin-top: 4px;
-	font-size: 0.62rem;
-	letter-spacing: 0.16em;
+	font-size: 0.56rem;
+	letter-spacing: 0.18em;
 	text-transform: uppercase;
-	color: rgba(220, 230, 220, 0.58);
+	color: rgba(220, 230, 220, 0.5);
 }
 
 .tw-vitalis-line {
 	position: relative;
-	height: 6px;
+	height: 5px;
 	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.06);
+	background: rgba(255, 255, 255, 0.05);
 	overflow: hidden;
+	z-index: 1;
+}
+
+.tw-vitalis-line::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+	opacity: 0.4;
 }
 
 .tw-vitalis-line-fill {
@@ -128,67 +174,73 @@
 	height: 100%;
 	border-radius: inherit;
 	background: currentColor;
-	opacity: 0.9;
+	opacity: 0.88;
 	box-shadow: 0 0 10px currentColor;
 }
 
 /* Kolory */
 .tw-vitalis-tile.stat-health {
 	color: #ff5757;
-	border-color: rgba(255, 87, 87, 0.22);
+	border-color: rgba(255, 87, 87, 0.18);
 }
 
 .tw-vitalis-tile.stat-energy {
 	color: #ffd166;
-	border-color: rgba(255, 209, 102, 0.22);
+	border-color: rgba(255, 209, 102, 0.18);
 }
 
 .tw-vitalis-tile.stat-magic {
 	color: #b37bff;
-	border-color: rgba(179, 123, 255, 0.22);
+	border-color: rgba(179, 123, 255, 0.18);
 }
 
 .tw-vitalis-tile.stat-sync {
 	color: #adff00;
-	border-color: rgba(173, 255, 0, 0.22);
+	border-color: rgba(173, 255, 0, 0.18);
 }
 
 .tw-vitalis-tile.stat-satiety {
 	color: #ff9b4a;
-	border-color: rgba(255, 155, 74, 0.22);
+	border-color: rgba(255, 155, 74, 0.18);
 }
 
 .tw-vitalis-tile.stat-hydration {
 	color: #52e6ff;
-	border-color: rgba(82, 230, 255, 0.22);
+	border-color: rgba(82, 230, 255, 0.18);
 }
 
 /* Stany */
 .tw-vitalis-tile.is-warning .tw-vitalis-readout__state {
 	color: #ffd166;
+	text-shadow: 0 0 6px rgba(255, 209, 102, 0.22);
 }
 
 .tw-vitalis-tile.is-critical .tw-vitalis-readout__state {
 	color: #ff6666;
+	text-shadow: 0 0 6px rgba(255, 102, 102, 0.22);
 }
 
 .tw-vitalis-tile.is-critical {
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.05),
-		0 0 0 1px rgba(255, 90, 90, 0.06),
-		0 0 16px rgba(255, 90, 90, 0.10);
+		inset 0 1px 0 rgba(255, 255, 255, 0.03),
+		0 0 0 1px rgba(255, 90, 90, 0.05),
+		0 0 14px rgba(255, 90, 90, 0.08);
 }
 
 .tw-vitalis-tile.stat-sync.is-warning,
 .tw-vitalis-tile.stat-sync.is-critical {
 	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.05),
-		0 0 0 1px rgba(173, 255, 0, 0.08),
-		0 0 18px rgba(173, 255, 0, 0.12);
+		inset 0 1px 0 rgba(255, 255, 255, 0.03),
+		0 0 0 1px rgba(173, 255, 0, 0.05),
+		0 0 16px rgba(173, 255, 0, 0.10);
 }
 
 .tw-vitalis-tile.stat-sync.is-critical .tw-vitalis-ring-fg {
 	animation: tw-vitalis-sync-flicker 1.3s infinite;
+}
+
+.tw-vitalis-tile.stat-sync.is-critical::before {
+	opacity: 0.62;
 }
 
 @keyframes tw-vitalis-sync-flicker {
