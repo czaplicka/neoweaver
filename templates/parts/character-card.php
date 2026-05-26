@@ -48,6 +48,10 @@ $total_mass           = $args['total_mass'];
 $mass_limit           = $args['mass_limit'];
 $total_power          = $args['total_power'];
 
+// Pet slot/tab unlocked at level 3
+$char_lvl     = (int) ( $char_data['lvl'] ?? 1 );
+$has_pet_slot = $char_lvl >= 3;
+
 // Build equipped items map: slot => item row
 $equipped_by_slot = array();
 foreach ( $inventory as $r ) {
@@ -85,9 +89,11 @@ foreach ( $inventory as $r ) {
 	<button class="tw-nav-btn" data-tab="vehicles" title="Garage" aria-label="Garage" type="button">
 		<i data-lucide="car"></i>
 	</button>
+	<?php if ( $has_pet_slot ) : ?>
 	<button class="tw-nav-btn" data-tab="pets" title="Pets" aria-label="Pets" type="button">
 		<i data-lucide="paw-print"></i>
 	</button>
+	<?php endif; ?>
 </div>
 
 <div
@@ -105,7 +111,7 @@ foreach ( $inventory as $r ) {
 
 			<div class="tw-char-info">
 				<div class="tw-lvl-frame">
-					LVL <?php echo (int) ( $char_data['lvl'] ?? 1 ); ?>
+					LVL <?php echo $char_lvl; ?>
 				</div>
 
 				<h3 class="tw-char-name">
@@ -287,7 +293,9 @@ foreach ( $inventory as $r ) {
 						<?php $render_slot( 'ring_2', 'RING',       'top:58%;right:12%;', 'tiny' ); ?>
 						<?php $render_slot( 'legs',   'LEGS',       'top:90%;left:50%;transform:translateX(-50%);' ); ?>
 
-						<?php $render_slot( 'pet',    'PET',        'top:105%;left:50%;transform:translateX(-50%);', 'pet-slot' ); ?>
+						<?php if ( $has_pet_slot ) : ?>
+							<?php $render_slot( 'pet', 'PET', 'top:105%;left:50%;transform:translateX(-50%);', 'pet-slot' ); ?>
+						<?php endif; ?>
 					</div>
 
 					<div id="tw-inventory-app">
@@ -387,9 +395,11 @@ foreach ( $inventory as $r ) {
 				<?php echo do_shortcode( '[neoweave_vehicle_panel]' ); ?>
 			</div>
 
+			<?php if ( $has_pet_slot ) : ?>
 			<div class="tw-tab-content" id="pets">
 				<?php echo do_shortcode( '[neoweaver_pets]' ); ?>
 			</div>
+			<?php endif; ?>
 
 		</div>
 	</div>
