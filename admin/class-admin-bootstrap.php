@@ -28,7 +28,7 @@ private const PARENT_SLUG = 'neoweaver';
 			'slug'  => 'neoweaver',
 			'root'  => true,
 		],
-			[
+		[
 			'file'  => 'abilities.php',
 			'class' => 'NWAbilitiesAdmin',
 			'slug'  => 'nw-abilities',
@@ -40,12 +40,12 @@ private const PARENT_SLUG = 'neoweaver';
 			'slug'  => 'nw-achievements',
 			'root'  => false,
 		],
-	[
-    'file'  => 'action-tags.php',
-    'class' => 'NW_Action_Tags_Admin',
-    'slug'  => 'nw-action-tags',
-    'root'  => false,
-],
+		[
+			'file'  => 'action-tags.php',
+			'class' => 'NW_Action_Tags_Admin',
+			'slug'  => 'nw-action-tags',
+			'root'  => false,
+		],
 		[
 			'file'  => 'classes.php',
 			'class' => 'NWClassesAdmin',
@@ -124,7 +124,7 @@ private const PARENT_SLUG = 'neoweaver';
 			'slug'  => 'nw-world-tag-defs',
 			'root'  => false,
 		],
-			[
+		[
 			'file'  => 'settings.php',
 			'class' => 'NeoWeaver_Settings',
 			'slug'  => 'nw-settings',
