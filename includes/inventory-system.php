@@ -9,6 +9,39 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Ładuje się tylko na stronie gry (templates/adventure.php).
  */
 
+/** Canonical list of valid equipment slots. */
+const NW_VALID_SLOTS = [
+	'head',
+	'torso',
+	'hand_l',
+	'hand_r',
+	'belt_1',
+	'belt_2',
+	'belt_3',
+	'legs',
+	'feet',
+	'accessory_1',
+	'accessory_2',
+];
+
+/**
+ * Map each slot to the item slot_type tag(s) that may be equipped there.
+ * Values must match the slot_type tags used in cyber_items.
+ */
+const NW_SLOT_ALLOWED_TYPES = [
+	'head'        => [ 'head' ],
+	'torso'       => [ 'torso', 'armor' ],
+	'hand_l'      => [ 'hand', 'shield', 'weapon' ],
+	'hand_r'      => [ 'hand', 'weapon' ],
+	'belt_1'      => [ 'belt', 'consumable', 'tool' ],
+	'belt_2'      => [ 'belt', 'consumable', 'tool' ],
+	'belt_3'      => [ 'belt', 'consumable', 'tool' ],
+	'legs'        => [ 'legs' ],
+	'feet'        => [ 'feet', 'boots' ],
+	'accessory_1' => [ 'accessory', 'implant' ],
+	'accessory_2' => [ 'accessory', 'implant' ],
+];
+
 add_action(
 	'wp_enqueue_scripts',
 	function () {
@@ -32,7 +65,7 @@ add_action(
 	40
 );
 
-// ─── AJAX handler: tw_update_inventory_slot ──────────────────────────────────
+// ─── AJAX handler: tw_update_inventory_slot ────────────────────────────────────────────
 add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot' );
 
 if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
@@ -59,11 +92,17 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 
 		$is_equipped = ! empty( $_POST['is_equipped'] ) && '1' === $_POST['is_equipped'];
 		$slot_name   = isset( $_POST['slot_name'] )
-			? sanitize_text_field( wp_unslash( (string) $_POST['slot_name'] ) )
+			? sanitize_key( wp_unslash( (string) $_POST['slot_name'] ) )
 			: null;
 
 		if ( '' === $slot_name ) {
 			$slot_name = null;
+		}
+
+		// Validate slot_name against the canonical allowlist.
+		if ( $is_equipped && ( null === $slot_name || ! in_array( $slot_name, NW_VALID_SLOTS, true ) ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid equipment slot' ) );
+			return;
 		}
 
 		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
@@ -79,12 +118,13 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			return;
 		}
 
+		// Verify ownership and fetch item slot_type in one query.
 		$ownership_rows = tw_supabase_get(
 			'cyber_character_inventory',
 			array(
 				'id'           => 'eq.' . $inventory_id,
 				'character_id' => 'eq.' . $character_id,
-				'select'       => 'id',
+				'select'       => 'id,cyber_items(slot_type)',
 				'limit'        => 1,
 			)
 		);
@@ -94,9 +134,20 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			return;
 		}
 
+		// Enforce item slot_type restriction when equipping.
+		if ( $is_equipped && null !== $slot_name ) {
+			$item_slot_type = $ownership_rows[0]['cyber_items']['slot_type'] ?? null;
+			$allowed_types  = NW_SLOT_ALLOWED_TYPES[ $slot_name ] ?? [];
+
+			if ( null === $item_slot_type || ! in_array( $item_slot_type, $allowed_types, true ) ) {
+				wp_send_json_error( array( 'message' => 'Item type not allowed in this slot' ) );
+				return;
+			}
+		}
+
 		$patch_body = array(
-			'is_equipped'  => $is_equipped,
-			'equipped_slot'=> $slot_name,
+			'is_equipped'   => $is_equipped,
+			'equipped_slot' => $slot_name,
 		);
 
 		$result = tw_supabase_request(
