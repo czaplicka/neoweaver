@@ -41,7 +41,6 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 
 		$done = true;
 
-		// Przekazujemy tylko REST URL i nonce — zero kluczy Supabase w JS.
 		$data = array_merge(
 			array(
 				'restUrl' => esc_url_raw( rest_url( 'neoweaver/v1/' ) ),
@@ -58,3 +57,35 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 		);
 	}
 }
+
+// Auto-enqueue by page slug — działa zanim shortcode zostanie wykonany.
+if ( ! function_exists( 'tw_maybe_enqueue_list_campaigns_assets' ) ) {
+	function tw_maybe_enqueue_list_campaigns_assets(): void {
+		if ( is_admin() ) {
+			return;
+		}
+
+		$load = false;
+
+		// Sprawdza popularne slugi stron z listą kampanii.
+		if ( is_page( array( 'deployments', 'campaigns', 'my-campaigns', 'dashboard' ) ) ) {
+			$load = true;
+		}
+
+		// Fallback: sprawdź shortcode w post_content.
+		if ( ! $load && is_singular() ) {
+			$post = get_post();
+			if ( $post ) {
+				$load = has_shortcode( $post->post_content, 'tw_list_campaigns' )
+					|| ( function_exists( 'tw_has_shortcode_on_current_page' )
+						&& tw_has_shortcode_on_current_page( 'tw_list_campaigns' ) );
+			}
+		}
+
+		if ( $load ) {
+			tw_enqueue_list_campaigns_assets();
+		}
+	}
+}
+
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_list_campaigns_assets', 20 );
