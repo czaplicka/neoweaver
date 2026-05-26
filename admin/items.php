@@ -344,6 +344,48 @@ class NW_Items_Admin {
 
 		return $rows;
 	}
+	private function sk(): array {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			return [];
+		}
+		return [
+			'apikey'        => TW_SUPABASE_SERVICE_KEY,
+			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+		];
+	}
+
+	private function get_cache_key( string $suffix ): string {
+		return 'nw_' . md5( $suffix );
+	}
+
+	private function bust_cache( string $scope ): void {
+		delete_transient( $this->get_cache_key( $scope . '_all' ) );
+	}
+
+	private function cached_get_all( string $table, string $order_by = 'name' ): array {
+		$cache_key = $this->get_cache_key( $table . '_all' );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		// ↓ KLUCZOWA ZMIANA: dodajemy $this->sk()
+		$res = $this->supa(
+			'GET',
+			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.asc',
+			[],
+			$this->sk()   // <── to było brakujące
+		);
+
+		if ( ! $res['ok'] ) {
+			return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
+		}
+
+		$rows = is_array( $res['data'] ) ? $res['data'] : [];
+		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+		return $rows;
+	}
+
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
@@ -351,96 +393,47 @@ class NW_Items_Admin {
 		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
 			$query = [];
-
 			if ( $qs ) {
 				parse_str( $qs, $query );
 			}
 
-			$data = tw_supabase_get( $table, $query );
+			// ↓ KLUCZOWA ZMIANA: przekazujemy headers z service key
+			$data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
 
 			if ( ! is_array( $data ) ) {
-				return [
-					'ok'    => false,
-					'code'  => 0,
-					'data'  => null,
-					'error' => 'tw_supabase_get returned non-array',
-				];
+				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
 			}
-
 			if ( isset( $data['code'], $data['message'] ) ) {
-				return [
-					'ok'    => false,
-					'code'  => (int) $data['code'],
-					'data'  => null,
-					'error' => $data['message'],
-				];
+				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
 			}
-
-			return [
-				'ok'    => true,
-				'code'  => 200,
-				'data'  => $data,
-				'error' => null,
-			];
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
 
 		if ( function_exists( 'tw_supabase_request' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
 			$query = [];
-
 			if ( $qs ) {
 				parse_str( $qs, $query );
 			}
-
 			$extra_args = [];
-
 			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
 				$extra_args['headers']['Prefer'] = 'return=representation';
 			}
-
 			if ( ! empty( $extra_headers ) ) {
 				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
 			}
-
-			$res = tw_supabase_request(
-				$method,
-				$table,
-				$query,
-				empty( $body ) ? null : $body,
-				$extra_args
-			);
-
+			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
 			$ok   = $res['ok']   ?? false;
 			$code = $res['code'] ?? 0;
 			$data = $res['data'] ?? null;
-
 			if ( ! $ok ) {
-				$msg = is_array( $data )
-					? ( $data['message'] ?? 'Supabase error ' . $code )
-					: 'Supabase error ' . $code;
-
-				return [
-					'ok'    => false,
-					'code'  => $code,
-					'data'  => $data,
-					'error' => $msg,
-				];
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
 			}
-
-			return [
-				'ok'    => true,
-				'code'  => $code,
-				'data'  => $data,
-				'error' => null,
-			];
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
 
-		return [
-			'ok'    => false,
-			'code'  => 0,
-			'data'  => null,
-			'error' => 'Supabase helper functions not available.',
-		];
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
 	}
 
 	// ── AJAX handlers ──────────────────────────────────────────────────────────
@@ -498,26 +491,27 @@ class NW_Items_Admin {
 	 */
 	public function ajax_get_archetypes(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
 		}
 
+		// ↓ KLUCZOWE ZMIANY: cyber_archetypes zamiast cyber_classes + sk()
 		$res = $this->supa(
 			'GET',
-			'cyber_classes?select=id,name&order=name.asc'
+			'cyber_archetypes?select=id,name&order=name.asc',
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to fetch archetypes.' );
+			// Zwróć pustą listę zamiast błędu — archetypes są opcjonalne
+			wp_send_json_success( [] );
 			return;
 		}
 
-		$rows = is_array( $res['data'] ) ? $res['data'] : [];
-		wp_send_json_success( $rows );
+		wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
 	}
-
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
 
