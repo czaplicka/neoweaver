@@ -1,42 +1,30 @@
 /**
  * NeoWeaver – Terminal UI Styles
- *
- * Covers: CSS variables, body reset, keyframe animations,
- * .neoweave-terminal container, inner terminal elements,
- * site header and footer.
- *
- * @package Neoweaver
+ * Updated: glass HUD + CRT terminal blend
  */
 
-/* ==========================================================================
-   1. FOUNDATION & VARIABLES
-   ========================================================================== */
 :root {
-    /* --- Core palette --- */
-    --neo-bg:             #020508;
-    --neo-accent:         #adff00;
-    --neo-border:         rgba(173, 255, 0, 0.3);
-    --neo-text-main:      #c8ffd0;
-    --neo-text-dim:       #6fb37a;
-    --neo-error:          #ff0000;
+    --neo-bg: #020508;
+    --neo-accent: #adff00;
+    --neo-border: rgba(173, 255, 0, 0.22);
+    --neo-text-main: #d8f5dc;
+    --neo-text-dim: #7aa685;
+    --neo-error: #ff4d4d;
 
-    /* --- Monitor / HUD palette --- */
-    --neo-monitor:        #00d2ff;
-    --neo-monitor-glow:   rgba(0, 210, 255, 0.6);
-    --neo-monitor-border: rgba(0, 210, 255, 0.25);
+    --neo-monitor: #00d2ff;
+    --neo-monitor-glow: rgba(0, 210, 255, 0.45);
+    --neo-monitor-border: rgba(0, 210, 255, 0.18);
 
-    /* --- Surfaces --- */
-    --neo-surface-hud:      rgba(3, 7, 18, 0.12);
-    --neo-surface-hud-open: rgba(3, 7, 18, 0.28);
-    --neo-surface-col:      rgba(15, 23, 42, 0.12);
+    --neo-surface-hud: rgba(3, 7, 18, 0.16);
+    --neo-surface-hud-open: rgba(3, 7, 18, 0.3);
+    --neo-surface-col: rgba(15, 23, 42, 0.14);
 
-    /* --- Typography --- */
-    --font-terminal:      'Chakra Petch', sans-serif;
+    --font-terminal: 'Chakra Petch', sans-serif;
 
-    /* --- Motion --- */
-    --transition-smooth:  0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    --transition-hud:     0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    --blur-hud:           12px;
+    --transition-smooth: 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-hud: 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --blur-hud: 16px;
+    --neo-radius: 22px;
 }
 
 * {
@@ -44,27 +32,25 @@
 }
 
 body {
-    background-color: var(--neo-bg);
+    background:
+        radial-gradient(circle at top, rgba(173, 255, 0, 0.04), transparent 30%),
+        linear-gradient(180deg, #020508 0%, #050912 100%);
     color: var(--neo-text-main);
     font-family: var(--font-terminal);
     margin: 0;
     overflow-x: hidden;
 }
 
-/* ==========================================================================
-   2. SYSTEM ANIMATIONS
-   ========================================================================== */
 @keyframes monitor-flicker {
-    0%   { opacity: 0.98; }
-    20%  { opacity: 1; }
-    40%  { opacity: 0.96; }
-    60%  { opacity: 0.99; }
-    80%  { opacity: 0.95; }
-    100% { opacity: 1; }
+    0%, 100% { opacity: 1; }
+    96%      { opacity: 0.985; }
+    97%      { opacity: 1; }
+    98%      { opacity: 0.992; }
+    99%      { opacity: 1; }
 }
 
 @keyframes scanline-scroll {
-    0%   { transform: translateY(0); }
+    0%   { transform: translateY(-100%); }
     100% { transform: translateY(100%); }
 }
 
@@ -76,73 +62,98 @@ body {
 @keyframes progress-fill {
     0%   { content: "█▒▒▒▒▒▒▒▒▒▒▒▒▒▒  5%"; }
     30%  { content: "██████▒▒▒▒▒▒▒▒▒ 45%"; }
-    50%  { content: "███████████▒▒▒▒ 78%"; opacity: 0.5; }
+    50%  { content: "███████████▒▒▒▒ 78%"; opacity: 0.65; }
     100% { content: "███████████████ 100%"; }
 }
 
 @keyframes entropy-loop {
     0%   { content: "█▒▒▒▒▒▒▒▒▒▒▒▒▒▒  2%"; color: var(--neo-accent); }
     85%  { content: "███████████████ 99%"; color: var(--neo-error); text-shadow: 0 0 15px var(--neo-error); }
-    95%  { content: "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  0%"; opacity: 0.5; }
+    95%  { content: "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  0%"; opacity: 0.55; }
     100% { content: "█▒▒▒▒▒▒▒▒▒▒▒▒▒▒  2%"; }
 }
 
 @keyframes neon-pulse {
-    0%, 100% { text-shadow: 0 0 8px var(--neo-monitor-glow); }
-    50%      { text-shadow: 0 0 20px var(--neo-monitor-glow), 0 0 30px var(--neo-monitor-glow); }
+    0%, 100% { text-shadow: 0 0 8px rgba(173, 255, 0, 0.35); }
+    50%      { text-shadow: 0 0 16px rgba(173, 255, 0, 0.55), 0 0 28px rgba(173, 255, 0, 0.15); }
 }
 
-/* ==========================================================================
-   3. MAIN TERMINAL CONTAINER
-   ========================================================================== */
 .neoweave-terminal {
-    background: rgba(5, 5, 5, 0.9);
-    color: #e0e0e0;
-    padding: 40px;
-    border: 2px solid var(--neo-accent);
+    background:
+        linear-gradient(135deg, rgba(6, 10, 14, 0.82) 0%, rgba(4, 8, 18, 0.92) 100%);
+    color: var(--neo-text-main);
+    padding: 32px;
+    border: 1px solid var(--neo-border);
+    border-radius: var(--neo-radius);
     position: relative;
     overflow: hidden;
+    backdrop-filter: blur(var(--blur-hud)) saturate(145%);
+    -webkit-backdrop-filter: blur(var(--blur-hud)) saturate(145%);
     box-shadow:
-        0 0 30px rgba(173, 255, 0, 0.1),
-        inset 0 0 20px rgba(0, 0, 0, 0.5);
+        0 0 0 1px rgba(0, 0, 0, 0.45),
+        0 0 40px rgba(173, 255, 0, 0.07),
+        inset 0 1px 0 rgba(173, 255, 0, 0.08),
+        inset 0 0 30px rgba(0, 0, 0, 0.35);
     line-height: 1.6;
-    margin: 40px auto;
-    max-width: 900px;
-    animation: monitor-flicker 0.15s infinite;
+    margin: 32px auto;
+    max-width: 1100px;
+    animation: monitor-flicker 7s linear infinite;
 }
 
 .neoweave-terminal::before {
-    content: " ";
-    display: block;
+    content: "";
     position: absolute;
-    inset: -100% 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
-    background-size: 100% 4px;
-    z-index: 10;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.06) 2px,
+        rgba(0, 0, 0, 0.06) 4px
+    );
     pointer-events: none;
-    animation: scanline-scroll 12s linear infinite;
+    z-index: 5;
+    opacity: 0.55;
 }
 
-/* ==========================================================================
-   4. INNER TERMINAL ELEMENTS
-   ========================================================================== */
+.neoweave-terminal::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -30%;
+    height: 30%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+    pointer-events: none;
+    z-index: 6;
+    animation: scanline-scroll 10s linear infinite;
+    opacity: 0.3;
+}
+
 .terminal-header {
     color: var(--neo-accent);
-    font-weight: bold;
+    font-weight: 700;
     text-transform: uppercase;
-    margin-bottom: 30px;
-    border-bottom: 1px solid var(--neo-border);
+    margin-bottom: 24px;
+    border-bottom: 1px solid rgba(173, 255, 0, 0.14);
     padding-bottom: 10px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     letter-spacing: 2px;
+    position: relative;
+    z-index: 7;
 }
 
 .terminal-title {
     color: var(--neo-accent);
-    font-size: 2.2rem;
+    font-size: 2rem;
     text-transform: uppercase;
-    text-shadow: 0 0 15px rgba(173, 255, 0, 0.6);
-    margin: 20px 0;
+    letter-spacing: 2px;
+    text-shadow:
+        0 0 10px rgba(173, 255, 0, 0.42),
+        0 0 24px rgba(173, 255, 0, 0.12);
+    margin: 16px 0 20px;
+    position: relative;
+    z-index: 7;
 }
 
 .terminal-cursor {
@@ -150,15 +161,24 @@ body {
     width: 10px;
     height: 20px;
     background: var(--neo-accent);
+    box-shadow: 0 0 10px rgba(173, 255, 0, 0.45);
     animation: power-blink 0.8s step-end infinite;
 }
 
 .loading-bar-container,
 .entropy-container {
-    border: 1px solid var(--neo-border);
-    padding: 15px;
-    margin: 25px 0;
-    background: rgba(173, 255, 0, 0.02);
+    border: 1px solid rgba(173, 255, 0, 0.14);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin: 22px 0;
+    background: rgba(173, 255, 0, 0.03);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+        inset 0 1px 0 rgba(173, 255, 0, 0.05),
+        0 0 16px rgba(173, 255, 0, 0.03);
+    position: relative;
+    z-index: 7;
 }
 
 .loading-bar::after {
@@ -173,19 +193,18 @@ body {
 
 .neoweave-tag {
     color: var(--neo-accent);
-    background: rgba(173, 255, 0, 0.1);
-    padding: 2px 6px;
-    border: 1px solid var(--neo-border);
-    font-weight: bold;
+    background: rgba(173, 255, 0, 0.09);
+    padding: 2px 7px;
+    border: 1px solid rgba(173, 255, 0, 0.18);
+    border-radius: 999px;
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(173, 255, 0, 0.28);
 }
 
-/* ==========================================================================
-   5. SITE HEADER & FOOTER
-   ========================================================================== */
 .neo-terminal-header {
     height: 60px;
-    background: #000;
-    border-bottom: 2px solid var(--neo-accent);
+    background: rgba(2, 6, 10, 0.78);
+    border-bottom: 1px solid rgba(173, 255, 0, 0.22);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -193,26 +212,35 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    animation: monitor-flicker 0.2s infinite;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+        0 0 20px rgba(173, 255, 0, 0.05),
+        inset 0 -1px 0 rgba(173, 255, 0, 0.08);
+    animation: monitor-flicker 7s linear infinite;
 }
 
 .neo-footer-container {
-    background: #000;
+    background: rgba(2, 6, 10, 0.78);
     padding: 40px 20px;
-    border-top: 2px solid var(--neo-accent);
+    border-top: 1px solid rgba(173, 255, 0, 0.22);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
 .footer-col h3 {
     color: var(--neo-accent);
     text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .footer-col a {
     color: var(--neo-text-dim);
     text-decoration: none;
+    transition: color var(--transition-smooth), text-shadow var(--transition-smooth);
 }
 
 .footer-col a:hover {
     color: #fff;
-    text-shadow: 0 0 10px var(--neo-accent);
+    text-shadow: 0 0 10px rgba(173, 255, 0, 0.35);
 }
