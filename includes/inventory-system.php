@@ -37,7 +37,7 @@ add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot
 
 if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 	function tw_handle_update_inventory_slot(): void {
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => 'Security check failed' ) );
 			return;
 		}

@@ -79,7 +79,7 @@ if ( ! function_exists( 'neoweave_get_owned_vehicle_module_type' ) ) {
 
 if ( ! function_exists( 'neoweave_update_vehicle_module' ) ) {
 	function neoweave_update_vehicle_module(): void {
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( [ 'message' => 'Security check failed.' ], 403 );
 			return;
 		}

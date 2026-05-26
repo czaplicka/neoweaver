@@ -24,7 +24,7 @@ if ( ! function_exists( 'tw_save_player_notes' ) ) {
 			return;
 		}
 
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( [ 'message' => 'Security check failed' ], 403 );
 			return;
 		}

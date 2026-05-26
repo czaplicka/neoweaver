@@ -250,7 +250,7 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 	add_action( 'wp_ajax_tw_start_scenario_generation', 'tw_start_scenario_generation' );
 
 	function tw_start_scenario_generation(): void {
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Security check failed', 403 );
 			return;
 		}
@@ -326,7 +326,7 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 	add_action( 'wp_ajax_tw_check_scenario_status', 'tw_check_scenario_status' );
 
 	function tw_check_scenario_status(): void {
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error(
 				array(
 					'message' => 'Security check failed',
@@ -369,7 +369,7 @@ if ( ! function_exists( 'tw_get_ai_message' ) ) {
 	add_action( 'wp_ajax_tw_get_ai_message', 'tw_get_ai_message' );
 
 	function tw_get_ai_message(): void {
-		if ( ! check_ajax_referer( 'tw_ajax_nonce', 'nonce', false ) ) {
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Security check failed', 403 );
 			return;
 		}
