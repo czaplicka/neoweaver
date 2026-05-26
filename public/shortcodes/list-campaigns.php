@@ -18,7 +18,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 			return '<p class="tw-error">UPLINK REQUIRED. IDENTIFY YOURSELF, FIELD AGENT.</p>';
 		}
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'nw_supabase_service_headers' ) ) {
 			return '<p class="tw-error">API Config missing.</p>';
 		}
 
@@ -36,7 +36,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 		}
 
 		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon_key = tw_supabase_anon_key();
 
 		$select = '*,cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty)),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
 
@@ -52,10 +51,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 		$response = wp_remote_get(
 			$url,
 			array(
-				'headers' => array(
-					'apikey'        => $anon_key,
-					'Authorization' => 'Bearer ' . $anon_key,
-				),
+				'headers' => nw_supabase_service_headers(),
 				'timeout' => 15,
 			)
 		);
