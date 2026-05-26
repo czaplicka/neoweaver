@@ -161,7 +161,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 		}
 
 		// Fail-fast: service key jest wymagany dla operacji zapisu.
-		// Nie ma silent fallback na anon key — to byłoby ciche obniżenie bezpieczeństwa.
 		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
 			error_log( 'TW tw_supabase_request: TW_SUPABASE_SERVICE_KEY not configured. Refusing ' . $method . ' ' . $endpoint . '.' );
 			return new WP_Error( 'tw_supabase_config', 'TW_SUPABASE_SERVICE_KEY not configured.' );
@@ -180,7 +179,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 			'Content-Type'  => 'application/json',
 		];
 
-		// Merge nagłówków: extra_args['headers'] (np. Prefer) nadpisuje/rozszerza.
 		$merged_headers = array_merge(
 			$default_headers,
 			(array) ( $extra_args['headers'] ?? [] )
@@ -193,7 +191,7 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 				'sslverify' => true,
 			],
 			$extra_args,
-			[ 'headers' => $merged_headers ] // headers zawsze po merge, nie nadpisane przez extra_args
+			[ 'headers' => $merged_headers ]
 		);
 
 		if ( ! is_numeric( $args['timeout'] ?? null ) ) {
@@ -234,9 +232,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 
 // ============================================================
 // tw_supabase_rpc() — wywołanie funkcji Postgres przez RPC
-// Używa anon key; jeśli funkcja nie ma SECURITY DEFINER i potrzeba
-// service key, przekaż headers w $extra_args.
-// Zwraca: array przy sukcesie, WP_Error przy błędzie
 // ============================================================
 
 if ( ! function_exists( 'tw_supabase_rpc' ) ) {
@@ -308,8 +303,7 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 }
 
 // ============================================================
-// tw_get_data() — stary helper kompatybilności (nie usuwamy, bo
-// może być używany w zewnętrznych plikach szablonu)
+// tw_get_data() — stary helper kompatybilności
 // ============================================================
 
 if ( ! function_exists( 'tw_get_data' ) ) {
@@ -355,7 +349,6 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 			]
 		);
 
-		// Zwróć puste array przy WP_Error — caller nie musi sprawdzać.
 		return is_wp_error( $result ) ? [] : $result;
 	}
 }
@@ -366,7 +359,6 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
-		// tw_supabase_request() już robi fail-fast jeśli SERVICE_KEY nie jest skonfigurowany.
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_user_settings',
@@ -399,7 +391,6 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 
 if ( ! function_exists( 'tw_get_user_setting' ) ) {
 	function tw_get_user_setting( int $wp_user_id, string $key ): ?string {
-		// tw_supabase_get_admin() robi fail-fast jeśli SERVICE_KEY nie jest skonfigurowany.
 		$result = tw_supabase_get_admin(
 			'cyber_user_settings',
 			[
@@ -437,7 +428,6 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 		$key   = sanitize_key( $_POST['key'] ?? '' );
 		$value = sanitize_text_field( $_POST['value'] ?? '' );
 
-		// Biała lista kluczy — rozszerzaj tu gdy dodajesz nowe preferencje.
 		$allowed_keys = [ 'onboarding_dismissed' ];
 
 		if ( empty( $key ) || ! in_array( $key, $allowed_keys, true ) ) {
@@ -457,10 +447,6 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 
 /**
  * Sprawdza czy postać należy do zalogowanego usera.
- *
- * SECURITY: używa SERVICE KEY — anon key bez JWT byłby zablokowany przez RLS
- * i zawsze zwracałby false, czyniąc ten guard bezużytecznym.
- * tw_supabase_get_admin() nigdy nie wysyła service key do przeglądarki.
  */
 if ( ! function_exists( 'tw_user_owns_character' ) ) {
 	function tw_user_owns_character( string $char_id, int $user_id ): bool {
@@ -484,5 +470,36 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 		);
 
 		return ! is_wp_error( $result ) && ! empty( $result );
+	}
+}
+
+// ============================================================
+// get_cyber_character_id_by_wp_id()
+// Zwraca character_id (string UUID) dla zalogowanego WP usera.
+// Używa SERVICE KEY — konieczne gdy RLS blokuje anon key.
+// Zdefiniowane tutaj globalnie, żeby shortcodes i AJAX miały dostęp.
+// ============================================================
+
+if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
+	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
+		if ( $wp_user_id <= 0 ) {
+			return '';
+		}
+
+		$result = tw_supabase_get_admin(
+			'cyber_characters',
+			[
+				'wp_user_id' => 'eq.' . $wp_user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			]
+		);
+
+		if ( is_wp_error( $result ) || empty( $result ) ) {
+			return '';
+		}
+
+		$id = $result[0]['id'] ?? '';
+		return is_string( $id ) ? $id : '';
 	}
 }
