@@ -1,16 +1,15 @@
 .tw-clock-wrapper {
     position: absolute;
-    top: 14px;
-    left: 14px;
-    width: 144px;
-    height: 144px;
+    top: 18px;
+    left: 18px;
+    width: 138px;
+    height: 138px;
     margin: 0;
     font-family: "Chakra Petch", sans-serif;
     z-index: 30;
     pointer-events: none;
 }
 
-/* glass HUD shell */
 .tw-clock-wrapper::before {
     content: '';
     position: absolute;
@@ -18,7 +17,7 @@
     border-radius: 50%;
     background:
         radial-gradient(circle at 30% 30%, rgba(173, 255, 0, 0.08), transparent 45%),
-        linear-gradient(135deg, rgba(8, 14, 12, 0.62), rgba(4, 8, 18, 0.82));
+        linear-gradient(135deg, rgba(8, 14, 12, 0.64), rgba(4, 8, 18, 0.84));
     border: 1px solid rgba(173, 255, 0, 0.18);
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -28,7 +27,6 @@
         inset 0 0 20px rgba(173, 255, 0, 0.03);
 }
 
-/* scanlines */
 .tw-clock-wrapper::after {
     content: '';
     position: absolute;
@@ -47,23 +45,21 @@
 
 .tw-main-disk {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    width: 120px;
-    height: 120px;
+    top: 11px;
+    left: 11px;
+    width: 116px;
+    height: 116px;
     border-radius: 50%;
     border: 1px solid rgba(173, 255, 0, 0.28);
-
     background:
         radial-gradient(circle at center, rgba(173, 255, 0, 0.05) 0%, transparent 48%),
         conic-gradient(
             from 0deg,
             rgba(8, 12, 14, 0.95) 0deg 75deg,
-            rgba(255, 136, 0, 0.40) 75deg 150deg,
-            rgba(68, 204, 255, 0.35) 150deg 285deg,
-            rgba(90, 0, 120, 0.35) 285deg 360deg
+            rgba(255, 136, 0, 0.36) 75deg 150deg,
+            rgba(68, 204, 255, 0.30) 150deg 285deg,
+            rgba(90, 0, 120, 0.30) 285deg 360deg
         );
-
     transition: transform 2s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow:
         inset 0 0 20px rgba(0, 0, 0, 0.85),
@@ -72,7 +68,6 @@
     overflow: hidden;
 }
 
-/* subtle tactical rings */
 .tw-main-disk::before {
     content: '';
     position: absolute;
@@ -89,14 +84,13 @@
     border: 1px solid rgba(173, 255, 0, 0.08);
 }
 
-/* center node */
 .tw-center-hub {
     position: absolute;
-    top: 72px;
-    left: 72px;
+    top: 69px;
+    left: 69px;
     transform: translate(-50%, -50%);
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     background:
         radial-gradient(circle, rgba(173, 255, 0, 0.08) 0%, rgba(0, 0, 0, 0.95) 70%);
     border: 1px solid rgba(173, 255, 0, 0.30);
@@ -119,13 +113,12 @@
     border: 1px dashed rgba(173, 255, 0, 0.14);
 }
 
-/* weather mini widget */
 .tw-forecast-bubble {
     position: absolute;
     top: 4px;
     right: 2px;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     background: rgba(0, 0, 0, 0.72);
     border: 1px solid rgba(173, 255, 0, 0.24);
     border-radius: 50%;
@@ -134,58 +127,37 @@
     align-items: center;
     justify-content: center;
     z-index: 1005;
-    font-size: 12px;
+    font-size: 11px;
     color: #adff00;
     box-shadow:
         0 0 10px rgba(173, 255, 0, 0.08),
         inset 0 0 6px rgba(173, 255, 0, 0.04);
 }
 
-/* season label */
 .tw-season-tag {
     position: absolute;
     bottom: 8px;
-    right: -2px;
+    right: -4px;
     background: rgba(173, 255, 0, 0.14);
     color: var(--season-color, #adff00);
     border: 1px solid rgba(173, 255, 0, 0.28);
     padding: 2px 6px;
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     letter-spacing: 1.2px;
     text-transform: uppercase;
     border-radius: 999px;
     transform: rotate(-8deg);
     z-index: 1006;
-    box-shadow: 0 0 8px rgba(173, 255, 0, 0.08);
 }
 
-/* top marker */
 .tw-pointer {
     position: absolute;
     top: 2px;
-    left: 72px;
+    left: 69px;
     transform: translateX(-50%);
     color: var(--season-color, #adff00);
     font-size: 10px;
     z-index: 1010;
-    overflow: visible;
     text-shadow: 0 0 8px rgba(173, 255, 0, 0.6);
-}
-
-/* optional helper labels if inside hub */
-.tw-center-hub .tw-time-label {
-    font-size: 0.42rem;
-    line-height: 1;
-    letter-spacing: 1px;
-    color: rgba(173, 255, 0, 0.6);
-    text-transform: uppercase;
-}
-
-.tw-center-hub .tw-time-value {
-    font-size: 0.72rem;
-    line-height: 1;
-    font-weight: 700;
-    color: #adff00;
-    text-shadow: 0 0 8px rgba(173, 255, 0, 0.45);
 }
