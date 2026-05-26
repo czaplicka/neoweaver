@@ -47,6 +47,14 @@ $logs_data            = is_array( $args['logs_data'] ) ? $args['logs_data'] : ar
 $total_mass           = $args['total_mass'];
 $mass_limit           = $args['mass_limit'];
 $total_power          = $args['total_power'];
+
+// Build equipped items map: slot => item row
+$equipped_by_slot = array();
+foreach ( $inventory as $r ) {
+	if ( ! empty( $r['is_equipped'] ) && ! empty( $r['info']['slot'] ) ) {
+		$equipped_by_slot[ $r['info']['slot'] ] = $r;
+	}
+}
 ?>
 
 <div class="tw-side-nav" id="twSideNav">
@@ -135,8 +143,10 @@ $total_power          = $args['total_power'];
 				$vitalis_partial = trailingslashit( NEOWEAVER_PLUGIN_DIR ) . 'templates/partials/character-vitalis.php';
 
 				if ( file_exists( $vitalis_partial ) ) {
-					$args = $vitalis_args;
+					// FIX: use separate variable so $args is not overwritten
+					$vitalis_data = $vitalis_args;
 					include $vitalis_partial;
+					unset( $vitalis_data );
 				}
 				?>
 
@@ -227,46 +237,52 @@ $total_power          = $args['total_power'];
 							</span>
 						</div>
 
-						<img src="https://cyber.nieodparady.pl/wp-content/uploads/2026/01/postac.png" class="char-bg" alt="Character" width="300" height="420" loading="lazy">
+						<?php
+						// FIX: use NEOWEAVER_PLUGIN_URL instead of hardcoded domain
+						$paperdoll_url = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'assets/images/postac.png';
+						?>
+						<img src="<?php echo esc_url( $paperdoll_url ); ?>" class="char-bg" alt="Character" width="300" height="420" loading="lazy">
 
-						<div class="inv-slot" data-slot="head" style="top:0%;left:50%;transform:translateX(-50%);">
-							<span class="slot-label">HEAD</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot tiny" data-slot="neck" style="top:12%;left:50%;transform:translateX(-50%);">
-							<span class="slot-label">NECK</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot" data-slot="torso" style="top:22%;left:52%;transform:translateX(-50%);">
-							<span class="slot-label">TORSO</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot" data-slot="bag" style="top:20%;left:9%;transform:translateX(-50%);">
-							<span class="slot-label">BAG</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot" data-slot="pouch" style="top:20%;right:0%;">
-							<span class="slot-label">POUCH</span><div class="item-icon"></div>
-						</div>
+						<?php
+						// Helper: render a single paperdoll slot, fill with equipped item if present
+						$render_slot = function( $slot_key, $label, $style = '', $extra_class = '' ) use ( $equipped_by_slot ) {
+							$r  = $equipped_by_slot[ $slot_key ] ?? null;
+							$it = $r['info'] ?? null;
+							$style_attr = $style ? ' style="' . esc_attr( $style ) . '"' : '';
+							$classes    = 'inv-slot' . ( $extra_class ? ' ' . $extra_class : '' ) . ( $it ? ' is-equipped' : '' );
+							echo '<div class="' . esc_attr( $classes ) . '" data-slot="' . esc_attr( $slot_key ) . '"' . $style_attr . '>';
+							if ( $label ) {
+								echo '<span class="slot-label">' . esc_html( $label ) . '</span>';
+							}
+							echo '<div class="item-icon">';
+							if ( $it ) {
+								echo '<span class="item-icon-name" title="' . esc_attr( $it['name'] ) . '">' . esc_html( $it['name'] ) . '</span>';
+							}
+							echo '</div>';
+							echo '</div>';
+						};
+						?>
+
+						<?php $render_slot( 'head',   'HEAD',       'top:0%;left:50%;transform:translateX(-50%);' ); ?>
+						<?php $render_slot( 'neck',   'NECK',       'top:12%;left:50%;transform:translateX(-50%);', 'tiny' ); ?>
+						<?php $render_slot( 'torso',  'TORSO',      'top:22%;left:52%;transform:translateX(-50%);' ); ?>
+						<?php $render_slot( 'bag',    'BAG',        'top:20%;left:9%;transform:translateX(-50%);' ); ?>
+						<?php $render_slot( 'pouch',  'POUCH',      'top:20%;right:0%;' ); ?>
+
 						<div class="belt-section">
 							<span class="belt-label">UTILITY BELT</span>
 							<div class="belt-slots">
-								<div class="inv-slot tiny" data-slot="belt_1"><div class="item-icon"></div></div>
-								<div class="inv-slot tiny" data-slot="belt_2"><div class="item-icon"></div></div>
-								<div class="inv-slot tiny" data-slot="belt_3"><div class="item-icon"></div></div>
+								<?php $render_slot( 'belt_1', '', '', 'tiny' ); ?>
+								<?php $render_slot( 'belt_2', '', '', 'tiny' ); ?>
+								<?php $render_slot( 'belt_3', '', '', 'tiny' ); ?>
 							</div>
 						</div>
-						<div class="inv-slot" data-slot="hand_l" style="top:46%;left:6%;">
-							<span class="slot-label">LEFT HAND</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot" data-slot="hand_r" style="top:46%;right:6%;">
-							<span class="slot-label">RIGHT HAND</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot tiny" data-slot="ring_1" style="top:58%;left:12%;">
-							<span class="slot-label">RING</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot tiny" data-slot="ring_2" style="top:58%;right:12%;">
-							<span class="slot-label">RING</span><div class="item-icon"></div>
-						</div>
-						<div class="inv-slot" data-slot="legs" style="top:90%;left:50%;transform:translateX(-50%);">
-							<span class="slot-label">LEGS</span><div class="item-icon"></div>
-						</div>
+
+						<?php $render_slot( 'hand_l', 'LEFT HAND',  'top:46%;left:6%;' ); ?>
+						<?php $render_slot( 'hand_r', 'RIGHT HAND', 'top:46%;right:6%;' ); ?>
+						<?php $render_slot( 'ring_1', 'RING',       'top:58%;left:12%;', 'tiny' ); ?>
+						<?php $render_slot( 'ring_2', 'RING',       'top:58%;right:12%;', 'tiny' ); ?>
+						<?php $render_slot( 'legs',   'LEGS',       'top:90%;left:50%;transform:translateX(-50%);' ); ?>
 					</div>
 
 					<div id="tw-inventory-app">
@@ -317,7 +333,8 @@ $total_power          = $args['total_power'];
 								$ts = is_numeric( $log['created_at'] )
 									? (int) $log['created_at']
 									: strtotime( $log['created_at'] );
-								$log_date = ( false !== $ts && $ts > 0 ) ? date( 'd.m.Y H:i', $ts ) : '';
+								// FIX: use wp_date() for timezone-aware formatting (respects WP Settings > Timezone)
+								$log_date = ( false !== $ts && $ts > 0 ) ? wp_date( 'd.m.Y H:i', $ts ) : '';
 							}
 							?>
 							<div class="tw-log-entry">
