@@ -264,3 +264,23 @@
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
   animation: scan-line 2s infinite;
 }
+/* CHAT jako kontener HUD */
+#adventure-chat {
+  position: relative;
+  overflow: hidden;
+  padding-top: 90px;
+}
+
+/* miejsce na zegar i kompas */
+.chat-header {
+  margin-bottom: 20px;
+  padding: 0 150px;
+}
+
+/* żeby pierwsze wiadomości nie wchodziły pod widgety */
+.chat-window {
+  height: 550px;
+  overflow-y: auto;
+  padding-right: 12px;
+  padding-top: 6px;
+}
