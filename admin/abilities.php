@@ -31,7 +31,7 @@ class NWAbilitiesAdmin {
 		add_submenu_page(
 			'neoweaver',
 			'NeoWeaver Abilities',
-			'⚡ Abilities',
+			'<span data-lucide-menu="zap"></span> Abilities',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
