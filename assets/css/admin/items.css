@@ -1,107 +1,51 @@
-/* ============================================================
-   NeoWeaver Admin — ITEMS PANEL
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver Admin — Items
+   Extends admin-core.css — only items-specific overrides here */
 
-/* ---- Item Visuals & Thumbnails ---- */
-.nw-item-thumb {
-	width: 40px;
-	height: 40px;
-	object-fit: cover;
-	border-radius: 4px;
-	border: 1px solid rgba(173,255,0,.25);
-}
-
-.nw-item-thumb--empty {
-	width: 40px;
-	height: 40px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	background: #1a1a1a;
-	border-radius: 4px;
-	border: 1px solid #333;
-	color: #555;
-	font-size: 1.1rem;
-}
-
-/* ---- Item Badges & Type ---------------------------------- */
-.nw-item-type {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 4px;
-	font-family: 'Chakra Petch', monospace;
-	font-size: 0.72rem;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	background: rgba(173,255,0,.12);
+/* Rarity badge colors in table */
+.nw-badge-slot {
+	background: rgba(173, 255, 0, 0.08);
 	color: #adff00;
-	border: 1px solid rgba(173,255,0,.3);
-}
-
-/* ---- Rarity Palette (Item-Specific) ----------------------- */
-.nw-rarity {
-	display: inline-block;
-	padding: 2px 8px;
+	border: 1px solid rgba(173, 255, 0, 0.2);
 	border-radius: 4px;
+	padding: 2px 7px;
+	font-size: 11px;
 	font-family: 'Chakra Petch', monospace;
-	font-size: 0.75rem;
-	font-weight: 600;
 	text-transform: uppercase;
-	letter-spacing: 0.04em;
+	letter-spacing: .04em;
 }
 
-.nw-rarity--common    { background: #444;    color: #ccc; }
-.nw-rarity--uncommon  { background: #1a4d1a; color: #6eff6e; }
-.nw-rarity--rare      { background: #0d2a4d; color: #4db8ff; }
-.nw-rarity--epic      { background: #2d0d4d; color: #bf7fff; }
-.nw-rarity--legendary { background: #4d2d00; color: #ffb347; }
-
-/* ---- Tabs System (Inside Modals/Forms) -------------------- */
-.nw-tabs {
-	display: flex;
-	gap: 0;
-	border-bottom: 2px solid #333;
-	margin-bottom: 16px;
+.nw-badge-purple {
+	background: rgba(192, 132, 252, 0.12);
+	color: #c084fc;
+	border: 1px solid rgba(192, 132, 252, 0.25);
+	border-radius: 4px;
+	padding: 2px 7px;
+	font-size: 11px;
 }
 
-.nw-tab {
-	background: none;
-	border: none;
-	border-bottom: 2px solid transparent;
-	margin-bottom: -2px;
-	padding: 8px 18px;
-	font-family: 'Chakra Petch', monospace;
-	font-size: 0.85rem;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: #888;
-	cursor: pointer;
-	transition: all 0.15s ease;
+.nw-badge-warn {
+	background: rgba(251, 191, 36, 0.10);
+	color: #fbbf24;
+	border: 1px solid rgba(251, 191, 36, 0.2);
+	border-radius: 4px;
+	padding: 2px 7px;
+	font-size: 11px;
+	cursor: help;
 }
 
-.nw-tab:hover { color: #ccc; }
-.nw-tab.active {
-	color: #adff00;
-	border-bottom-color: #adff00;
+/* Item image in table */
+#nw-items-table td:first-child {
+	width: 52px;
+	vertical-align: middle;
 }
 
-/* ---- Component Extensions -------------------------------- */
-.nw-toggle {
-	cursor: pointer;
-	background: none;
-	border: none;
-	padding: 0;
-	font-size: 1.2rem;
-	line-height: 1;
-	transition: transform 0.15s ease;
+/* Kingdom requirements section divider */
+.form-table tr.nw-section-header th {
+	padding-top: 16px;
+	padding-bottom: 4px;
 }
-.nw-toggle:hover { transform: scale(1.2); }
-.nw-toggle--on  { color: #adff00; }
-.nw-toggle--off { color: #555; }
 
-.nw-help-text {
-	margin-bottom: 8px;
-	color: #888;
-	font-size: 0.82rem;
+/* Archetype select width */
+#nw-field-restricted-archetype {
+	min-width: 240px;
 }
