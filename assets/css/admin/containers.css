@@ -1,87 +1,123 @@
-/* ==========================================================================
-   NeoWeaver Admin — CONTAINERS PANEL
-   Module-specific styles (extension for admin-core.css)
-   ========================================================================== */
+/* NeoWeaver Admin — containers.css */
 
-/* ---- Container Visuals (Table & Grid) ---- */
-.nw-col-img { width: 44px; }
-
-.nw-cont-img {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    object-fit: cover;
-    border: 1px solid #2e2e2e;
-    background: #1a1a1a;
-    padding: 3px;
-    /* Analogue-Glitched look for container icons */
-    filter: invert(1) sepia(1) saturate(5) hue-rotate(50deg);
+.nw-filters-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
 }
 
-.nw-cont-img-placeholder {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    background: #1a1a1a;
-    border: 1px solid #2e2e2e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 18px;
+.nw-btn-sm {
+	padding: 4px 10px;
+	font-size: 11px;
 }
 
-.nw-cont-name { font-weight: 600; color: #fff; }
-.nw-cont-sub  { font-size: 11px; color: #555; margin-top: 2px; }
-
-/* ---- Rarity System (Item-Specific) ---- */
-.nw-rarity {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .5px;
+.nw-table td.nw-num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: #adff00;
+	font-size: 13px;
 }
 
-.nw-rarity-common    { background: #1e1e1e; color: #aaa;    border: 1px solid #2e2e2e; }
-.nw-rarity-uncommon  { background: #0d2a00; color: #4dff4d; border: 1px solid #1a4400; }
-.nw-rarity-rare      { background: #001a33; color: #4d9fff; border: 1px solid #003366; }
-.nw-rarity-epic      { background: #1a0033; color: #cc66ff; border: 1px solid #330066; }
-.nw-rarity-legendary { background: #2a1500; color: #ffaa00; border: 1px solid #553300; }
-
-/* ---- Storage & Scaling ---- */
-.nw-slots-badge { font-size: 13px; color: #adff00; font-weight: 700; }
-.nw-sizes       { display: flex; flex-wrap: wrap; gap: 4px; }
-
-.nw-size-tag {
-    font-size: 10px;
-    padding: 2px 7px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    border-radius: 3px;
-    color: #888;
+.nw-subcell {
+	margin-top: 3px;
+	font-size: 11px;
+	color: #666;
+	max-width: 320px;
+	line-height: 1.35;
 }
 
-/* ---- Form Controls (Unique for Inventory/Containers) ---- */
-
-/* Range Slider */
-.nw-stat-slider-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.nw-range { width: 100%; accent-color: #adff00; cursor: pointer; }
-.nw-range-val { font-size: 13px; color: #adff00; font-weight: 700; min-width: 28px; text-align: right; }
-
-/* Multi-Checkbox groups (e.g. Allowed Sizes) */
-.nw-checkbox-group  { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
-.nw-check-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #aaa;
-    cursor: pointer;
-    text-transform: capitalize;
+.nw-inline-code {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 11px;
+	color: #8f8f8f;
+	background: #0d0d0d;
+	border: 1px solid #222;
+	border-radius: 4px;
+	padding: 2px 6px;
 }
-.nw-check-label input[type="checkbox"] { accent-color: #adff00; width: 15px; height: 15px; cursor: pointer; }
 
-/* Special State: Inactive Row */
-.nw-row-inactive td:not(:last-child):not(:first-child) { opacity: .4; 
+.nw-size-pill,
+.nw-rarity-pill {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 20px;
+	font-size: 10px;
+	font-family: 'Chakra Petch', monospace;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	margin: 1px 2px 1px 0;
+	border: 1px solid transparent;
+}
+
+.nw-size-tiny {
+	color: #b6b6b6;
+	background: rgba(255,255,255,0.05);
+	border-color: rgba(255,255,255,0.12);
+}
+
+.nw-size-small {
+	color: #44aaff;
+	background: rgba(68,170,255,0.08);
+	border-color: rgba(68,170,255,0.2);
+}
+
+.nw-size-medium {
+	color: #adff00;
+	background: rgba(173,255,0,0.08);
+	border-color: rgba(173,255,0,0.22);
+}
+
+.nw-size-large {
+	color: #ff9f00;
+	background: rgba(255,159,0,0.08);
+	border-color: rgba(255,159,0,0.22);
+}
+
+.nw-rarity-common {
+	color: #a0a0a0;
+	background: rgba(255,255,255,0.05);
+	border-color: rgba(255,255,255,0.12);
+}
+
+.nw-rarity-uncommon {
+	color: #59d66f;
+	background: rgba(89,214,111,0.08);
+	border-color: rgba(89,214,111,0.22);
+}
+
+.nw-rarity-rare {
+	color: #44aaff;
+	background: rgba(68,170,255,0.08);
+	border-color: rgba(68,170,255,0.22);
+}
+
+.nw-rarity-epic {
+	color: #cc88ff;
+	background: rgba(204,136,255,0.08);
+	border-color: rgba(204,136,255,0.22);
+}
+
+.nw-rarity-legendary {
+	color: #ff9f00;
+	background: rgba(255,159,0,0.08);
+	border-color: rgba(255,159,0,0.22);
+}
+
+.nw-dup-btn {
+	color: #44aaff !important;
+}
+
+.nw-dup-btn:hover {
+	border-color: #44aaff !important;
+	background: rgba(68, 170, 255, 0.08) !important;
+}
+
+.nw-pill-rare {
+	border-color: #cc88ff;
+}
+
+.nw-pill-rare strong {
+	color: #cc88ff;
+}
