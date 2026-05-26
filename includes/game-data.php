@@ -63,7 +63,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             'active_character_id' => '',
             'active_scenario_id'  => '',
             'active_world_id'     => '',
-            'active_location_id'  => 0,
+            'active_location_id'  => '',   // UUID — nigdy nie castuj na int
             'char_name'           => 'Nieznany Bohater',
             'char_class_id'       => '',
             'char_race_id'        => '',
@@ -91,8 +91,8 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         }
 
         // ── Warstwa 3: Supabase query ────────────────────────────────────────
-        $sanitize_id = static function ( $raw ): string {
-            return preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $raw );
+        $sanitize_uuid = static function ( $raw ): string {
+            return preg_replace( '/[^a-f0-9\-]/i', '', (string) $raw );
         };
 
         // 1. Aktywna sesja
@@ -115,12 +115,13 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
         $session = $sessions[0];
 
-        $defaults['active_session_id']   = isset( $session['id'] )            ? $sanitize_id( $session['id'] )           : '';
-        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )   ? $sanitize_id( $session['campaign_id'] )  : '';
-        $defaults['active_character_id'] = isset( $session['character_id'] )  ? $sanitize_id( $session['character_id'] ) : '';
-        $defaults['active_world_id']     = isset( $session['world_id'] )      ? $sanitize_id( $session['world_id'] )     : '';
-        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? $sanitize_id( $session['scenario_id'] )  : '';
-        $defaults['active_location_id']  = isset( $session['location_id'] )   ? (int) $session['location_id']            : 0;
+        $defaults['active_session_id']   = isset( $session['id'] )            ? $sanitize_uuid( $session['id'] )           : '';
+        $defaults['active_campaign_id']  = isset( $session['campaign_id'] )   ? $sanitize_uuid( $session['campaign_id'] )  : '';
+        $defaults['active_character_id'] = isset( $session['character_id'] )  ? $sanitize_uuid( $session['character_id'] ) : '';
+        $defaults['active_world_id']     = isset( $session['world_id'] )      ? $sanitize_uuid( $session['world_id'] )     : '';
+        $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? $sanitize_uuid( $session['scenario_id'] )  : '';
+        // UUID — przechowuj jako string, nigdy jako int
+        $defaults['active_location_id']  = isset( $session['location_id'] )   ? $sanitize_uuid( $session['location_id'] )  : '';
 
         // 2. Postać + tagi (tylko gdy mamy character_id)
         if ( $defaults['active_character_id'] ) {
@@ -130,8 +131,6 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             );
             $defaults['char_tags'] = is_array( $tags_data ) ? $tags_data : [];
 
-            // POPRAWKA: cyber_characters nie ma kolumn 'race' ani 'class'
-            // — poprawne nazwy to 'race_id' i 'class_id' (uuid)
             $chars = tw_supabase_get(
                 'cyber_characters',
                 [
