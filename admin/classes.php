@@ -35,7 +35,7 @@ class NW_Classes_Admin {
         add_submenu_page(
             $this->menu_parent,
             __( 'Classes', 'neoweaver' ),
-            __( '<span data-lucide-menu="circle-user"></span> Classes', 'neoweaver' ),
+            __( '<span data-lucide-menu="swords"></span> Classes', 'neoweaver' ),
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
@@ -415,7 +415,7 @@ class NW_Classes_Admin {
 
     <div class="nw-panel-header">
         <div>
-            <h1 class="nw-panel-title">⚔ Classes</h1>
+            <h1 class="nw-panel-title"><span data-lucide-menu="swords"></span> Classes</h1>
             <p class="nw-panel-subtitle">Manage playable character classes for NeoWeaver.</p>
         </div>
         <div class="nw-header-actions">
