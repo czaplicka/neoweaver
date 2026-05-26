@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-    // Guard against DOMContentLoaded already having fired
     function onDOMReady(fn) {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', fn, { once: true });
@@ -32,10 +31,7 @@
                 body:        params,
                 credentials: 'same-origin',
             });
-            if (!resp.ok) {
-                console.error('Session state HTTP error', resp.status);
-                return null;
-            }
+            if (!resp.ok) { console.error('Session state HTTP error', resp.status); return null; }
             const json = await resp.json();
             if (!json.success || !json.data) return null;
             return json.data.chat_channel_id || null;
@@ -45,7 +41,6 @@
         }
     }
 
-    // Exponential backoff — starts at 1s, caps at 8s, max 6 tries
     async function waitForChatChannel(maxTries = 6) {
         if (!playerChatEl) return;
         playerChatEl.innerHTML = '<p class="empty-msg">Channel syncing, please wait…</p>';
@@ -82,9 +77,7 @@
                 nonce:       nonce,
             });
             const resp = await fetch(window.twAdventureData.ajax_url, {
-                method:      'POST',
-                body:        formData,
-                credentials: 'same-origin',
+                method: 'POST', body: formData, credentials: 'same-origin',
             });
             const json = await resp.json();
             console.log('🌍 World state ensure:', json);
@@ -111,7 +104,7 @@
         window.twGameState.currentCharacterId = d.active_character_id ?? null;
         window.twGameState.currentWorldId     = d.active_world_id     ?? null;
         window.twGameState.currentLocationId  = d.active_location_id  ?? null;
-        console.log('✓ twGameState hydrated from twAdventureData', window.twGameState);
+        console.log('✓ twGameState hydrated', window.twGameState);
         document.dispatchEvent(new Event('twGameStateHydrated'));
     }
 
