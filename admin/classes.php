@@ -415,7 +415,7 @@ class NW_Classes_Admin {
 
     <div class="nw-panel-header">
         <div>
-            <h1 class="nw-panel-title">⚔ Field Agents</h1>
+            <h1 class="nw-panel-title">⚔ Classes</h1>
             <p class="nw-panel-subtitle">Manage playable character classes for NeoWeaver.</p>
         </div>
         <div class="nw-header-actions">
