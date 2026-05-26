@@ -1,685 +1,813 @@
-/* =============================================================================
-   TW CHARACTER PANEL – tw-char-panel.css
-   All rules scoped under #charPanel to prevent collision with any other
-   component that uses generic class names like .tw-progress-fill.
-   ============================================================================= */
-
-/* ---------------------------------------------------------------------------
-   1. SIDE NAV
-   --------------------------------------------------------------------------- */
-#twSideNav.tw-side-nav {
-    position: fixed;
-    right: 0;
-    bottom: 80px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    z-index: 1100;
-    padding: 6px 4px;
-    background: rgba(3, 7, 18, 0.85);
-    border: 1px solid rgba(173, 255, 0, 0.25);
-    border-right: none;
-    border-radius: 8px 0 0 8px;
-    backdrop-filter: blur(8px);
-}
-
-#twSideNav .tw-nav-btn {
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 8px 10px;
-    border-radius: 6px;
-    font-size: 18px;
-    line-height: 1;
-    transition: all 0.2s;
-}
-#twSideNav .tw-nav-btn:hover,
-#twSideNav .tw-nav-btn.active {
-    background: rgba(173, 255, 0, 0.12);
-    color: #adff00;
-    box-shadow: 0 0 8px rgba(173, 255, 0, 0.3);
-}
-
-/* ---------------------------------------------------------------------------
-   2. PANEL CONTAINER
-   --------------------------------------------------------------------------- */
-#charPanel.tw-character-panel-container {
-    position: fixed;
-    right: 44px;          /* sits left of the side nav */
-    bottom: 20px;
-    width: 340px;
-    max-height: calc(100vh - 100px);
-    display: none;        /* hidden until .is-visible */
-    flex-direction: column;
-    z-index: 1099;
-    border-radius: 14px;
-    border: 1px solid rgba(173, 255, 0, 0.35);
-    background: rgba(3, 7, 18, 0.94);
-    backdrop-filter: blur(16px);
-    box-shadow:
-        0 0 30px rgba(0, 0, 0, 0.7),
-        0 0 20px rgba(173, 255, 0, 0.08);
-    font-family: 'Chakra Petch', sans-serif;
-    color: #f0f0f0;
-    overflow: hidden;
-}
-
-#charPanel.tw-character-panel-container.is-visible {
-    display: flex;
-}
-
-/* ---------------------------------------------------------------------------
-   3. CHARACTER CARD INNER
-   --------------------------------------------------------------------------- */
-#charPanel .tw-character-card {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-}
-
-/* Header: avatar + name/class */
-#charPanel .tw-char-header {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 14px 14px 10px;
-    border-bottom: 1px solid rgba(173, 255, 0, 0.15);
-    flex-shrink: 0;
-}
-
-#charPanel .tw-char-avatar {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background-size: cover;
-    background-position: center;
-    border: 2px solid #adff00;
-    box-shadow: 0 0 12px rgba(173, 255, 0, 0.4);
-    background-color: #0a0f0a;
-}
-
-#charPanel .tw-char-info {
-    flex: 1;
-    min-width: 0;
-}
-
-#charPanel .tw-lvl-frame {
-    display: inline-block;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: #adff00;
-    background: rgba(173, 255, 0, 0.1);
-    border: 1px solid rgba(173, 255, 0, 0.3);
-    padding: 2px 8px;
-    border-radius: 3px;
-    margin-bottom: 4px;
-}
-
-#charPanel .tw-char-name {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #fff;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#charPanel .tw-char-class-line {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    margin-top: 2px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-#charPanel .tw-char-class-line .highlight {
-    color: #adff00;
-}
-
-#charPanel .tw-char-gold-line {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    margin-top: 3px;
-}
-
-#charPanel .tw-gold-label {
-    color: rgba(173, 255, 0, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-right: 4px;
-}
-
-/* ---------------------------------------------------------------------------
-   4. SCROLL AREA + TABS
-   --------------------------------------------------------------------------- */
-#charPanel .tw-panel-scroll-area {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(173, 255, 0, 0.3) transparent;
-}
-#charPanel .tw-panel-scroll-area::-webkit-scrollbar { width: 4px; }
-#charPanel .tw-panel-scroll-area::-webkit-scrollbar-thumb {
-    background: rgba(173, 255, 0, 0.3);
-    border-radius: 4px;
-}
-
-#charPanel .tw-tab-content {
-    display: none;
-    padding: 12px 14px 16px;
-}
-#charPanel .tw-tab-content.active {
-    display: block;
-}
-
-/* ---------------------------------------------------------------------------
-   5. STAT BARS BLOCK
-   --------------------------------------------------------------------------- */
-#charPanel .tw-bars-block {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-#charPanel .tw-stat-bar-container {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-#charPanel .tw-stat-label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #94a3b8;
-}
-#charPanel .tw-stat-label.main-label {
-    font-size: 0.72rem;
-    color: #cbd5e1;
-}
-#charPanel .tw-stat-label.small-label {
-    font-size: 0.62rem;
-    color: #64748b;
-}
-
-/* Progress bar track */
-#charPanel .tw-progress-bg {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-    /* Height defined per size variant below — never inherits a screen-filling default */
-}
-
-#charPanel .tw-progress-bg.big-bar {
-    height: 10px;
-}
-
-#charPanel .tw-progress-bg.small-bar {
-    height: 6px;
-}
-
-#charPanel .tw-progress-bg.bordered {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* The fill — constrained to 100% of its parent track, never the viewport */
-#charPanel .tw-progress-fill {
-    height: 100%;
-    width: 0;                    /* start at 0; inline style sets actual value */
-    max-width: 100%;             /* hard cap: can never escape the track */
-    border-radius: 4px;
-    transition: width 0.6s ease;
-    display: block;              /* block, not a screen-filler */
-    position: relative;
-}
-
-/* HP colours */
-#charPanel .tw-progress-fill.hp-green  { background: linear-gradient(90deg, #22c55e, #16a34a); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
-#charPanel .tw-progress-fill.hp-yellow { background: linear-gradient(90deg, #eab308, #ca8a04); box-shadow: 0 0 8px rgba(234,179,8,0.5); }
-#charPanel .tw-progress-fill.hp-red    { background: linear-gradient(90deg, #ef4444, #b91c1c); box-shadow: 0 0 8px rgba(239,68,68,0.6); }
-
-/* MP */
-#charPanel .tw-progress-fill.mp-blue   { background: linear-gradient(90deg, #3b82f6, #1d4ed8); box-shadow: 0 0 8px rgba(59,130,246,0.5); }
-
-/* Sync-rate */
-#charPanel .tw-progress-fill.sync-stable   { background: linear-gradient(90deg, #adff00, #7ec800); box-shadow: 0 0 8px rgba(173,255,0,0.5); }
-#charPanel .tw-progress-fill.sync-warning  { background: linear-gradient(90deg, #f59e0b, #d97706); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
-#charPanel .tw-progress-fill.sync-critical { background: linear-gradient(90deg, #ef4444, #991b1b); box-shadow: 0 0 8px rgba(239,68,68,0.7); animation: tw-sync-pulse 1s infinite; }
-
-@keyframes tw-sync-pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
-}
-
-/* Survival bars */
-#charPanel .tw-progress-fill.satiety-orange  { background: linear-gradient(90deg, #f97316, #ea580c); }
-#charPanel .tw-progress-fill.hydration-cyan  { background: linear-gradient(90deg, #06b6d4, #0891b2); }
-#charPanel .tw-progress-fill.rest-purple     { background: linear-gradient(90deg, #a855f7, #7c3aed); }
-
-/* Glitch border on sync track */
-#charPanel .tw-progress-bg.glitch-border {
-    border-color: rgba(173, 255, 0, 0.3);
-}
-
-/* Survival bars row */
-#charPanel .tw-survival-bars {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 4px;
-}
-
-/* ---------------------------------------------------------------------------
-   6. ACCORDION (attributes / skills / bio)
-   --------------------------------------------------------------------------- */
-#charPanel .tw-accordion-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-#charPanel .tw-accordion-group details {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(173, 255, 0, 0.12);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-#charPanel .tw-accordion-group details > div,
-#charPanel .tw-accordion-group details > p {
-    padding: 10px 12px 12px;
-}
-
-#charPanel .tw-accordion-group summary {
-    padding: 8px 12px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #adff00;
-    cursor: pointer;
-    list-style: none;
-    user-select: none;
-}
-#charPanel .tw-accordion-group summary::-webkit-details-marker { display: none; }
-#charPanel .tw-accordion-group summary::before {
-    content: '▶ ';
-    font-size: 0.6rem;
-}
-#charPanel .tw-accordion-group details[open] summary::before {
-    content: '▼ ';
-}
-
-/* Attribute grid */
-#charPanel .tw-attr-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-}
-
-#charPanel .tw-attr-box {
-    background: rgba(173, 255, 0, 0.06);
-    border: 1px solid rgba(173, 255, 0, 0.18);
-    border-radius: 6px;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-}
-
-#charPanel .tw-at-l {
-    font-size: 0.6rem;
-    letter-spacing: 1px;
-    color: #94a3b8;
-    text-transform: uppercase;
-}
-
-#charPanel .tw-at-v {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #adff00;
-    line-height: 1;
-}
-
-/* Skills list */
-#charPanel .tw-skills-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-#charPanel .tw-skill-chip {
-    position: relative;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-    padding: 6px 10px;
-    text-align: left;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-family: 'Chakra Petch', sans-serif;
-    font-size: 0.72rem;
-    color: #e2e8f0;
-    transition: all 0.2s;
-}
-#charPanel .tw-skill-chip:hover {
-    border-color: rgba(173, 255, 0, 0.4);
-    background: rgba(173, 255, 0, 0.06);
-}
-
-#charPanel .tw-skill-chip-name { font-weight: 600; }
-#charPanel .tw-skill-chip-cost {
-    font-size: 0.6rem;
-    color: #adff00;
-    background: rgba(173, 255, 0, 0.12);
-    border: 1px solid rgba(173, 255, 0, 0.25);
-    border-radius: 3px;
-    padding: 1px 5px;
-    margin-left: 6px;
-    flex-shrink: 0;
-}
-
-/* Skill tooltip */
-#charPanel .tw-skill-tooltip {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 0;
-    width: 220px;
-    background: rgba(3, 7, 18, 0.97);
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    border-radius: 8px;
-    padding: 10px 12px;
-    z-index: 2000;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-}
-#charPanel .tw-skill-chip:hover .tw-skill-tooltip {
-    display: block;
-}
-#charPanel .tw-skill-tooltip-header {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #adff00;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 6px;
-}
-#charPanel .tw-skill-tooltip-body {
-    font-size: 0.68rem;
-    color: #94a3b8;
-    line-height: 1.5;
-}
-
-/* Bio text */
-#charPanel .tw-bio-text {
-    font-size: 0.72rem;
-    line-height: 1.6;
-    color: #94a3b8;
-    padding: 4px 0;
-}
-
-/* ---------------------------------------------------------------------------
-   7. INVENTORY / PAPERDOLL
-   --------------------------------------------------------------------------- */
-#charPanel .equipment-container {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-#charPanel .paperdoll-wrapper {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1 / 1.4;
-    max-height: 340px;
-    margin: 0 auto;
-}
-
-#charPanel .char-bg {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    opacity: 0.35;
-    display: block;
-}
-
-#charPanel .inv-slot {
-    position: absolute;
-    width: 44px;
-    height: 44px;
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    border-radius: 6px;
-    background: rgba(3, 7, 18, 0.7);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-#charPanel .inv-slot.tiny {
-    width: 32px;
-    height: 32px;
-}
-#charPanel .inv-slot:hover {
-    border-color: #adff00;
-    box-shadow: 0 0 8px rgba(173, 255, 0, 0.4);
-}
-
-#charPanel .slot-label {
-    font-size: 0.45rem;
-    letter-spacing: 0.5px;
-    color: rgba(173, 255, 0, 0.6);
-    text-transform: uppercase;
-    line-height: 1;
-    margin-bottom: 2px;
-}
-
-#charPanel .item-icon {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#charPanel .item-img-fluid {
-    max-width: 90%;
-    max-height: 90%;
-    object-fit: contain;
-    border-radius: 4px;
-}
-
-#charPanel .corner-stat {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 0.58rem;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    top: 0;
-}
-#charPanel .corner-stat.stat-left  { left: 0; }
-#charPanel .corner-stat.stat-right { right: 0; }
-#charPanel .corner-stat .stat-value {
-    font-size: 0.75rem;
-    color: #adff00;
-    font-weight: 700;
-}
-
-#charPanel .belt-section {
-    position: absolute;
-    bottom: 18%;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.45rem;
-    color: rgba(173, 255, 0, 0.5);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-}
-#charPanel .belt-slots {
-    display: flex;
-    gap: 4px;
-}
-
-/* Carried items list */
-#charPanel .tw-inv-title {
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #adff00;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid rgba(173, 255, 0, 0.2);
-    padding-bottom: 4px;
-    margin-bottom: 6px;
-}
-
-#charPanel .tw-item-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-height: 40px;
-}
-
-#charPanel .tw-item-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 5px;
-    padding: 5px 8px;
-    cursor: grab;
-    transition: border-color 0.15s;
-}
-#charPanel .tw-item-card:hover {
-    border-color: rgba(173, 255, 0, 0.35);
-}
-#charPanel .tw-item-card.dragging {
-    opacity: 0.5;
-    cursor: grabbing;
-}
-
-#charPanel .tw-item-name {
-    font-size: 0.72rem;
-    color: #e2e8f0;
-    display: block;
-}
-
-/* ---------------------------------------------------------------------------
-   8. LOGS
-   --------------------------------------------------------------------------- */
-#charPanel .tw-logs-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-#charPanel .tw-log-entry {
-    background: rgba(255, 255, 255, 0.03);
-    border-left: 2px solid rgba(173, 255, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 0 4px 4px 0;
-}
-
-#charPanel .tw-log-date {
-    font-size: 0.6rem;
-    color: #64748b;
-    letter-spacing: 0.5px;
-    display: block;
-    margin-bottom: 3px;
-}
-
-#charPanel .tw-log-text {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    line-height: 1.5;
-    margin: 0;
-}
-
-/* ---------------------------------------------------------------------------
-   9. NOTES
-   --------------------------------------------------------------------------- */
-#charPanel .tw-notes-tab-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    height: 100%;
-}
-
-#charPanel .tw-notes-area {
-    width: 100%;
-    flex: 1;
-    min-height: 200px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(173, 255, 0, 0.2);
-    border-radius: 6px;
-    color: #e2e8f0;
-    font-family: 'Chakra Petch', monospace;
-    font-size: 0.72rem;
-    padding: 10px;
-    resize: vertical;
-    outline: none;
-    transition: border-color 0.2s;
-}
-#charPanel .tw-notes-area:focus {
-    border-color: rgba(173, 255, 0, 0.5);
-}
-
-#charPanel .tw-save-notes-btn {
-    background: rgba(173, 255, 0, 0.1);
-    border: 1px solid rgba(173, 255, 0, 0.4);
-    color: #adff00;
-    font-family: 'Chakra Petch', monospace;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    padding: 8px 0;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    width: 100%;
-}
-#charPanel .tw-save-notes-btn:hover {
-    background: rgba(173, 255, 0, 0.2);
-    box-shadow: 0 0 10px rgba(173, 255, 0, 0.3);
-}
-#charPanel .tw-save-notes-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* ---------------------------------------------------------------------------
-   10. GLITCH EFFECTS (applied by JS based on sync_rate)
-   --------------------------------------------------------------------------- */
-#charPanel.glitch-active {
-    animation: tw-panel-glitch 0.15s steps(1) infinite;
-}
-
-@keyframes tw-panel-glitch {
-    0%   { clip-path: inset(0 0 95% 0); }
-    25%  { clip-path: inset(30% 0 50% 0); filter: hue-rotate(45deg); }
-    50%  { clip-path: inset(60% 0 20% 0); }
-    75%  { clip-path: inset(10% 0 80% 0); filter: hue-rotate(-45deg); }
-    100% { clip-path: inset(0); }
-}
+<?php
+/**
+ * NeoWeaver Admin — Action Tags & Tag Categories
+ * Dwie tabele na jednym ekranie (taby).
+ */
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class NW_Action_Tags_Admin {
+
+    private $table_tags = 'cyber_action_tags';
+    private $table_cats = 'cyber_action_tag_categories';
+    private $nonce_key  = 'nw_action_tags_nonce';
+
+    public function __construct() {
+        add_action( 'admin_menu',           [ $this, 'register_menu' ], 12 );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+        // AJAX — categories
+        add_action( 'wp_ajax_nw_acats_load',      [ $this, 'ajax_cats_load' ] );
+        add_action( 'wp_ajax_nw_acats_save',      [ $this, 'ajax_cats_save' ] );
+        add_action( 'wp_ajax_nw_acats_delete',    [ $this, 'ajax_cats_delete' ] );
+        add_action( 'wp_ajax_nw_acats_duplicate', [ $this, 'ajax_cats_duplicate' ] );
+
+        // AJAX — tags
+        add_action( 'wp_ajax_nw_atags_load',      [ $this, 'ajax_tags_load' ] );
+        add_action( 'wp_ajax_nw_atags_save',      [ $this, 'ajax_tags_save' ] );
+        add_action( 'wp_ajax_nw_atags_delete',    [ $this, 'ajax_tags_delete' ] );
+        add_action( 'wp_ajax_nw_atags_duplicate', [ $this, 'ajax_tags_duplicate' ] );
+
+        // HUD groups helper
+        add_action( 'wp_ajax_nw_hud_groups_load', [ $this, 'ajax_hud_groups_load' ] );
+        add_action( 'wp_ajax_nw_hud_save',        [ $this, 'ajax_hud_save' ] );
+        add_action( 'wp_ajax_nw_hud_delete',      [ $this, 'ajax_hud_delete' ] );
+        add_action( 'wp_ajax_nw_hud_duplicate',   [ $this, 'ajax_hud_duplicate' ] );
+    }
+
+    /* ── Menu ─────────────────────────────────────────────── */
+
+    public function register_menu() {
+        add_submenu_page(
+            'neoweaver',
+            __( 'Action Tags', 'neoweaver' ),
+            __( 'Action Tags', 'neoweaver' ),
+            'manage_options',
+            'nw-action-tags',
+            [ $this, 'render_page' ]
+        );
+    }
+
+    /* ── Assets ───────────────────────────────────────────── */
+
+    public function enqueue_assets( $hook ) {
+        if ( strpos( $hook, 'nw-action-tags' ) === false ) return;
+
+        $base = plugin_dir_url( __FILE__ );
+
+        wp_enqueue_style(
+            'nw-admin-core',
+            plugin_dir_url( dirname( __FILE__ ) ) . '../assets/css/admin/admin-core.css',
+            [],
+            NW_VERSION
+        );
+        wp_enqueue_style(
+            'nw-action-tags',
+            $base . '../../assets/css/admin/action-tags.css',
+            [ 'nw-admin-core' ],
+            NW_VERSION
+        );
+
+        wp_enqueue_script( 'jquery' );
+        wp_enqueue_script(
+            'lucide',
+            'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
+            [],
+            null,
+            true
+        );
+        wp_enqueue_script(
+            'nw-action-tags',
+            $base . '../../assets/js/admin/action-tags.js',
+            [ 'jquery', 'lucide' ],
+            NW_VERSION,
+            true
+        );
+        wp_localize_script( 'nw-action-tags', 'NWActionTags', [
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( $this->nonce_key ),
+        ] );
+    }
+
+    /* ── Page HTML ────────────────────────────────────────── */
+
+    public function render_page() { ?>
+<div class="nw-admin-wrap">
+
+    <div class="nw-admin-header">
+        <div class="nw-admin-header-left">
+            <i data-lucide="tags" style="width:20px;height:20px;color:#adff00;flex-shrink:0;"></i>
+            <h1 class="nw-admin-title">Action Tags</h1>
+        </div>
+        <div class="nw-admin-header-actions">
+            <button id="nw-tags-add-btn"  class="nw-btn nw-btn-primary" data-tab-add="tags">
+                <i data-lucide="plus" style="width:14px;height:14px;"></i> New Tag
+            </button>
+            <button id="nw-cats-add-btn"  class="nw-btn nw-btn-secondary" data-tab-add="cats">
+                <i data-lucide="folder-plus" style="width:14px;height:14px;"></i> New Category
+            </button>
+            <button id="nw-hud-add-btn" class="nw-btn nw-btn-ghost" data-tab-add="hud">
+                <i data-lucide="layout-dashboard" style="width:14px;height:14px;"></i> New HUD Group
+            </button>
+        </div>
+    </div>
+
+    <div id="nw-at-notice" class="nw-notice" style="display:none;"></div>
+
+    <!-- Stats bar — Tags -->
+    <div class="nw-stats-bar" id="nw-tags-stats-bar">
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Total Tags</span>
+            <span class="nw-stat-value" id="nw-tags-total">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Active</span>
+            <span class="nw-stat-value nw-stat-green" id="nw-tags-active">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Positive</span>
+            <span class="nw-stat-value" style="color:#adff00;" id="nw-tags-pos">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Negative</span>
+            <span class="nw-stat-value" style="color:#ff5050;" id="nw-tags-neg">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Neutral</span>
+            <span class="nw-stat-value" style="color:#888;" id="nw-tags-neu">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">Categories</span>
+            <span class="nw-stat-value" id="nw-cats-total">—</span>
+        </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">HUD Groups</span>
+            <span class="nw-stat-value" style="color:#44aaff;" id="nw-hud-total">—</span>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="nw-admin-card" style="padding:0;">
+        <div class="nw-tab-nav">
+            <button class="nw-tab-btn nw-tab-active" data-tab="tags">
+                <i data-lucide="tag" style="width:13px;height:13px;"></i>
+                Tags <span class="nw-tab-count" id="nw-tab-count-tags">—</span>
+            </button>
+            <button class="nw-tab-btn" data-tab="cats">
+                <i data-lucide="folder" style="width:13px;height:13px;"></i>
+                Categories <span class="nw-tab-count" id="nw-tab-count-cats">—</span>
+            </button>
+            <button class="nw-tab-btn" data-tab="hud">
+                <i data-lucide="layout-dashboard" style="width:13px;height:13px;"></i>
+                HUD Groups <span class="nw-tab-count" id="nw-tab-count-hud">—</span>
+            </button>
+        </div>
+
+        <!-- ======= TAB: TAGS ======= -->
+        <div id="nw-tab-tags" class="nw-tab-panel" style="padding:20px;">
+            <div class="nw-table-controls">
+                <div class="nw-search-wrap">
+                    <i data-lucide="search" class="nw-search-icon"></i>
+                    <input type="text" id="nw-tags-search" class="nw-search-input" placeholder="Search tags…">
+                </div>
+                <div class="nw-filter-group">
+                    <select id="nw-tags-filter-cat" class="nw-select">
+                        <option value="">All categories</option>
+                    </select>
+                    <select id="nw-tags-filter-sentiment" class="nw-select">
+                        <option value="">All sentiments</option>
+                        <option value="positive">Positive</option>
+                        <option value="negative">Negative</option>
+                        <option value="neutral">Neutral</option>
+                    </select>
+                    <button id="nw-tags-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
+                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="nw-table-wrap">
+                <table class="nw-table">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;">Color</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th style="width:90px;">Sentiment</th>
+                            <th style="width:80px;">Impact</th>
+                            <th style="width:60px;">Active</th>
+                            <th style="width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nw-tags-tbody">
+                        <tr class="nw-loading-row"><td colspan="7"><span class="nw-spinner"></span> Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div><!-- /tab-tags -->
+
+        <!-- ======= TAB: CATEGORIES ======= -->
+        <div id="nw-tab-cats" class="nw-tab-panel nw-hidden" style="padding:20px;">
+            <div class="nw-table-controls">
+                <div class="nw-search-wrap">
+                    <i data-lucide="search" class="nw-search-icon"></i>
+                    <input type="text" id="nw-cats-search" class="nw-search-input" placeholder="Search categories…">
+                </div>
+                <div class="nw-filter-group">
+                    <button id="nw-cats-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
+                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="nw-table-wrap">
+                <table class="nw-table">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;">Color</th>
+                            <th>Internal Name</th>
+                            <th>Display Name</th>
+                            <th style="width:60px;">Sort</th>
+                            <th>HUD Group</th>
+                            <th style="width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nw-cats-tbody">
+                        <tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div><!-- /tab-cats -->
+        <!-- ======= TAB: HUD GROUPS ======= -->
+        <div id="nw-tab-hud" class="nw-tab-panel nw-hidden" style="padding:20px;">
+            <div class="nw-table-controls">
+                <div class="nw-search-wrap">
+                    <i data-lucide="search" class="nw-search-icon"></i>
+                    <input type="text" id="nw-hud-search" class="nw-search-input" placeholder="Search HUD groups…">
+                </div>
+                <div class="nw-filter-group">
+                    <button id="nw-hud-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
+                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="nw-table-wrap">
+                <table class="nw-table">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;">Color</th>
+                            <th style="width:36px;">Icon</th>
+                            <th>Slug</th>
+                            <th>Label</th>
+                            <th style="width:60px;">Sort</th>
+                            <th style="width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nw-hud-tbody">
+                        <tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div><!-- /tab-hud -->
+
+    </div><!-- /.nw-admin-card -->
+
+</div><!-- /.nw-admin-wrap -->
+
+<!-- ============================================================ -->
+<!-- MODAL: TAG                                                    -->
+<!-- ============================================================ -->
+<div id="nw-tag-modal-overlay" class="nw-modal-overlay" style="display:none;">
+    <div class="nw-modal">
+        <div class="nw-modal-header">
+            <h2 class="nw-modal-title" id="nw-tag-modal-title">New Tag</h2>
+            <button class="nw-modal-close" data-modal="nw-tag-modal-overlay">
+                <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+        <div class="nw-modal-body">
+            <form id="nw-tag-form" autocomplete="off">
+                <input type="hidden" id="nw-tag-field-id">
+
+                <div class="nw-field-grid nw-field-grid-2">
+                    <div class="nw-field">
+                        <label class="nw-label">Name <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-tag-field-name" class="nw-input" placeholder="e.g. aggressive_action">
+                        <p class="nw-field-hint">Will be auto-normalised (lowercase, underscores) by the DB trigger.</p>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Category <span class="nw-required">*</span></label>
+                        <select id="nw-tag-field-category" class="nw-select">
+                            <option value="">— select —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="nw-field-grid nw-field-grid-3">
+                    <div class="nw-field">
+                        <label class="nw-label">Sentiment</label>
+                        <select id="nw-tag-field-sentiment" class="nw-select">
+                            <option value="neutral">Neutral</option>
+                            <option value="positive">Positive</option>
+                            <option value="negative">Negative</option>
+                        </select>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Impact</label>
+                        <input type="number" id="nw-tag-field-impact" class="nw-input" step="0.01" placeholder="0.00">
+                        <p class="nw-field-hint">Negative values allowed.</p>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Color</label>
+                        <div class="nw-color-input-wrap">
+                            <input type="color" id="nw-tag-field-color-picker" value="#adff00">
+                            <input type="text" id="nw-tag-field-color" class="nw-input" maxlength="7" placeholder="#adff00">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nw-field">
+                    <label class="nw-label">Description</label>
+                    <textarea id="nw-tag-field-description" class="nw-input nw-textarea" rows="3" placeholder="Optional description…"></textarea>
+                </div>
+
+                <div class="nw-field nw-field-toggle">
+                    <label class="nw-label">Active</label>
+                    <label class="nw-toggle-wrap">
+                        <input type="checkbox" id="nw-tag-field-is-active" checked>
+                        <span class="nw-toggle-slider"></span>
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="nw-modal-footer">
+            <button id="nw-tag-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
+            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-tag-modal-overlay">Cancel</button>
+            <button id="nw-tag-save-btn" class="nw-btn nw-btn-primary">
+                <span id="nw-tag-save-label">Create Tag</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL: CATEGORY                                               -->
+<!-- ============================================================ -->
+<div id="nw-cat-modal-overlay" class="nw-modal-overlay" style="display:none;">
+    <div class="nw-modal">
+        <div class="nw-modal-header">
+            <h2 class="nw-modal-title" id="nw-cat-modal-title">New Category</h2>
+            <button class="nw-modal-close" data-modal="nw-cat-modal-overlay">
+                <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+        <div class="nw-modal-body">
+            <form id="nw-cat-form" autocomplete="off">
+                <input type="hidden" id="nw-cat-field-id">
+
+                <div class="nw-field-grid nw-field-grid-2">
+                    <div class="nw-field">
+                        <label class="nw-label">Internal Name <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-cat-field-internal" class="nw-input" placeholder="e.g. combat">
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Display Name <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-cat-field-display" class="nw-input" placeholder="e.g. Combat Actions">
+                    </div>
+                </div>
+
+                <div class="nw-field-grid nw-field-grid-3">
+                    <div class="nw-field">
+                        <label class="nw-label">UI Color</label>
+                        <div class="nw-color-input-wrap">
+                            <input type="color" id="nw-cat-field-color-picker" value="#adff00">
+                            <input type="text" id="nw-cat-field-ui-color" class="nw-input" maxlength="7" placeholder="#adff00">
+                        </div>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Sort Order</label>
+                        <input type="number" id="nw-cat-field-sort" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">HUD Group <span class="nw-required">*</span></label>
+                        <select id="nw-cat-field-hud" class="nw-select">
+                            <option value="">— select —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="nw-field">
+                    <label class="nw-label">Description</label>
+                    <textarea id="nw-cat-field-description" class="nw-input nw-textarea" rows="3" placeholder="Optional…"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="nw-modal-footer">
+            <button id="nw-cat-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
+            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-cat-modal-overlay">Cancel</button>
+            <button id="nw-cat-save-btn" class="nw-btn nw-btn-primary">
+                <span id="nw-cat-save-label">Create Category</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- MODAL: HUD GROUP                                              -->
+<!-- ============================================================ -->
+<div id="nw-hud-modal-overlay" class="nw-modal-overlay" style="display:none;">
+    <div class="nw-modal">
+        <div class="nw-modal-header">
+            <h2 class="nw-modal-title" id="nw-hud-modal-title">New HUD Group</h2>
+            <button class="nw-modal-close" data-modal="nw-hud-modal-overlay">
+                <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+        <div class="nw-modal-body">
+            <form id="nw-hud-form" autocomplete="off">
+                <input type="hidden" id="nw-hud-field-id">
+                <div class="nw-field-grid nw-field-grid-2">
+                    <div class="nw-field">
+                        <label class="nw-label">Slug <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-hud-field-slug" class="nw-input" placeholder="e.g. combat">
+                        <p class="nw-field-hint">Lowercase, underscores only.</p>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Display Label <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-hud-field-label" class="nw-input" placeholder="e.g. Combat">
+                    </div>
+                </div>
+                <div class="nw-field-grid nw-field-grid-3">
+                    <div class="nw-field">
+                        <label class="nw-label">Base Color</label>
+                        <div class="nw-color-input-wrap">
+                            <input type="color" id="nw-hud-field-color-picker" value="#adff00">
+                            <input type="text" id="nw-hud-field-color" class="nw-input" maxlength="7" placeholder="#adff00">
+                        </div>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Icon <span class="nw-field-hint-inline">(Lucide slug)</span></label>
+                        <div class="nw-icon-input-wrap">
+                            <input type="text" id="nw-hud-field-icon" class="nw-input" placeholder="e.g. sword">
+                            <span id="nw-hud-icon-preview" class="nw-icon-preview"></span>
+                        </div>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Sort Order</label>
+                        <input type="number" id="nw-hud-field-sort" class="nw-input" value="0" min="0">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="nw-modal-footer">
+            <button id="nw-hud-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
+            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-hud-modal-overlay">Cancel</button>
+            <button id="nw-hud-save-btn" class="nw-btn nw-btn-primary">
+                <span id="nw-hud-save-label">Create HUD Group</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Init Lucide icons in admin
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.lucide) lucide.createIcons();
+});
+// Tab: header buttons jump to correct tab
+jQuery(function($){
+    $('[data-tab-add]').on('click', function(){
+        var tab = $(this).data('tab-add');
+        $('.nw-tab-btn[data-tab="' + tab + '"]').trigger('click');
+    });
+});
+</script>
+<?php
+    }
+
+    /* ── Security helper ──────────────────────────────────── */
+
+    private function verify_nonce() {
+        if ( ! check_ajax_referer( $this->nonce_key, 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce', 403 );
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Insufficient permissions', 403 );
+        }
+    }
+
+    /* ── HUD Groups ──────────────────────────────────────── */
+
+    public function ajax_hud_groups_load() {
+        $this->verify_nonce();
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT id, slug, display_label, base_color, icon, sort_order
+             FROM cyber_hud_groups ORDER BY sort_order ASC, id ASC",
+            ARRAY_A
+        );
+        if ( $rows === null ) $rows = [];
+        wp_send_json_success( $rows );
+    }
+
+    public function ajax_hud_save() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id         = absint( $_POST['id'] ?? 0 );
+        $slug       = sanitize_key( $_POST['slug'] ?? '' );
+        $label      = sanitize_text_field( $_POST['display_label'] ?? '' );
+        $base_color = sanitize_hex_color( $_POST['base_color'] ?? '#adff00' ) ?: '#adff00';
+        $icon       = sanitize_text_field( $_POST['icon'] ?? '' );
+        $sort_order = intval( $_POST['sort_order'] ?? 0 );
+
+        if ( ! $slug || ! $label ) wp_send_json_error( 'Slug and label are required.' );
+
+        $data = [
+            'slug'          => $slug,
+            'display_label' => $label,
+            'base_color'    => $base_color,
+            'icon'          => $icon ?: null,
+            'sort_order'    => $sort_order,
+        ];
+        $fmt = [ '%s', '%s', '%s', '%s', '%d' ];
+
+        if ( $id ) {
+            $ok = $wpdb->update( 'cyber_hud_groups', $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+        } else {
+            $ok = $wpdb->insert( 'cyber_hud_groups', $data, $fmt );
+            $id = $wpdb->insert_id;
+        }
+
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        wp_send_json_success( [ 'id' => $id ] );
+    }
+
+    public function ajax_hud_delete() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $ok = $wpdb->delete( 'cyber_hud_groups', [ 'id' => $id ], [ '%d' ] );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
+        wp_send_json_success();
+    }
+
+    public function ajax_hud_duplicate() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM cyber_hud_groups WHERE id = %d", $id ),
+            ARRAY_A
+        );
+        if ( ! $row ) wp_send_json_error( 'HUD Group not found.' );
+
+        unset( $row['id'] );
+        $base  = rtrim( $row['slug'], '_' );
+        $taken = true; $i = 2;
+        while ( $taken ) {
+            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
+            $taken = (bool) $wpdb->get_var(
+                $wpdb->prepare( "SELECT id FROM cyber_hud_groups WHERE slug = %s", $try )
+            );
+            if ( ! $taken ) $row['slug'] = $try;
+            $i++;
+        }
+        $row['display_label'] = $row['display_label'] . ' (copy)';
+        $row['sort_order']    = intval( $row['sort_order'] ) + 1;
+
+        $ok = $wpdb->insert( 'cyber_hud_groups', $row );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
+        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+    }
+
+    /* ================================================================ */
+    /* CATEGORIES AJAX                                                    */
+    /* ================================================================ */
+
+    public function ajax_cats_load() {
+        $this->verify_nonce();
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT id, internal_name, display_name, description, ui_color, sort_order, hud_group_id
+             FROM {$this->table_cats}
+             ORDER BY sort_order ASC, id ASC",
+            ARRAY_A
+        );
+        if ( $rows === null ) {
+            wp_send_json_error( $wpdb->last_error );
+        }
+        wp_send_json_success( $rows );
+    }
+
+    public function ajax_cats_save() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id            = absint( $_POST['id'] ?? 0 );
+        $internal_name = sanitize_key( $_POST['internal_name'] ?? '' );
+        $display_name  = sanitize_text_field( $_POST['display_name'] ?? '' );
+        $description   = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $ui_color      = sanitize_hex_color( $_POST['ui_color'] ?? '#adff00' ) ?: '#adff00';
+        $sort_order    = intval( $_POST['sort_order'] ?? 0 );
+        $hud_group_id  = absint( $_POST['hud_group_id'] ?? 0 );
+
+        if ( ! $internal_name || ! $display_name || ! $hud_group_id ) {
+            wp_send_json_error( 'Required fields missing.' );
+        }
+
+        $data = [
+            'internal_name' => $internal_name,
+            'display_name'  => $display_name,
+            'description'   => $description ?: null,
+            'ui_color'      => $ui_color,
+            'sort_order'    => $sort_order,
+            'hud_group_id'  => $hud_group_id,
+        ];
+        $fmt = [ '%s', '%s', '%s', '%s', '%d', '%d' ];
+
+        if ( $id ) {
+            $ok = $wpdb->update( $this->table_cats, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+        } else {
+            $ok = $wpdb->insert( $this->table_cats, $data, $fmt );
+            $id = $wpdb->insert_id;
+        }
+
+        if ( $ok === false ) {
+            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        }
+        wp_send_json_success( [ 'id' => $id ] );
+    }
+
+    public function ajax_cats_delete() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $ok = $wpdb->delete( $this->table_cats, [ 'id' => $id ], [ '%d' ] );
+        if ( $ok === false ) {
+            wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
+        }
+        wp_send_json_success();
+    }
+
+    public function ajax_cats_duplicate() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$this->table_cats} WHERE id = %d", $id ),
+            ARRAY_A
+        );
+        if ( ! $row ) wp_send_json_error( 'Category not found.' );
+
+        unset( $row['id'] );
+        // Make internal_name unique
+        $base  = rtrim( $row['internal_name'], '_' );
+        $taken = true;
+        $i     = 2;
+        while ( $taken ) {
+            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
+            $taken = (bool) $wpdb->get_var(
+                $wpdb->prepare( "SELECT id FROM {$this->table_cats} WHERE internal_name = %s", $try )
+            );
+            if ( ! $taken ) $row['internal_name'] = $try;
+            $i++;
+        }
+        $row['display_name'] = $row['display_name'] . ' (copy)';
+        $row['sort_order']   = intval( $row['sort_order'] ) + 1;
+
+        $ok = $wpdb->insert( $this->table_cats, $row );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
+        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+    }
+
+    /* ================================================================ */
+    /* TAGS AJAX                                                          */
+    /* ================================================================ */
+
+    public function ajax_tags_load() {
+        $this->verify_nonce();
+        global $wpdb;
+        $rows = $wpdb->get_results(
+            "SELECT id, name, color, sentiment, impact, description, category_id, is_active
+             FROM {$this->table_tags}
+             ORDER BY name ASC",
+            ARRAY_A
+        );
+        if ( $rows === null ) {
+            wp_send_json_error( $wpdb->last_error );
+        }
+        wp_send_json_success( $rows );
+    }
+
+    public function ajax_tags_save() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id          = absint( $_POST['id'] ?? 0 );
+        $name        = sanitize_text_field( $_POST['name'] ?? '' );
+        $color       = sanitize_hex_color( $_POST['color'] ?? '#adff00' ) ?: '#adff00';
+        $sentiment   = sanitize_text_field( $_POST['sentiment'] ?? 'neutral' );
+        $impact      = round( floatval( $_POST['impact'] ?? 0 ), 2 );
+        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
+        $category_id = absint( $_POST['category_id'] ?? 0 );
+        $is_active   = isset( $_POST['is_active'] ) ? (int) boolval( $_POST['is_active'] ) : 1;
+
+        if ( ! $name || ! $category_id ) {
+            wp_send_json_error( 'Name and category are required.' );
+        }
+
+        $valid_sentiments = [ 'positive', 'negative', 'neutral' ];
+        if ( ! in_array( $sentiment, $valid_sentiments, true ) ) {
+            $sentiment = 'neutral';
+        }
+
+        $data = [
+            'name'        => $name,
+            'color'       => $color,
+            'sentiment'   => $sentiment,
+            'impact'      => $impact,
+            'description' => $description ?: null,
+            'category_id' => $category_id,
+            'is_active'   => $is_active,
+        ];
+        $fmt = [ '%s', '%s', '%s', '%f', '%s', '%d', '%d' ];
+
+        if ( $id ) {
+            $ok = $wpdb->update( $this->table_tags, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+        } else {
+            $ok = $wpdb->insert( $this->table_tags, $data, $fmt );
+            $id = $wpdb->insert_id;
+        }
+
+        if ( $ok === false ) {
+            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        }
+        wp_send_json_success( [ 'id' => $id ] );
+    }
+
+    public function ajax_tags_delete() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $ok = $wpdb->delete( $this->table_tags, [ 'id' => $id ], [ '%d' ] );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        wp_send_json_success();
+    }
+
+    public function ajax_tags_duplicate() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$this->table_tags} WHERE id = %d", $id ),
+            ARRAY_A
+        );
+        if ( ! $row ) wp_send_json_error( 'Tag not found.' );
+
+        unset( $row['id'] );
+        $base  = rtrim( $row['name'], '_' );
+        $taken = true;
+        $i     = 2;
+        while ( $taken ) {
+            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
+            $taken = (bool) $wpdb->get_var(
+                $wpdb->prepare( "SELECT id FROM {$this->table_tags} WHERE name = %s", $try )
+            );
+            if ( ! $taken ) $row['name'] = $try;
+            $i++;
+        }
+        $row['is_active'] = 0; // duplicate starts inactive
+
+        $ok = $wpdb->insert( $this->table_tags, $row );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
+        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+    }
+}
+
+new NW_Action_Tags_Admin();
