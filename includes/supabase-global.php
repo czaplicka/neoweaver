@@ -16,26 +16,14 @@ if ( ! function_exists( 'nw_debug_log' ) ) {
 }
 
 /**
- * Returns true only on pages that actually run the adventure terminal.
- * Checks for the [nw_adventure] shortcode or the nw-adventure page slug.
+ * Returns true only on pages using the Adventure Template
+ * (templates/adventure.php → Template Name: Adventure Template).
  */
 function nw_is_adventure_page() {
 	if ( ! is_singular() ) {
 		return false;
 	}
-	$post = get_post();
-	if ( ! $post ) {
-		return false;
-	}
-	// Match by shortcode presence in post content.
-	if ( has_shortcode( $post->post_content, 'nw_adventure' ) ) {
-		return true;
-	}
-	// Fallback: match by page slug.
-	if ( in_array( $post->post_name, [ 'adventure', 'nw-adventure', 'play' ], true ) ) {
-		return true;
-	}
-	return false;
+	return 'templates/adventure.php' === get_page_template_slug();
 }
 
 add_action( 'wp_enqueue_scripts', function () {
