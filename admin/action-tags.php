@@ -809,5 +809,3 @@ jQuery(function($){
         wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
     }
 }
-
-new NW_Action_Tags_Admin();
