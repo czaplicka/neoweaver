@@ -54,7 +54,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'containers.php',
-			'class' => 'NeoWeaver_Containers_Admin',
+			'class' => 'NW_Containers_Admin',
 			'slug'  => 'nw-containers',
 			'root'  => false,
 		],
