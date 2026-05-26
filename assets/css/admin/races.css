@@ -1,94 +1,132 @@
-/* ============================================================
-   NeoWeaver Admin — RACES PANEL
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver Races admin — extends admin-core.css */
 
-/* ---- Table: Column Specifics ---- */
-.nw-col-img { width: 44px; }
-
-/* ---- Race Identity & Visuals ---- */
-.nw-race-img {
-	width: 36px; height: 36px;
-	border-radius: 50%;
-	object-fit: cover;
-	border: 1px solid #2e2e2e;
-	background: #1a1a1a;
-	padding: 3px;
-}
-
-.nw-race-img-placeholder {
-	width: 36px; height: 36px;
-	border-radius: 50%;
-	background: #1a1a1a;
-	border: 1px solid #2e2e2e;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: #444;
-	font-size: 16px;
-}
-
-.nw-race-name { font-weight: 600; color: #fff; }
-.nw-race-sub { font-size: 11px; color: #555; margin-top: 2px; }
-
-/* ---- HP / MP Meters ---- */
-.nw-hp-mp { font-size: 12px; color: #aaa; white-space: nowrap; }
-.nw-hp { color: #ff6b35; font-weight: 600; }
-.nw-mp { color: #00d4ff; font-weight: 600; }
-
-/* ---- Specialized Row Actions ---- */
-.nw-row-actions { display: flex; gap: 6px; }
-
-/* ---- Custom Stat Sliders (Modal Extension) ---- */
-.nw-stats-section { 
-    margin-top: 20px; 
-    padding-top: 16px; 
-    border-top: 1px solid #1e1e1e; 
-}
-
-.nw-stats-title {
+/* ── Parent badge ─────────────────────────────────────────────────────────── */
+.nw-races-panel .nw-parent-badge {
 	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: .6px;
-	color: #666;
-	margin: 0 0 12px;
+	background: rgba(173,255,0,0.08);
+	border: 1px solid rgba(173,255,0,0.2);
+	color: #adff00;
+	border-radius: 4px;
+	padding: 1px 6px;
 	font-family: 'Chakra Petch', monospace;
 }
 
-.nw-stats-grid { 
-    display: grid; 
-    grid-template-columns: repeat(3, 1fr); 
-    gap: 12px; 
+/* ── Conflict pill ────────────────────────────────────────────────────────── */
+.nw-races-panel .nw-conflict-pill {
+	font-size: 11px;
+	color: #a78bfa;
+	background: rgba(167,139,250,0.08);
+	border: 1px solid rgba(167,139,250,0.2);
+	border-radius: 4px;
+	padding: 1px 6px;
+	font-family: 'Chakra Petch', monospace;
+	white-space: nowrap;
 }
 
-@media (max-width: 600px) {
-    .nw-stats-grid { grid-template-columns: 1fr; }
+/* ── HP / MP stats ────────────────────────────────────────────────────────── */
+.nw-races-panel .nw-stat-val {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+	font-weight: 600;
+	color: #f87171;
+}
+.nw-races-panel .nw-stat-val.nw-stat-mp {
+	color: #60a5fa;
 }
 
-.nw-stat-slider { display: flex; flex-direction: column; gap: 4px; }
-.nw-stat-slider label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: .5px; }
-
-.nw-stat-slider-row { display: flex; align-items: center; gap: 8px; }
-
-/* Range Input Styling */
-.nw-range { 
-    width: 100%; 
-    accent-color: #adff00; 
-    cursor: pointer; 
-    height: 6px;
-    background: #0d0d0d;
-    border-radius: 999px;
+/* ── Mini preference bars (table row) ────────────────────────────────────── */
+.nw-prefs-mini-row {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.nw-pref-mini {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+}
+.nw-pref-mini-label {
+	font-size: 9px;
+	color: var(--nw-text-muted, #999);
+	font-family: 'Chakra Petch', monospace;
+	text-transform: uppercase;
+	line-height: 1;
+}
+.nw-pref-mini-track {
+	width: 24px;
+	height: 3px;
+	background: rgba(255,255,255,0.08);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.nw-pref-mini-fill {
+	display: block;
+	height: 100%;
+	background: #adff00;
+	border-radius: 2px;
+	transition: width .2s;
 }
 
-.nw-range-val { 
-    font-size: 13px; 
-    color: #adff00; 
-    font-weight: 700; 
-    min-width: 22px; 
-    text-align: right; 
+/* ── Preference grid (modal) ──────────────────────────────────────────────── */
+.nw-prefs-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px 20px;
+	margin-bottom: 16px;
+}
+@media (max-width: 640px) {
+	.nw-prefs-grid { grid-template-columns: 1fr; }
 }
 
-/* Status Handling */
-.nw-row-inactive td:not(:last-child):not(:first-child) { 
-    opacity: .4; 
+.nw-pref-row {
+	display: grid;
+	grid-template-columns: 72px 54px 1fr;
+	align-items: center;
+	gap: 8px;
+}
+.nw-pref-row label {
+	font-size: 12px;
+	color: var(--nw-text-muted, #aaa);
+	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	gap: 3px;
+}
+.nw-pref-row input[type="number"] {
+	width: 54px;
+	text-align: center;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+}
+.nw-pref-bar-wrap {
+	height: 4px;
+	background: rgba(255,255,255,0.06);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.nw-pref-bar {
+	height: 100%;
+	background: linear-gradient(90deg, #adff00 0%, #5eff5e 100%);
+	border-radius: 2px;
+	transition: width .18s ease;
+}
+
+/* ── JSON / code textareas ───────────────────────────────────────────────── */
+.nw-code-field {
+	font-family: 'Chakra Petch', monospace !important;
+	font-size: 12px !important;
+	color: #adff00 !important;
+	background: rgba(173,255,0,0.04) !important;
+	border-color: rgba(173,255,0,0.18) !important;
+}
+.nw-code-field:focus {
+	border-color: rgba(173,255,0,0.5) !important;
+}
+
+/* ── Wide modal variant ───────────────────────────────────────────────────── */
+.nw-modal.nw-modal-wide {
+	max-width: 720px;
+	width: 95vw;
 }
