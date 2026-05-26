@@ -23,12 +23,12 @@ class NW_Items_Admin {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
-		add_action( 'wp_ajax_nw_items_load',             [ $this, 'ajax_load' ] );
-		add_action( 'wp_ajax_nw_items_get',              [ $this, 'ajax_get' ] );
-		add_action( 'wp_ajax_nw_items_save',             [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_items_toggle',           [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_items_delete',           [ $this, 'ajax_delete' ] );
-		add_action( 'wp_ajax_nw_items_get_archetypes',   [ $this, 'ajax_get_archetypes' ] );
+		add_action( 'wp_ajax_nw_items_load',           [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_items_get',            [ $this, 'ajax_get' ] );
+		add_action( 'wp_ajax_nw_items_save',           [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_items_toggle',         [ $this, 'ajax_toggle' ] );
+		add_action( 'wp_ajax_nw_items_delete',         [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_items_get_archetypes', [ $this, 'ajax_get_archetypes' ] );
 	}
 
 	public function register_menu(): void {
@@ -324,15 +324,17 @@ class NW_Items_Admin {
 
 	private function cached_get_all( string $table, string $order_by = 'name' ): array {
 		$cache_key = $this->get_cache_key( $table . '_all' );
+		$cached    = get_transient( $cache_key );
 
-		$cached = get_transient( $cache_key );
 		if ( false !== $cached && is_array( $cached ) ) {
 			return $cached;
 		}
 
 		$res = $this->supa(
 			'GET',
-			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.asc'
+			$table . '?select=*&order=' . rawurlencode( $order_by ) . '.asc',
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
@@ -344,6 +346,7 @@ class NW_Items_Admin {
 
 		return $rows;
 	}
+
 	private function sk(): array {
 		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
 			return [];
@@ -352,14 +355,6 @@ class NW_Items_Admin {
 			'apikey'        => TW_SUPABASE_SERVICE_KEY,
 			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
 		];
-	}
-
-	private function get_cache_key( string $suffix ): string {
-		return 'nw_' . md5( $suffix );
-	}
-
-	private function bust_cache( string $scope ): void {
-		delete_transient( $this->get_cache_key( $scope . '_all' ) );
 	}
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
@@ -372,7 +367,6 @@ class NW_Items_Admin {
 				parse_str( $qs, $query );
 			}
 
-			// ↓ KLUCZOWA ZMIANA: przekazujemy headers z service key
 			$data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
 
 			if ( ! is_array( $data ) ) {
@@ -448,7 +442,9 @@ class NW_Items_Admin {
 
 		$res = $this->supa(
 			'GET',
-			$this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*'
+			$this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*',
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
@@ -462,16 +458,16 @@ class NW_Items_Admin {
 
 	/**
 	 * Fetch archetypes list for the dropdown.
-	 * Returns id + name from cyber_archetypes (or cyber_classes depending on actual table).
+	 * Returns id + name from cyber_archetypes.
 	 */
 	public function ajax_get_archetypes(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
+
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
 			return;
 		}
 
-		// ↓ KLUCZOWE ZMIANY: cyber_archetypes zamiast cyber_classes + sk()
 		$res = $this->supa(
 			'GET',
 			'cyber_archetypes?select=id,name&order=name.asc',
@@ -480,13 +476,13 @@ class NW_Items_Admin {
 		);
 
 		if ( ! $res['ok'] ) {
-			// Zwróć pustą listę zamiast błędu — archetypes są opcjonalne
 			wp_send_json_success( [] );
 			return;
 		}
 
 		wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
 	}
+
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
 
@@ -562,13 +558,15 @@ class NW_Items_Admin {
 			$res = $this->supa(
 				'PATCH',
 				$this->table . '?id=eq.' . rawurlencode( $id ),
-				$payload
+				$payload,
+				$this->sk()
 			);
 		} else {
 			$res = $this->supa(
 				'POST',
 				$this->table,
-				$payload
+				$payload,
+				$this->sk()
 			);
 		}
 
@@ -602,7 +600,8 @@ class NW_Items_Admin {
 		$res = $this->supa(
 			'PATCH',
 			$this->table . '?id=eq.' . rawurlencode( $id ),
-			[ 'is_active' => $is_active ]
+			[ 'is_active' => $is_active ],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
@@ -636,7 +635,9 @@ class NW_Items_Admin {
 
 		$res = $this->supa(
 			'DELETE',
-			$this->table . '?id=eq.' . rawurlencode( $id )
+			$this->table . '?id=eq.' . rawurlencode( $id ),
+			[],
+			$this->sk()
 		);
 
 		if ( ! $res['ok'] ) {
