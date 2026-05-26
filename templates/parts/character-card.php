@@ -49,8 +49,10 @@ $mass_limit           = $args['mass_limit'];
 $total_power          = $args['total_power'];
 
 // Pet slot/tab unlocked at level 3
-$char_lvl     = (int) ( $char_data['lvl'] ?? 1 );
-$has_pet_slot = $char_lvl >= 3;
+// Vehicle slot/tab unlocked at level 10
+$char_lvl        = (int) ( $char_data['lvl'] ?? 1 );
+$has_pet_slot    = $char_lvl >= 3;
+$has_vehicle_slot = $char_lvl >= 10;
 
 // Build equipped items map: slot => item row
 $equipped_by_slot = array();
@@ -86,9 +88,11 @@ foreach ( $inventory as $r ) {
 	<button class="tw-nav-btn" data-tab="loom" title="Loom of Fate" aria-label="Loom of Fate" type="button">
 		<i data-lucide="layers"></i>
 	</button>
+	<?php if ( $has_vehicle_slot ) : ?>
 	<button class="tw-nav-btn" data-tab="vehicles" title="Garage" aria-label="Garage" type="button">
 		<i data-lucide="car"></i>
 	</button>
+	<?php endif; ?>
 	<?php if ( $has_pet_slot ) : ?>
 	<button class="tw-nav-btn" data-tab="pets" title="Pets" aria-label="Pets" type="button">
 		<i data-lucide="paw-print"></i>
@@ -391,9 +395,11 @@ foreach ( $inventory as $r ) {
 				<?php echo do_shortcode( '[tw_loom_of_fate]' ); ?>
 			</div>
 
+			<?php if ( $has_vehicle_slot ) : ?>
 			<div class="tw-tab-content" id="vehicles">
 				<?php echo do_shortcode( '[neoweave_vehicle_panel]' ); ?>
 			</div>
+			<?php endif; ?>
 
 			<?php if ( $has_pet_slot ) : ?>
 			<div class="tw-tab-content" id="pets">
