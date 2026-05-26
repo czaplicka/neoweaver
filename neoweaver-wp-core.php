@@ -101,6 +101,7 @@ final class NeoWeaver_Core {
 			'includes/char-panel.php',
 			'includes/checkout.php',
 			'includes/deck-core.php',
+			'includes/fetch-foundry.php',
 			'includes/game-data.php',
 			'includes/head-injection.php',
 			'includes/inventory-system.php',
