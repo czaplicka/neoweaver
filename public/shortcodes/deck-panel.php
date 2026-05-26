@@ -9,15 +9,16 @@ if ( ! function_exists( 'tw_deck_panel_render' ) ) {
 
 		ob_start();
 		?>
-		<div id="deck-panel" class="is-collapsed" aria-label="<?php echo esc_attr__( 'Deck panel', 'neoweaver' ); ?>">
+		<!-- ID zmienione z deck-panel na deck-panel-standalone, aby uniknąć konfliktu z adventure-terminal -->
+		<div id="deck-panel-standalone" class="deck-panel is-collapsed" aria-label="<?php echo esc_attr__( 'Deck panel', 'neoweaver' ); ?>">
 			<div class="deck-tabs-wrapper">
 
 				<button
-					id="toggle-deck"
+					id="toggle-deck-standalone"
 					class="panel-tab"
 					type="button"
 					aria-label="<?php echo esc_attr__( 'Toggle deck panel', 'neoweaver' ); ?>"
-					aria-controls="deck-panel"
+					aria-controls="deck-panel-standalone"
 					aria-expanded="false"
 				>
 					&#9776;
