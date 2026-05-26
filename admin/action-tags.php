@@ -3,7 +3,6 @@
  * NeoWeaver Admin — Action Tags & Tag Categories
  * Dwie tabele na jednym ekranie (taby).
  */
-
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class NW_Action_Tags_Admin {
