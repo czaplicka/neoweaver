@@ -148,7 +148,7 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 			<?php endif; ?>
 
 			<div class="foundry-credits" data-credits-display="1">
-				GOLD: <span class="credits-value"><?php echo esc_html( (string) $current_player_credits ); ?></span>
+				CREDITS: <span class="credits-value"><?php echo esc_html( (string) $current_player_credits ); ?></span>
 				<?php echo $icon; // phpcs:ignore WordPress.Security.EscapeOutput ?>
 			</div>
 
@@ -209,7 +209,7 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 					const hasCredits = credits >= cost;
 					const canUpgrade = hasDupes && hasCredits;
 					const progress   = Math.min( 100, Math.max( 0, ( dupes / needed ) * 100 ) );
-					const btnLabel   = ! hasDupes ? 'NEED MORE DATA' : ( ! hasCredits ? 'INSUFFICIENT GOLD' : 'START FUSION' );
+					const btnLabel   = ! hasDupes ? 'NEED MORE DATA' : ( ! hasCredits ? 'INSUFFICIENT CREDITS' : 'START FUSION' );
 					const instId     = card.instance_id || '';
 					if ( ! instId ) return '';
 					return `<div class="foundry-item ${ canUpgrade ? 'ready' : '' }">
@@ -267,7 +267,7 @@ if ( ! function_exists( 'nw_foundry_render_cards' ) ) {
 			$has_creds = $credits >= $cost;
 			$can_up    = $has_dupes && $has_creds;
 			$progress  = max( 0, min( 100, ( $dupes / $needed ) * 100 ) );
-			$btn_label = ! $has_dupes ? 'NEED MORE DATA' : ( ! $has_creds ? 'INSUFFICIENT GOLD' : 'START FUSION' );
+			$btn_label = ! $has_dupes ? 'NEED MORE DATA' : ( ! $has_creds ? 'INSUFFICIENT CREDITS' : 'START FUSION' );
 
 			$out .= '<div class="foundry-item ' . ( $can_up ? 'ready' : '' ) . '">';
 			$out .= '<div class="card-preview">';
