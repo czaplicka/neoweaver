@@ -11,138 +11,6 @@
     }
 
     // =========================================================================
-    // SCENARIOS
-    // =========================================================================
-    async function loadScenarios() {
-        const shell = document.getElementById('adventure-shell');
-        if (!shell) return;
-        const list = document.getElementById('scenarios-list');
-        if (!list) {
-            console.warn('⚠️ scenarios-list not found in DOM');
-            return;
-        }
-        list.innerHTML = '<p class="empty-msg">Scanning network for missions...</p>';
-        try {
-            const campaignId = window.twGameState?.currentCampaignId || window.twAdventureData?.active_campaign_id;
-            if (!campaignId) {
-                list.innerHTML = '<p class="empty-msg">No active campaign detected.</p>';
-                return;
-            }
-            const formData = new URLSearchParams({
-                action:      'tw_get_scenarios_ajax',
-                campaign_id: campaignId,
-                nonce:       window.twAdventureData?.nonce ?? '',
-            });
-            const response = await fetch(window.twAdventureData?.ajax_url ?? '/wp-admin/admin-ajax.php', {
-                method:      'POST',
-                body:        formData,
-                credentials: 'same-origin',
-            });
-            if (!response.ok) {
-                throw new Error('AJAX HTTP error ' + response.status);
-            }
-            const json = await response.json();
-            if (!json.success || !Array.isArray(json.data)) {
-                list.innerHTML = '<p class="empty-msg">No missions available for this campaign yet.</p>';
-                return;
-            }
-            const scenarios = json.data;
-            if (!scenarios.length) {
-                list.innerHTML = '<p class="empty-msg">No missions available. Ask your GM to sync the campaign.</p>';
-                return;
-            }
-            list.innerHTML = '';
-
-            scenarios.forEach((s) => {
-                const tags = (s.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
-
-                const card = document.createElement('article');
-                card.className = 'deck-card scenario-card';
-                card.dataset.scenarioId = s.id;
-
-                const inner = document.createElement('div');
-                inner.className = 'deck-card-inner';
-
-                // Optional image
-                if (s.img_url) {
-                    const wrap = document.createElement('div');
-                    wrap.className = 'scenario-image-wrap';
-                    const img = document.createElement('img');
-                    img.setAttribute('src', s.img_url);
-                    img.setAttribute('alt', s.name || '');
-                    img.className = 'scenario-image';
-                    wrap.appendChild(img);
-                    inner.appendChild(wrap);
-                }
-
-                // Header
-                const header = document.createElement('header');
-                header.className = 'scenario-header';
-                const diff = document.createElement('span');
-                diff.className = 'scenario-difficulty';
-                diff.textContent = s.difficulty || '';
-                const title = document.createElement('h4');
-                title.className = 'scenario-title';
-                title.textContent = s.name || 'Untitled mission';
-                header.appendChild(diff);
-                header.appendChild(title);
-
-                // Body
-                const body = document.createElement('div');
-                body.className = 'scenario-body';
-                const goal = document.createElement('p');
-                goal.className = 'scenario-goal';
-                goal.textContent = s.goal || '';
-                const tagsP = document.createElement('p');
-                tagsP.className = 'scenario-tags';
-                tags.forEach((t) => {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#' + t;
-                    tagsP.appendChild(span);
-                });
-                if (s.is_boss) {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#boss';
-                    tagsP.appendChild(span);
-                }
-                if (s.is_key_arc) {
-                    const span = document.createElement('span');
-                    span.className = 'scenario-tag';
-                    span.textContent = '#key_arc';
-                    tagsP.appendChild(span);
-                }
-                body.appendChild(goal);
-                body.appendChild(tagsP);
-
-                // Footer
-                const footer = document.createElement('footer');
-                footer.className = 'scenario-footer';
-                const type = document.createElement('span');
-                type.className = 'scenario-type';
-                type.textContent = s.type || '';
-                const cat = document.createElement('span');
-                cat.className = 'scenario-category';
-                cat.textContent = s.category || '';
-                footer.appendChild(type);
-                footer.appendChild(cat);
-
-                inner.appendChild(header);
-                inner.appendChild(body);
-                inner.appendChild(footer);
-                card.appendChild(inner);
-                list.appendChild(card);
-            });
-            console.log('✅ Loaded', scenarios.length, 'scenario cards');
-        } catch (error) {
-            console.error('❌ Error loading scenarios:', error);
-            list.innerHTML = '<p class="empty-msg">Mission panel offline. Please refresh the terminal.</p>';
-        }
-    }
-    window.twLoadScenarios = loadScenarios;
-
-    // =========================================================================
     // CHAT CHANNEL
     // =========================================================================
     const playerChatEl = document.getElementById('player-chat');
@@ -248,8 +116,8 @@
     }
 
     document.addEventListener('twGameStateHydrated', function onGameStateReady() {
+        // scenarios-loader.js listens to twGameStateHydrated independently
         Promise.allSettled([
-            loadScenarios(),
             window.twGameState?.chatChannelId
                 ? Promise.resolve()
                 : waitForChatChannel(),
