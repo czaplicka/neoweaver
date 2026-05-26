@@ -1,123 +1,50 @@
-/* NeoWeaver Admin — containers.css */
+/* NeoWeaver — Containers admin (extends admin-core.css) */
 
-.nw-filters-bar {
+.nw-containers-panel .nw-pill-common    { background: #3d3d3d; color: #ccc; }
+.nw-containers-panel .nw-pill-uncommon  { background: #1a3a1a; color: #6fcf6f; }
+.nw-containers-panel .nw-pill-rare      { background: #1a2a4a; color: #7ab4ff; }
+.nw-containers-panel .nw-pill-epic      { background: #2a1a4a; color: #c07aff; }
+.nw-containers-panel .nw-pill-legendary { background: #4a2a00; color: #ffb347; }
+
+.nw-sizes-text {
+	font-size: 11px;
+	color: var(--nw-text-muted, #999);
+	font-family: 'Chakra Petch', monospace;
+}
+
+.nw-linked-item {
+	font-size: 12px;
+	color: #adff00;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+/* Info box — auto-create item */
+.nw-info-box {
+	background: rgba(173, 255, 0, 0.06);
+	border: 1px solid rgba(173, 255, 0, 0.25);
+	border-radius: 6px;
+	padding: 10px 14px;
+	font-size: 13px;
+	color: #d4d4d4;
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+}
+.nw-info-box code {
+	background: rgba(255,255,255,0.08);
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 11px;
+}
+
+/* Delete item checkbox row */
+#nw-delete-item-row label {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	flex-wrap: wrap;
-	margin-bottom: 14px;
-}
-
-.nw-btn-sm {
-	padding: 4px 10px;
-	font-size: 11px;
-}
-
-.nw-table td.nw-num {
-	text-align: right;
-	font-variant-numeric: tabular-nums;
-	color: #adff00;
+	color: #f87171;
 	font-size: 13px;
-}
-
-.nw-subcell {
-	margin-top: 3px;
-	font-size: 11px;
-	color: #666;
-	max-width: 320px;
-	line-height: 1.35;
-}
-
-.nw-inline-code {
-	font-family: 'Chakra Petch', monospace;
-	font-size: 11px;
-	color: #8f8f8f;
-	background: #0d0d0d;
-	border: 1px solid #222;
-	border-radius: 4px;
-	padding: 2px 6px;
-}
-
-.nw-size-pill,
-.nw-rarity-pill {
-	display: inline-block;
-	padding: 2px 8px;
-	border-radius: 20px;
-	font-size: 10px;
-	font-family: 'Chakra Petch', monospace;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	margin: 1px 2px 1px 0;
-	border: 1px solid transparent;
-}
-
-.nw-size-tiny {
-	color: #b6b6b6;
-	background: rgba(255,255,255,0.05);
-	border-color: rgba(255,255,255,0.12);
-}
-
-.nw-size-small {
-	color: #44aaff;
-	background: rgba(68,170,255,0.08);
-	border-color: rgba(68,170,255,0.2);
-}
-
-.nw-size-medium {
-	color: #adff00;
-	background: rgba(173,255,0,0.08);
-	border-color: rgba(173,255,0,0.22);
-}
-
-.nw-size-large {
-	color: #ff9f00;
-	background: rgba(255,159,0,0.08);
-	border-color: rgba(255,159,0,0.22);
-}
-
-.nw-rarity-common {
-	color: #a0a0a0;
-	background: rgba(255,255,255,0.05);
-	border-color: rgba(255,255,255,0.12);
-}
-
-.nw-rarity-uncommon {
-	color: #59d66f;
-	background: rgba(89,214,111,0.08);
-	border-color: rgba(89,214,111,0.22);
-}
-
-.nw-rarity-rare {
-	color: #44aaff;
-	background: rgba(68,170,255,0.08);
-	border-color: rgba(68,170,255,0.22);
-}
-
-.nw-rarity-epic {
-	color: #cc88ff;
-	background: rgba(204,136,255,0.08);
-	border-color: rgba(204,136,255,0.22);
-}
-
-.nw-rarity-legendary {
-	color: #ff9f00;
-	background: rgba(255,159,0,0.08);
-	border-color: rgba(255,159,0,0.22);
-}
-
-.nw-dup-btn {
-	color: #44aaff !important;
-}
-
-.nw-dup-btn:hover {
-	border-color: #44aaff !important;
-	background: rgba(68, 170, 255, 0.08) !important;
-}
-
-.nw-pill-rare {
-	border-color: #cc88ff;
-}
-
-.nw-pill-rare strong {
-	color: #cc88ff;
+	cursor: pointer;
 }
