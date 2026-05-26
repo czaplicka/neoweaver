@@ -151,7 +151,23 @@ private const PARENT_SLUG = 'neoweaver';
 			}
 		}
 
-		add_action( 'admin_menu', [ __CLASS__, 'reorder_submenu' ], 999 );
+		add_action( 'admin_menu',            [ __CLASS__, 'reorder_submenu' ],  999 );
+		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_menu_icons' ] );
+	}
+
+	/**
+	 * Ładuje Lucide + skrypt ikon menu globalnie w całym adminie.
+	 */
+	public static function enqueue_menu_icons(): void {
+		wp_enqueue_script( 'nw-lucide' ); // zarejestrowany w vendors.php
+
+		wp_enqueue_script(
+			'nw-admin-menu-icons',
+			NW_PLUGIN_URL . 'assets/js/admin/admin-menu-icons.js',
+			[ 'nw-lucide' ],
+			NW_VERSION,
+			true
+		);
 	}
 
 	public static function parent_slug(): string {
