@@ -97,6 +97,7 @@ if ( ! function_exists( 'tw_enqueue_connect_character_campaign_assets' ) ) {
 			'supabaseKey'    => $anon_key,
 			'restNonce'      => wp_create_nonce( 'wp_rest' ),
 			'nonce'          => wp_create_nonce( 'tw_deployment_nonce' ),
+			'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
 			'deploymentsUrl' => home_url( '/deployments/' ),
 			'initialData'    => [
 				'campaigns'  => $campaigns,

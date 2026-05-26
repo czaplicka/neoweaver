@@ -435,3 +435,83 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 		wp_send_json_success( $tips );
 	}
 }
+
+// ============================================================
+// 4. CONNECT CHARACTER TO CAMPAIGN
+// Bypasses RLS by using service key server-side.
+// ============================================================
+
+if ( ! function_exists( 'tw_connect_character_campaign' ) ) {
+
+	add_action( 'wp_ajax_tw_connect_character_campaign', 'tw_connect_character_campaign' );
+
+	function tw_connect_character_campaign(): void {
+		if ( ! check_ajax_referer( 'tw_deployment_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => 'Security check failed' ), 403 );
+			return;
+		}
+
+		$wp_user_id = get_current_user_id();
+		if ( ! $wp_user_id ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized' ), 401 );
+			return;
+		}
+
+		$campaign_id  = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? '' );
+		$character_id = tw_sanitize_supabase_id( $_POST['character_id'] ?? '' );
+
+		if ( empty( $campaign_id ) || empty( $character_id ) ) {
+			wp_send_json_error( array( 'message' => 'Missing campaign_id or character_id' ), 400 );
+			return;
+		}
+
+		$url = tw_supa_url( 'cyber_campaign_characters' );
+		if ( '' === $url ) {
+			wp_send_json_error( array( 'message' => 'Supabase config missing' ), 500 );
+			return;
+		}
+
+		$headers              = tw_supa_headers( 'service' );
+		$headers['Prefer']    = 'resolution=merge-duplicates,return=representation';
+
+		$body = array(
+			'campaign_id'  => $campaign_id,
+			'character_id' => $character_id,
+			'wp_user_id'   => $wp_user_id,
+		);
+
+		$response = wp_remote_post(
+			$url,
+			array(
+				'headers'   => $headers,
+				'body'      => wp_json_encode( $body ),
+				'timeout'   => 10,
+				'sslverify' => true,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			error_log( 'tw_connect_character_campaign network error: ' . $response->get_error_message() );
+			wp_send_json_error( array( 'message' => 'Network error' ), 502 );
+			return;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			$body_raw = wp_remote_retrieve_body( $response );
+			error_log( 'tw_connect_character_campaign Supabase HTTP ' . $code . ': ' . $body_raw );
+			wp_send_json_error( array( 'message' => 'Injection failed', 'detail' => $body_raw ), 502 );
+			return;
+		}
+
+		$result = json_decode( wp_remote_retrieve_body( $response ), true );
+		wp_send_json_success(
+			array(
+				'message'      => 'Agent linked successfully',
+				'campaign_id'  => $campaign_id,
+				'character_id' => $character_id,
+				'data'         => is_array( $result ) ? $result : array(),
+			)
+		);
+	}
+}

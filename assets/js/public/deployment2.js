@@ -3,7 +3,9 @@
 const config = {
     url: twDeploymentConfig.supabaseUrl,
     key: twDeploymentConfig.supabaseKey,
-    uid: twDeploymentConfig.userId
+    uid: twDeploymentConfig.userId,
+    ajaxUrl: twDeploymentConfig.ajaxUrl || (window.ajaxurl || '/wp-admin/admin-ajax.php'),
+    nonce: twDeploymentConfig.nonce
 };
         (function autoScroll() {
             var el = document.getElementById('tw-deployment-root');
@@ -251,35 +253,37 @@ const config = {
             const charVal = selChar.value;
 
             setStatus('> System: Injecting Agent data into Matrix...');
-            showOverlay('INJECTING AGENT INTO MATRIX…');
-
-            const payload = {
-                campaign_id:  campVal,
-                character_id: charVal,
-                wp_user_id:   config.uid
-            };
+            showOverlay('INJECTING AGENT INTO MATRIX\u2026');
 
             try {
-                const res = await fetch(config.url + 'rest/v1/cyber_campaign_characters', {
+                const formData = new FormData();
+                formData.append('action', 'tw_connect_character_campaign');
+                formData.append('nonce', config.nonce);
+                formData.append('campaign_id', campVal);
+                formData.append('character_id', charVal);
+
+                const res = await fetch(config.ajaxUrl, {
                     method: 'POST',
-                    headers: {
-                        'apikey':        config.key,
-                        'Authorization': `Bearer ${config.key}`,
-                        'Content-Type':  'application/json',
-                        'Prefer':        'resolution=merge-duplicates,return=representation'
-                    },
-                    body: JSON.stringify(payload)
+                    body: formData,
+                    credentials: 'same-origin'
                 });
 
                 if (!res.ok) {
                     const txt = await res.text();
-                    console.error('Injection error:', res.status, txt);
-                    throw new Error('Rejection');
+                    console.error('Injection HTTP error:', res.status, txt);
+                    throw new Error('HTTP ' + res.status);
                 }
 
-                spnMsg.textContent = 'SYNCHRONISING WORLD NODE…';
-                setStatus('> System: Synchronising World Node…');
+                const json = await res.json();
+                if (!json.success) {
+                    console.error('Injection rejected:', json.data);
+                    throw new Error(json.data?.message || 'Rejection');
+                }
 
+                spnMsg.textContent = 'SYNCHRONISING WORLD NODE\u2026';
+                setStatus('> System: Synchronising World Node\u2026');
+
+                /* Poll to confirm row exists (read uses anon key — RLS allows SELECT) */
                 const pollHeaders = { 'apikey': config.key, 'Authorization': `Bearer ${config.key}` };
                 let confirmed = false;
 
@@ -303,14 +307,14 @@ const config = {
                 }
 
                 if (!confirmed) {
-                    console.warn('World-node sync timeout – redirecting anyway.');
+                    console.warn('World-node sync timeout \u2013 redirecting anyway.');
                 }
 
                 root.classList.add('tw-glitch-shake');
                 setStatus('> System: INJECTION SUCCESSFUL. AGENT LINKED.', '#adff00');
                 spnMsg.textContent = confirmed
-                    ? 'INJECTION CONFIRMED. BRIDGING TO DEPLOYMENT…'
-                    : 'SYNC TIMEOUT. BRIDGING ANYWAY…';
+                    ? 'INJECTION CONFIRMED. BRIDGING TO DEPLOYMENT\u2026'
+                    : 'SYNC TIMEOUT. BRIDGING ANYWAY\u2026';
 
                 if (audio) audio.play().catch(err => console.warn('Audio autoplay blocked:', err));
 
@@ -322,7 +326,7 @@ const config = {
             } catch (err) {
                 console.error('Submit error:', err);
                 hideOverlay();
-                setStatus('> Error: Injection failed. Entity rejection.', '#ff0055');
+                setStatus('> Error: Injection failed. ' + (err.message || 'Entity rejection.'), '#ff0055');
                 setBtn(true);
             }
         });
