@@ -408,6 +408,137 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 }
 
 // ===========================================================================
+// CHARACTER CHANGE ENDPOINT
+// ===========================================================================
+
+/**
+ * POST /wp-json/neoweaver/v1/character/change
+ * Swap the active character on a campaign (replaces cyber_campaign_characters row).
+ * Fires tw_character_changed after a successful swap.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function neoweaver_change_character( WP_REST_Request $request ) {
+	error_log( 'TW_ENDPOINT_CHARACTER_CHANGE: START' );
+
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
+	}
+
+	$campaign_id      = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'campaign_id' )      ?? '' ) );
+	$new_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'character_id' )     ?? '' ) );
+
+	if ( ! $campaign_id || ! $new_character_id ) {
+		return new WP_Error( 'missing_params', 'campaign_id and character_id are required.', [ 'status' => 400 ] );
+	}
+
+	$base = nw_supabase_base();
+	if ( ! $base ) {
+		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
+	}
+
+	// Verify campaign belongs to this user
+	$camp_url   = add_query_arg( [
+		'id'         => 'eq.' . $campaign_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_campaign' );
+	$camp_check = wp_remote_get( $camp_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $camp_check ) || empty( json_decode( wp_remote_retrieve_body( $camp_check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'Campaign not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Verify character belongs to this user
+	$char_url   = add_query_arg( [
+		'id'         => 'eq.' . $new_character_id,
+		'wp_user_id' => 'eq.' . $user_id,
+		'select'     => 'id',
+		'limit'      => 1,
+	], $base . 'cyber_characters' );
+	$char_check = wp_remote_get( $char_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( is_wp_error( $char_check ) || empty( json_decode( wp_remote_retrieve_body( $char_check ), true ) ) ) {
+		return new WP_Error( 'not_found', 'Character not found or access denied.', [ 'status' => 404 ] );
+	}
+
+	// Read old character_id before the swap (for the hook payload)
+	$old_char_id = null;
+	$old_url     = add_query_arg( [
+		'campaign_id' => 'eq.' . $campaign_id,
+		'select'      => 'character_id',
+		'limit'       => 1,
+	], $base . 'cyber_campaign_characters' );
+	$old_resp    = wp_remote_get( $old_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	if ( ! is_wp_error( $old_resp ) ) {
+		$old_rows    = json_decode( wp_remote_retrieve_body( $old_resp ), true ) ?: [];
+		$old_char_id = ! empty( $old_rows[0]['character_id'] )
+			? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $old_rows[0]['character_id'] )
+			: null;
+	}
+
+	// Upsert: delete existing row then insert new one (cyber_campaign_characters has campaign_id as PK or unique)
+	$delete_url  = add_query_arg( [ 'campaign_id' => 'eq.' . $campaign_id ], $base . 'cyber_campaign_characters' );
+	wp_remote_request( $delete_url, [
+		'method'  => 'DELETE',
+		'headers' => nw_supabase_service_headers(),
+		'timeout' => 10,
+	] );
+
+	$insert_resp = wp_remote_post( $base . 'cyber_campaign_characters', [
+		'headers' => nw_supabase_service_headers( true ),
+		'body'    => wp_json_encode( [
+			'campaign_id'  => $campaign_id,
+			'character_id' => $new_character_id,
+			'wp_user_id'   => $user_id,
+		] ),
+		'timeout' => 15,
+	] );
+
+	if ( is_wp_error( $insert_resp ) ) {
+		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
+	}
+
+	$code = wp_remote_retrieve_response_code( $insert_resp );
+	if ( $code < 200 || $code >= 300 ) {
+		error_log( 'TW_CHARACTER_CHANGE: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $insert_resp ) );
+		return new WP_Error( 'change_failed', 'Character change failed. HTTP ' . $code, [ 'status' => $code ] );
+	}
+
+	if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
+		tw_invalidate_game_data_cache( $user_id );
+	}
+
+	/**
+	 * Fires after the active character on a campaign is successfully changed.
+	 *
+	 * @param int    $user_id  WP user ID.
+	 * @param array  $context {
+	 *   @type string      $campaign_id       Campaign UUID.
+	 *   @type string      $new_character_id  New character UUID.
+	 *   @type string|null $old_character_id  Previous character UUID, or null if none existed.
+	 * }
+	 */
+	do_action( 'tw_character_changed', $user_id, [
+		'campaign_id'      => $campaign_id,
+		'new_character_id' => $new_character_id,
+		'old_character_id' => $old_char_id,
+	] );
+
+	error_log( 'TW_CHARACTER_CHANGE: SUCCESS campaign=' . $campaign_id . ' new_char=' . $new_character_id );
+
+	return rest_ensure_response( [
+		'success' => true,
+		'data'    => [
+			'campaign_id'      => $campaign_id,
+			'new_character_id' => $new_character_id,
+			'old_character_id' => $old_char_id,
+			'message'          => 'Character changed successfully.',
+		],
+	] );
+}
+
+// ===========================================================================
 // CAMPAIGN / DEPLOYMENT ENDPOINT
 // ===========================================================================
 
@@ -569,7 +700,7 @@ function neoweaver_campaign_signup( WP_REST_Request $request ) {
 	$check_rows = json_decode( wp_remote_retrieve_body( $check ), true ) ?: [];
 
 	if ( ! empty( $check_rows ) ) {
-		// Already signed up — just return success
+		// Already signed up — just return success (no duplicate hook)
 		return rest_ensure_response( [ 'success' => true, 'data' => [ 'message' => 'Already signed up.' ] ] );
 	}
 
@@ -593,6 +724,20 @@ function neoweaver_campaign_signup( WP_REST_Request $request ) {
 		error_log( 'TW_CAMPAIGN_SIGNUP: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $insert_resp ) );
 		return new WP_Error( 'signup_failed', 'Signup failed. HTTP ' . $code, [ 'status' => $code ] );
 	}
+
+	/**
+	 * Fires after a player successfully joins (signs up to) a campaign.
+	 *
+	 * @param int   $user_id  WP user ID of the joining player.
+	 * @param array $context {
+	 *   @type string $campaign_id  Campaign UUID.
+	 *   @type string $character_id Character UUID used for the signup.
+	 * }
+	 */
+	do_action( 'tw_campaign_joined', $user_id, [
+		'campaign_id'  => $campaign_id,
+		'character_id' => $character_id,
+	] );
 
 	error_log( 'TW_CAMPAIGN_SIGNUP: SUCCESS user=' . $user_id . ' campaign=' . $campaign_id );
 	return rest_ensure_response( [ 'success' => true, 'data' => [ 'message' => 'Signup successful.' ] ] );
@@ -1230,6 +1375,19 @@ add_action( 'rest_api_init', function () {
 			'attr_reflex' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
 			'attr_mind'   => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
 			'attr_spirit' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 5 ],
+		],
+	] );
+
+	// -----------------------------------------------------------------------
+	// /character/change
+	// -----------------------------------------------------------------------
+	register_rest_route( 'neoweaver/v1', '/character/change', [
+		'methods'             => 'POST',
+		'callback'            => 'neoweaver_change_character',
+		'permission_callback' => 'neoweaver_user_can_play',
+		'args'                => [
+			'campaign_id'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+			'character_id' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 		],
 	] );
 
