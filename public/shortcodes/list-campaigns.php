@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /**
- * TALE WEAVER - FIELD AGENT COMMAND CENTER
+ * NEOWEAVER - DEPLOYMENTS LIST
  * Shortcode: [tw_list_campaigns]
  */
 
@@ -93,8 +93,8 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
 		ob_start();
 		?>
-		<div class="tw-char-wrapper">
-			<div class="tw-char-grid">
+		<div class="tw-campaigns-wrap">
+			<div class="tw-campaigns-grid">
 				<?php foreach ( $active_campaigns as $c ) : ?>
 					<?php
 					$c_id_safe  = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $c['id'] ?? '' ) );
@@ -140,12 +140,14 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					$nodes_url  = '/nodes/?campaign_id=' . rawurlencode( $c_id_safe ) . '#tw-deployment-root';
 					$agents_url = '/agents/?campaign_id=' . rawurlencode( $c_id_safe ) . '#tw-deployment-root';
 
+					$status_class = $is_active ? 'active' : 'paused';
+
 					if ( ! $world_rel ) {
-						$main_btn = '<a href="' . esc_url( $nodes_url ) . '" class="tw-action-btn pulse-red">ANCHOR WORLD NODE</a>';
+						$main_btn = '<a href="' . esc_url( $nodes_url ) . '" class="tw-btn">ANCHOR WORLD NODE</a>';
 					} elseif ( ! $char_rel ) {
-						$main_btn = '<a href="' . esc_url( $agents_url ) . '" class="tw-action-btn">INJECT FIELD AGENT</a>';
+						$main_btn = '<a href="' . esc_url( $agents_url ) . '" class="tw-btn">INJECT FIELD AGENT</a>';
 					} else {
-						$main_btn = '<button class="tw-action-btn enter-matrix"'
+						$main_btn = '<button class="tw-btn enter-matrix"'
 							. ' type="button"'
 							. ' data-id="' . esc_attr( $c_id_safe ) . '"'
 							. ' data-character="' . esc_attr( (string) $char_id ) . '"'
@@ -157,59 +159,37 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					}
 					?>
 
-					<div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-char-card<?php echo ! $is_active ? ' is-inactive' : ''; ?>">
-						<div class="tw-card-header">
+					<div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-campaign-card">
+
+						<div class="tw-campaign-card-header">
 							<div>
-								<div class="tw-id-tag">UPLINK_ID: <?php echo esc_html( $c_id_safe ); ?></div>
+								<div class="tw-campaign-world"><?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : 'NO WORLD ANCHORED'; ?></div>
 								<h3 class="tw-campaign-title"><?php echo $c_name; ?></h3>
-								<div class="tw-card-status">
-									<span class="status-dot <?php echo $is_active ? 'is-active' : 'is-inactive'; ?>"></span>
-									<span class="tw-status-text"><?php echo $is_active ? 'CONNECTION STABLE' : 'LINK SEVERED'; ?></span>
-								</div>
 							</div>
-							<div class="tw-card-mode">
-								<span class="tw-badge-cyber"><?php echo esc_html( $mode_str ); ?></span>
+							<div>
+								<span class="tw-campaign-status <?php echo esc_attr( $status_class ); ?>"><?php echo $is_active ? 'ACTIVE' : 'PAUSED'; ?></span>
+								<span class="tw-campaign-mode<?php echo $is_team ? ' multiplayer' : ''; ?>"><?php echo esc_html( $mode_str ); ?></span>
 							</div>
 						</div>
 
-						<div class="tw-card-body">
-							<div class="tw-data-row">
-								<span class="tw-data-label">REALITY_NODE:</span>
-								<span class="tw-data-value <?php echo $world_rel ? 'has-value' : 'is-missing'; ?>">
-									<?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : 'MISSING ANCHOR'; ?>
-									<?php if ( ! $world_rel ) : ?>
-										<a href="<?php echo esc_url( $nodes_url ); ?>" class="tw-mini-btn">LINK NODE</a>
-									<?php endif; ?>
-								</span>
-							</div>
-
-							<div class="tw-data-row">
-								<span class="tw-data-label">OPERATIVE_LINK:</span>
-								<span class="tw-data-value has-value">
-									<?php echo $operative_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-									<?php if ( ! $char_rel ) : ?>
-										<a href="<?php echo esc_url( $agents_url ); ?>" class="tw-mini-btn">ASSIGN AGENT</a>
-									<?php endif; ?>
-								</span>
-							</div>
-
-							<?php if ( $is_team ) : ?>
-								<div class="tw-data-row">
-									<span class="tw-data-label">DEPLOYMENT HASH:</span>
-									<span class="tw-data-value has-value">
-										<?php echo $join_code ? esc_html( strtoupper( $join_code ) ) : 'NOT INITIALIZED'; ?>
-									</span>
-								</div>
-							<?php endif; ?>
+						<div class="tw-campaign-meta">
+							<span><strong>OPERATIVE:</strong> <?php echo $operative_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 						</div>
 
-						<div class="tw-card-footer">
-							<div class="tw-card-footer-main"><?php echo $main_btn; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
+						<?php if ( $is_team && $join_code ) : ?>
+							<div class="tw-campaign-hash">
+								<span class="tw-campaign-hash-label">DEPLOYMENT HASH</span>
+								<span class="tw-campaign-hash-code"><?php echo esc_html( strtoupper( $join_code ) ); ?></span>
+							</div>
+						<?php endif; ?>
+
+						<div class="tw-campaign-actions">
+							<?php echo $main_btn; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 							<?php if ( $is_team && $join_code ) : ?>
 								<button
 									type="button"
-									class="tw-copy-join-btn"
+									class="tw-btn tw-btn-ghost tw-copy-join-btn"
 									data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>"
 								>
 									COPY HASH
@@ -218,7 +198,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
 							<button
 								type="button"
-								class="tw-delete-campaign-btn"
+								class="tw-btn tw-btn-danger tw-delete-campaign-btn"
 								data-id="<?php echo esc_attr( $c_id_safe ); ?>"
 								data-name="<?php echo esc_attr( $c_name_raw ); ?>"
 							>
@@ -226,9 +206,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 							</button>
 						</div>
 
-						<?php if ( ! $world_rel && $is_active ) : ?>
-							<div class="world-error-overlay"></div>
-						<?php endif; ?>
 					</div>
 				<?php endforeach; ?>
 			</div>
