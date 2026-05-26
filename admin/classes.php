@@ -34,8 +34,8 @@ class NW_Classes_Admin {
     public function register_menu(): void {
         add_submenu_page(
             $this->menu_parent,
-            __( 'Field Agents', 'neoweaver' ),
-            __( 'Field Agents', 'neoweaver' ),
+            __( 'Classes', 'neoweaver' ),
+            __( '<span data-lucide-menu="circle-user"></span> Classes', 'neoweaver' ),
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
