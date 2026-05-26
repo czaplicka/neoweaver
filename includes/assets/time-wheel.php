@@ -23,8 +23,6 @@ if ( ! function_exists( 'tw_register_time_wheel_assets' ) ) {
 			true
 		);
 	}
-
-	add_action( 'wp_enqueue_scripts', 'tw_register_time_wheel_assets', 5 );
 }
 
 if ( ! function_exists( 'tw_enqueue_time_wheel_assets' ) ) {
@@ -47,3 +45,18 @@ if ( ! function_exists( 'tw_enqueue_time_wheel_assets' ) ) {
 		);
 	}
 }
+
+if ( ! function_exists( 'tw_maybe_enqueue_time_wheel_assets' ) ) {
+	function tw_maybe_enqueue_time_wheel_assets(): void {
+		if ( is_admin() ) {
+			return;
+		}
+
+		if ( is_page_template( 'templates/adventure.php' ) ) {
+			tw_enqueue_time_wheel_assets();
+		}
+	}
+}
+
+add_action( 'wp_enqueue_scripts', 'tw_register_time_wheel_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_time_wheel_assets', 20 );

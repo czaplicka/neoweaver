@@ -58,7 +58,7 @@ if ( ! function_exists( 'tw_enqueue_compass_assets' ) ) {
 			'window.twCompassData = ' . wp_json_encode(
 				[
 					'wpUserId'         => (int) $wp_user_id,
-					'activeLocationId' => isset( $game_data['active_location_id'] ) ? (int) $game_data['active_location_id'] : 0,
+					'activeLocationId' => isset( $game_data['active_location_id'] ) ? (string) $game_data['active_location_id'] : '',
 					'activeWorldId'    => isset( $game_data['active_world_id'] ) ? (string) $game_data['active_world_id'] : '',
 					'activeSessionId'  => isset( $game_data['active_session_id'] ) ? (string) $game_data['active_session_id'] : '',
 				]

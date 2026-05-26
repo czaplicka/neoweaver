@@ -51,4 +51,17 @@ if ( ! function_exists( 'tw_enqueue_cyber_hud_assets' ) ) {
 	}
 }
 
+if ( ! function_exists( 'tw_maybe_enqueue_cyber_hud_assets' ) ) {
+	function tw_maybe_enqueue_cyber_hud_assets(): void {
+		if ( is_admin() ) {
+			return;
+		}
+
+		if ( is_page_template( 'templates/adventure.php' ) ) {
+			tw_enqueue_cyber_hud_assets();
+		}
+	}
+}
+
 add_action( 'wp_enqueue_scripts', 'tw_register_cyber_hud_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_cyber_hud_assets', 20 );
