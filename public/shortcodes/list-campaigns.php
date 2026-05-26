@@ -162,10 +162,9 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					$gm_data       = ( $gm_style_val && isset( $gm_style_map[ $gm_style_val ] ) ) ? $gm_style_map[ $gm_style_val ] : null;
 					$priority_data = ( $priority_val && isset( $priority_map[ $priority_val ] ) ) ? $priority_map[ $priority_val ] : null;
 
-					// Threat color for glow.
 					$threat_color = $threat_data ? $threat_data['color'] : '#adff00';
 
-					$operative_name  = 'PENDING ASSIGNMENT';
+					$operative_name  = '';
 					$operative_class = '';
 					$operative_race  = '';
 					if ( is_array( $char_rel ) ) {
@@ -197,55 +196,62 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					<div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-campaign-card" style="--threat-color: <?php echo esc_attr( $threat_color ); ?>">
 						<div class="tw-card-scan-line"></div>
 
-						<!-- TOP ROW: mode icon + world name + length/threat badges -->
-						<div class="tw-card-top">
-							<div class="tw-card-mode-icon" title="<?php echo esc_attr( $mode_str ); ?>">
-								<i data-lucide="<?php echo $is_team ? 'users' : 'user'; ?>" aria-label="<?php echo esc_attr( $mode_str ); ?>"></i>
+						<!-- HEADER: ikona solo/team | nazwa kampanii + world | badges -->
+						<div class="tw-card-header">
+							<div class="tw-card-mode-icon" title="<?php echo esc_attr( $mode_str ); ?>" aria-label="<?php echo esc_attr( $mode_str ); ?>">
+								<i data-lucide="<?php echo $is_team ? 'users' : 'user'; ?>"></i>
 							</div>
-							<div class="tw-card-world-name"><?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : '<span class="tw-card-unset">NO WORLD</span>'; ?></div>
+
+							<div class="tw-card-header-text">
+								<h3 class="tw-card-title"><?php echo $c_name; ?></h3>
+								<div class="tw-card-world-name">
+									<?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : '<span class="tw-card-unset">No World</span>'; ?>
+								</div>
+							</div>
+
 							<div class="tw-card-top-badges">
+								<?php if ( $threat_data ) : ?>
+									<span class="tw-pill tw-pill--threat" style="color:<?php echo esc_attr( $threat_data['color'] ); ?>;border-color:<?php echo esc_attr( $threat_data['color'] ); ?>44;" title="Threat">
+										<i data-lucide="<?php echo esc_attr( $threat_data['icon'] ); ?>"></i>
+										<?php echo esc_html( $threat_data['label'] ); ?>
+									</span>
+								<?php endif; ?>
 								<?php if ( $length_data ) : ?>
 									<span class="tw-pill tw-pill--length" title="Length">
 										<i data-lucide="<?php echo esc_attr( $length_data['icon'] ); ?>"></i>
 										<?php echo esc_html( $length_data['label'] ); ?>
 									</span>
 								<?php endif; ?>
-								<?php if ( $threat_data ) : ?>
-									<span class="tw-pill tw-pill--threat" style="color: <?php echo esc_attr( $threat_data['color'] ); ?>; border-color: <?php echo esc_attr( $threat_data['color'] ); ?>33;" title="Threat">
-										<i data-lucide="<?php echo esc_attr( $threat_data['icon'] ); ?>"></i>
-										<?php echo esc_html( $threat_data['label'] ); ?>
-									</span>
-								<?php endif; ?>
 							</div>
-						</div>
-
-						<!-- CAMPAIGN NAME -->
-						<h3 class="tw-card-title"><?php echo $c_name; ?></h3>
+						</div><!-- .tw-card-header -->
 
 						<!-- OPERATIVE -->
 						<div class="tw-card-operative">
 							<i data-lucide="user-round" class="tw-card-operative-icon"></i>
 							<div class="tw-card-operative-info">
+								<span class="tw-card-operative-label">Field Agent</span>
 								<?php if ( is_array( $char_rel ) ) : ?>
 									<span class="tw-card-operative-name"><?php echo esc_html( $operative_name ); ?></span>
-									<span class="tw-card-operative-meta"><?php echo esc_html( $operative_race ); ?><?php echo ( $operative_race && $operative_class ) ? ' · ' : ''; ?><?php echo esc_html( $operative_class ); ?></span>
+									<?php if ( $operative_race || $operative_class ) : ?>
+										<span class="tw-card-operative-meta"><?php echo esc_html( $operative_race ); ?><?php echo ( $operative_race && $operative_class ) ? ' · ' : ''; ?><?php echo esc_html( $operative_class ); ?></span>
+									<?php endif; ?>
 								<?php else : ?>
-									<span class="tw-card-operative-name tw-card-unset">PENDING ASSIGNMENT</span>
+									<span class="tw-card-operative-name tw-card-unset">Pending Assignment</span>
 								<?php endif; ?>
 							</div>
-						</div>
+						</div><!-- .tw-card-operative -->
 
-						<!-- GM STYLE + PRIORITY -->
+						<!-- META: GM style + priority -->
 						<?php if ( $gm_data || $priority_data ) : ?>
-							<div class="tw-card-tags">
+							<div class="tw-card-meta">
 								<?php if ( $gm_data ) : ?>
-									<span class="tw-tag">
+									<span class="tw-card-meta-item">
 										<i data-lucide="<?php echo esc_attr( $gm_data['icon'] ); ?>"></i>
 										<?php echo esc_html( $gm_data['label'] ); ?>
 									</span>
 								<?php endif; ?>
 								<?php if ( $priority_data ) : ?>
-									<span class="tw-tag">
+									<span class="tw-card-meta-item">
 										<i data-lucide="<?php echo esc_attr( $priority_data['icon'] ); ?>"></i>
 										<?php echo esc_html( $priority_data['label'] ); ?>
 									</span>
@@ -256,7 +262,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 						<!-- TEAM HASH -->
 						<?php if ( $is_team && $join_code ) : ?>
 							<div class="tw-campaign-hash">
-								<span class="tw-campaign-hash-label">DEPLOYMENT HASH</span>
+								<span class="tw-campaign-hash-label">Deployment Hash</span>
 								<span class="tw-campaign-hash-code"><?php echo esc_html( strtoupper( $join_code ) ); ?></span>
 							</div>
 						<?php endif; ?>
@@ -267,14 +273,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 
 							<?php if ( $is_team && $join_code ) : ?>
 								<button type="button" class="tw-btn tw-btn-ghost tw-copy-join-btn" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>">
-									COPY HASH
+									<i data-lucide="copy" style="width:12px;height:12px;vertical-align:middle;"></i>
+									Hash
 								</button>
 							<?php endif; ?>
 
 							<button type="button" class="tw-btn tw-btn-danger tw-delete-campaign-btn" data-id="<?php echo esc_attr( $c_id_safe ); ?>" data-name="<?php echo esc_attr( $c_name_raw ); ?>">
-								TERMINATE
+								<i data-lucide="x" style="width:12px;height:12px;vertical-align:middle;"></i>
+								Terminate
 							</button>
-						</div>
+						</div><!-- .tw-campaign-actions -->
 
 					</div><!-- .tw-campaign-card -->
 				<?php endforeach; ?>
