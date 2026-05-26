@@ -11,7 +11,8 @@ if ( ! function_exists( 'tw_compass_render' ) ) {
 			return '';
 		}
 
-		if ( ! is_page_template( 'templates/adventure.php' ) ) {
+		$page_id = get_queried_object_id();
+		if ( ! $page_id || get_page_template_slug( $page_id ) !== 'templates/adventure.php' ) {
 			return '';
 		}
 
