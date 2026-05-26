@@ -1,90 +1,63 @@
-/* ============================================================
-   NeoWeaver Admin — CLASSES PANEL
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* =============================================================
+   NeoWeaver Admin — classes.css
+   Extends admin-core.css; only classes-specific overrides here.
+   ============================================================= */
 
-/* ---- Table: Class Visuals & Identity ---- */
-#nw-classes-panel .nw-col-img { width: 52px; }
-
-#nw-classes-panel .nw-class-img,
-#nw-classes-panel .nw-class-img-placeholder {
-    width: 40px;
-    height: 40px;
-    border-radius: 4px;
-    border: 1px solid #2e2e2e;
-}
-
-#nw-classes-panel .nw-class-img { 
-    object-fit: cover; 
-    display: block; 
-}
-
-#nw-classes-panel .nw-class-img-placeholder {
+/* ── Filters bar ─────────────────────────────────────── */
+.nw-filters-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: #1a1a1a;
-    font-size: 18px;
-    color: #555;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
 }
 
-/* ---- Typography & Details ---- */
-#nw-classes-panel .nw-class-name {
-    font-weight: 600;
+/* ── Table: numeric column alignment ─────────────────── */
+.nw-table td.nw-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
     color: #adff00;
     font-size: 13px;
-    line-height: 1.3;
 }
 
-#nw-classes-panel .nw-class-desc {
-    font-size: 11px;
-    color: #666;
-    margin-top: 2px;
-    max-width: 320px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ---- Status Badges ---- */
-.nw-active-badge {
+/* ── Tag pills in table rows ─────────────────────────── */
+.nw-tag {
     display: inline-block;
     padding: 2px 8px;
     border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-}
-
-.nw-active-badge.is-active {
-    background: rgba(173, 255, 0, .15);
+    background: rgba(173, 255, 0, 0.08);
+    border: 1px solid rgba(173, 255, 0, 0.22);
     color: #adff00;
-    border: 1px solid rgba(173, 255, 0, .35);
-}
-
-.nw-active-badge.is-inactive {
-    background: rgba(255, 255, 255, .05);
-    color: #555;
-    border: 1px solid #2a2a2a;
-}
-
-/* ---- Specialized Data Columns ---- */
-.nw-gold-value {
-    font-family: 'Chakra Petch', sans-serif;
-    color: #ffd700;
-    font-size: 12px;
-}
-
-.nw-vuln-value {
-    font-size: 11px;
-    color: #ff6b6b;
-}
-
-/* ---- Form Helpers ---- */
-.nw-json-hint {
     font-size: 10px;
+    font-family: 'Chakra Petch', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 1px 2px 1px 0;
+}
+
+.nw-tag-more {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 20px;
+    background: #1a1a1a;
+    border: 1px solid #2e2e2e;
     color: #555;
-    margin-top: 3px;
-    font-family: 'Courier New', monospace; /* optymalizacja czytelności kodu */
+    font-size: 10px;
+    font-family: 'Chakra Petch', monospace;
+    margin-left: 2px;
+}
+
+/* ── Dup button accent ───────────────────────────────── */
+.nw-dup-btn {
+    color: #44aaff !important;
+}
+.nw-dup-btn:hover {
+    border-color: #44aaff !important;
+    background: rgba(68, 170, 255, 0.08) !important;
+}
+
+/* ── Btn-sm helper ───────────────────────────────────── */
+.nw-btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
 }
