@@ -85,6 +85,9 @@ foreach ( $inventory as $r ) {
 	<button class="tw-nav-btn" data-tab="vehicles" title="Garage" aria-label="Garage" type="button">
 		<i data-lucide="car"></i>
 	</button>
+	<button class="tw-nav-btn" data-tab="pets" title="Pets" aria-label="Pets" type="button">
+		<i data-lucide="paw-print"></i>
+	</button>
 </div>
 
 <div
@@ -283,6 +286,8 @@ foreach ( $inventory as $r ) {
 						<?php $render_slot( 'ring_1', 'RING',       'top:58%;left:12%;', 'tiny' ); ?>
 						<?php $render_slot( 'ring_2', 'RING',       'top:58%;right:12%;', 'tiny' ); ?>
 						<?php $render_slot( 'legs',   'LEGS',       'top:90%;left:50%;transform:translateX(-50%);' ); ?>
+
+						<?php $render_slot( 'pet',    'PET',        'top:105%;left:50%;transform:translateX(-50%);', 'pet-slot' ); ?>
 					</div>
 
 					<div id="tw-inventory-app">
@@ -380,6 +385,10 @@ foreach ( $inventory as $r ) {
 
 			<div class="tw-tab-content" id="vehicles">
 				<?php echo do_shortcode( '[neoweave_vehicle_panel]' ); ?>
+			</div>
+
+			<div class="tw-tab-content" id="pets">
+				<?php echo do_shortcode( '[neoweaver_pets]' ); ?>
 			</div>
 
 		</div>
