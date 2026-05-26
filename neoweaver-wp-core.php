@@ -217,17 +217,6 @@ final class NeoWeaver_Core {
 			}
 		}
 
-		// Tylko normalny frontend page request.
-		if ( self::is_frontend_page_request() ) {
-			foreach ( $frontend_only as $file ) {
-				$path = NEOWEAVER_PLUGIN_DIR . $file;
-
-				if ( file_exists( $path ) ) {
-					require_once $path;
-				}
-			}
-		}
-
 		// Tylko requesty AJAX.
 		if ( self::is_ajax_request() ) {
 			foreach ( $ajax_only as $file ) {
