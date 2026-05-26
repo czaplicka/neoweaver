@@ -8,9 +8,6 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'display_cyber_hud' ) ) {
 	function display_cyber_hud(): string {
-		if ( ! is_page_template( 'templates/adventure.php' ) ) {
-			return '';
-		}
 
 		if ( ! function_exists( 'tw_supabase_url' ) || ! tw_supabase_url() ) {
 			return '';
