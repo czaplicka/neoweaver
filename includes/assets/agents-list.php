@@ -70,24 +70,27 @@ if ( ! function_exists( 'tw_enqueue_agents_list_assets' ) ) {
 
 if ( ! function_exists( 'tw_maybe_enqueue_agents_list_assets' ) ) {
 	function tw_maybe_enqueue_agents_list_assets(): void {
-		if ( is_admin() || ! is_singular() ) {
+		if ( is_admin() ) {
 			return;
 		}
 
-		$post = get_post();
+		// Load on any page with slug 'agents' or that contains the shortcode.
+		$load = false;
 
-		if ( ! $post ) {
-			return;
+		if ( is_page( 'agents' ) ) {
+			$load = true;
 		}
 
-		// has_shortcode() sprawdza post_content — działa dla klasycznych stron.
-		// Fallback: tw_has_shortcode_on_current_page obsługuje page buildera/bloki.
-		$in_content = has_shortcode( $post->post_content, 'tw_characters_list' );
-		$in_builder = ! $in_content
-			&& function_exists( 'tw_has_shortcode_on_current_page' )
-			&& tw_has_shortcode_on_current_page( 'tw_characters_list' );
+		if ( ! $load && is_singular() ) {
+			$post = get_post();
+			if ( $post ) {
+				$load = has_shortcode( $post->post_content, 'tw_characters_list' )
+					|| ( function_exists( 'tw_has_shortcode_on_current_page' )
+						&& tw_has_shortcode_on_current_page( 'tw_characters_list' ) );
+			}
+		}
 
-		if ( $in_content || $in_builder ) {
+		if ( $load ) {
 			tw_enqueue_agents_list_assets();
 		}
 	}
