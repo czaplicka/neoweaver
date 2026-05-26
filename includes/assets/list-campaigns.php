@@ -3,17 +3,16 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'tw_register_list_campaigns_assets' ) ) {
 	function tw_register_list_campaigns_assets(): void {
-		$core_css_rel  = 'assets/css/public/core.css';
-		$core_css_path = NEOWEAVER_PLUGIN_DIR . $core_css_rel;
-
-		$js_rel  = 'assets/js/public/list-campaigns.js';
-		$js_path = NEOWEAVER_PLUGIN_DIR . $js_rel;
+		$css_rel  = 'assets/css/public/list-campaigns.css';
+		$js_rel   = 'assets/js/public/list-campaigns.js';
+		$css_path = NEOWEAVER_PLUGIN_DIR . $css_rel;
+		$js_path  = NEOWEAVER_PLUGIN_DIR . $js_rel;
 
 		wp_register_style(
-			'neoweaver-tw-core',
-			NEOWEAVER_PLUGIN_URL . $core_css_rel,
+			'neoweaver-list-campaigns',
+			NEOWEAVER_PLUGIN_URL . $css_rel,
 			array(),
-			file_exists( $core_css_path ) ? (string) filemtime( $core_css_path ) : NEOWEAVER_VERSION
+			file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION
 		);
 
 		wp_register_script(
@@ -24,18 +23,16 @@ if ( ! function_exists( 'tw_register_list_campaigns_assets' ) ) {
 			true
 		);
 	}
-
-	add_action( 'wp_enqueue_scripts', 'tw_register_list_campaigns_assets', 5 );
 }
 
 if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 	function tw_enqueue_list_campaigns_assets( array $config = array() ): void {
 		static $done = false;
 
-		wp_enqueue_style( 'neoweaver-tw-core' );
+		wp_enqueue_style( 'neoweaver-list-campaigns' );
 		wp_enqueue_script( 'neoweaver-list-campaigns' );
 
-		if ( $done === true ) {
+		if ( $done ) {
 			return;
 		}
 
@@ -43,9 +40,12 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 
 		$data = array_merge(
 			array(
-				'restUrl' => esc_url_raw( rest_url( 'neoweaver/v1/' ) ),
-				'nonce'   => wp_create_nonce( 'wp_rest' ),
-				'uid'     => get_current_user_id(),
+				'nonce'       => wp_create_nonce( 'tw_game_nonce' ),
+				'restNonce'   => wp_create_nonce( 'wp_rest' ),
+				'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ),
+				'terminalUrl' => home_url( '/game/' ),
+				'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
+				'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
 			),
 			$config
 		);
@@ -58,31 +58,30 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 	}
 }
 
-// Auto-enqueue: odpala wczesniej niz shortcode, dzieki czemu JS/CSS laduja sie w <head>.
 if ( ! function_exists( 'tw_maybe_enqueue_list_campaigns_assets' ) ) {
 	function tw_maybe_enqueue_list_campaigns_assets(): void {
-		if ( is_admin() || ! is_singular() ) {
+		if ( is_admin() ) {
 			return;
 		}
 
-		$post = get_post();
-		if ( ! $post ) {
-			return;
+		$load = false;
+
+		if ( is_page( 'deployments' ) ) {
+			$load = true;
 		}
 
-		if ( has_shortcode( $post->post_content, 'tw_list_campaigns' ) ) {
-			tw_enqueue_list_campaigns_assets(
-				array(
-					'nonce'       => wp_create_nonce( 'tw_game_nonce' ),
-					'restNonce'   => wp_create_nonce( 'wp_rest' ),
-					'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ),
-					'terminalUrl' => home_url( '/game/' ),
-					'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
-					'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
-				)
-			);
+		if ( ! $load && is_singular() ) {
+			$post = get_post();
+			if ( $post ) {
+				$load = has_shortcode( $post->post_content, 'tw_list_campaigns' );
+			}
+		}
+
+		if ( $load ) {
+			tw_enqueue_list_campaigns_assets();
 		}
 	}
 }
 
-add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_list_campaigns_assets', 15 );
+add_action( 'wp_enqueue_scripts', 'tw_register_list_campaigns_assets', 5 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_list_campaigns_assets', 20 );
