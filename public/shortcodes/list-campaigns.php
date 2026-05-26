@@ -36,33 +36,33 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 		}
 
 		$world_type_map = array(
-			1 => array( 'label' => 'Easy',      'emoji' => '🌱' ),
-			2 => array( 'label' => 'Casual',    'emoji' => '☕' ),
-			3 => array( 'label' => 'Standard',  'emoji' => '🎯' ),
-			4 => array( 'label' => 'Hardcore',  'emoji' => '💀' ),
-			5 => array( 'label' => 'Nightmare', 'emoji' => '☠️' ),
+			1 => array( 'label' => 'Easy',      'icon' => 'leaf',        'color' => '#4ade80' ),
+			2 => array( 'label' => 'Casual',    'icon' => 'coffee',      'color' => '#86efac' ),
+			3 => array( 'label' => 'Standard',  'icon' => 'crosshair',   'color' => '#adff00' ),
+			4 => array( 'label' => 'Hardcore',  'icon' => 'skull',       'color' => '#f97316' ),
+			5 => array( 'label' => 'Nightmare', 'icon' => 'skull',       'color' => '#ef4444' ),
 		);
 
 		$game_length_map = array(
-			1 => array( 'label' => 'Short',    'emoji' => '⚡' ),
-			2 => array( 'label' => 'Medium',   'emoji' => '⏱️' ),
-			3 => array( 'label' => 'Standard', 'emoji' => '📡' ),
-			4 => array( 'label' => 'Epic',     'emoji' => '🌐' ),
-			5 => array( 'label' => 'Endless',  'emoji' => '♾️' ),
+			1 => array( 'label' => 'Short',    'icon' => 'zap' ),
+			2 => array( 'label' => 'Medium',   'icon' => 'timer' ),
+			3 => array( 'label' => 'Standard', 'icon' => 'radio-tower' ),
+			4 => array( 'label' => 'Epic',     'icon' => 'globe' ),
+			5 => array( 'label' => 'Endless',  'icon' => 'infinity' ),
 		);
 
 		$gm_style_map = array(
-			'cinematic_heroic' => array( 'label' => 'Cinematic', 'emoji' => '🎬' ),
-			'harsh_grounded'   => array( 'label' => 'Harsh',     'emoji' => '🩸' ),
-			'fast_tactical'    => array( 'label' => 'Tactical',  'emoji' => '⚡' ),
+			'cinematic_heroic' => array( 'label' => 'Cinematic', 'icon' => 'clapperboard' ),
+			'harsh_grounded'   => array( 'label' => 'Harsh',     'icon' => 'droplets' ),
+			'fast_tactical'    => array( 'label' => 'Tactical',  'icon' => 'zap' ),
 		);
 
 		$priority_map = array(
-			1 => array( 'label' => 'Combat',    'emoji' => '⚔️' ),
-			2 => array( 'label' => 'Wealth',    'emoji' => '💰' ),
-			3 => array( 'label' => 'Discovery', 'emoji' => '🔍' ),
-			4 => array( 'label' => 'Relations', 'emoji' => '🤝' ),
-			5 => array( 'label' => 'Mix',       'emoji' => '🎲' ),
+			1 => array( 'label' => 'Combat',    'icon' => 'swords' ),
+			2 => array( 'label' => 'Wealth',    'icon' => 'coins' ),
+			3 => array( 'label' => 'Discovery', 'icon' => 'search' ),
+			4 => array( 'label' => 'Relations', 'icon' => 'handshake' ),
+			5 => array( 'label' => 'Mix',       'icon' => 'shuffle' ),
 		);
 
 		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
@@ -148,11 +148,10 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					$char_id  = $char_junction ? ( $char_junction['character_id'] ?? null ) : null;
 
 					$game_mode = isset( $c['game_mode'] ) ? (int) $c['game_mode'] : 1;
-					$mode_str  = 2 === $game_mode ? 'TEAM' : 'SOLO';
 					$is_team   = 2 === $game_mode;
+					$mode_str  = $is_team ? 'TEAM' : 'SOLO';
 					$join_code = isset( $c['join_code'] ) ? (string) $c['join_code'] : '';
 
-					// Descriptive fields.
 					$world_type_val  = isset( $c['world_type'] ) ? (int) $c['world_type'] : 0;
 					$game_length_val = isset( $c['game_length'] ) ? (int) $c['game_length'] : 0;
 					$gm_style_val    = isset( $c['gm_style'] ) ? (string) $c['gm_style'] : '';
@@ -163,12 +162,16 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					$gm_data       = ( $gm_style_val && isset( $gm_style_map[ $gm_style_val ] ) ) ? $gm_style_map[ $gm_style_val ] : null;
 					$priority_data = ( $priority_val && isset( $priority_map[ $priority_val ] ) ) ? $priority_map[ $priority_val ] : null;
 
-					$operative_name = 'PENDING ASSIGNMENT';
+					// Threat color for glow.
+					$threat_color = $threat_data ? $threat_data['color'] : '#adff00';
+
+					$operative_name  = 'PENDING ASSIGNMENT';
+					$operative_class = '';
+					$operative_race  = '';
 					if ( is_array( $char_rel ) ) {
-						$race  = isset( $char_rel['cyber_races']['name'] ) ? (string) $char_rel['cyber_races']['name'] : 'Unknown';
-						$class = isset( $char_rel['cyber_classes']['name'] ) ? (string) $char_rel['cyber_classes']['name'] : 'Agent';
-						$name  = isset( $char_rel['name'] ) ? (string) $char_rel['name'] : 'Unnamed';
-						$operative_name = esc_html( $name ) . " <small>[" . esc_html( $race ) . ' | ' . esc_html( $class ) . "]</small>";
+						$operative_race  = isset( $char_rel['cyber_races']['name'] ) ? (string) $char_rel['cyber_races']['name'] : '';
+						$operative_class = isset( $char_rel['cyber_classes']['name'] ) ? (string) $char_rel['cyber_classes']['name'] : '';
+						$operative_name  = isset( $char_rel['name'] ) ? (string) $char_rel['name'] : 'Unnamed';
 					}
 
 					$nodes_url  = '/nodes/?campaign_id=' . rawurlencode( $c_id_safe ) . '#tw-deployment-root';
@@ -191,46 +194,66 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					}
 					?>
 
-					<div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-campaign-card">
+					<div id="campaign-card-<?php echo esc_attr( $c_id_safe ); ?>" class="tw-campaign-card" style="--threat-color: <?php echo esc_attr( $threat_color ); ?>">
+						<div class="tw-card-scan-line"></div>
 
-						<!-- HEADER: world name + badges (length, threat, mode) -->
-						<div class="tw-campaign-card-header">
-							<div class="tw-campaign-header-left">
-								<div class="tw-campaign-world"><?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : 'NO WORLD ANCHORED'; ?></div>
-								<h3 class="tw-campaign-title"><?php echo $c_name; ?></h3>
+						<!-- TOP ROW: mode icon + world name + length/threat badges -->
+						<div class="tw-card-top">
+							<div class="tw-card-mode-icon" title="<?php echo esc_attr( $mode_str ); ?>">
+								<i data-lucide="<?php echo $is_team ? 'users' : 'user'; ?>" aria-label="<?php echo esc_attr( $mode_str ); ?>"></i>
 							</div>
-							<div class="tw-campaign-header-badges">
+							<div class="tw-card-world-name"><?php echo $world_rel ? esc_html( (string) ( $world_rel['name'] ?? '' ) ) : '<span class="tw-card-unset">NO WORLD</span>'; ?></div>
+							<div class="tw-card-top-badges">
 								<?php if ( $length_data ) : ?>
-									<span class="tw-hbadge tw-hbadge--length"><?php echo esc_html( $length_data['emoji'] . ' ' . $length_data['label'] ); ?></span>
+									<span class="tw-pill tw-pill--length" title="Length">
+										<i data-lucide="<?php echo esc_attr( $length_data['icon'] ); ?>"></i>
+										<?php echo esc_html( $length_data['label'] ); ?>
+									</span>
 								<?php endif; ?>
 								<?php if ( $threat_data ) : ?>
-									<span class="tw-hbadge tw-hbadge--threat"><?php echo esc_html( $threat_data['emoji'] . ' ' . $threat_data['label'] ); ?></span>
+									<span class="tw-pill tw-pill--threat" style="color: <?php echo esc_attr( $threat_data['color'] ); ?>; border-color: <?php echo esc_attr( $threat_data['color'] ); ?>33;" title="Threat">
+										<i data-lucide="<?php echo esc_attr( $threat_data['icon'] ); ?>"></i>
+										<?php echo esc_html( $threat_data['label'] ); ?>
+									</span>
 								<?php endif; ?>
-								<span class="tw-hbadge tw-hbadge--mode<?php echo $is_team ? ' is-team' : ''; ?>"><?php echo esc_html( $mode_str ); ?></span>
 							</div>
 						</div>
 
+						<!-- CAMPAIGN NAME -->
+						<h3 class="tw-card-title"><?php echo $c_name; ?></h3>
+
 						<!-- OPERATIVE -->
-						<div class="tw-campaign-meta">
-							<span><strong>OPERATIVE:</strong> <?php echo $operative_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+						<div class="tw-card-operative">
+							<i data-lucide="user-round" class="tw-card-operative-icon"></i>
+							<div class="tw-card-operative-info">
+								<?php if ( is_array( $char_rel ) ) : ?>
+									<span class="tw-card-operative-name"><?php echo esc_html( $operative_name ); ?></span>
+									<span class="tw-card-operative-meta"><?php echo esc_html( $operative_race ); ?><?php echo ( $operative_race && $operative_class ) ? ' · ' : ''; ?><?php echo esc_html( $operative_class ); ?></span>
+								<?php else : ?>
+									<span class="tw-card-operative-name tw-card-unset">PENDING ASSIGNMENT</span>
+								<?php endif; ?>
+							</div>
 						</div>
 
-						<!-- GM + PRIORITY inline row -->
+						<!-- GM STYLE + PRIORITY -->
 						<?php if ( $gm_data || $priority_data ) : ?>
-							<div class="tw-campaign-style-row">
+							<div class="tw-card-tags">
 								<?php if ( $gm_data ) : ?>
-									<span class="tw-style-item"><?php echo esc_html( $gm_data['emoji'] . ' ' . $gm_data['label'] ); ?></span>
-								<?php endif; ?>
-								<?php if ( $gm_data && $priority_data ) : ?>
-									<span class="tw-style-sep">|</span>
+									<span class="tw-tag">
+										<i data-lucide="<?php echo esc_attr( $gm_data['icon'] ); ?>"></i>
+										<?php echo esc_html( $gm_data['label'] ); ?>
+									</span>
 								<?php endif; ?>
 								<?php if ( $priority_data ) : ?>
-									<span class="tw-style-item"><?php echo esc_html( $priority_data['emoji'] . ' ' . $priority_data['label'] ); ?></span>
+									<span class="tw-tag">
+										<i data-lucide="<?php echo esc_attr( $priority_data['icon'] ); ?>"></i>
+										<?php echo esc_html( $priority_data['label'] ); ?>
+									</span>
 								<?php endif; ?>
 							</div>
 						<?php endif; ?>
 
-						<!-- TEAM join hash -->
+						<!-- TEAM HASH -->
 						<?php if ( $is_team && $join_code ) : ?>
 							<div class="tw-campaign-hash">
 								<span class="tw-campaign-hash-label">DEPLOYMENT HASH</span>
@@ -243,29 +266,21 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 							<?php echo $main_btn; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 							<?php if ( $is_team && $join_code ) : ?>
-								<button
-									type="button"
-									class="tw-btn tw-btn-ghost tw-copy-join-btn"
-									data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>"
-								>
+								<button type="button" class="tw-btn tw-btn-ghost tw-copy-join-btn" data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>">
 									COPY HASH
 								</button>
 							<?php endif; ?>
 
-							<button
-								type="button"
-								class="tw-btn tw-btn-danger tw-delete-campaign-btn"
-								data-id="<?php echo esc_attr( $c_id_safe ); ?>"
-								data-name="<?php echo esc_attr( $c_name_raw ); ?>"
-							>
+							<button type="button" class="tw-btn tw-btn-danger tw-delete-campaign-btn" data-id="<?php echo esc_attr( $c_id_safe ); ?>" data-name="<?php echo esc_attr( $c_name_raw ); ?>">
 								TERMINATE
 							</button>
 						</div>
 
-					</div>
+					</div><!-- .tw-campaign-card -->
 				<?php endforeach; ?>
 			</div>
 		</div>
+		<script>if(window.lucide&&typeof window.lucide.createIcons==='function'){window.lucide.createIcons();}</script>
 		<?php
 
 		return ob_get_clean();
