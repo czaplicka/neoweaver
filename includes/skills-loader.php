@@ -8,11 +8,16 @@ add_action( 'wp_enqueue_scripts', function () {
 		return;
 	}
 
+	$file_path = NW_PLUGIN_DIR . 'assets/js/public/skills-loader.js';
+	if ( ! file_exists( $file_path ) ) {
+		return;
+	}
+
 	wp_enqueue_script(
 		'tw-skills-loader',
-		NW_PLUGIN_DIR . 'assets/js/public/skills-loader.js',
+		NW_PLUGIN_URL . 'assets/js/public/skills-loader.js',
 		array(),
-		filemtime( NW_PLUGIN_DIR . 'assets/js/public/skills-loader.js' ),
+		filemtime( $file_path ),
 		true
 	);
 }, 35 );
