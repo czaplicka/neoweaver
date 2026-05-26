@@ -50,32 +50,32 @@ $total_power          = $args['total_power'];
 ?>
 
 <div class="tw-side-nav" id="twSideNav">
-	<button class="tw-nav-btn" data-tab="status" title="Status" type="button">
-		<span class="icon">🧬</span>
+	<button class="tw-nav-btn" data-tab="status" title="Status" aria-label="Status" type="button">
+		<i data-lucide="activity"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="inventory" title="Gear" type="button">
-		<span class="icon">🎒</span>
+	<button class="tw-nav-btn" data-tab="inventory" title="Gear" aria-label="Gear" type="button">
+		<i data-lucide="backpack"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="weavers" title="Weavers" type="button">
-		<span class="icon">🔮</span>
+	<button class="tw-nav-btn" data-tab="weavers" title="Weavers" aria-label="Weavers" type="button">
+		<i data-lucide="wand-sparkles"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="player_quests" title="Quests" type="button">
-		<span class="icon">📜</span>
+	<button class="tw-nav-btn" data-tab="player_quests" title="Quests" aria-label="Quests" type="button">
+		<i data-lucide="scroll-text"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="echo" title="Echo" type="button">
-		<span class="icon">💠</span>
+	<button class="tw-nav-btn" data-tab="echo" title="Echo" aria-label="Echo" type="button">
+		<i data-lucide="radio"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="logs" title="Logs" type="button">
-		<span class="icon">💾</span>
+	<button class="tw-nav-btn" data-tab="logs" title="Logs" aria-label="Logs" type="button">
+		<i data-lucide="terminal"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="player_notes" title="Notes" type="button">
-		<span class="icon">📝</span>
+	<button class="tw-nav-btn" data-tab="player_notes" title="Notes" aria-label="Notes" type="button">
+		<i data-lucide="notebook-pen"></i>
 	</button>
-	<button class="tw-nav-btn" data-tab="loom" title="Loom of Fate" type="button">
-		<span class="icon">🃏</span>
+	<button class="tw-nav-btn" data-tab="loom" title="Loom of Fate" aria-label="Loom of Fate" type="button">
+		<i data-lucide="layers"></i>
 	</button>
-		<button class="tw-nav-btn" data-tab="vechicles" title="Garage" type="button">
-		<span class="icon">C</span>
+	<button class="tw-nav-btn" data-tab="vehicles" title="Garage" aria-label="Garage" type="button">
+		<i data-lucide="car"></i>
 	</button>
 </div>
 
@@ -119,97 +119,27 @@ $total_power          = $args['total_power'];
 		<div class="tw-panel-scroll-area">
 
 			<div class="tw-tab-content active" id="status">
-				 <div class="tw-bars-block">
-					<!--<div class="tw-stat-bar-container">
-						<div class="tw-stat-label main-label">
-							<span>HEALTH</span>
-							<span><?php echo (int) $c_hp; ?>/<?php echo (int) $m_hp; ?></span>
-						</div>
-						<div class="tw-progress-bg big-bar bordered">
-							<div class="tw-progress-fill <?php echo esc_attr( $hp_class ); ?>" style="width:<?php echo esc_attr( $hp_p ); ?>%;"></div>
-						</div>
-					</div>
 
-					<div class="tw-stat-bar-container">
-						<div class="tw-stat-label main-label">
-							<span>ENERGY</span>
-							<span><?php echo (int) $c_mp; ?>/<?php echo (int) $m_mp; ?></span>
-						</div>
-						<div class="tw-progress-bg big-bar bordered">
-							<div class="tw-progress-fill mp-blue" style="width:<?php echo esc_attr( $mp_p ); ?>%;"></div>
-						</div>
-					</div>
+				<?php
+				$vitalis_args = array(
+					'c_hp'        => $c_hp,
+					'm_hp'        => $m_hp,
+					'c_mp'        => $c_mp,
+					'm_mp'        => $m_mp,
+					'sync_p'      => $sync_p,
+					'c_satiety'   => $c_satiety,
+					'c_hydration' => $c_hydration,
+					'c_rest'      => $c_rest,
+				);
 
-					<div class="tw-stat-bar-container">
-						<div class="tw-stat-label main-label">
-							<span>SYNC-RATE</span>
-							<span><?php echo (int) $sync_p; ?>%</span>
-						</div>
-						<div class="tw-progress-bg big-bar bordered glitch-border">
-							<div
-								class="tw-progress-fill <?php echo esc_attr( $sync_class ); ?>"
-								style="width:<?php echo (int) $sync_p; ?>%;"
-							></div>
-						</div>
-					</div>
+				$vitalis_partial = trailingslashit( NEOWEAVER_PLUGIN_DIR ) . 'templates/partials/character-vitalis.php';
 
-					<div class="tw-survival-bars">
-						<div class="tw-stat-bar-container small">
-							<div class="tw-stat-label small-label">
-								<span>SATIETY</span>
-								<span><?php echo (int) $c_satiety; ?>%</span>
-							</div>
-							<div class="tw-progress-bg small-bar">
-								<div class="tw-progress-fill satiety-orange" style="width:<?php echo (int) $c_satiety; ?>%;"></div>
-							</div>
-						</div>
+				if ( file_exists( $vitalis_partial ) ) {
+					$args = $vitalis_args;
+					include $vitalis_partial;
+				}
+				?>
 
-						<div class="tw-stat-bar-container small">
-							<div class="tw-stat-label small-label">
-								<span>HYDRATION</span>
-								<span><?php echo (int) $c_hydration; ?>%</span>
-							</div>
-							<div class="tw-progress-bg small-bar">
-								<div class="tw-progress-fill hydration-cyan" style="width:<?php echo (int) $c_hydration; ?>%;"></div>
-							</div>
-						</div>
-
-						<div class="tw-stat-bar-container small">
-							<div class="tw-stat-label small-label">
-								<span>REST</span>
-								<span><?php echo (int) $c_rest; ?>%</span>
-							</div>
-							<div class="tw-progress-bg small-bar">
-								<div class="tw-progress-fill rest-purple" style="width:<?php echo (int) $c_rest; ?>%;"></div>
-							</div>
-						</div> 
-					</div>-->
-				 
-				</div> 
-
-<?php
-$vitalis_args = array(
-    'c_hp'        => $c_hp,
-    'm_hp'        => $m_hp,
-    'c_mp'        => $c_mp,
-    'm_mp'        => $m_mp,
-    'sync_p'      => $sync_p,
-    'c_satiety'   => $c_satiety,
-    'c_hydration' => $c_hydration,
-    'c_rest'      => $c_rest,
-);
-
-// dostosuj ścieżkę do swojej struktury pluginu:
-$vitalis_partial = trailingslashit( NEOWEAVER_PLUGIN_DIR ) . 'templates/partials/character-vitalis.php';
-
-if ( file_exists( $vitalis_partial ) ) {
-    /** @var array $vitalis_args */
-    $args = $vitalis_args;
-    include $vitalis_partial;
-}
-?>
-
-				
 				<div class="tw-accordion-group">
 					<details>
 						<summary>Attributes</summary>
@@ -279,8 +209,8 @@ if ( file_exists( $vitalis_partial ) ) {
 			<div class="tw-tab-content" id="inventory">
 				<div class="equipment-container">
 
-					<div style="margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.5);border:1px solid #adff00;border-radius:8px;">
-						<div style="font-size:0.75rem;color:#adff00;margin-bottom:5px;font-weight:bold;letter-spacing:1px;">ESSENCES</div>
+					<div class="tw-essences-block">
+						<div class="tw-inv-title">ESSENCES</div>
 						<?php echo do_shortcode( '[tw_essences]' ); ?>
 					</div>
 
@@ -297,7 +227,7 @@ if ( file_exists( $vitalis_partial ) ) {
 							</span>
 						</div>
 
-						<img src="https://cyber.nieodparady.pl/wp-content/uploads/2026/01/postac.png" class="char-bg" alt="Character">
+						<img src="https://cyber.nieodparady.pl/wp-content/uploads/2026/01/postac.png" class="char-bg" alt="Character" width="300" height="420" loading="lazy">
 
 						<div class="inv-slot" data-slot="head" style="top:0%;left:50%;transform:translateX(-50%);">
 							<span class="slot-label">HEAD</span><div class="item-icon"></div>
@@ -315,7 +245,7 @@ if ( file_exists( $vitalis_partial ) ) {
 							<span class="slot-label">POUCH</span><div class="item-icon"></div>
 						</div>
 						<div class="belt-section">
-							<span style="font-size:0.5rem;letter-spacing:1px;">UTILITY BELT</span>
+							<span class="belt-label">UTILITY BELT</span>
 							<div class="belt-slots">
 								<div class="inv-slot tiny" data-slot="belt_1"><div class="item-icon"></div></div>
 								<div class="inv-slot tiny" data-slot="belt_2"><div class="item-icon"></div></div>
@@ -339,11 +269,9 @@ if ( file_exists( $vitalis_partial ) ) {
 						</div>
 					</div>
 
-					<div id="tw-inventory-app" style="margin-top:20px;">
-						<h4 class="tw-inv-title" style="font-size:0.8rem;border-bottom:1px solid #adff00;padding-bottom:5px;">
-							CARRIED ITEMS
-						</h4>
-						<div id="tw-inventory-list" class="tw-item-list" style="min-height:50px;">
+					<div id="tw-inventory-app">
+						<h4 class="tw-inv-title">CARRIED ITEMS</h4>
+						<div id="tw-inventory-list" class="tw-item-list">
 							<?php foreach ( $inventory as $r ) : ?>
 								<?php
 								$it = $r['info'] ?? null;
@@ -356,13 +284,12 @@ if ( file_exists( $vitalis_partial ) ) {
 									draggable="true"
 									data-inventory-id="<?php echo esc_attr( $r['id'] ); ?>"
 									data-item-slot="<?php echo esc_attr( $it['slot'] ?? '' ); ?>"
-									style="background:rgba(255,255,255,0.05);margin-bottom:2px;padding:5px;cursor:grab;"
 								>
-									<span class="tw-item-name" style="font-size:0.85rem;">
+									<span class="tw-item-name">
 										<?php echo esc_html( $it['name'] ); ?>
-										<small style="opacity:0.6;"> x<?php echo (int) $r['quantity']; ?></small>
+										<small class="tw-item-qty">x<?php echo (int) $r['quantity']; ?></small>
 										<?php if ( isset( $it['mass'] ) ) : ?>
-											<small style="float:right;color:#adff00;"><?php echo esc_html( $it['mass'] ); ?> kg</small>
+											<small class="tw-item-mass"><?php echo esc_html( $it['mass'] ); ?> kg</small>
 										<?php endif; ?>
 									</span>
 								</div>
@@ -374,9 +301,7 @@ if ( file_exists( $vitalis_partial ) ) {
 			</div>
 
 			<div class="tw-tab-content" id="player_quests">
-				<div class="tw-gold-hud">
-					<div class="tw-gold-label">MISSIONS</div>
-				</div>
+				<div class="tw-inv-title">MISSIONS</div>
 				<?php echo do_shortcode( '[active_scenarios]' ); ?>
 			</div>
 
@@ -384,34 +309,43 @@ if ( file_exists( $vitalis_partial ) ) {
 				<div class="tw-logs-list">
 					<?php if ( empty( $logs_data ) ) : ?>
 						<p class="tw-bio-text">Logs empty.</p>
+					<?php else : ?>
+						<?php foreach ( $logs_data as $log ) : ?>
+							<?php
+							$log_date = '';
+							if ( ! empty( $log['created_at'] ) ) {
+								$ts = is_numeric( $log['created_at'] )
+									? (int) $log['created_at']
+									: strtotime( $log['created_at'] );
+								$log_date = ( false !== $ts && $ts > 0 ) ? date( 'd.m.Y H:i', $ts ) : '';
+							}
+							?>
+							<div class="tw-log-entry">
+								<?php if ( $log_date ) : ?>
+									<small class="tw-log-date"><?php echo esc_html( $log_date ); ?></small>
+								<?php endif; ?>
+								<p class="tw-log-text">
+									<?php echo nl2br( esc_html( $log['log'] ?? '' ) ); ?>
+								</p>
+							</div>
+						<?php endforeach; ?>
 					<?php endif; ?>
-
-					<?php foreach ( $logs_data as $log ) : ?>
-						<?php
-						$log_date = '';
-						if ( ! empty( $log['created_at'] ) ) {
-							$ts = is_numeric( $log['created_at'] )
-								? (int) $log['created_at']
-								: strtotime( $log['created_at'] );
-							$log_date = ( false !== $ts && $ts > 0 ) ? date( 'd.m.Y H:i', $ts ) : '';
-						}
-						?>
-						<div class="tw-log-entry">
-							<?php if ( $log_date ) : ?>
-								<small class="tw-log-date"><?php echo esc_html( $log_date ); ?></small>
-							<?php endif; ?>
-							<p class="tw-log-text">
-								<?php echo nl2br( esc_html( $log['log'] ?? '' ) ); ?>
-							</p>
-						</div>
-					<?php endforeach; ?>
 				</div>
 			</div>
 
 			<div class="tw-tab-content" id="player_notes">
 				<div class="tw-notes-tab-container">
-					<textarea class="tw-notes-area" id="twNotesField" placeholder="Enter notes..."><?php echo esc_textarea( $char_data['notes'] ?? '' ); ?></textarea>
-					<button class="tw-save-notes-btn" id="twSaveNotes" type="button" data-char-id="<?php echo esc_attr( (string) $char_id ); ?>">SYNC DATA</button>
+					<textarea
+						class="tw-notes-area"
+						id="twNotesField"
+						placeholder="Enter notes..."
+					><?php echo esc_textarea( $char_data['notes'] ?? '' ); ?></textarea>
+					<button
+						class="tw-save-notes-btn"
+						id="twSaveNotes"
+						type="button"
+						data-char-id="<?php echo esc_attr( (string) $char_id ); ?>"
+					>SYNC DATA</button>
 				</div>
 			</div>
 
@@ -421,13 +355,13 @@ if ( file_exists( $vitalis_partial ) ) {
 
 			<div class="tw-tab-content" id="weavers">
 				<?php echo do_shortcode( '[tw_weaver_list]' ); ?>
-
 			</div>
 
 			<div class="tw-tab-content" id="loom">
 				<?php echo do_shortcode( '[tw_loom_of_fate]' ); ?>
 			</div>
-			<div class="tw-tab-content" id="vechicles">
+
+			<div class="tw-tab-content" id="vehicles">
 				<?php echo do_shortcode( '[neoweave_vehicle_panel]' ); ?>
 			</div>
 
