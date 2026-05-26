@@ -41,7 +41,7 @@ class NW_Action_Tags_Admin {
         add_submenu_page(
             'neoweaver',
             __( 'Action Tags', 'neoweaver' ),
-            __( 'Action Tags', 'neoweaver' ),
+            __( '<span data-lucide-menu="activity"></span> Action Tags', 'neoweaver' ),
             'manage_options',
             'nw-action-tags',
             [ $this, 'render_page' ]
