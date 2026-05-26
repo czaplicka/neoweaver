@@ -458,7 +458,8 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 // fetch_foundry_data()
 // Zwraca karty gracza z ich poziomem i liczbą duplikatów.
 // Potrzebne dla shortcode [cyber_foundry].
-// Używa: cyber_character_cards JOIN cyber_cards
+// Używa: cyber_character_deck JOIN cyber_deck
+// Duplikaty = wiele wierszy z tym samym deck_id dla tej postaci.
 // ============================================================
 
 if ( ! function_exists( 'fetch_foundry_data' ) ) {
@@ -469,32 +470,52 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 			return new WP_Error( 'tw_foundry', 'Invalid character_id.' );
 		}
 
-		$result = tw_supabase_get_admin(
-			'cyber_character_cards',
+		$rows = tw_supabase_get_admin(
+			'cyber_character_deck',
 			[
-				'character_id'  => 'eq.' . $safe_id,
-				'select'        => 'instance_id,level,duplicate_count,cyber_cards(name)',
-				'order'         => 'level.asc',
+				'character_id' => 'eq.' . $safe_id,
+				'select'       => 'id,deck_id,current_level,cyber_deck(name)',
+				'order'        => 'deck_id.asc',
 			]
 		);
 
-		if ( is_wp_error( $result ) ) {
-			error_log( 'TW fetch_foundry_data error: ' . $result->get_error_message() );
-			return $result;
+		if ( is_wp_error( $rows ) ) {
+			error_log( 'TW fetch_foundry_data error: ' . $rows->get_error_message() );
+			return $rows;
 		}
 
-		// Spłaszcz: dodaj name z join bezpośrednio do obiektu.
-		$cards = [];
-		foreach ( $result as $row ) {
+		if ( ! is_array( $rows ) ) {
+			return [];
+		}
+
+		// Grupuj po deck_id — pierwsza karta = instancja do upgrade, reszta = duplikaty.
+		$grouped = [];
+		foreach ( $rows as $row ) {
+			$deck_id = (int) ( $row['deck_id'] ?? 0 );
+			if ( ! isset( $grouped[ $deck_id ] ) ) {
+				$grouped[ $deck_id ] = [
+					'instance_id'     => (string) ( $row['id'] ?? '' ),
+					'name'            => (string) ( $row['cyber_deck']['name'] ?? '[UNKNOWN]' ),
+					'level'           => (int) ( $row['current_level'] ?? 1 ),
+					'duplicate_count' => 0,
+				];
+			} else {
+				$grouped[ $deck_id ]['duplicate_count']++;
+			}
+		}
+
+		// Mapuj na obiekty których oczekuje shortcode.
+		$result = [];
+		foreach ( $grouped as $item ) {
 			$obj                  = new stdClass();
-			$obj->instance_id     = $row['instance_id'] ?? '';
-			$obj->level           = (int) ( $row['level'] ?? 1 );
-			$obj->duplicate_count = (int) ( $row['duplicate_count'] ?? 0 );
-			$obj->name            = $row['cyber_cards']['name'] ?? '[UNKNOWN]';
-			$cards[]              = $obj;
+			$obj->instance_id     = $item['instance_id'];
+			$obj->name            = $item['name'];
+			$obj->level           = $item['level'];
+			$obj->duplicate_count = $item['duplicate_count'];
+			$result[]             = $obj;
 		}
 
-		return $cards;
+		return $result;
 	}
 }
 
