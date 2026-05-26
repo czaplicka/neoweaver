@@ -584,5 +584,3 @@ class NW_Classes_Admin {
         <?php
     }
 }
-
-new NW_Classes_Admin();
