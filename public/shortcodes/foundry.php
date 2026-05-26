@@ -1,6 +1,18 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+// SVG badge-cent (Lucide) — używane w kilku miejscach.
+define(
+	'NW_ICON_GOLD',
+	'<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"'
+	. ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"'
+	. ' stroke-linejoin="round" class="nw-icon-gold" aria-hidden="true">'
+	. '<circle cx="12" cy="12" r="10"/>'
+	. '<path d="M14.5 9a3.5 3.5 0 0 0-5 0v6a3.5 3.5 0 0 0 5 0"/>'
+	. '<path d="M12 6v2m0 8v2"/>'
+	. '</svg>'
+);
+
 // ============================================================
 // AJAX: zwróć karty Foundry dla wybranej postaci
 // ============================================================
@@ -18,7 +30,6 @@ if ( ! function_exists( 'nw_foundry_get_cards_ajax' ) ) {
 			return;
 		}
 
-		// Weryfikacja — postać należy do usera.
 		if ( ! function_exists( 'tw_user_owns_character' ) || ! tw_user_owns_character( $character_id, $user_id ) ) {
 			wp_send_json_error( 'Access denied.', 403 );
 			return;
@@ -80,16 +91,14 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 			return '<div class="foundry-container">ERROR: CREDIT HELPER NOT AVAILABLE.</div>';
 		}
 
-		// Pobierz wszystkie postaci usera.
 		$characters = get_cyber_characters_by_wp_id( $user_id );
 
 		if ( empty( $characters ) ) {
 			return '<div class="foundry-container">ERROR: NO FIELD AGENT DETECTED.</div>';
 		}
 
-		// Domyślnie pierwsza postać.
-		$character_id   = (string) ( $characters[0]['id'] ?? '' );
-		$library_cards  = fetch_foundry_data( $character_id );
+		$character_id  = (string) ( $characters[0]['id'] ?? '' );
+		$library_cards = fetch_foundry_data( $character_id );
 
 		if ( is_wp_error( $library_cards ) ) {
 			$library_cards = [];
@@ -101,6 +110,7 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 		$current_player_credits = (int) get_cyber_player_credits( $character_id );
 		$nonce                  = wp_create_nonce( 'cyber_foundry_upgrade' );
 		$uid                    = 'foundry_' . wp_generate_uuid4();
+		$icon                   = NW_ICON_GOLD;
 
 		if ( function_exists( 'tw_enqueue_foundry_assets' ) ) {
 			tw_enqueue_foundry_assets( [
@@ -138,16 +148,19 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 			<?php endif; ?>
 
 			<div class="foundry-credits" data-credits-display="1">
-				CREDITS: <span class="credits-value"><?php echo esc_html( (string) $current_player_credits ); ?></span> CC
+				GOLD: <span class="credits-value"><?php echo esc_html( (string) $current_player_credits ); ?></span>
+				<?php echo $icon; // phpcs:ignore WordPress.Security.EscapeOutput ?>
 			</div>
 
 			<div class="foundry-grid" data-foundry-grid="1">
-				<?php echo nw_foundry_render_cards( $library_cards, $current_player_credits ); ?>
+				<?php echo nw_foundry_render_cards( $library_cards, $current_player_credits ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 			</div>
 		</div>
 
 		<script>
 		(function(){
+			const ICON_GOLD = <?php echo wp_json_encode( NW_ICON_GOLD ); ?>;
+
 			const root = document.getElementById( <?php echo wp_json_encode( $uid ); ?> );
 			if ( ! root ) return;
 
@@ -196,7 +209,7 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 					const hasCredits = credits >= cost;
 					const canUpgrade = hasDupes && hasCredits;
 					const progress   = Math.min( 100, Math.max( 0, ( dupes / needed ) * 100 ) );
-					const btnLabel   = ! hasDupes ? 'NEED MORE DATA' : ( ! hasCredits ? 'INSUFFICIENT CC' : 'START FUSION' );
+					const btnLabel   = ! hasDupes ? 'NEED MORE DATA' : ( ! hasCredits ? 'INSUFFICIENT GOLD' : 'START FUSION' );
 					const instId     = card.instance_id || '';
 					if ( ! instId ) return '';
 					return `<div class="foundry-item ${ canUpgrade ? 'ready' : '' }">
@@ -207,7 +220,7 @@ if ( ! function_exists( 'cyber_foundry_shortcode' ) ) {
 						<div class="upgrade-info">
 							<div class="progress-bar"><div class="progress-fill" style="width:${ progress }%"></div></div>
 							<span class="count-text">DATA NODES: ${ dupes } / ${ needed }</span>
-							<div class="credit-cost ${ hasCredits ? '' : 'insufficient' }">COST: ${ cost } CC</div>
+							<div class="credit-cost ${ hasCredits ? '' : 'insufficient' }">COST: ${ cost } ${ ICON_GOLD }</div>
 						</div>
 						<button class="upgrade-btn" type="button"
 							data-action="upgrade-card"
@@ -238,7 +251,9 @@ if ( ! function_exists( 'nw_foundry_render_cards' ) ) {
 			return '<p class="buffer-empty">NO DATA NODES DETECTED IN ARCHIVE.</p>';
 		}
 
-		$out = '';
+		$icon = NW_ICON_GOLD;
+		$out  = '';
+
 		foreach ( $cards as $card ) {
 			$level      = max( 1, (int) ( $card->level ?? 1 ) );
 			$name       = esc_html( (string) ( $card->name ?? '[UNKNOWN CARD]' ) );
@@ -246,13 +261,13 @@ if ( ! function_exists( 'nw_foundry_render_cards' ) ) {
 			$inst_id    = (string) ( $card->instance_id ?? '' );
 			if ( '' === $inst_id ) continue;
 
-			$needed     = max( 1, $level * 2 );
-			$cost       = $level * 100;
-			$has_dupes  = $dupes >= $needed;
-			$has_creds  = $credits >= $cost;
-			$can_up     = $has_dupes && $has_creds;
-			$progress   = max( 0, min( 100, ( $dupes / $needed ) * 100 ) );
-			$btn_label  = ! $has_dupes ? 'NEED MORE DATA' : ( ! $has_creds ? 'INSUFFICIENT CC' : 'START FUSION' );
+			$needed    = max( 1, $level * 2 );
+			$cost      = $level * 100;
+			$has_dupes = $dupes >= $needed;
+			$has_creds = $credits >= $cost;
+			$can_up    = $has_dupes && $has_creds;
+			$progress  = max( 0, min( 100, ( $dupes / $needed ) * 100 ) );
+			$btn_label = ! $has_dupes ? 'NEED MORE DATA' : ( ! $has_creds ? 'INSUFFICIENT GOLD' : 'START FUSION' );
 
 			$out .= '<div class="foundry-item ' . ( $can_up ? 'ready' : '' ) . '">';
 			$out .= '<div class="card-preview">';
@@ -262,7 +277,8 @@ if ( ! function_exists( 'nw_foundry_render_cards' ) ) {
 			$out .= '<div class="upgrade-info">';
 			$out .= '<div class="progress-bar"><div class="progress-fill" style="width:' . esc_attr( (string) $progress ) . '%"></div></div>';
 			$out .= '<span class="count-text">DATA NODES: ' . esc_html( (string) $dupes ) . ' / ' . esc_html( (string) $needed ) . '</span>';
-			$out .= '<div class="credit-cost ' . ( $has_creds ? '' : 'insufficient' ) . '">COST: ' . esc_html( (string) $cost ) . ' CC</div>';
+			// phpcs:ignore WordPress.Security.EscapeOutput -- $icon is a hardcoded SVG constant
+			$out .= '<div class="credit-cost ' . ( $has_creds ? '' : 'insufficient' ) . '">COST: ' . esc_html( (string) $cost ) . ' ' . $icon . '</div>';
 			$out .= '</div>';
 			$out .= '<button class="upgrade-btn" type="button"';
 			$out .= ' data-action="upgrade-card"';
