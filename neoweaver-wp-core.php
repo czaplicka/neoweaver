@@ -111,9 +111,7 @@ final class NeoWeaver_Core {
 			'includes/shortcodes-tags.php',
 
 			'public/class-public.php',
-		];
 
-		$frontend_only = [
 			// Frontend assets.
 			'includes/assets/vendors.php',
 			'includes/assets/adventure.php',
