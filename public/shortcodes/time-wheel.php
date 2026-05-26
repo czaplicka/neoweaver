@@ -13,7 +13,7 @@ if ( ! function_exists( 'neoweaver_render_time_wheel' ) ) {
 			return '';
 		}
 
-		if ( ! function_exists( 'tw_supabase_anon_key' ) || ! tw_supabase_anon_key() ) {
+		if ( ! function_exists( 'tw_supabase_service_key' ) || ! tw_supabase_service_key() ) {
 			return '';
 		}
 
@@ -22,21 +22,27 @@ if ( ! function_exists( 'neoweaver_render_time_wheel' ) ) {
 		}
 
 		$supabase_url = tw_supabase_url();
-		$anon_key     = tw_supabase_anon_key();
+		$service_key  = tw_supabase_service_key();
 		$game_data    = get_user_game_data_from_supabase( $wp_user_id );
 
+		// active_campaign_id is a UUID — keep it as a string, never cast to (int)
 		$campaign_id = ( is_array( $game_data ) && ! empty( $game_data['active_campaign_id'] ) )
-			? (int) $game_data['active_campaign_id']
-			: 1;
+			? (string) $game_data['active_campaign_id']
+			: '';
 
-		$url = trailingslashit( $supabase_url ) . 'rest/v1/cyber_world_state?campaign_id=eq.' . rawurlencode( (string) $campaign_id );
+		if ( '' === $campaign_id ) {
+			return '';
+		}
 
+		$url = trailingslashit( $supabase_url ) . 'rest/v1/cyber_world_state?campaign_id=eq.' . rawurlencode( $campaign_id );
+
+		// Server-side read: use service key so RLS does not block the request
 		$response = wp_remote_get(
 			$url,
 			array(
 				'headers' => array(
-					'apikey'        => $anon_key,
-					'Authorization' => 'Bearer ' . $anon_key,
+					'apikey'        => $service_key,
+					'Authorization' => 'Bearer ' . $service_key,
 				),
 				'timeout' => 15,
 			)
@@ -55,8 +61,8 @@ if ( ! function_exists( 'neoweaver_render_time_wheel' ) ) {
 		if ( empty( $body ) || ! is_array( $body ) || ! isset( $body[0] ) || ! is_array( $body[0] ) ) {
 			return sprintf(
 				'<div id="tw-clock-container" data-campaign-id="%s">No time data for campaign %s</div>',
-				esc_attr( (string) $campaign_id ),
-				esc_html( (string) $campaign_id )
+				esc_attr( $campaign_id ),
+				esc_html( $campaign_id )
 			);
 		}
 
@@ -88,7 +94,7 @@ if ( ! function_exists( 'neoweaver_render_time_wheel' ) ) {
 			tw_enqueue_time_wheel_assets(
 				array(
 					'supabaseUrl' => $supabase_url,
-					'anonKey'     => $anon_key,
+					'anonKey'     => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 					'campaignId'  => $campaign_id,
 					'initialHour' => $hour,
 					'season'      => $season,
@@ -103,7 +109,7 @@ if ( ! function_exists( 'neoweaver_render_time_wheel' ) ) {
 
 		ob_start();
 		?>
-		<div id="tw-clock-container" data-campaign-id="<?php echo esc_attr( (string) $campaign_id ); ?>">
+		<div id="tw-clock-container" data-campaign-id="<?php echo esc_attr( $campaign_id ); ?>">
 			<div class="tw-clock-wrapper" style="--season-color: <?php echo esc_attr( $season_color ); ?>;">
 				<div class="tw-pointer">▼</div>
 
