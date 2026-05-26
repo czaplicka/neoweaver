@@ -39,11 +39,6 @@ if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
 	}
 }
 
-// ============================================================
-// tw_supabase_get() — GET zapytania (anon key, respektuje RLS)
-// Zwraca: array przy sukcesie, WP_Error przy błędzie sieci lub HTTP ≥ 300
-// ============================================================
-
 if ( ! function_exists( 'tw_supabase_get' ) ) {
 	function tw_supabase_get( string $endpoint, array $query = [], array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
@@ -71,7 +66,6 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 			'Authorization' => 'Bearer ' . $anon_key,
 		];
 
-		// Merge nagłówków: extra_args['headers'] nadpisuje/rozszerza domyślne.
 		$merged_headers = array_merge(
 			$default_headers,
 			(array) ( $extra_args['headers'] ?? [] )
@@ -83,7 +77,7 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 				'sslverify' => true,
 			],
 			$extra_args,
-			[ 'headers' => $merged_headers ] // headers zawsze po merge
+			[ 'headers' => $merged_headers ]
 		);
 
 		if ( ! is_numeric( $args['timeout'] ?? null ) ) {
@@ -113,13 +107,6 @@ if ( ! function_exists( 'tw_supabase_get' ) ) {
 	}
 }
 
-// ============================================================
-// tw_supabase_get_admin() — GET z SERVICE KEY (omija RLS)
-// Używaj tylko po stronie serwera: security guards, ownership checks,
-// admin lookups. Nigdy nie wysyłaj service key do przeglądarki.
-// Zwraca: array przy sukcesie, WP_Error przy błędzie
-// ============================================================
-
 if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 	function tw_supabase_get_admin( string $endpoint, array $query = [] ) {
 		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
@@ -140,14 +127,6 @@ if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 	}
 }
 
-// ============================================================
-// tw_supabase_request() — POST / PATCH / PUT / DELETE
-// Wymaga SERVICE KEY — fail-fast jeśli nie jest skonfigurowany.
-// Aby użyć anon key, przekaż headers w $extra_args.
-// Zwraca: WP_Error przy błędzie sieci lub HTTP ≥ 300
-//         ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
-// ============================================================
-
 if ( ! function_exists( 'tw_supabase_request' ) ) {
 	function tw_supabase_request( string $method, string $endpoint, array $query = [], $body = null, array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
@@ -160,7 +139,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 			return new WP_Error( 'tw_supabase_args', 'tw_supabase_request: empty endpoint.' );
 		}
 
-		// Fail-fast: service key jest wymagany dla operacji zapisu.
 		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) || ! TW_SUPABASE_SERVICE_KEY ) {
 			error_log( 'TW tw_supabase_request: TW_SUPABASE_SERVICE_KEY not configured. Refusing ' . $method . ' ' . $endpoint . '.' );
 			return new WP_Error( 'tw_supabase_config', 'TW_SUPABASE_SERVICE_KEY not configured.' );
@@ -230,10 +208,6 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 	}
 }
 
-// ============================================================
-// tw_supabase_rpc() — wywołanie funkcji Postgres przez RPC
-// ============================================================
-
 if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 	function tw_supabase_rpc( string $function_name, array $params = [], array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
@@ -302,10 +276,6 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 	}
 }
 
-// ============================================================
-// tw_get_data() — stary helper kompatybilności
-// ============================================================
-
 if ( ! function_exists( 'tw_get_data' ) ) {
 	function tw_get_data( string $url, array $args = [] ): array {
 		$args = array_merge(
@@ -326,10 +296,6 @@ if ( ! function_exists( 'tw_get_data' ) ) {
 		return json_decode( wp_remote_retrieve_body( $response ), true ) ?: [];
 	}
 }
-
-// ============================================================
-// get_character_equipped_items()
-// ============================================================
 
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
 	function get_character_equipped_items( string $character_id ): array {
@@ -352,10 +318,6 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 		return is_wp_error( $result ) ? [] : $result;
 	}
 }
-
-// ============================================================
-// tw_save_user_setting() — SERVICE KEY (pomija RLS)
-// ============================================================
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
@@ -385,10 +347,6 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	}
 }
 
-// ============================================================
-// tw_get_user_setting() — SERVICE KEY przez tw_supabase_get_admin()
-// ============================================================
-
 if ( ! function_exists( 'tw_get_user_setting' ) ) {
 	function tw_get_user_setting( int $wp_user_id, string $key ): ?string {
 		$result = tw_supabase_get_admin(
@@ -409,10 +367,6 @@ if ( ! function_exists( 'tw_get_user_setting' ) ) {
 		return $result[0]['value'] ?? null;
 	}
 }
-
-// ============================================================
-// AJAX: tw_ajax_save_user_setting
-// ============================================================
 
 add_action( 'wp_ajax_tw_save_user_setting', 'tw_ajax_save_user_setting' );
 
@@ -445,9 +399,6 @@ if ( ! function_exists( 'tw_ajax_save_user_setting' ) ) {
 	}
 }
 
-/**
- * Sprawdza czy postać należy do zalogowanego usera.
- */
 if ( ! function_exists( 'tw_user_owns_character' ) ) {
 	function tw_user_owns_character( string $char_id, int $user_id ): bool {
 		if ( empty( $char_id ) || $user_id <= 0 ) {
@@ -475,9 +426,8 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 
 // ============================================================
 // get_cyber_character_id_by_wp_id()
-// Zwraca character_id (string UUID) dla zalogowanego WP usera.
-// Używa SERVICE KEY — konieczne gdy RLS blokuje anon key.
-// Zdefiniowane tutaj globalnie, żeby shortcodes i AJAX miały dostęp.
+// Zwraca character_id (UUID) dla WP usera. Globalnie dostępna
+// dla shortcodes i AJAX (była tylko w buffer.php).
 // ============================================================
 
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
@@ -501,5 +451,79 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 
 		$id = $result[0]['id'] ?? '';
 		return is_string( $id ) ? $id : '';
+	}
+}
+
+// ============================================================
+// fetch_foundry_data()
+// Zwraca karty gracza z ich poziomem i liczbą duplikatów.
+// Potrzebne dla shortcode [cyber_foundry].
+// Używa: cyber_character_cards JOIN cyber_cards
+// ============================================================
+
+if ( ! function_exists( 'fetch_foundry_data' ) ) {
+	function fetch_foundry_data( string $character_id ) {
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+
+		if ( empty( $safe_id ) ) {
+			return new WP_Error( 'tw_foundry', 'Invalid character_id.' );
+		}
+
+		$result = tw_supabase_get_admin(
+			'cyber_character_cards',
+			[
+				'character_id'  => 'eq.' . $safe_id,
+				'select'        => 'instance_id,level,duplicate_count,cyber_cards(name)',
+				'order'         => 'level.asc',
+			]
+		);
+
+		if ( is_wp_error( $result ) ) {
+			error_log( 'TW fetch_foundry_data error: ' . $result->get_error_message() );
+			return $result;
+		}
+
+		// Spłaszcz: dodaj name z join bezpośrednio do obiektu.
+		$cards = [];
+		foreach ( $result as $row ) {
+			$obj                  = new stdClass();
+			$obj->instance_id     = $row['instance_id'] ?? '';
+			$obj->level           = (int) ( $row['level'] ?? 1 );
+			$obj->duplicate_count = (int) ( $row['duplicate_count'] ?? 0 );
+			$obj->name            = $row['cyber_cards']['name'] ?? '[UNKNOWN]';
+			$cards[]              = $obj;
+		}
+
+		return $cards;
+	}
+}
+
+// ============================================================
+// get_cyber_player_credits()
+// Zwraca ilość kredytów (CC) gracza dla danej postaci.
+// ============================================================
+
+if ( ! function_exists( 'get_cyber_player_credits' ) ) {
+	function get_cyber_player_credits( string $character_id ): int {
+		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+
+		if ( empty( $safe_id ) ) {
+			return 0;
+		}
+
+		$result = tw_supabase_get_admin(
+			'cyber_characters',
+			[
+				'id'     => 'eq.' . $safe_id,
+				'select' => 'credits',
+				'limit'  => 1,
+			]
+		);
+
+		if ( is_wp_error( $result ) || empty( $result ) ) {
+			return 0;
+		}
+
+		return (int) ( $result[0]['credits'] ?? 0 );
 	}
 }
