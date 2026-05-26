@@ -1,0 +1,286 @@
+:root { --neon: #adff00; --dark: #0a0a0a; --gray: #151515; }
+
+/* ── WRAPPER ── */
+.tw-campaigns-wrap {
+	font-family: 'Chakra Petch', sans-serif;
+}
+
+/* ── EMPTY STATE ── */
+.tw-campaigns-empty {
+	text-align: center;
+	padding: 100px 0;
+	font-family: 'Chakra Petch', sans-serif;
+}
+.tw-campaigns-empty-icon {
+	font-size: 40px;
+	margin-bottom: 20px;
+	opacity: 0.3;
+	line-height: 1;
+}
+.tw-campaigns-empty-main {
+	font-size: 1rem;
+	color: #adff00;
+	margin: 0 0 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.tw-campaigns-empty-sub {
+	display: block;
+	font-size: 0.85rem;
+	color: #fff;
+	margin: 0 0 28px;
+}
+.tw-campaigns-empty-actions { display: flex; justify-content: center; }
+.tw-campaigns-empty-actions .tw-btn-sync {
+	display: inline-block;
+	background: #adff00;
+	color: #000 !important;
+	border: none;
+	padding: 10px 22px;
+	font-weight: 900;
+	border-radius: 4px;
+	cursor: pointer;
+	text-transform: uppercase;
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 11px;
+	letter-spacing: 0.05em;
+	text-decoration: none;
+	transition: background 0.2s, box-shadow 0.2s;
+}
+.tw-campaigns-empty-actions .tw-btn-sync:hover {
+	background: #fff;
+	box-shadow: 0 0 15px #adff00;
+	color: #000 !important;
+}
+
+/* ── GRID ── */
+.tw-campaigns-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+	gap: 20px;
+	font-family: 'Chakra Petch', sans-serif;
+}
+
+/* ── CARD ── */
+.tw-campaign-card {
+	background: var(--dark);
+	border: 1px solid rgba(173,255,0,0.2);
+	padding: 18px;
+	color: white;
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	transition: border-color 0.2s, box-shadow 0.2s;
+}
+.tw-campaign-card:hover {
+	border-color: rgba(173,255,0,0.5);
+	box-shadow: 0 0 18px rgba(173,255,0,0.08);
+}
+
+/* ── CARD HEADER ── */
+.tw-campaign-card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 10px;
+}
+.tw-campaign-title {
+	font-size: 1rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #fff;
+	margin: 0;
+	line-height: 1.3;
+}
+.tw-campaign-status {
+	flex-shrink: 0;
+	font-size: 9px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	padding: 3px 8px;
+	border: 1px solid;
+}
+.tw-campaign-status.active    { color: var(--neon); border-color: var(--neon); }
+.tw-campaign-status.paused    { color: #ffaa00; border-color: #ffaa00; }
+.tw-campaign-status.completed { color: #888; border-color: #444; }
+
+/* ── META ROW ── */
+.tw-campaign-meta {
+	display: flex;
+	gap: 16px;
+	font-size: 10px;
+	text-transform: uppercase;
+	color: #888;
+	letter-spacing: 0.05em;
+	border-top: 1px solid #1e1e1e;
+	padding-top: 10px;
+}
+.tw-campaign-meta span { display: flex; align-items: center; gap: 4px; }
+.tw-campaign-meta strong { color: var(--neon); }
+
+/* ── WORLD BADGE ── */
+.tw-campaign-world {
+	font-size: 10px;
+	text-transform: uppercase;
+	color: var(--neon);
+	opacity: 0.8;
+	letter-spacing: 0.05em;
+}
+
+/* ── DESCRIPTION ── */
+.tw-campaign-desc {
+	font-size: 0.82rem;
+	color: #aaa;
+	line-height: 1.5;
+	margin: 0;
+}
+
+/* ── MODE BADGE ── */
+.tw-campaign-mode {
+	display: inline-block;
+	font-size: 9px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	padding: 2px 8px;
+	border: 1px solid rgba(173,255,0,0.4);
+	color: var(--neon);
+	width: fit-content;
+}
+.tw-campaign-mode.multiplayer {
+	border-color: rgba(0,200,255,0.4);
+	color: #00c8ff;
+}
+
+/* ── PLAYERS ROW ── */
+.tw-campaign-players {
+	font-size: 10px;
+	color: #888;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+.tw-campaign-players strong { color: #fff; }
+
+/* ── JOIN HASH ── */
+.tw-campaign-hash {
+	background: #111;
+	border: 1px solid #2a2a2a;
+	padding: 8px 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.tw-campaign-hash-label {
+	font-size: 9px;
+	text-transform: uppercase;
+	color: #555;
+	letter-spacing: 0.1em;
+}
+.tw-campaign-hash-code {
+	font-size: 12px;
+	color: var(--neon);
+	font-weight: 700;
+	letter-spacing: 0.15em;
+	word-break: break-all;
+}
+
+/* ── ACTIONS ── */
+.tw-campaign-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: 4px;
+}
+.tw-campaign-actions .tw-btn { flex: 1 1 0; }
+
+/* ── BUTTONS (shared) ── */
+.tw-btn {
+	background: var(--gray);
+	border: 1px solid var(--neon);
+	color: var(--neon);
+	padding: 8px 10px;
+	cursor: pointer;
+	font-family: 'Chakra Petch', sans-serif;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+}
+.tw-btn:hover {
+	background: var(--neon);
+	color: #000;
+	box-shadow: 0 0 12px rgba(173,255,0,0.35);
+}
+.tw-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.tw-btn-danger {
+	border-color: #ff3b3b;
+	color: #ff3b3b;
+}
+.tw-btn-danger:hover {
+	background: #ff3b3b;
+	color: #000;
+	box-shadow: 0 0 12px rgba(255,59,59,0.35);
+}
+.tw-btn-ghost {
+	border-color: #333;
+	color: #666;
+}
+.tw-btn-ghost:hover {
+	background: #222;
+	color: #aaa;
+	box-shadow: none;
+}
+
+/* ── COPY HASH BUTTON ── */
+.tw-copy-join-btn {
+	flex-shrink: 0;
+	font-size: 10px;
+	padding: 5px 10px;
+}
+
+/* ── ENTER MATRIX (primary CTA) ── */
+.enter-matrix {
+	background: var(--neon);
+	color: #000 !important;
+	border-color: var(--neon);
+	font-weight: 900;
+}
+.enter-matrix:hover {
+	background: #fff;
+	color: #000 !important;
+	border-color: #fff;
+	box-shadow: 0 0 20px rgba(173,255,0,0.5);
+}
+
+/* ── FADE-OUT ON DELETE ── */
+.tw-campaign-card {
+	transition: opacity 0.4s ease, border-color 0.2s, box-shadow 0.2s;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+	.tw-campaigns-grid {
+		grid-template-columns: 1fr;
+	}
+	.tw-campaign-actions {
+		flex-wrap: wrap;
+	}
+	.tw-campaign-actions .tw-btn {
+		flex: 1 1 100%;
+	}
+	.tw-campaign-meta {
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+}
