@@ -58,34 +58,31 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 	}
 }
 
-// Auto-enqueue by page slug — działa zanim shortcode zostanie wykonany.
+// Auto-enqueue: odpala wczesniej niz shortcode, dzieki czemu JS/CSS laduja sie w <head>.
 if ( ! function_exists( 'tw_maybe_enqueue_list_campaigns_assets' ) ) {
 	function tw_maybe_enqueue_list_campaigns_assets(): void {
-		if ( is_admin() ) {
+		if ( is_admin() || ! is_singular() ) {
 			return;
 		}
 
-		$load = false;
-
-		// Sprawdza popularne slugi stron z listą kampanii.
-		if ( is_page( array( 'deployments', 'campaigns', 'my-campaigns', 'dashboard' ) ) ) {
-			$load = true;
+		$post = get_post();
+		if ( ! $post ) {
+			return;
 		}
 
-		// Fallback: sprawdź shortcode w post_content.
-		if ( ! $load && is_singular() ) {
-			$post = get_post();
-			if ( $post ) {
-				$load = has_shortcode( $post->post_content, 'tw_list_campaigns' )
-					|| ( function_exists( 'tw_has_shortcode_on_current_page' )
-						&& tw_has_shortcode_on_current_page( 'tw_list_campaigns' ) );
-			}
-		}
-
-		if ( $load ) {
-			tw_enqueue_list_campaigns_assets();
+		if ( has_shortcode( $post->post_content, 'tw_list_campaigns' ) ) {
+			tw_enqueue_list_campaigns_assets(
+				array(
+					'nonce'       => wp_create_nonce( 'tw_game_nonce' ),
+					'restNonce'   => wp_create_nonce( 'wp_rest' ),
+					'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ),
+					'terminalUrl' => home_url( '/game/' ),
+					'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
+					'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
+				)
+			);
 		}
 	}
 }
 
-add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_list_campaigns_assets', 20 );
+add_action( 'wp_enqueue_scripts', 'tw_maybe_enqueue_list_campaigns_assets', 15 );
