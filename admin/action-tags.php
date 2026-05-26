@@ -30,6 +30,9 @@ class NW_Action_Tags_Admin {
 
         // HUD groups helper
         add_action( 'wp_ajax_nw_hud_groups_load', [ $this, 'ajax_hud_groups_load' ] );
+        add_action( 'wp_ajax_nw_hud_save',        [ $this, 'ajax_hud_save' ] );
+        add_action( 'wp_ajax_nw_hud_delete',      [ $this, 'ajax_hud_delete' ] );
+        add_action( 'wp_ajax_nw_hud_duplicate',   [ $this, 'ajax_hud_duplicate' ] );
     }
 
     /* ── Menu ─────────────────────────────────────────────── */
@@ -103,6 +106,9 @@ class NW_Action_Tags_Admin {
             <button id="nw-cats-add-btn"  class="nw-btn nw-btn-secondary" data-tab-add="cats">
                 <i data-lucide="folder-plus" style="width:14px;height:14px;"></i> New Category
             </button>
+            <button id="nw-hud-add-btn" class="nw-btn nw-btn-ghost" data-tab-add="hud">
+                <i data-lucide="layout-dashboard" style="width:14px;height:14px;"></i> New HUD Group
+            </button>
         </div>
     </div>
 
@@ -139,6 +145,11 @@ class NW_Action_Tags_Admin {
             <span class="nw-stat-label">Categories</span>
             <span class="nw-stat-value" id="nw-cats-total">—</span>
         </div>
+        <div class="nw-stat-divider"></div>
+        <div class="nw-stat-item">
+            <span class="nw-stat-label">HUD Groups</span>
+            <span class="nw-stat-value" style="color:#44aaff;" id="nw-hud-total">—</span>
+        </div>
     </div>
 
     <!-- Tabs -->
@@ -151,6 +162,10 @@ class NW_Action_Tags_Admin {
             <button class="nw-tab-btn" data-tab="cats">
                 <i data-lucide="folder" style="width:13px;height:13px;"></i>
                 Categories <span class="nw-tab-count" id="nw-tab-count-cats">—</span>
+            </button>
+            <button class="nw-tab-btn" data-tab="hud">
+                <i data-lucide="layout-dashboard" style="width:13px;height:13px;"></i>
+                HUD Groups <span class="nw-tab-count" id="nw-tab-count-hud">—</span>
             </button>
         </div>
 
@@ -229,6 +244,38 @@ class NW_Action_Tags_Admin {
                 </table>
             </div>
         </div><!-- /tab-cats -->
+        <!-- ======= TAB: HUD GROUPS ======= -->
+        <div id="nw-tab-hud" class="nw-tab-panel nw-hidden" style="padding:20px;">
+            <div class="nw-table-controls">
+                <div class="nw-search-wrap">
+                    <i data-lucide="search" class="nw-search-icon"></i>
+                    <input type="text" id="nw-hud-search" class="nw-search-input" placeholder="Search HUD groups…">
+                </div>
+                <div class="nw-filter-group">
+                    <button id="nw-hud-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
+                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="nw-table-wrap">
+                <table class="nw-table">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;">Color</th>
+                            <th style="width:36px;">Icon</th>
+                            <th>Slug</th>
+                            <th>Label</th>
+                            <th style="width:60px;">Sort</th>
+                            <th style="width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nw-hud-tbody">
+                        <tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div><!-- /tab-hud -->
+
     </div><!-- /.nw-admin-card -->
 
 </div><!-- /.nw-admin-wrap -->
@@ -371,6 +418,64 @@ class NW_Action_Tags_Admin {
     </div>
 </div>
 
+
+<!-- ============================================================ -->
+<!-- MODAL: HUD GROUP                                              -->
+<!-- ============================================================ -->
+<div id="nw-hud-modal-overlay" class="nw-modal-overlay" style="display:none;">
+    <div class="nw-modal">
+        <div class="nw-modal-header">
+            <h2 class="nw-modal-title" id="nw-hud-modal-title">New HUD Group</h2>
+            <button class="nw-modal-close" data-modal="nw-hud-modal-overlay">
+                <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+        <div class="nw-modal-body">
+            <form id="nw-hud-form" autocomplete="off">
+                <input type="hidden" id="nw-hud-field-id">
+                <div class="nw-field-grid nw-field-grid-2">
+                    <div class="nw-field">
+                        <label class="nw-label">Slug <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-hud-field-slug" class="nw-input" placeholder="e.g. combat">
+                        <p class="nw-field-hint">Lowercase, underscores only.</p>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Display Label <span class="nw-required">*</span></label>
+                        <input type="text" id="nw-hud-field-label" class="nw-input" placeholder="e.g. Combat">
+                    </div>
+                </div>
+                <div class="nw-field-grid nw-field-grid-3">
+                    <div class="nw-field">
+                        <label class="nw-label">Base Color</label>
+                        <div class="nw-color-input-wrap">
+                            <input type="color" id="nw-hud-field-color-picker" value="#adff00">
+                            <input type="text" id="nw-hud-field-color" class="nw-input" maxlength="7" placeholder="#adff00">
+                        </div>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Icon <span class="nw-field-hint-inline">(Lucide slug)</span></label>
+                        <div class="nw-icon-input-wrap">
+                            <input type="text" id="nw-hud-field-icon" class="nw-input" placeholder="e.g. sword">
+                            <span id="nw-hud-icon-preview" class="nw-icon-preview"></span>
+                        </div>
+                    </div>
+                    <div class="nw-field">
+                        <label class="nw-label">Sort Order</label>
+                        <input type="number" id="nw-hud-field-sort" class="nw-input" value="0" min="0">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="nw-modal-footer">
+            <button id="nw-hud-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
+            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-hud-modal-overlay">Cancel</button>
+            <button id="nw-hud-save-btn" class="nw-btn nw-btn-primary">
+                <span id="nw-hud-save-label">Create HUD Group</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Init Lucide icons in admin
 document.addEventListener('DOMContentLoaded', function() {
@@ -398,14 +503,95 @@ jQuery(function($){
         }
     }
 
-    /* ── HUD Groups helper ────────────────────────────────── */
+    /* ── HUD Groups ──────────────────────────────────────── */
 
     public function ajax_hud_groups_load() {
         $this->verify_nonce();
         global $wpdb;
-        $rows = $wpdb->get_results( "SELECT id, display_name, internal_name FROM cyber_hud_groups ORDER BY sort_order, id", ARRAY_A );
+        $rows = $wpdb->get_results(
+            "SELECT id, slug, display_label, base_color, icon, sort_order
+             FROM cyber_hud_groups ORDER BY sort_order ASC, id ASC",
+            ARRAY_A
+        );
         if ( $rows === null ) $rows = [];
         wp_send_json_success( $rows );
+    }
+
+    public function ajax_hud_save() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id         = absint( $_POST['id'] ?? 0 );
+        $slug       = sanitize_key( $_POST['slug'] ?? '' );
+        $label      = sanitize_text_field( $_POST['display_label'] ?? '' );
+        $base_color = sanitize_hex_color( $_POST['base_color'] ?? '#adff00' ) ?: '#adff00';
+        $icon       = sanitize_text_field( $_POST['icon'] ?? '' );
+        $sort_order = intval( $_POST['sort_order'] ?? 0 );
+
+        if ( ! $slug || ! $label ) wp_send_json_error( 'Slug and label are required.' );
+
+        $data = [
+            'slug'          => $slug,
+            'display_label' => $label,
+            'base_color'    => $base_color,
+            'icon'          => $icon ?: null,
+            'sort_order'    => $sort_order,
+        ];
+        $fmt = [ '%s', '%s', '%s', '%s', '%d' ];
+
+        if ( $id ) {
+            $ok = $wpdb->update( 'cyber_hud_groups', $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+        } else {
+            $ok = $wpdb->insert( 'cyber_hud_groups', $data, $fmt );
+            $id = $wpdb->insert_id;
+        }
+
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        wp_send_json_success( [ 'id' => $id ] );
+    }
+
+    public function ajax_hud_delete() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $ok = $wpdb->delete( 'cyber_hud_groups', [ 'id' => $id ], [ '%d' ] );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
+        wp_send_json_success();
+    }
+
+    public function ajax_hud_duplicate() {
+        $this->verify_nonce();
+        global $wpdb;
+
+        $id = absint( $_POST['id'] ?? 0 );
+        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM cyber_hud_groups WHERE id = %d", $id ),
+            ARRAY_A
+        );
+        if ( ! $row ) wp_send_json_error( 'HUD Group not found.' );
+
+        unset( $row['id'] );
+        $base  = rtrim( $row['slug'], '_' );
+        $taken = true; $i = 2;
+        while ( $taken ) {
+            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
+            $taken = (bool) $wpdb->get_var(
+                $wpdb->prepare( "SELECT id FROM cyber_hud_groups WHERE slug = %s", $try )
+            );
+            if ( ! $taken ) $row['slug'] = $try;
+            $i++;
+        }
+        $row['display_label'] = $row['display_label'] . ' (copy)';
+        $row['sort_order']    = intval( $row['sort_order'] ) + 1;
+
+        $ok = $wpdb->insert( 'cyber_hud_groups', $row );
+        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
+        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
     }
 
     /* ================================================================ */
