@@ -68,21 +68,25 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		$gm_text = $gm_result['text'];
 		$gm_tags = $gm_result['tags'];
 
-		// 5. Zapis do cyber_chat_messages (service key przez tw_rest_ai_supa_post)
-		tw_rest_ai_supa_post( 'cyber_chat_messages', [
-			'channel_id'   => $channel_id,
-			'char_id'      => $char_id,
-			'message_type' => 'player',
-			'content'      => $message,
-			'meta'         => wp_json_encode( [ 'protocol' => $protocol ] ),
-		] );
-		tw_rest_ai_supa_post( 'cyber_chat_messages', [
-			'channel_id'   => $channel_id,
-			'char_id'      => $char_id,
-			'message_type' => 'gm',
-			'content'      => $gm_text,
-			'meta'         => wp_json_encode( [ 'protocol' => $protocol, 'tags' => $gm_tags ] ),
-		] );
+		// BUG FIX: Zapisuj oba komunikaty tylko gdy GM zwrócił niepustą odpowiedź.
+		// Dzięki temu historia nigdy nie będzie zawierała "wiadomości gracza bez odpowiedzi GM",
+		// co łamałoby zasadę alternacji user/assistant wymaganą przez Claude API.
+		if ( ! empty( $gm_text ) ) {
+			tw_rest_ai_supa_post( 'cyber_chat_messages', [
+				'channel_id'   => $channel_id,
+				'char_id'      => $char_id,
+				'message_type' => 'player',
+				'content'      => $message,
+				'meta'         => wp_json_encode( [ 'protocol' => $protocol ] ),
+			] );
+			tw_rest_ai_supa_post( 'cyber_chat_messages', [
+				'channel_id'   => $channel_id,
+				'char_id'      => $char_id,
+				'message_type' => 'gm',
+				'content'      => $gm_text,
+				'meta'         => wp_json_encode( [ 'protocol' => $protocol, 'tags' => $gm_tags ] ),
+			] );
+		}
 
 		// 6. Tagi
 		if ( ! empty( $gm_tags ) ) {
@@ -108,16 +112,21 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 	/**
 	 * @param string $char_id
 	 * @return array|WP_Error
+	 *
+	 * POPRAWKA: cyber_characters używa snake_case:
+	 *   current_hp, max_hp, location_id, world_id, class_id, race_id
+	 * (nie: currenthp, maxhp, locationid, worldid, race, class)
 	 */
 	function tw_rest_ai_build_context( string $char_id ) {
 
 		$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char_id ) );
 
 		// Pobierz postać (service key — omija RLS)
-		// wp_user_id jest wymagany do do_action('tw_location_changed') — nie używamy get_current_user_id() w REST
 		$char = tw_rest_ai_supa_get(
 			'cyber_characters',
-			'id=eq.' . $safe_id . '&select=id,name,wp_user_id,currenthp,maxhp,mp,satiety,hydration,gold,echo_tags,locationid,worldid,archetype,level&limit=1'
+			'id=eq.' . $safe_id
+				. '&select=id,name,wp_user_id,current_hp,max_hp,mp,satiety,hydration,gold,echo_tags,location_id,world_id,archetype,level,class_id,race_id'
+				. '&limit=1'
 		)[0] ?? null;
 
 		if ( empty( $char ) ) {
@@ -126,8 +135,8 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 
 		// Pobierz lokację z FK w postaci
 		$location = [];
-		if ( ! empty( $char['locationid'] ) ) {
-			$safe_loc = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['locationid'] ) );
+		if ( ! empty( $char['location_id'] ) ) {
+			$safe_loc = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['location_id'] ) );
 			$location = tw_rest_ai_supa_get(
 				'cyber_world_map',
 				'id=eq.' . $safe_loc . '&select=id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type&limit=1'
@@ -136,8 +145,8 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 
 		// Pobierz świat z FK w postaci
 		$world = [];
-		if ( ! empty( $char['worldid'] ) ) {
-			$safe_world = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['worldid'] ) );
+		if ( ! empty( $char['world_id'] ) ) {
+			$safe_world = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['world_id'] ) );
 			$world = tw_rest_ai_supa_get(
 				'cyber_worlds',
 				'id=eq.' . $safe_world . '&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype,tech_vs_nature,chaos_vs_order,gold_vs_thief&limit=1'
@@ -165,14 +174,34 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			return [];
 		}
 
-		$rows    = array_reverse( $rows );
-		$history = [];
+		$rows = array_reverse( $rows );
+
+		// BUG FIX: Claude wymaga ścisłej alternacji user → assistant → user → …
+		// Filtrujemy: usuwamy wiersze z pustą treścią oraz scalamy kolejne wiersze
+		// tego samego typu (zachowujemy tylko ostatni w grupie), żeby uniknąć 400.
+		$history  = [];
+		$prev_role = null;
+
 		foreach ( $rows as $row ) {
-			$history[] = [
-				'role'    => ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant',
-				'content' => $row['content'] ?? '',
-			];
+			$content = trim( $row['content'] ?? '' );
+			if ( $content === '' ) {
+				continue; // pomiń puste
+			}
+			$role = ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant';
+
+			if ( $role === $prev_role ) {
+				// Ten sam typ pod rząd — zastąp poprzedni wpis, by zachować alternację
+				array_pop( $history );
+			}
+			$history[]  = [ 'role' => $role, 'content' => $content ];
+			$prev_role   = $role;
 		}
+
+		// Claude musi zaczynać od 'user' — odrzuć ewentualny wiodący 'assistant'
+		while ( ! empty( $history ) && $history[0]['role'] === 'assistant' ) {
+			array_shift( $history );
+		}
+
 		return $history;
 	}
 }
@@ -249,9 +278,6 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					if ( $val ) {
 						tw_rest_ai_supa_rpc( 'fn_move_character', [ 'p_char_id' => $char_id, 'p_location_id' => $val ] );
 
-						// Używamy wp_user_id z kontekstu postaci (pobranego z Supabase service key),
-						// zamiast get_current_user_id() — które może zwrócić 0 w REST przy niektórych
-						// konfiguracjach WP, jeśli determine_current_user nie odpaliło w odpowiednim czasie.
 						$wp_user_id = (int) ( $context['char']['wp_user_id'] ?? 0 );
 						do_action( 'tw_location_changed', $wp_user_id, [ 'char_id' => $char_id, 'location_id' => $val ] );
 					}
