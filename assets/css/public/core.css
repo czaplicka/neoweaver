@@ -274,3 +274,35 @@ body.page-template-adventure {
             .tw-campaigns-empty-actions .tw-btn-sync:hover { background:#fff; box-shadow:0 0 15px #adff00; color:#000!important; }
             .tw-campaigns-empty-actions .tw-btn-outline { display:inline-block; background:transparent; color:#adff00!important; border:1px dashed #444; padding:10px 22px; font-weight:700; border-radius:4px; cursor:pointer; text-transform:uppercase; font-family:\'Chakra Petch\',sans-serif; font-size:11px; letter-spacing:.05em; text-decoration:none; transition:border-color .2s,color .2s; }
             .tw-campaigns-empty-actions .tw-btn-outline:hover { border-color:#adff00; color:#fff!important; }
+.lucide {
+	width: 1em;
+	height: 1em;
+	stroke-width: 0.75;
+	stroke: currentColor;
+	fill: none;
+	vector-effect: non-scaling-stroke;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	flex-shrink: 0;
+}
+
+.tw-nav-btn-tactical .lucide,
+.tw-msg-meta .lucide,
+.tw-grid-header .lucide,
+.tw-gold-hud .lucide,
+.tw-lvl-frame .lucide {
+	width: 16px;
+	height: 16px;
+}
+
+.tw-vitalis-tile .lucide {
+	width: 14px;
+	height: 14px;
+	opacity: 0.9;
+}
+
+.tw-compass-center .lucide,
+.tw-forecast-bubble .lucide {
+	width: 18px;
+	height: 18px;
+}
