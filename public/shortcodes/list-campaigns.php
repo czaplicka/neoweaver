@@ -35,6 +35,37 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 			);
 		}
 
+		// Label maps matching campaign-creator.php definitions.
+		$world_type_map = array(
+			1 => array( 'label' => 'Easy',      'emoji' => '🌱' ),
+			2 => array( 'label' => 'Casual',    'emoji' => '☕' ),
+			3 => array( 'label' => 'Standard',  'emoji' => '🎯' ),
+			4 => array( 'label' => 'Hardcore',  'emoji' => '💀' ),
+			5 => array( 'label' => 'Nightmare', 'emoji' => '☠️' ),
+		);
+
+		$game_length_map = array(
+			1 => array( 'label' => 'Short',    'emoji' => '⚡' ),
+			2 => array( 'label' => 'Medium',   'emoji' => '⏱️' ),
+			3 => array( 'label' => 'Standard', 'emoji' => '📡' ),
+			4 => array( 'label' => 'Epic',     'emoji' => '🌐' ),
+			5 => array( 'label' => 'Endless',  'emoji' => '♾️' ),
+		);
+
+		$gm_style_map = array(
+			'cinematic_heroic' => array( 'label' => 'Cinematic', 'emoji' => '🎬' ),
+			'harsh_grounded'   => array( 'label' => 'Harsh',     'emoji' => '🩸' ),
+			'fast_tactical'    => array( 'label' => 'Tactical',  'emoji' => '⚡' ),
+		);
+
+		$priority_map = array(
+			1 => array( 'label' => 'Combat',    'emoji' => '⚔️' ),
+			2 => array( 'label' => 'Wealth',    'emoji' => '💰' ),
+			3 => array( 'label' => 'Discovery', 'emoji' => '🔍' ),
+			4 => array( 'label' => 'Relations', 'emoji' => '🤝' ),
+			5 => array( 'label' => 'Mix',       'emoji' => '🎲' ),
+		);
+
 		$url_base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
 
 		$select = '*,cyber_campaign_worlds(world_id,cyber_worlds(name,difficulty)),cyber_campaign_characters(character_id,cyber_characters(name,cyber_races(name),cyber_classes(name)))';
@@ -127,6 +158,25 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					$is_team   = 2 === $game_mode;
 					$join_code = isset( $c['join_code'] ) ? (string) $c['join_code'] : '';
 
+					// Descriptive fields.
+					$world_type_val  = isset( $c['world_type'] ) ? (int) $c['world_type'] : 0;
+					$game_length_val = isset( $c['game_length'] ) ? (int) $c['game_length'] : 0;
+					$gm_style_val    = isset( $c['gm_style'] ) ? (string) $c['gm_style'] : '';
+					$priority_val    = isset( $c['priority'] ) ? (int) $c['priority'] : 0;
+
+					$threat_badge    = $world_type_val && isset( $world_type_map[ $world_type_val ] )
+						? $world_type_map[ $world_type_val ]['emoji'] . ' ' . $world_type_map[ $world_type_val ]['label']
+						: '';
+					$length_badge    = $game_length_val && isset( $game_length_map[ $game_length_val ] )
+						? $game_length_map[ $game_length_val ]['emoji'] . ' ' . $game_length_map[ $game_length_val ]['label']
+						: '';
+					$gm_badge        = $gm_style_val && isset( $gm_style_map[ $gm_style_val ] )
+						? $gm_style_map[ $gm_style_val ]['emoji'] . ' ' . $gm_style_map[ $gm_style_val ]['label']
+						: '';
+					$priority_badge  = $priority_val && isset( $priority_map[ $priority_val ] )
+						? $priority_map[ $priority_val ]['emoji'] . ' ' . $priority_map[ $priority_val ]['label']
+						: '';
+
 					$operative_name = 'PENDING ASSIGNMENT';
 
 					if ( is_array( $char_rel ) ) {
@@ -175,6 +225,23 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 						<div class="tw-campaign-meta">
 							<span><strong>OPERATIVE:</strong> <?php echo $operative_name; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 						</div>
+
+						<?php if ( $threat_badge || $length_badge || $gm_badge || $priority_badge ) : ?>
+							<div class="tw-campaign-badges">
+								<?php if ( $threat_badge ) : ?>
+									<span class="tw-badge tw-badge--threat" title="Threat Level"><?php echo esc_html( $threat_badge ); ?></span>
+								<?php endif; ?>
+								<?php if ( $length_badge ) : ?>
+									<span class="tw-badge tw-badge--length" title="Operation Scope"><?php echo esc_html( $length_badge ); ?></span>
+								<?php endif; ?>
+								<?php if ( $gm_badge ) : ?>
+									<span class="tw-badge tw-badge--gm" title="GM Protocol"><?php echo esc_html( $gm_badge ); ?></span>
+								<?php endif; ?>
+								<?php if ( $priority_badge ) : ?>
+									<span class="tw-badge tw-badge--priority" title="Mission Priority"><?php echo esc_html( $priority_badge ); ?></span>
+								<?php endif; ?>
+							</div>
+						<?php endif; ?>
 
 						<?php if ( $is_team && $join_code ) : ?>
 							<div class="tw-campaign-hash">
