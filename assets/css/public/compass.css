@@ -1,37 +1,28 @@
-/**
- * NeoWeaver Compass Styles
- * Small right-side HUD compass
- */
-
 .tw-compass-wrapper {
     position: absolute;
     top: 18px;
     right: 18px;
-    width: 168px;
-    height: 168px;
+    width: 138px;
+    height: 138px;
     margin: 0;
-    padding: 10px;
-    z-index: 20;
+    padding: 9px;
+    z-index: 30;
     font-family: 'Chakra Petch', sans-serif;
     color: #e8f5d0;
-
     background:
         linear-gradient(135deg, rgba(10, 16, 14, 0.68) 0%, rgba(5, 10, 18, 0.88) 100%);
-    border: 1px solid rgba(173, 255, 0, 0.28);
-    border-radius: 18px;
+    border: 1px solid rgba(173, 255, 0, 0.24);
+    border-radius: 16px;
     backdrop-filter: blur(16px) saturate(150%);
     -webkit-backdrop-filter: blur(16px) saturate(150%);
-
     box-shadow:
         0 0 0 1px rgba(0, 0, 0, 0.45),
         0 0 20px rgba(173, 255, 0, 0.08),
         inset 0 1px 0 rgba(173, 255, 0, 0.08),
         inset 0 0 14px rgba(173, 255, 0, 0.04);
-
     overflow: hidden;
 }
 
-/* scanlines */
 .tw-compass-wrapper::before {
     content: '';
     position: absolute;
@@ -47,34 +38,20 @@
     opacity: 0.55;
 }
 
-/* HUD corner */
-.tw-compass-wrapper::after {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 14px;
-    height: 14px;
-    border-top: 1px solid rgba(173, 255, 0, 0.45);
-    border-left: 1px solid rgba(173, 255, 0, 0.45);
-    pointer-events: none;
-}
-
 .tw-compass-grid {
     display: grid;
-    grid-template-columns: 1fr 56px 1fr;
-    grid-template-rows: 1fr 56px 1fr;
+    grid-template-columns: 1fr 46px 1fr;
+    grid-template-rows: 1fr 46px 1fr;
     width: 100%;
     height: 100%;
     text-align: center;
     position: relative;
 }
 
-/* faint ring */
 .tw-compass-grid::before {
     content: '';
     position: absolute;
-    inset: 18px;
+    inset: 16px;
     border: 1px solid rgba(173, 255, 0, 0.14);
     border-radius: 50%;
     box-shadow: inset 0 0 10px rgba(173, 255, 0, 0.03);
@@ -107,24 +84,22 @@
 
 .tw-compass-cell .dir-label {
     font-weight: 700;
-    font-size: 0.82rem;
+    font-size: 0.74rem;
     letter-spacing: 2px;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
     line-height: 1;
 }
 
 .tw-compass-cell .loc-name {
-    font-size: 0.5rem;
+    font-size: 0.44rem;
     text-transform: uppercase;
-    letter-spacing: 1.2px;
-    max-width: 52px;
+    letter-spacing: 1px;
+    max-width: 44px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    opacity: 0.9;
 }
 
-/* direction placement */
 .tw-n { grid-column: 2; grid-row: 1; }
 .tw-w { grid-column: 1; grid-row: 2; }
 .tw-e { grid-column: 3; grid-row: 2; }
@@ -152,59 +127,25 @@
 .tw-compass-center::before {
     content: '';
     position: absolute;
-    inset: 6px;
+    inset: 5px;
     border: 1px dashed rgba(173, 255, 0, 0.12);
     border-radius: 50%;
 }
 
 .tw-compass-icon {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     color: #adff00;
     text-shadow: 0 0 10px rgba(173, 255, 0, 0.65);
-    animation: tw-compass-pulse 2.5s ease-in-out infinite;
 }
 
 #tw-current-loc-name {
-    font-size: 0.52rem;
+    font-size: 0.45rem;
     font-weight: 700;
     color: #adff00;
-    letter-spacing: 1.4px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    max-width: 44px;
+    max-width: 38px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* subtle axis markers */
-.tw-n::after,
-.tw-s::after,
-.tw-e::after,
-.tw-w::after {
-    content: '';
-    position: absolute;
-    background: rgba(173, 255, 0, 0.12);
-}
-
-.tw-n::after,
-.tw-s::after {
-    width: 1px;
-    height: 10px;
-}
-
-.tw-e::after,
-.tw-w::after {
-    width: 10px;
-    height: 1px;
-}
-
-.tw-n::after { bottom: 4px; }
-.tw-s::after { top: 4px; }
-.tw-w::after { right: 4px; }
-.tw-e::after { left: 4px; }
-
-@keyframes tw-compass-pulse {
-    0%   { transform: scale(1); opacity: 0.78; }
-    50%  { transform: scale(1.08); opacity: 1; }
-    100% { transform: scale(1); opacity: 0.78; }
 }
