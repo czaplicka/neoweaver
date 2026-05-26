@@ -426,8 +426,6 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 
 // ============================================================
 // get_cyber_character_id_by_wp_id()
-// Zwraca character_id (UUID) dla WP usera. Globalnie dostępna
-// dla shortcodes i AJAX (była tylko w buffer.php).
 // ============================================================
 
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
@@ -456,10 +454,6 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 
 // ============================================================
 // fetch_foundry_data()
-// Zwraca karty gracza z ich poziomem i liczbą duplikatów.
-// Potrzebne dla shortcode [cyber_foundry].
-// Używa: cyber_character_deck JOIN cyber_deck
-// Duplikaty = wiele wierszy z tym samym deck_id dla tej postaci.
 // ============================================================
 
 if ( ! function_exists( 'fetch_foundry_data' ) ) {
@@ -488,7 +482,6 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 			return [];
 		}
 
-		// Grupuj po deck_id — pierwsza karta = instancja do upgrade, reszta = duplikaty.
 		$grouped = [];
 		foreach ( $rows as $row ) {
 			$deck_id = (int) ( $row['deck_id'] ?? 0 );
@@ -504,7 +497,6 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 			}
 		}
 
-		// Mapuj na obiekty których oczekuje shortcode.
 		$result = [];
 		foreach ( $grouped as $item ) {
 			$obj                  = new stdClass();
@@ -521,7 +513,7 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 
 // ============================================================
 // get_cyber_player_credits()
-// Zwraca ilość kredytów (CC) gracza dla danej postaci.
+// Zwraca gold gracza z cyber_characters.
 // ============================================================
 
 if ( ! function_exists( 'get_cyber_player_credits' ) ) {
@@ -536,7 +528,7 @@ if ( ! function_exists( 'get_cyber_player_credits' ) ) {
 			'cyber_characters',
 			[
 				'id'     => 'eq.' . $safe_id,
-				'select' => 'credits',
+				'select' => 'gold',
 				'limit'  => 1,
 			]
 		);
@@ -545,6 +537,6 @@ if ( ! function_exists( 'get_cyber_player_credits' ) ) {
 			return 0;
 		}
 
-		return (int) ( $result[0]['credits'] ?? 0 );
+		return (int) ( $result[0]['gold'] ?? 0 );
 	}
 }
