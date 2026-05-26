@@ -3,17 +3,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-error_log( 'NW: supabase-global loaded' );
+if ( ! defined( 'NEOWEAVER_DEBUG' ) ) {
+	define( 'NEOWEAVER_DEBUG', false );
+}
+
+if ( ! function_exists( 'nw_debug_log' ) ) {
+	function nw_debug_log( $message ) {
+		if ( NEOWEAVER_DEBUG ) {
+			error_log( '[NeoWeaver] ' . $message );
+		}
+	}
+}
+
+nw_debug_log( 'supabase-global loaded' );
 
 add_action( 'wp_enqueue_scripts', function () {
-	error_log( 'NW: supabase-global enqueue hook fired' );
+	nw_debug_log( 'supabase-global enqueue hook fired' );
 
 	if ( ! is_user_logged_in() ) {
-		error_log( 'NW: user not logged in' );
+		nw_debug_log( 'user not logged in' );
 		return;
 	}
 
-	error_log( 'NW: user logged in, enqueue supabase init' );
+	nw_debug_log( 'user logged in, enqueue supabase init' );
 
 	tw_enqueue_script_asset( 'nw-game-data', 'assets/js/public/game-data.js', [], true );
 
@@ -21,7 +33,7 @@ add_action( 'wp_enqueue_scripts', function () {
 		? tw_supabase_get_current_user_token()
 		: '';
 
-	error_log( 'NW: JWT present = ' . ( $jwt ? 'yes' : 'no' ) );
+	nw_debug_log( 'JWT present = ' . ( $jwt ? 'yes' : 'no' ) );
 
 	wp_localize_script(
 		'nw-game-data',
