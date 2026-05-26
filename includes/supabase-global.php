@@ -15,17 +15,41 @@ if ( ! function_exists( 'nw_debug_log' ) ) {
 	}
 }
 
-nw_debug_log( 'supabase-global loaded' );
+/**
+ * Returns true only on pages that actually run the adventure terminal.
+ * Checks for the [nw_adventure] shortcode or the nw-adventure page slug.
+ */
+function nw_is_adventure_page() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+	$post = get_post();
+	if ( ! $post ) {
+		return false;
+	}
+	// Match by shortcode presence in post content.
+	if ( has_shortcode( $post->post_content, 'nw_adventure' ) ) {
+		return true;
+	}
+	// Fallback: match by page slug.
+	if ( in_array( $post->post_name, [ 'adventure', 'nw-adventure', 'play' ], true ) ) {
+		return true;
+	}
+	return false;
+}
 
 add_action( 'wp_enqueue_scripts', function () {
-	nw_debug_log( 'supabase-global enqueue hook fired' );
-
 	if ( ! is_user_logged_in() ) {
-		nw_debug_log( 'user not logged in' );
+		nw_debug_log( 'supabase-global: user not logged in, skipping enqueue' );
 		return;
 	}
 
-	nw_debug_log( 'user logged in, enqueue supabase init' );
+	if ( ! nw_is_adventure_page() ) {
+		nw_debug_log( 'supabase-global: not an adventure page, skipping enqueue' );
+		return;
+	}
+
+	nw_debug_log( 'supabase-global: adventure page detected, enqueuing nw-game-data' );
 
 	tw_enqueue_script_asset( 'nw-game-data', 'assets/js/public/game-data.js', [], true );
 
@@ -33,7 +57,7 @@ add_action( 'wp_enqueue_scripts', function () {
 		? tw_supabase_get_current_user_token()
 		: '';
 
-	nw_debug_log( 'JWT present = ' . ( $jwt ? 'yes' : 'no' ) );
+	nw_debug_log( 'supabase-global: JWT present = ' . ( $jwt ? 'yes' : 'no' ) );
 
 	wp_localize_script(
 		'nw-game-data',
