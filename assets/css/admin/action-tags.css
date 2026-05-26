@@ -135,3 +135,35 @@
 .nw-tab-panel {
     padding-top: 0;
 }
+
+/* ---- Icon input + live preview ─────────────────────── */
+.nw-icon-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nw-icon-input-wrap .nw-input {
+    flex: 1;
+}
+
+.nw-icon-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    background: #1a1a1a;
+    flex-shrink: 0;
+    color: #adff00;
+}
+
+/* ---- Hint inline (next to label) ─────────────────────── */
+.nw-field-hint-inline {
+    font-size: 10px;
+    color: #555;
+    font-weight: 400;
+    margin-left: 4px;
+}
