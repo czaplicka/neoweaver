@@ -320,11 +320,23 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 }
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
+	/**
+	 * Upsert a user setting row in cyber_user_settings.
+	 *
+	 * Uses PATCH on an exact (wp_user_id, key) match so PostgREST updates
+	 * the existing row, and falls back to POST with on_conflict when the row
+	 * doesn’t yet exist. The simpler approach is a true upsert via POST with
+	 * Prefer: resolution=merge-duplicates AND on_conflict=wp_user_id,key —
+	 * which requires a UNIQUE constraint on (wp_user_id, key) in Supabase.
+	 * That constraint is assumed to exist; if it doesn’t, add it:
+	 *   ALTER TABLE cyber_user_settings
+	 *     ADD CONSTRAINT uq_user_settings_user_key UNIQUE (wp_user_id, key);
+	 */
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_user_settings',
-			[],
+			[ 'on_conflict' => 'wp_user_id,key' ],
 			[
 				'wp_user_id' => $wp_user_id,
 				'key'        => $key,
@@ -333,7 +345,7 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 			],
 			[
 				'headers' => [
-					'Prefer' => 'resolution=merge-duplicates',
+					'Prefer' => 'resolution=merge-duplicates,return=minimal',
 				],
 			]
 		);
@@ -484,7 +496,11 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 
 		$grouped = [];
 		foreach ( $rows as $row ) {
-			$deck_id = (int) ( $row['deck_id'] ?? 0 );
+			// deck_id is a UUID — keep it as string, never cast to int.
+			$deck_id = (string) ( $row['deck_id'] ?? '' );
+			if ( '' === $deck_id ) {
+				continue;
+			}
 			if ( ! isset( $grouped[ $deck_id ] ) ) {
 				$grouped[ $deck_id ] = [
 					'instance_id'     => (string) ( $row['id'] ?? '' ),
