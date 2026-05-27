@@ -10,10 +10,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Sanitize UUID — never use intval() on UUID.
+ * tw_sanitize_uuid — backward-compat alias for nw_sanitize_uuid.
+ * Defined here because adventure-data.php loads before supabase-helpers.php
+ * in some contexts. The alias is a no-op if nw_sanitize_uuid already exists.
  */
-function tw_sanitize_uuid( string $raw ): string {
-	return preg_replace( '/[^a-f0-9\-]/i', '', $raw );
+if ( ! function_exists( 'tw_sanitize_uuid' ) ) {
+	function tw_sanitize_uuid( string $raw ): string {
+		return nw_sanitize_uuid( $raw );
+	}
 }
 
 /**
@@ -101,7 +105,7 @@ function nw_get_active_campaign_id( int $wp_user_id = 0 ): string {
 		]
 	);
 
-	return tw_sanitize_uuid( (string) ( $row['campaign_id'] ?? '' ) );
+	return nw_sanitize_uuid( (string) ( $row['campaign_id'] ?? '' ) );
 }
 
 /**
@@ -173,8 +177,8 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
  * Returns exactly the keys expected by the template.
  */
 function tw_prepare_character_data( array $game_data ): array {
-	$char_id     = tw_sanitize_uuid( (string) ( $game_data['active_character_id'] ?? '' ) );
-	$campaign_id = tw_sanitize_uuid( (string) ( $game_data['active_campaign_id'] ?? '' ) );
+	$char_id     = nw_sanitize_uuid( (string) ( $game_data['active_character_id'] ?? '' ) );
+	$campaign_id = nw_sanitize_uuid( (string) ( $game_data['active_campaign_id'] ?? '' ) );
 	$wp_user_id  = (int) ( $game_data['wp_user_id'] ?? get_current_user_id() );
 
 	$result = [
@@ -244,8 +248,8 @@ function tw_prepare_character_data( array $game_data ): array {
 		$result['m_hp'] = max( 1, (int) tw_num( $char_row['hp'] ?? 10, 10 ) );
 		$result['m_mp'] = max( 1, (int) tw_num( $char_row['mp'] ?? 10, 10 ) );
 
-		$race_id  = tw_sanitize_uuid( (string) ( $char_row['race_id'] ?? '' ) );
-		$class_id = tw_sanitize_uuid( (string) ( $char_row['class_id'] ?? '' ) );
+		$race_id  = nw_sanitize_uuid( (string) ( $char_row['race_id'] ?? '' ) );
+		$class_id = nw_sanitize_uuid( (string) ( $char_row['class_id'] ?? '' ) );
 
 		if ( $race_id ) {
 			$race_row = tw_supabase_first(
@@ -522,7 +526,7 @@ function tw_prepare_tactical_data( array $game_data, int $userid ): array {
 		'grid_map'  => [],
 	];
 
-	$active_session_id = tw_sanitize_uuid( (string) ( $game_data['active_session_id'] ?? '' ) );
+	$active_session_id = nw_sanitize_uuid( (string) ( $game_data['active_session_id'] ?? '' ) );
 
 	if ( ! $active_session_id ) {
 		return $result;

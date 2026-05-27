@@ -23,7 +23,7 @@ function nw_foundry_get_item( string $item_id ): array {
 	return tw_supabase_first(
 		'cyber_items',
 		[
-			'id'     => 'eq.' . tw_sanitize_uuid( $item_id ),
+			'id'     => 'eq.' . nw_sanitize_uuid( $item_id ),
 			'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
 			'limit'  => 1,
 		]

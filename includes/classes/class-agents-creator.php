@@ -35,7 +35,7 @@ class Neoweaver_Agents_Creator {
 
 		$payload = [
 			'name'       => sanitize_text_field( $data['name'] ),
-			'world_id'   => tw_sanitize_uuid( (string) $data['world_id'] ),
+			'world_id'   => nw_sanitize_uuid( (string) $data['world_id'] ),
 			'wp_user_id' => ! empty( $data['wp_user_id'] ) ? (int) $data['wp_user_id'] : get_current_user_id(),
 			'bio'        => sanitize_textarea_field( $data['bio'] ?? '' ),
 			'avatar'     => esc_url_raw( $data['avatar'] ?? '' ),
@@ -50,11 +50,11 @@ class Neoweaver_Agents_Creator {
 		];
 
 		if ( ! empty( $data['race_id'] ) ) {
-			$payload['race_id'] = tw_sanitize_uuid( (string) $data['race_id'] );
+			$payload['race_id'] = nw_sanitize_uuid( (string) $data['race_id'] );
 		}
 
 		if ( ! empty( $data['class_id'] ) ) {
-			$payload['class_id'] = tw_sanitize_uuid( (string) $data['class_id'] );
+			$payload['class_id'] = nw_sanitize_uuid( (string) $data['class_id'] );
 		}
 
 		$result = tw_supabase_request(
@@ -107,7 +107,7 @@ class Neoweaver_Agents_Creator {
 		$row = tw_supabase_first(
 			'cyber_characters',
 			[
-				'world_id'   => 'eq.' . tw_sanitize_uuid( $world_id ),
+				'world_id'   => 'eq.' . nw_sanitize_uuid( $world_id ),
 				'wp_user_id' => 'eq.' . $wp_user_id,
 				'select'     => 'id',
 				'limit'      => 1,
