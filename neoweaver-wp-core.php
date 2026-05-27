@@ -2,7 +2,7 @@
 /**
  * Plugin Name: NeoWeaver
  * Description: Core logic for NeoWeaver game
- * Version:     0.7.4
+ * Version:     0.7.5
  * Author:      Monika Czaplicka
  * Text Domain: neoweaver
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-defined( 'NEOWEAVER_VERSION' )     || define( 'NEOWEAVER_VERSION', '0.7.4' );
+defined( 'NEOWEAVER_VERSION' )     || define( 'NEOWEAVER_VERSION', '0.7.5' );
 defined( 'NEOWEAVER_PLUGIN_FILE' ) || define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 defined( 'NEOWEAVER_PLUGIN_DIR' )  || define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 defined( 'NEOWEAVER_PLUGIN_URL' )  || define( 'NEOWEAVER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -88,6 +88,7 @@ final class NeoWeaver_Core {
 			// Shared classes / repositories.
 			'includes/classes/class-supabase.php',
 			'includes/classes/class-loader.php',
+			'includes/classes/class-agents-creator.php',
 			'includes/classes/class-agents-repository.php',
 			'includes/classes/class-agents-list.php',
 			'includes/classes/class-deployments-creator.php',
@@ -159,7 +160,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/agents-list.php',
 			'public/shortcodes/connect-campaign-world.php',
 			'public/shortcodes/connect-character-campaign.php',
-			'public/shortcodes/essence.php',
+			'public/shortcodes/essences.php',
 			'public/shortcodes/hand.php',
 			'public/shortcodes/foundry.php',
 			'public/shortcodes/join-terminal.php',
@@ -194,7 +195,7 @@ final class NeoWeaver_Core {
 
 		$ajax_only = [
 			'includes/ajax/buffer.php',
-			'includes/ajax/chat-gm.php',
+			// chat-gm.php removed — GM chat uses REST (/wp-json/neoweaver/v1/), not admin-ajax.
 			'includes/ajax/deck-scenarios.php',
 			'includes/ajax/ensure-world-state.php',
 			'includes/ajax/get-char-state.php',
@@ -295,14 +296,8 @@ final class NeoWeaver_Core {
 			return;
 		}
 
-		if ( ! class_exists( 'Neoweaver_Public', false ) ) {
-			$public_class = NEOWEAVER_PLUGIN_DIR . 'public/class-public.php';
-
-			if ( file_exists( $public_class ) ) {
-				require_once $public_class;
-			}
-		}
-
+		// class-public.php is already loaded unconditionally via $always above.
+		// If the class still doesn't exist here, there's a parse error in that file.
 		if ( ! class_exists( 'Neoweaver_Public', false ) ) {
 			return;
 		}
