@@ -4,34 +4,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Pobiera postacie aktualnego użytkownika z cyber_characters.
- */
-if ( ! function_exists( 'tw_get_user_characters' ) ) {
-	function tw_get_user_characters( $user_id ) {
-		$rows = tw_supabase_get(
-			'cyber_characters',
-			array(
-				'wp_user_id' => 'eq.' . (int) $user_id,
-				'select'     => 'id,name,lvl,avatar',
-				'order'      => 'name.asc',
-			)
-		);
-
-		if ( ! is_array( $rows ) ) {
-			return array();
-		}
-
-		$results = array();
-
-		foreach ( $rows as $row ) {
-			$results[] = (object) $row;
-		}
-
-		return $results;
-	}
-}
-
-/**
  * Pobiera achievementy gracza przez RPC get_player_achievements().
  */
 if ( ! function_exists( 'tw_get_player_achievements' ) ) {
@@ -144,7 +116,6 @@ if ( ! function_exists( 'render_player_achievements' ) ) {
 
 		$results = tw_get_player_achievements( $profile_user_id, $selected_char_id, $a['type'] );
 
-		// ── POPRAWKA: buduj output od razu, lista postaci zawsze widoczna ──
 		$output = '';
 
 		if ( ! empty( $characters ) ) {
@@ -179,7 +150,6 @@ if ( ! function_exists( 'render_player_achievements' ) ) {
 			$output .= '</form>';
 		}
 
-		// ── POPRAWKA: empty check po zbudowaniu formularza, zwracamy też formularz ──
 		if ( empty( $results ) ) {
 			$output .= '<p>' . esc_html__( 'No achievements to display.', 'neoweaver' ) . '</p>';
 			return $output;
