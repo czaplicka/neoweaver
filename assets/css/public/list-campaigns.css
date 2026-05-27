@@ -1,210 +1,377 @@
 /* ============================================================
-   NEOWEAVER — LIST CAMPAIGNS  (redesign v2)
-   Brak pasków, duże zaokrąglenia, karty zamiast tabeli
+   NEOWEAVER — LIST CAMPAIGNS  (v3 — glass / CRT / terminal)
    ============================================================ */
 
 /* ---------- Wrapper ---------- */
 .tw-campaigns-wrap {
   width: 100%;
-  padding: 8px 0 32px;
+  padding: 8px 0 40px;
 }
 
 /* ---------- Grid ---------- */
 .tw-campaigns-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 24px;
 }
 
-/* ---------- Karta kampanii ---------- */
+/* =================================================================
+   KARTA
+   - overflow: visible  → żeby badge SOLO/TEAM i difficulty
+     mogły "wystawać" poza ramkę
+   ================================================================= */
 .tw-campaign-card {
   position: relative;
-  background: #0f1117;
-  border: 1px solid rgba(173,255,0,.10);
+  /* glass */
+  background: rgba(10,12,18,.72);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(173,255,0,.13);
   border-radius: 24px;
-  overflow: hidden;
+  overflow: visible;          /* wystawanie elementów */
   transition:
-    transform .22s cubic-bezier(.16,1,.3,1),
-    box-shadow .22s cubic-bezier(.16,1,.3,1),
-    border-color .22s ease;
+    transform .24s cubic-bezier(.16,1,.3,1),
+    box-shadow .24s cubic-bezier(.16,1,.3,1),
+    border-color .24s ease;
 }
 
 .tw-campaign-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(173,255,0,.32);
+  transform: translateY(-4px);
+  border-color: rgba(173,255,0,.30);
   box-shadow:
-    0 0 0 1px rgba(173,255,0,.10),
-    0 20px 48px rgba(0,0,0,.38);
+    0 0 0 1px rgba(173,255,0,.08),
+    0 0 32px rgba(173,255,0,.06),
+    0 24px 56px rgba(0,0,0,.45);
 }
 
-/* Wewnętrzny kontener */
+/* CRT scanline overlay */
+.tw-campaign-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,.07) 3px,
+    rgba(0,0,0,.07) 4px
+  );
+  z-index: 1;
+}
+
+/* ---------- SVG tło karty (GM style) ---------- */
+.tw-card-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.tw-card-bg img {
+  position: absolute;
+  right: -10px; bottom: -10px;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  opacity: .06;
+  filter: saturate(0) brightness(2);
+  transition: opacity .3s;
+}
+.tw-campaign-card:hover .tw-card-bg img {
+  opacity: .11;
+}
+
+/* ---------- Wewnętrzny kontener (ponad bg i CRT) ---------- */
 .tw-card-inner {
   position: relative;
-  padding: 22px 22px 18px;
+  z-index: 2;
+  padding: 36px 22px 18px;   /* góra: miejsce na wystawający badge */
+  border-radius: 24px;
+  overflow: hidden;           /* nie przycinamy rodzica, ale przycinamy wnętrze */
 }
 
-/* ---------- Pasek scan-line (dekoracja) ---------- */
+/* ---------- Scan-line górna krawędź ---------- */
 .tw-card-scan-line {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
   background: linear-gradient(90deg,
     transparent 0%,
-    var(--threat-color, #adff00) 40%,
-    var(--threat-color, #adff00) 60%,
+    var(--threat-color, #adff00) 35%,
+    var(--threat-color, #adff00) 65%,
     transparent 100%
   );
-  opacity: .55;
-  border-radius: 24px 24px 0 0;
+  opacity: .7;
+  z-index: 3;
 }
 
-/* ---------- Badge trybu (SOLO / TEAM) ---------- */
+/* =================================================================
+   1. SOLO / TEAM — badge wystawający z lewego górnego rogu
+   ================================================================= */
 .tw-card-mode-badge {
   position: absolute;
-  top: 16px; right: 16px;
-  width: 34px; height: 34px;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 50%;
-  color: rgba(255,255,255,.5);
-  transition: background .18s, color .18s;
+  top: -1px;      /* wystawanie PONAD ramkę */
+  left: 20px;
+  z-index: 10;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px 4px 9px;
+  border-radius: 0 0 12px 12px;  /* górne rogi proste (wtapiają się w krawędź) */
+  background: rgba(20,24,32,.90);
+  border: 1px solid rgba(255,255,255,.12);
+  border-top: none;
+  color: rgba(255,255,255,.55);
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  transition: background .18s, color .18s, border-color .18s;
 }
 .tw-campaign-card:hover .tw-card-mode-badge {
-  background: rgba(173,255,0,.10);
+  background: rgba(173,255,0,.12);
+  border-color: rgba(173,255,0,.30);
   color: #adff00;
 }
+.tw-card-mode-badge svg { flex-shrink: 0; }
 
-/* ---------- Header karty ---------- */
-.tw-card-header {
-  padding-right: 44px;
-  margin-bottom: 16px;
+/* =================================================================
+   6. DIFFICULTY — wystawający tab z prawego górnego rogu
+   ================================================================= */
+.tw-card-difficulty-tab {
+  position: absolute;
+  top: -1px;
+  right: 20px;
+  z-index: 10;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px 4px 10px;
+  border-radius: 0 0 12px 12px;
+  background: rgba(20,24,32,.90);
+  border: 1px solid rgba(255,255,255,.12);
+  border-top: none;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  color: var(--threat-color, #adff00);
+  backdrop-filter: blur(8px);
+  transition: background .18s, box-shadow .18s;
+}
+.tw-campaign-card:hover .tw-card-difficulty-tab {
+  background: rgba(20,24,32,.98);
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+/* =================================================================
+   4. INFO — world / campaign / agent / objective
+   ================================================================= */
+.tw-card-info {
+  margin-bottom: 14px;
+}
+
+.tw-info-world {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .7rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(173,255,0,.55);
+  margin-bottom: 2px;
 }
 
 .tw-card-title {
   font-family: 'Chakra Petch', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.22rem;
+  font-weight: 700;
   color: #fff;
   letter-spacing: .02em;
   line-height: 1.2;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.tw-card-world-row {
+.tw-info-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+  font-size: .82rem;
+  line-height: 1.5;
 }
 
-.tw-card-world-name {
-  font-size: .88rem;
-  color: rgba(255,255,255,.45);
-  letter-spacing: .04em;
-}
-
-/* ---------- Pills / badges ---------- */
-.tw-card-badges {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.tw-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(173,255,0,.22);
-  color: #adff00;
-  font-size: .75rem;
+.tw-info-label {
   font-family: 'Chakra Petch', sans-serif;
-  letter-spacing: .06em;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-.tw-pill--length {
-  border-color: rgba(255,255,255,.14);
-  color: rgba(255,255,255,.5);
-}
-
-/* ---------- Body — 2×2 data chips ---------- */
-.tw-card-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  margin-bottom: 18px;
-}
-
-.tw-card-body-divider {
-  grid-column: 1 / -1;
-  height: 1px;
-  background: rgba(255,255,255,.05);
-  margin: 6px 0;
-}
-
-.tw-card-cell {
-  background: rgba(255,255,255,.03);
-  border-radius: 14px;
-  padding: 11px 14px;
-  min-height: 64px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  transition: background .18s;
-}
-
-.tw-campaign-card:hover .tw-card-cell {
-  background: rgba(255,255,255,.05);
-}
-
-.tw-card-cell-label {
   font-size: .68rem;
-  letter-spacing: .1em;
+  letter-spacing: .09em;
   text-transform: uppercase;
-  color: rgba(255,255,255,.3);
-  font-family: 'Chakra Petch', sans-serif;
+  color: rgba(255,255,255,.28);
+  flex-shrink: 0;
 }
 
-.tw-card-cell-value {
-  font-size: .95rem;
-  font-weight: 600;
-  color: rgba(255,255,255,.85);
+.tw-info-value {
   font-family: 'Chakra Petch', sans-serif;
+  font-size: .85rem;
+  color: rgba(255,255,255,.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tw-card-cell-sub {
+.tw-info-sub {
   font-size: .75rem;
   color: rgba(255,255,255,.35);
   letter-spacing: .03em;
 }
 
-.tw-card-unset,
-.tw-card-cell-value.tw-card-unset {
-  color: rgba(255,255,255,.2);
-  font-weight: 400;
-}
-
-/* ikona + tekst w komórce */
-.tw-cell-icon {
-  display: inline-flex;
+.tw-info-objective {
+  display: flex;
   align-items: center;
   gap: 5px;
+  margin-top: 4px;
 }
 
-/* ---------- Actions ---------- */
+.tw-info-objective .tw-info-label { flex-shrink: 0; }
+
+.tw-info-unset {
+  color: rgba(255,255,255,.2);
+  font-style: italic;
+}
+
+/* =================================================================
+   2. LENGTH PROGRESS BAR
+   ================================================================= */
+.tw-card-length-bar {
+  margin-bottom: 14px;
+}
+
+.tw-length-label {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .65rem;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.25);
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tw-length-track {
+  height: 6px;
+  background: rgba(255,255,255,.07);
+  border-radius: 999px;
+  overflow: visible;
+  position: relative;
+  display: flex;
+  gap: 3px;
+  align-items: stretch;
+}
+
+/* Endless: jeden ciągły pasek */
+.tw-length-track.tw-length--endless {
+  gap: 0;
+}
+.tw-length-track.tw-length--endless .tw-length-seg {
+  border-radius: 999px;
+  flex: 1;
+  background: linear-gradient(90deg,
+    rgba(173,255,0,.30) 0%,
+    rgba(173,255,0,.60) 50%,
+    rgba(173,255,0,.30) 100%
+  );
+  animation: tw-endless-pulse 3s ease-in-out infinite;
+}
+@keyframes tw-endless-pulse {
+  0%,100% { opacity: .5; }
+  50%      { opacity: 1; }
+}
+
+/* Segmenty (Short=3, Medium=5, Long=8, Epic=13) */
+.tw-length-seg {
+  flex: 1;
+  border-radius: 3px;
+  background: rgba(255,255,255,.08);
+  transition: background .3s;
+}
+.tw-length-seg.tw-seg--active {
+  background: var(--threat-color, #adff00);
+  box-shadow: 0 0 6px var(--threat-color, #adff00);
+}
+
+/* =================================================================
+   5. JOIN CODE + copy — prawa strona karty
+   ================================================================= */
+.tw-card-join {
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  transform: translateY(-50%);
+  z-index: 10;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+
+  background: rgba(10,12,18,.85);
+  border: 1px solid rgba(255,255,255,.10);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  padding: 8px 8px 6px;
+  backdrop-filter: blur(8px);
+  transition: background .18s, border-color .18s;
+}
+.tw-campaign-card:hover .tw-card-join {
+  background: rgba(10,12,18,.95);
+  border-color: rgba(255,255,255,.18);
+}
+
+.tw-join-code {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: .65rem;
+  letter-spacing: .16em;
+  color: rgba(0,229,255,.75);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  user-select: all;
+}
+
+.tw-join-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.40);
+  cursor: pointer;
+  transition: background .18s, color .18s, border-color .18s;
+  padding: 0;
+}
+.tw-join-copy-btn:hover {
+  background: rgba(0,229,255,.10);
+  border-color: rgba(0,229,255,.30);
+  color: rgba(0,229,255,.85);
+}
+
+/* ---------- Actions (dolna belka) ---------- */
 .tw-campaign-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  padding-right: 28px; /* miejsce na join tab */
 }
 
 /* Główny przycisk */
@@ -213,29 +380,24 @@
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
-  min-height: 44px;
-  border-radius: 14px;
-  background: rgba(173,255,0,.12);
-  border: 1px solid rgba(173,255,0,.28);
+  min-height: 42px;
+  border-radius: 12px;
+  background: rgba(173,255,0,.10);
+  border: 1px solid rgba(173,255,0,.25);
   color: #adff00;
   font-family: 'Chakra Petch', sans-serif;
-  font-size: .85rem;
+  font-size: .82rem;
   font-weight: 600;
   letter-spacing: .06em;
   cursor: pointer;
   text-decoration: none;
-  transition:
-    background .18s,
-    border-color .18s,
-    color .18s,
-    box-shadow .18s;
+  transition: background .18s, border-color .18s, color .18s, box-shadow .18s;
   white-space: nowrap;
 }
-
 .tw-btn:hover {
-  background: rgba(173,255,0,.22);
+  background: rgba(173,255,0,.20);
   border-color: rgba(173,255,0,.55);
-  box-shadow: 0 0 14px rgba(173,255,0,.15);
+  box-shadow: 0 0 14px rgba(173,255,0,.14);
   color: #adff00;
   text-decoration: none;
 }
@@ -243,21 +405,21 @@
 /* Ghost */
 .tw-btn.tw-btn-ghost {
   background: rgba(255,255,255,.04);
-  border-color: rgba(255,255,255,.12);
-  color: rgba(255,255,255,.55);
+  border-color: rgba(255,255,255,.10);
+  color: rgba(255,255,255,.45);
 }
 .tw-btn.tw-btn-ghost:hover {
   background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.22);
-  color: rgba(255,255,255,.85);
+  border-color: rgba(255,255,255,.20);
+  color: rgba(255,255,255,.80);
   box-shadow: none;
 }
 
-/* Danger (delete) */
+/* Danger (delete / X) */
 .tw-btn.tw-btn-danger {
   background: transparent;
-  border-color: rgba(239,68,68,.20);
-  color: rgba(239,68,68,.55);
+  border-color: rgba(239,68,68,.18);
+  color: rgba(239,68,68,.45);
   padding: 10px 12px;
   margin-left: auto;
 }
@@ -268,100 +430,59 @@
   box-shadow: none;
 }
 
-/* Sync alias */
+/* Sync / Outline aliases (empty state) */
 .tw-btn-sync {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  min-height: 44px;
-  border-radius: 14px;
-  background: rgba(173,255,0,.14);
-  border: 1px solid rgba(173,255,0,.30);
-  color: #adff00;
-  font-family: 'Chakra Petch', sans-serif;
-  font-size: .85rem;
-  font-weight: 600;
-  letter-spacing: .06em;
-  cursor: pointer;
-  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px; min-height: 42px; border-radius: 12px;
+  background: rgba(173,255,0,.12); border: 1px solid rgba(173,255,0,.28);
+  color: #adff00; font-family: 'Chakra Petch', sans-serif;
+  font-size: .82rem; font-weight: 600; letter-spacing: .06em;
+  cursor: pointer; text-decoration: none;
   transition: background .18s, border-color .18s, box-shadow .18s;
 }
 .tw-btn-sync:hover {
-  background: rgba(173,255,0,.24);
-  border-color: rgba(173,255,0,.55);
+  background: rgba(173,255,0,.22); border-color: rgba(173,255,0,.55);
   box-shadow: 0 0 14px rgba(173,255,0,.14);
 }
-
-/* Outline alias */
 .tw-btn-outline {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  min-height: 44px;
-  border-radius: 14px;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.55);
-  font-family: 'Chakra Petch', sans-serif;
-  font-size: .85rem;
-  font-weight: 600;
-  letter-spacing: .06em;
-  cursor: pointer;
-  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px; min-height: 42px; border-radius: 12px;
+  background: transparent; border: 1px solid rgba(255,255,255,.13);
+  color: rgba(255,255,255,.50); font-family: 'Chakra Petch', sans-serif;
+  font-size: .82rem; font-weight: 600; letter-spacing: .06em;
+  cursor: pointer; text-decoration: none;
   transition: background .18s, border-color .18s;
 }
 .tw-btn-outline:hover {
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.25);
-  color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.24);
+  color: rgba(255,255,255,.80);
 }
 
 /* ---------- Empty state ---------- */
 .tw-campaigns-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 64px 24px;
-  gap: 12px;
+  display: flex; flex-direction: column;
+  align-items: center; text-align: center;
+  padding: 64px 24px; gap: 12px;
 }
-
-.tw-campaigns-empty-icon {
-  font-size: 2.5rem;
-  opacity: .6;
-}
-
+.tw-campaigns-empty-icon { font-size: 2.5rem; opacity: .5; }
 .tw-campaigns-empty-main {
   font-family: 'Chakra Petch', sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: .12em;
-  color: rgba(255,255,255,.55);
+  font-size: 1rem; font-weight: 600; letter-spacing: .12em;
+  color: rgba(255,255,255,.50);
 }
-
 .tw-campaigns-empty-sub {
-  font-size: .85rem;
-  color: rgba(255,255,255,.3);
-  max-width: 36ch;
-  line-height: 1.6;
+  font-size: .85rem; color: rgba(255,255,255,.28);
+  max-width: 36ch; line-height: 1.6;
 }
-
 .tw-campaigns-empty-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 8px;
+  display: flex; gap: 10px; flex-wrap: wrap;
+  justify-content: center; margin-top: 8px;
 }
 
 /* ---------- Error ---------- */
 .tw-error {
   font-family: 'Chakra Petch', sans-serif;
-  font-size: .88rem;
-  color: #ef4444;
-  letter-spacing: .06em;
+  font-size: .88rem; color: #ef4444; letter-spacing: .06em;
   padding: 16px;
   border: 1px solid rgba(239,68,68,.2);
   border-radius: 14px;
@@ -370,13 +491,20 @@
 
 /* ---------- Responsive ---------- */
 @media (max-width: 500px) {
-  .tw-campaigns-grid {
-    grid-template-columns: 1fr;
+  .tw-campaigns-grid { grid-template-columns: 1fr; }
+  .tw-card-join {
+    position: static;
+    flex-direction: row;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.10);
+    transform: none;
+    padding: 6px 10px;
+    margin-bottom: 8px;
   }
-  .tw-card-body {
-    grid-template-columns: 1fr;
+  .tw-join-code {
+    writing-mode: horizontal-tb;
+    transform: none;
+    font-size: .7rem;
   }
-  .tw-card-body-divider {
-    display: none;
-  }
+  .tw-campaign-actions { padding-right: 0; }
 }
