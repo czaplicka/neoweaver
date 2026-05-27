@@ -2,11 +2,22 @@
 /**
  * Shortcode: [nw_vitalis]
  *
- * Displays the character vitalis (HP / vitality) panel.
- * Loads the template partial templates/partials/character-vitalis.php if available,
- * otherwise renders a minimal inline fallback.
+ * Displays the character vitalis panel: HP, MP, XP and survival bars
+ * (satiety, hydration, rest, sync_rate).
  *
- * Usage: [nw_vitalis] or [nw_vitalis character_id="uuid"]
+ * Data sources:
+ *   current values  — cyber_state_of_the_campaign (hp, mp, xp, satiety, hydration, rest, sync_rate)
+ *   max HP / max MP — cyber_characters (hp, mp)
+ *
+ * Requires campaign_id — either passed as attribute or resolved via nw_get_active_campaign_id().
+ *
+ * Usage:
+ *   [nw_vitalis]
+ *   [nw_vitalis character_id="uuid" campaign_id="uuid"]
+ *
+ * Template override: templates/partials/character-vitalis.php
+ *   Variables available inside the template:
+ *     $safe_character_id, $safe_campaign_id, $state, $char_max
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -15,7 +26,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( ! function_exists( 'nw_shortcode_vitalis' ) ) {
 	function nw_shortcode_vitalis( array $atts ): string {
 		$atts = shortcode_atts(
-			[ 'character_id' => '' ],
+			[
+				'character_id' => '',
+				'campaign_id'  => '',
+			],
 			$atts,
 			'nw_vitalis'
 		);
@@ -25,79 +39,162 @@ if ( ! function_exists( 'nw_shortcode_vitalis' ) ) {
 		}
 
 		$character_id = sanitize_text_field( $atts['character_id'] );
+		$campaign_id  = sanitize_text_field( $atts['campaign_id'] );
 
 		if ( ! $character_id && function_exists( 'nw_get_active_character_id' ) ) {
 			$character_id = nw_get_active_character_id( get_current_user_id() );
 		}
+		if ( ! $campaign_id && function_exists( 'nw_get_active_campaign_id' ) ) {
+			$campaign_id = nw_get_active_campaign_id( get_current_user_id() );
+		}
 
-		if ( ! $character_id ) {
+		if ( ! $character_id || ! $campaign_id ) {
 			return '<div class="nw-vitalis nw-vitalis--empty"></div>';
 		}
 
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+		$safe_character_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+		$safe_campaign_id  = preg_replace( '/[^a-zA-Z0-9\-]/', '', $campaign_id );
 
 		// Try the template partial first.
 		$template = NEOWEAVER_PLUGIN_DIR . 'templates/partials/character-vitalis.php';
 		if ( file_exists( $template ) ) {
+			$state    = nw_vitalis_fetch_state( $safe_character_id, $safe_campaign_id );
+			$char_max = nw_vitalis_fetch_char_max( $safe_character_id );
 			ob_start();
-			set_query_var( 'nw_character_id', $safe_id );
-			load_template( $template, false );
+			include $template;
 			return ob_get_clean();
 		}
 
-		// --- Inline fallback (renders until the template partial is created) ---
-		$vitalis = null;
-		if ( function_exists( 'nw_supabase_base' ) && function_exists( 'nw_supabase_service_headers' ) ) {
-			$url = add_query_arg( [
-				'character_id' => 'eq.' . $safe_id,
-				'select'       => 'hp_current,hp_max,shield_current,shield_max',
-				'limit'        => 1,
-			], nw_supabase_base() . 'cyber_character_stats' );
+		// --- Inline fallback ---
+		$state    = nw_vitalis_fetch_state( $safe_character_id, $safe_campaign_id );
+		$char_max = nw_vitalis_fetch_char_max( $safe_character_id );
 
-			$res = wp_remote_get( $url, [
-				'headers' => nw_supabase_service_headers(),
-				'timeout' => 10,
-			] );
-
-			if ( ! is_wp_error( $res ) ) {
-				$rows    = json_decode( wp_remote_retrieve_body( $res ), true );
-				$vitalis = $rows[0] ?? null;
-			}
-		}
-
-		if ( ! $vitalis ) {
+		if ( ! $state ) {
 			return '<div class="nw-vitalis nw-vitalis--empty"></div>';
 		}
 
-		$hp_cur  = (int) ( $vitalis['hp_current']     ?? 0 );
-		$hp_max  = (int) ( $vitalis['hp_max']          ?? 0 );
-		$sh_cur  = (int) ( $vitalis['shield_current']  ?? 0 );
-		$sh_max  = (int) ( $vitalis['shield_max']       ?? 0 );
-		$hp_pct  = $hp_max > 0 ? round( ( $hp_cur / $hp_max ) * 100 ) : 0;
-		$sh_pct  = $sh_max > 0 ? round( ( $sh_cur / $sh_max ) * 100 ) : 0;
+		$hp_cur   = (int) ( $state['hp']          ?? 0 );
+		$mp_cur   = (int) ( $state['mp']          ?? 0 );
+		$xp       = (int) ( $state['xp']          ?? 0 );
+		$satiety  = (int) ( $state['satiety']      ?? 100 );
+		$hydro    = (int) ( $state['hydration']    ?? 100 );
+		$rest     = (int) ( $state['rest']         ?? 100 );
+		$sync     = (int) ( $state['sync_rate']    ?? 100 );
+
+		$hp_max   = (int) ( $char_max['hp']        ?? 0 );
+		$mp_max   = (int) ( $char_max['mp']        ?? 0 );
+
+		$hp_pct   = $hp_max > 0 ? round( ( $hp_cur / $hp_max ) * 100 ) : 0;
+		$mp_pct   = $mp_max > 0 ? round( ( $mp_cur / $mp_max ) * 100 ) : 0;
 
 		ob_start();
 		?>
-		<div class="nw-vitalis" data-character-id="<?php echo esc_attr( $safe_id ); ?>">
+		<div class="nw-vitalis" data-character-id="<?php echo esc_attr( $safe_character_id ); ?>" data-campaign-id="<?php echo esc_attr( $safe_campaign_id ); ?>">
+
 			<div class="nw-vitalis__bar nw-vitalis__bar--hp">
 				<span class="nw-vitalis__label">HP</span>
-				<div class="nw-vitalis__track">
-					<div class="nw-vitalis__fill" style="width:<?php echo esc_attr( $hp_pct ); ?>%"></div>
-				</div>
+				<div class="nw-vitalis__track"><div class="nw-vitalis__fill" style="width:<?php echo esc_attr( $hp_pct ); ?>%"></div></div>
 				<span class="nw-vitalis__numbers"><?php echo esc_html( $hp_cur . ' / ' . $hp_max ); ?></span>
 			</div>
-			<?php if ( $sh_max > 0 ) : ?>
-			<div class="nw-vitalis__bar nw-vitalis__bar--shield">
-				<span class="nw-vitalis__label">Shield</span>
-				<div class="nw-vitalis__track">
-					<div class="nw-vitalis__fill" style="width:<?php echo esc_attr( $sh_pct ); ?>%"></div>
-				</div>
-				<span class="nw-vitalis__numbers"><?php echo esc_html( $sh_cur . ' / ' . $sh_max ); ?></span>
+
+			<?php if ( $mp_max > 0 ) : ?>
+			<div class="nw-vitalis__bar nw-vitalis__bar--mp">
+				<span class="nw-vitalis__label">MP</span>
+				<div class="nw-vitalis__track"><div class="nw-vitalis__fill" style="width:<?php echo esc_attr( $mp_pct ); ?>%"></div></div>
+				<span class="nw-vitalis__numbers"><?php echo esc_html( $mp_cur . ' / ' . $mp_max ); ?></span>
 			</div>
 			<?php endif; ?>
+
+			<div class="nw-vitalis__xp">XP: <?php echo esc_html( $xp ); ?></div>
+
+			<div class="nw-vitalis__bars">
+				<?php
+				$survival_bars = [
+					'satiety'  => [ 'label' => 'Satiety',   'value' => $satiety ],
+					'hydro'    => [ 'label' => 'Hydration', 'value' => $hydro ],
+					'rest'     => [ 'label' => 'Rest',      'value' => $rest ],
+					'sync'     => [ 'label' => 'Sync',      'value' => $sync ],
+				];
+				foreach ( $survival_bars as $key => $bar ) : ?>
+				<div class="nw-vitalis__bar nw-vitalis__bar--<?php echo esc_attr( $key ); ?>">
+					<span class="nw-vitalis__label"><?php echo esc_html( $bar['label'] ); ?></span>
+					<div class="nw-vitalis__track"><div class="nw-vitalis__fill" style="width:<?php echo esc_attr( $bar['value'] ); ?>%"></div></div>
+					<span class="nw-vitalis__numbers"><?php echo esc_html( $bar['value'] ); ?>/100</span>
+				</div>
+				<?php endforeach; ?>
+			</div>
+
 		</div>
 		<?php
 		return ob_get_clean();
+	}
+}
+
+/**
+ * Fetch current state row from cyber_state_of_the_campaign.
+ *
+ * @return array|null
+ */
+if ( ! function_exists( 'nw_vitalis_fetch_state' ) ) {
+	function nw_vitalis_fetch_state( string $character_id, string $campaign_id ): ?array {
+		if ( ! function_exists( 'nw_supabase_base' ) || ! function_exists( 'nw_supabase_service_headers' ) ) {
+			return null;
+		}
+
+		$url = add_query_arg( [
+			'character_id' => 'eq.' . $character_id,
+			'campaign_id'  => 'eq.' . $campaign_id,
+			'select'       => 'hp,mp,xp,satiety,hydration,rest,sync_rate',
+			'limit'        => 1,
+		], nw_supabase_base() . 'cyber_state_of_the_campaign' );
+
+		$res = wp_remote_get( $url, [
+			'headers' => nw_supabase_service_headers(),
+			'timeout' => 10,
+		] );
+
+		if ( is_wp_error( $res ) ) {
+			error_log( 'nw_vitalis_fetch_state — ' . $res->get_error_message() );
+			return null;
+		}
+
+		$rows = json_decode( wp_remote_retrieve_body( $res ), true );
+		return $rows[0] ?? null;
+	}
+}
+
+/**
+ * Fetch max HP and max MP from cyber_characters.
+ *
+ * @return array  ['hp' => int, 'mp' => int]
+ */
+if ( ! function_exists( 'nw_vitalis_fetch_char_max' ) ) {
+	function nw_vitalis_fetch_char_max( string $character_id ): array {
+		if ( ! function_exists( 'nw_supabase_base' ) || ! function_exists( 'nw_supabase_service_headers' ) ) {
+			return [ 'hp' => 0, 'mp' => 0 ];
+		}
+
+		$url = add_query_arg( [
+			'id'     => 'eq.' . $character_id,
+			'select' => 'hp,mp',
+			'limit'  => 1,
+		], nw_supabase_base() . 'cyber_characters' );
+
+		$res = wp_remote_get( $url, [
+			'headers' => nw_supabase_service_headers(),
+			'timeout' => 10,
+		] );
+
+		if ( is_wp_error( $res ) ) {
+			error_log( 'nw_vitalis_fetch_char_max — ' . $res->get_error_message() );
+			return [ 'hp' => 0, 'mp' => 0 ];
+		}
+
+		$rows = json_decode( wp_remote_retrieve_body( $res ), true );
+		return [
+			'hp' => (int) ( $rows[0]['hp'] ?? 0 ),
+			'mp' => (int) ( $rows[0]['mp'] ?? 0 ),
+		];
 	}
 }
 
