@@ -2,7 +2,7 @@
 ( function ( $ ) {
 	'use strict';
 
-	$( document ).ready( function () {
+	$( function () {
 		if ( window.neoweaverAdmin && window.neoweaverAdmin.debug ) {
 			console.log( 'NeoWeaver Admin loaded.' );
 		}
