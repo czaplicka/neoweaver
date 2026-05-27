@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			try {
 				const formData = new FormData();
 				formData.append('action',   'save_player_notes');
-				formData.append('nonce',    window.twAdventureData?.nonce    || '');
+				formData.append('nonce', window.twCharacterPanelData?.nonce || window.twAdventureData?.nonce || '');
 				formData.append('notes',    notesField.value);
 				formData.append('char_id',  charId);
 
