@@ -296,7 +296,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 						<!-- 3. SVG tło GM style -->
 						<?php if ( $gm_data && ! empty( $gm_data['bg'] ) ) : ?>
 						<div class="tw-card-bg" aria-hidden="true">
-							<img src="<?php echo esc_url( $gm_data['bg'] ); ?>" alt="" width="300" height="200" loading="lazy">
+							<img src="<?php echo esc_url( $gm_data['bg'] ); ?>" alt="" width="300" height="170" loading="lazy">
 						</div>
 						<?php endif; ?>
 
