@@ -6,6 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * NEOWEAVER - QUICK ACTIONS (SERVER-SIDE COOLDOWN)
  * Ładuje się tylko na stronie gry (templates/adventure.php).
+ *
+ * Zależy od nw-game-data (supabase-global.php, priority 5), który dostarcza
+ * window.twSupabase i window.twGameState zanim ten skrypt wykona jakikolwiek kod.
  */
 
 add_action(
@@ -23,7 +26,7 @@ add_action(
 		wp_enqueue_script(
 			'tw-quick-actions',
 			$file_url,
-			array(),
+			array( 'nw-game-data' ),
 			$version,
 			true
 		);
