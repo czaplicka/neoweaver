@@ -18,9 +18,16 @@ if ( ! function_exists( 'tw_enqueue_library_assets' ) ) {
 
 		// ── CSS ──────────────────────────────────────────────────────────────
 		wp_enqueue_style(
-			'nw-deck-library',
-			$plugin_url . 'public/css/deck-library.css',
+			'nw-cards',
+			$plugin_url . 'assets/css/public/cards.css',
 			[],
+			$version
+		);
+
+		wp_enqueue_style(
+			'nw-deck-library',
+			$plugin_url . 'assets/css/public/library.css',
+			[ 'nw-cards' ],
 			$version
 		);
 
