@@ -267,24 +267,39 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 							<?php echo esc_html( $threat_data['label'] ); ?>
 						</div>
 						<?php endif; ?>
+			<!-- gm -->
+						<?php if ( $gm_data ) : ?>
+<div class="tw-card-gm-style-block">
+    <div class="tw-gm-ai-icon" title="AI Game Master">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 1 8 8v4a8 8 0 0 1-16 0v-4a8 8 0 0 1 8-8z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9.5 14s1 1.5 2.5 1.5 2.5-1.5 2.5-1.5"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
+    </div>
+    <div class="tw-gm-style-badge">
+        <?php echo $lucide_svg[ $gm_data['icon'] ] ?? ''; // phpcs:ignore ?>
+        <?php echo esc_html( $gm_data['label'] ); ?>
+    </div>
+</div>
+<?php endif; ?>
 
 						<!-- 5. JOIN CODE — wystawający prawy środkowy panel (tylko TEAM) -->
-						<?php if ( $is_team && $join_code ) : ?>
-						<div class="tw-card-join">
-							<span class="tw-join-code"><?php echo esc_html( strtoupper( $join_code ) ); ?></span>
-							<button type="button"
-								class="tw-join-copy-btn tw-copy-join-btn"
-								data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>"
-								aria-label="Copy join code">
-								<?php echo $lucide_svg['copy']; // phpcs:ignore ?>
-							</button>
-						</div>
-						<?php endif; ?>
+<?php if ( $is_team && $join_code ) : ?>
+<div class="tw-card-join">
+    <div class="tw-join-invite-label">INVITE</div>
+    <div class="tw-join-code-row">
+        <span class="tw-join-code"><?php echo esc_html( strtoupper( $join_code ) ); ?></span>
+        <button type="button"
+            class="tw-join-copy-btn tw-copy-join-btn"
+            data-code="<?php echo esc_attr( strtoupper( $join_code ) ); ?>"
+            aria-label="Copy join code">
+            <?php echo $lucide_svg['copy']; // phpcs:ignore ?>
+        </button>
+    </div>
+</div>
+<?php endif; ?>
 
 						<!-- 3. SVG tło GM style -->
 						<?php if ( $gm_data && ! empty( $gm_data['bg'] ) ) : ?>
 						<div class="tw-card-bg" aria-hidden="true">
-							<img src="<?php echo esc_url( $gm_data['bg'] ); ?>" alt="" width="160" height="160" loading="lazy">
+							<img src="<?php echo esc_url( $gm_data['bg'] ); ?>" alt="" width="300" height="200" loading="lazy">
 						</div>
 						<?php endif; ?>
 
@@ -303,23 +318,20 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 								<div class="tw-card-title"><?php echo $c_name; // phpcs:ignore ?></div>
 
 								<!-- Agent -->
-								<?php if ( $operative_name ) : ?>
-								<div class="tw-info-row">
-									<span class="tw-info-label">Agent:</span>
-									<span class="tw-info-value"><?php echo esc_html( $operative_name ); ?></span>
-								</div>
-								<?php if ( $operative_race || $operative_class ) : ?>
-								<div class="tw-info-row">
-									<span class="tw-info-label"></span>
-									<span class="tw-info-sub"><?php echo esc_html( trim( $operative_race . ( $operative_class ? ' · ' . $operative_class : '' ) ) ); ?></span>
-								</div>
-								<?php endif; ?>
-								<?php else : ?>
-								<div class="tw-info-row">
-									<span class="tw-info-label">Agent:</span>
-									<span class="tw-info-value tw-info-unset">—</span>
-								</div>
-								<?php endif; ?>
+<?php if ( $operative_name ) : ?>
+<div class="tw-info-agent-full">
+    <span class="tw-info-label">Agent:</span>
+    <span class="tw-info-value"><?php echo esc_html( $operative_name ); ?></span>
+    <?php if ( $operative_race || $operative_class ) : ?>
+    <span class="tw-info-sub"><?php echo esc_html( trim( $operative_race . ( $operative_class ? ' · ' . $operative_class : '' ) ) ); ?></span>
+    <?php endif; ?>
+</div>
+<?php else : ?>
+<div class="tw-info-agent-full">
+    <span class="tw-info-label">Agent:</span>
+    <span class="tw-info-value tw-info-unset">—</span>
+</div>
+<?php endif; ?>
 
 								<!-- Objective / Priority -->
 								<?php if ( $priority_data ) : ?>
