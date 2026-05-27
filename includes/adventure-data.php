@@ -73,6 +73,38 @@ function tw_supabase_first( string $table, array $params ): array {
 }
 
 /**
+ * Returns the active campaign_id for a given WP user.
+ *
+ * Reads the most recently updated row in cyber_state_of_the_campaign
+ * for the user. Used by shortcodes that need campaign context without
+ * requiring a manual campaign_id attribute.
+ *
+ * @param int $wp_user_id WP user ID. Defaults to current user.
+ * @return string UUID string, or empty string if not found.
+ */
+function nw_get_active_campaign_id( int $wp_user_id = 0 ): string {
+	if ( ! $wp_user_id ) {
+		$wp_user_id = get_current_user_id();
+	}
+
+	if ( ! $wp_user_id || ! function_exists( 'tw_supabase_first' ) ) {
+		return '';
+	}
+
+	$row = tw_supabase_first(
+		'cyber_state_of_the_campaign',
+		[
+			'wp_user_id' => 'eq.' . $wp_user_id,
+			'select'     => 'campaign_id',
+			'order'      => 'updated_at.desc',
+			'limit'      => 1,
+		]
+	);
+
+	return tw_sanitize_uuid( (string) ( $row['campaign_id'] ?? '' ) );
+}
+
+/**
  * Ensure a state row exists for the given campaign+character.
  * If missing, inserts defaults so the HUD always has something to show.
  * Uses service key — server-side write that must bypass RLS.
