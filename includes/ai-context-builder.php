@@ -7,8 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * NEOWEAVER — AI CONTEXT BUILDER
  *
  * Pobiera z Supabase minimalny, specyficzny zestaw danych per protokół.
- * Zwraca tablicę gotową do przekazania do tw_ai_gm():
- *
+ * Zwraca tablicę gotową do przekazania do tw_ai_gm():\n *
  *   tw_ai_build_context( string $char_id, string $protocol ): array
  *
  * Struktura zwracanego array:
@@ -102,7 +101,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 						);
 						if ( ! is_wp_error( $exit_rows ) && ! empty( $exit_rows ) ) {
 							$e = $exit_rows[0];
-							$exits[] = strtoupper( $dir ) . ': ' . esc_html( $e['locationname'] ) . ' [threat:' . (int) $e['threatlevel'] . ']';
+							$exits[] = strtoupper( $dir ) . ': ' . sanitize_text_field( $e['locationname'] ) . ' [threat:' . (int) $e['threatlevel'] . ']';
 						}
 					}
 				}
@@ -149,7 +148,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				if ( ! is_wp_error( $shop_rows ) && ! empty( $shop_rows ) ) {
 					$shop_lines = [];
 					foreach ( $shop_rows as $s ) {
-						$name  = esc_html( isset( $s['cyber_items']['name'] ) ? $s['cyber_items']['name'] : '?' );
+						$name  = sanitize_text_field( isset( $s['cyber_items']['name'] ) ? $s['cyber_items']['name'] : '?' );
 						$price = (int) ( isset( $s['price'] ) ? $s['price'] : 0 );
 						$qty   = (int) ( isset( $s['quantity'] ) ? $s['quantity'] : 0 );
 						$shop_lines[] = "{$name} ({$price}g x{$qty})";
@@ -157,7 +156,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 					$extra .= 'SHOP_INVENTORY: ' . implode( ', ', $shop_lines ) . "\n";
 				}
 				$extra .= 'PLAYER_GOLD: ' . (int)( isset( $char['gold'] ) ? $char['gold'] : 0 ) . "\n";
-				$extra .= 'WORLD_DIFFICULTY: ' . esc_html( isset( $world['difficulty'] ) ? $world['difficulty'] : 'normal' ) . "\n";
+				$extra .= 'WORLD_DIFFICULTY: ' . sanitize_text_field( isset( $world['difficulty'] ) ? $world['difficulty'] : 'normal' ) . "\n";
 				break;
 
 			case 'DIALOG':
@@ -171,11 +170,11 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				);
 				if ( ! is_wp_error( $npc_rows ) && ! empty( $npc_rows ) ) {
 					foreach ( $npc_rows as $npc ) {
-						$extra .= 'NPC: ' . esc_html( isset( $npc['name'] ) ? $npc['name'] : '?' );
-						if ( ! empty( $npc['faction'] ) )     $extra .= ' [faction:' . esc_html( $npc['faction'] ) . ']';
-						if ( ! empty( $npc['disposition'] ) ) $extra .= ' [disp:' . esc_html( $npc['disposition'] ) . ']';
+						$extra .= 'NPC: ' . sanitize_text_field( isset( $npc['name'] ) ? $npc['name'] : '?' );
+						if ( ! empty( $npc['faction'] ) )     $extra .= ' [faction:' . sanitize_text_field( $npc['faction'] ) . ']';
+						if ( ! empty( $npc['disposition'] ) ) $extra .= ' [disp:' . sanitize_text_field( $npc['disposition'] ) . ']';
 						if ( ! empty( $npc['ai_personality_prompt'] ) ) {
-							$extra .= "\nPERSONALITY: " . mb_substr( esc_html( $npc['ai_personality_prompt'] ), 0, 200 );
+							$extra .= "\nPERSONALITY: " . mb_substr( sanitize_text_field( $npc['ai_personality_prompt'] ), 0, 200 );
 						}
 						$extra .= "\n";
 					}
@@ -194,11 +193,11 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				if ( ! is_wp_error( $tag_rows ) && ! empty( $tag_rows ) ) {
 					$lore = [];
 					foreach ( $tag_rows as $t ) {
-						$lore[] = esc_html( isset( $t['tag_name'] ) ? $t['tag_name'] : '' ) . ': ' . mb_substr( esc_html( isset( $t['tag_description'] ) ? $t['tag_description'] : '' ), 0, 100 );
+						$lore[] = sanitize_text_field( isset( $t['tag_name'] ) ? $t['tag_name'] : '' ) . ': ' . mb_substr( sanitize_text_field( isset( $t['tag_description'] ) ? $t['tag_description'] : '' ), 0, 100 );
 					}
 					$extra .= 'WORLD_LORE: ' . implode( ' | ', $lore ) . "\n";
 				}
-				$extra .= 'ECHO_TAGS: ' . esc_html( implode( ', ', (array)( isset( $char['echo_tags'] ) ? $char['echo_tags'] : [] ) ) ) . "\n";
+				$extra .= 'ECHO_TAGS: ' . sanitize_text_field( implode( ', ', (array)( isset( $char['echo_tags'] ) ? $char['echo_tags'] : [] ) ) ) . "\n";
 				break;
 
 			case 'REST':
