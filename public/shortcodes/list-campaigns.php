@@ -270,9 +270,6 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 			<!-- gm -->
 						<?php if ( $gm_data ) : ?>
 <div class="tw-card-gm-style-block">
-    <div class="tw-gm-ai-icon" title="AI Game Master">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 1 8 8v4a8 8 0 0 1-16 0v-4a8 8 0 0 1 8-8z"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M9.5 14s1 1.5 2.5 1.5 2.5-1.5 2.5-1.5"/><path d="M2 12h2"/><path d="M20 12h2"/></svg>
-    </div>
     <div class="tw-gm-style-badge">
         <?php echo $lucide_svg[ $gm_data['icon'] ] ?? ''; // phpcs:ignore ?>
         <?php echo esc_html( $gm_data['label'] ); ?>
