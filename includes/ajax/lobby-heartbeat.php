@@ -26,7 +26,7 @@ if ( ! function_exists( 'neoweave_sanitize_campaign_id' ) ) {
 
 if ( ! function_exists( 'neoweave_lobby_supabase_headers' ) ) {
 	function neoweave_lobby_supabase_headers(): array {
-		if ( defined( 'NW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
+		if ( defined( 'TW_SUPABASE_SERVICE_KEY' ) && TW_SUPABASE_SERVICE_KEY ) {
 			$key = TW_SUPABASE_SERVICE_KEY;
 		} elseif ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
 			$key = tw_supabase_service_key();
