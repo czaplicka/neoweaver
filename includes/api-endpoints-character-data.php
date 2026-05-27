@@ -275,20 +275,7 @@ if ( ! function_exists( 'nw_supabase_request' ) ) {
 		}
 
 		return is_array( $data ) ? $data : array();
-
-    if ( $code < 200 || $code >= 300 ) {
-        return new WP_Error(
-            'supabase_http_error',
-            is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'Supabase request failed.',
-            array(
-                'status' => $code,
-                'body'   => $data,
-            )
-        );
     }
-
-    return is_array( $data ) ? $data : array();
-}
 }
 if ( ! function_exists( 'nw_fetch_lookup_table' ) ) {
     function nw_fetch_lookup_table( string $table, string $select_cols, string $order = '', int $limit = 300, array $extra_filters = array(), int $ttl = 60 ) {
@@ -802,7 +789,6 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
         return new WP_Error( 'subrace_required', 'Subrace is required.', array( 'status' => 400 ) );
     }
 
-    // 1. Pobierz i zwaliduj rasę nadrzędną
     $race_row = nw_find_race_by_id( $race_id_input );
 
     if ( empty( $race_row['id'] ) || ! is_string( $race_row['id'] ) ) {
@@ -815,7 +801,6 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
         return new WP_Error( 'invalid_race', 'Selected race must be a parent race.', array( 'status' => 400 ) );
     }
 
-    // 2. Pobierz i zwaliduj subrasę
     $subrace_row = nw_find_race_by_id( $subrace_id_input );
 
     if ( empty( $subrace_row['id'] ) || ! is_string( $subrace_row['id'] ) ) {
@@ -828,7 +813,6 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
         return new WP_Error( 'invalid_subrace', 'Selected subrace is not linked to a parent race.', array( 'status' => 400 ) );
     }
 
-    // 3. Porównaj parent_race subrasy z nazwą lub id rasy (case-insensitive)
     $race_name_normalized = trim( strtolower( (string) ( $race_row['name'] ?? '' ) ) );
     $race_id_normalized   = trim( strtolower( (string) ( $race_row['id']   ?? '' ) ) );
 
@@ -1003,7 +987,7 @@ if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
             )
         );
 
-        if ( ! empty( $uploaded['error'] ) ) {
+        if ( ! empty( $uploaded['error']) ) {
             return new WP_Error( 'avatar_upload_error', 'Avatar could not be uploaded.', array( 'status' => 400 ) );
         }
         if ( empty( $uploaded['url'] ) ) {
@@ -1014,24 +998,6 @@ if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
     }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * nw_parse_attr_post
- *
- * Reads a single character attribute from $_POST with strict validation.
- *
- * Rules enforced:
- *  - Both spelling variants present simultaneously → WP_Error (prevents
- *    crafted requests that send conflicting values to manipulate the sum).
- *  - Neither spelling present                      → WP_Error (no silent
- *    default-of-1 that makes the sum check pass for partial requests).
- *  - Value outside [1, 5]                          → WP_Error.
- *
- * @param string $key1  Primary POST key   (e.g. 'attrbody').
- * @param string $key2  Alias POST key     (e.g. 'attr_body').
- * @return int|WP_Error Validated integer on success.
- * ---------------------------------------------------------------------------
- */
 if ( ! function_exists( 'nw_parse_attr_post' ) ) {
     function nw_parse_attr_post( string $key1, string $key2 ) {
         $has1 = isset( $_POST[ $key1 ] );
@@ -1040,7 +1006,6 @@ if ( ! function_exists( 'nw_parse_attr_post' ) ) {
         if ( $has1 && $has2 ) {
             return new WP_Error(
                 'attr_duplicate_key',
-                /* translators: %1$s and %2$s are POST key names */
                 sprintf( 'Duplicate attribute keys in request (%1$s / %2$s).', $key1, $key2 ),
                 array( 'status' => 400 )
             );
@@ -1118,7 +1083,6 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
             return;
         }
 
-        // Attribute parsing: all four keys must be present; duplicate spellings rejected.
         $body   = nw_parse_attr_post( 'attrbody',   'attr_body' );
         $reflex = nw_parse_attr_post( 'attrreflex', 'attr_reflex' );
         $mind   = nw_parse_attr_post( 'attrmind',   'attr_mind' );
@@ -1378,12 +1342,6 @@ if ( ! function_exists( 'nw_get_backstory_tags_handler' ) ) {
     add_action( 'wp_ajax_nopriv_neoweaver_get_backstory_tags', 'nw_get_backstory_tags_handler' );
 }
 
-/**
- * tw_supabase_get_admin
- *
- * Wykonuje zapytanie GET do Supabase używając service key (omija RLS).
- * Używać tylko server-side, nigdy nie zwracać service key do frontendu.
- */
 if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
     function tw_supabase_get_admin( string $table, array $query = array() ) {
         if ( ! function_exists( 'tw_supabase_rest_base' ) ) {
@@ -1392,104 +1350,4 @@ if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 
         $service_key = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : '';
         if ( '' === $service_key ) {
-            return new WP_Error( 'config_missing', 'NW_SUPABASE_SERVICE_KEY not defined in wp-config.php.', array( 'status' => 500 ) );
-        }
-
-        $base = tw_supabase_rest_base();
-        if ( empty( $base ) ) {
-            return new WP_Error( 'config_missing', 'Supabase REST URL is empty.', array( 'status' => 500 ) );
-        }
-
-        $url = trailingslashit( $base ) . ltrim( $table, '/' );
-        if ( ! empty( $query ) ) {
-            $url = add_query_arg( $query, $url );
-        }
-
-        $response = wp_remote_get( $url, array(
-            'headers' => array(
-                'apikey'        => $service_key,
-                'Authorization' => 'Bearer ' . $service_key,
-                'Accept'        => 'application/json',
-            ),
-            'timeout'   => 30,
-            'sslverify' => true,
-        ) );
-
-        if ( is_wp_error( $response ) ) {
-            return $response;
-        }
-
-        $code = (int) wp_remote_retrieve_response_code( $response );
-        $raw  = wp_remote_retrieve_body( $response );
-        $data = '' !== $raw ? json_decode( $raw, true ) : array();
-
-        if ( $code < 200 || $code >= 300 ) {
-            return new WP_Error(
-                'supabase_http_error',
-                is_array( $data ) && ! empty( $data['message'] ) ? $data['message'] : 'Supabase admin request failed.',
-                array( 'status' => $code, 'body' => $data )
-            );
-        }
-
-        return is_array( $data ) ? $data : array();
-    }
-}
-
-/**
- * fetch_foundry_data
- *
- * Pobiera karty talii przypisane do postaci z tabeli cyber_character_deck.
- * Grupuje po deck_id — pierwsza karta = instancja, reszta = duplikaty do upgrade.
- *
- * @param string $character_id UUID postaci.
- * @return array|WP_Error Tablica obiektów stdClass z polami: instance_id, name, level, duplicate_count.
- */
-if ( ! function_exists( 'fetch_foundry_data' ) ) {
-    function fetch_foundry_data( string $character_id ) {
-        if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
-            return new WP_Error( 'missing_helper', 'tw_supabase_get_admin not available.' );
-        }
-
-        $rows = tw_supabase_get_admin(
-            'cyber_character_deck',
-            array(
-                'character_id' => 'eq.' . $character_id,
-                'select'       => 'id,deck_id,current_level,cyber_deck(name)',
-                'order'        => 'deck_id.asc',
-            )
-        );
-
-        if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
-            return $rows instanceof WP_Error ? $rows : array();
-        }
-
-        // Grupuj po deck_id — pierwsza karta = instancja do upgrade, reszta = duplikaty
-        $grouped = array();
-        foreach ( $rows as $row ) {
-            $deck_id = (int) ( $row['deck_id'] ?? 0 );
-            if ( ! isset( $grouped[ $deck_id ] ) ) {
-                $grouped[ $deck_id ] = array(
-                    'instance_id'     => (string) ( $row['id'] ?? '' ),
-                    'name'            => (string) ( $row['cyber_deck']['name'] ?? '[UNKNOWN]' ),
-                    'level'           => (int) ( $row['current_level'] ?? 1 ),
-                    'duplicate_count' => 0,
-                );
-            } else {
-                $grouped[ $deck_id ]['duplicate_count']++;
-            }
-        }
-
-        // Mapuj na obiekty których oczekuje shortcode
-        $result = array();
-        foreach ( $grouped as $item ) {
-            $obj                  = new stdClass();
-            $obj->instance_id     = $item['instance_id'];
-            $obj->name            = $item['name'];
-            $obj->level           = $item['level'];
-            $obj->duplicate_count = $item['duplicate_count'];
-            $result[]             = $obj;
-        }
-
-        return $result;
-    }
-}
+            return new WP_Error( 'config_missin
