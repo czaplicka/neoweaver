@@ -487,6 +487,46 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 }
 
 // ============================================================
+// tw_get_user_characters()
+// Zwraca listę postaci użytkownika z cyber_characters.
+// Używane przez library.php, achievements.php i inne shortcody.
+// ============================================================
+
+if ( ! function_exists( 'tw_get_user_characters' ) ) {
+	/**
+	 * Pobiera wszystkie postacie danego użytkownika WP z cyber_characters.
+	 *
+	 * @param int $user_id  WordPress user ID.
+	 * @return object[]     Tablica obiektów z polami: id, name, lvl, avatar.
+	 */
+	function tw_get_user_characters( int $user_id ): array {
+		if ( $user_id <= 0 ) {
+			return [];
+		}
+
+		$rows = tw_supabase_get_admin(
+			'cyber_characters',
+			[
+				'wp_user_id' => 'eq.' . $user_id,
+				'select'     => 'id,name,lvl,avatar',
+				'order'      => 'name.asc',
+			]
+		);
+
+		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+			return [];
+		}
+
+		$results = [];
+		foreach ( $rows as $row ) {
+			$results[] = (object) $row;
+		}
+
+		return $results;
+	}
+}
+
+// ============================================================
 // fetch_foundry_data()
 // ============================================================
 
