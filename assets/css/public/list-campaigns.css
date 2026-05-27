@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   NEOWEAVER — LIST CAMPAIGNS  v9 (glass / terminal / CRT)
+   NEOWEAVER — LIST CAMPAIGNS  v10 (glass / terminal / CRT)
    font: Chakra Petch | accent: #adff00
    ═══════════════════════════════════════════════════════════════ */
 
@@ -62,7 +62,7 @@
   z-index: 1;
 }
 
-/* ── SVG background (gm style) ──────────────────────────────────*/
+/* ── SVG background — pełna karta ───────────────────────────────*/
 .tw-card-bg {
   position: absolute;
   inset: 0;
@@ -73,17 +73,17 @@
 }
 .tw-card-bg img {
   position: absolute;
-  right: -10px;
-  bottom: -10px;
-  width: 190px;
-  height: 190px;
-  object-fit: contain;
-  opacity: .07;
-  filter: saturate(0) brightness(1.4);
-  transition: opacity .3s ease;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: .14;
+  filter: saturate(0) brightness(1.6) contrast(.85);
+  transition: opacity .35s ease;
 }
 .tw-campaign-card:hover .tw-card-bg img {
-  opacity: .12;
+  opacity: .24;
 }
 
 /* ── 1. SOLO/TEAM badge — wystający lewy górny ──────────────────*/
@@ -130,21 +130,92 @@
   backdrop-filter: blur(8px);
 }
 
+/* ── GM STYLE BLOCK — pod difficulty, z prawej ──────────────────*/
+.tw-card-gm-style-block {
+  position: absolute;
+  top: 38px;
+  right: -1px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* ikona AI */
+.tw-gm-ai-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px 0 0 8px;
+  background: rgba(10,12,16,.90);
+  border: 1px solid rgba(100,180,255,.28);
+  border-right: none;
+  color: rgba(100,180,255,.75);
+  box-shadow: 0 0 10px rgba(100,180,255,.10);
+}
+.tw-gm-ai-icon svg {
+  flex-shrink: 0;
+}
+
+/* GM style badge */
+.tw-gm-style-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 10px 0 0 10px;
+  background: rgba(10,12,16,.90);
+  border: 1px solid rgba(173,255,0,.20);
+  border-right: none;
+  color: rgba(200,230,160,.80);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+}
+.tw-gm-style-badge svg {
+  color: rgba(173,255,0,.60);
+  flex-shrink: 0;
+}
+
 /* ── 5. JOIN CODE — prawy środkowy ─────────────────────────────*/
 .tw-card-join {
   position: absolute;
   right: -1px;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 72px;
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.tw-join-invite-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(173,255,0,.50);
+  padding: 4px 10px 2px 12px;
+  background: rgba(10,12,16,.80);
+  border: 1px solid rgba(173,255,0,.18);
+  border-right: none;
+  border-bottom: none;
+  border-radius: 8px 0 0 0;
+}
+
+.tw-join-code-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 10px 6px 12px;
-  border-radius: 10px 0 0 10px;
   background: rgba(10,12,16,.95);
   border: 1px solid rgba(173,255,0,.28);
   border-right: none;
+  border-radius: 0 0 0 10px;
 }
 .tw-join-code {
   font-size: 11px;
@@ -231,14 +302,14 @@
   margin-bottom: 6px;
 }
 
-/* Agent / Objective rows */
-.tw-info-row,
-.tw-info-objective {
+/* Agent row — name + race·class inline */
+.tw-info-agent-full {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 6px;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .tw-info-label {
   color: rgba(200,220,180,.45);
@@ -253,7 +324,7 @@
   font-weight: 600;
 }
 .tw-info-sub {
-  color: rgba(200,220,180,.55);
+  color: rgba(200,220,180,.50);
   font-size: 11px;
   font-style: italic;
   letter-spacing: .02em;
@@ -261,6 +332,16 @@
 .tw-info-unset {
   color: rgba(200,220,180,.3);
   font-weight: 400;
+}
+
+/* Objective row */
+.tw-info-row,
+.tw-info-objective {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 /* ── 2. LENGTH PROGRESS BAR ─────────────────────────────────────*/
