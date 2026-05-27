@@ -21,7 +21,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		return '<p class="nw-notice">Log in to manage your deck.</p>';
 	}
 
-	// ── Character selection ────────────────────────────────────────────
+	// ── Character selection ───────────────────────────────────────────────
 	$selected_char_id = null;
 	if ( isset( $_GET['char_id'] ) && is_scalar( $_GET['char_id'] ) ) {
 		$selected_char_id = sanitize_text_field( wp_unslash( $_GET['char_id'] ) );
@@ -70,7 +70,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── 2. Active play cards (admin key – bypasses RLS) ────────────────
+	// ── 2. Active play cards (admin key – bypasses RLS) ──────────────────
 	$active_deck_ids = [];
 	if ( function_exists( 'tw_supabase_get_admin' ) ) {
 		$raw_play = tw_supabase_get_admin( 'cyber_character_play_cards', [
@@ -87,7 +87,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── 3. Split into active vs library ───────────────────────────────
+	// ── 3. Split into active vs library ─────────────────────────────
 	$active_cards  = [];
 	$library_cards = [];
 
@@ -101,10 +101,11 @@ function tw_shortcode_deck_library( $atts ): string {
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
-			'img_url'     => (string) ( $cdata['img_url']  ?? '' ),
-			'name'        => (string) ( $cdata['name']     ?? '' ),
+			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
+			'name'        => (string) ( $cdata['name']        ?? '' ),
+			'description' => (string) ( $cdata['description'] ?? '' ),
 			'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
-			'rarity'      => (string) ( $cdata['rarity']   ?? '' ),
+			'rarity'      => (string) ( $cdata['rarity']      ?? '' ),
 		];
 
 		if ( in_array( $rid, $active_deck_ids, true ) ) {
@@ -114,7 +115,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── Enqueue assets ─────────────────────────────────────────────────
+	// ── Enqueue assets ──────────────────────────────────────────────────
 	if ( function_exists( 'tw_enqueue_library_assets' ) ) {
 		tw_enqueue_library_assets( [
 			'characterId' => $safe_id,
@@ -165,28 +166,12 @@ function tw_shortcode_deck_library( $atts ): string {
 						<?php echo count( $active_cards ); ?>/50
 					</span>
 				</h3>
-				<div id="active-deck" class="card-slot-container">
+				<div id="active-deck" class="nw-cards-grid">
 					<?php if ( empty( $active_cards ) ) : ?>
-						<p class="deck-empty-note">No cards in active play.</p>
+						<p class="nw-cards-empty">No cards in active play.</p>
 					<?php else : ?>
 						<?php foreach ( $active_cards as $card ) : ?>
-							<div class="cyber-card cyber-card--active"
-								draggable="true"
-								data-instance-id="<?php echo esc_attr( $card['instance_id'] ); ?>"
-								data-card-location="active">
-								<?php if ( ! empty( $card['img_url'] ) ) : ?>
-									<img src="<?php echo esc_url( $card['img_url'] ); ?>"
-										alt="<?php echo esc_attr( $card['name'] ); ?>"
-										loading="lazy" width="120" height="118">
-								<?php endif; ?>
-								<div class="card-info">
-									<div class="card-name"><?php echo esc_html( $card['name'] ); ?></div>
-									<div class="card-lvl">LVL <?php echo esc_html( $card['level'] ); ?></div>
-									<?php if ( ! empty( $card['category'] ) ) : ?>
-										<span class="card-zone"><?php echo esc_html( strtoupper( $card['category'] ) ); ?></span>
-									<?php endif; ?>
-								</div>
-							</div>
+							<?php echo tw_render_library_card( $card, 'active' ); ?>
 						<?php endforeach; ?>
 					<?php endif; ?>
 				</div>
@@ -195,28 +180,12 @@ function tw_shortcode_deck_library( $atts ): string {
 			<!-- ── Library ── -->
 			<div class="deck-section">
 				<h3>Library</h3>
-				<div id="library-deck" class="card-slot-container">
+				<div id="library-deck" class="nw-cards-grid">
 					<?php if ( empty( $library_cards ) ) : ?>
-						<p class="deck-empty-note">Library is empty.</p>
+						<p class="nw-cards-empty">Library is empty.</p>
 					<?php else : ?>
 						<?php foreach ( $library_cards as $card ) : ?>
-							<div class="cyber-card"
-								draggable="true"
-								data-instance-id="<?php echo esc_attr( $card['instance_id'] ); ?>"
-								data-card-location="library">
-								<?php if ( ! empty( $card['img_url'] ) ) : ?>
-									<img src="<?php echo esc_url( $card['img_url'] ); ?>"
-										alt="<?php echo esc_attr( $card['name'] ); ?>"
-										loading="lazy" width="120" height="118">
-								<?php endif; ?>
-								<div class="card-info">
-									<div class="card-name"><?php echo esc_html( $card['name'] ); ?></div>
-									<div class="card-lvl">LVL <?php echo esc_html( $card['level'] ); ?></div>
-									<?php if ( ! empty( $card['category'] ) ) : ?>
-										<span class="card-zone"><?php echo esc_html( strtoupper( $card['category'] ) ); ?></span>
-									<?php endif; ?>
-								</div>
-							</div>
+							<?php echo tw_render_library_card( $card, 'library' ); ?>
 						<?php endforeach; ?>
 					<?php endif; ?>
 				</div>
@@ -250,10 +219,8 @@ function tw_shortcode_deck_library( $atts ): string {
 				.then(function(data){
 					if ( data.success && inner ) {
 						inner.outerHTML = data.data.html;
-						// Update root character-id attribute
 						var root = document.querySelector('[data-deck-builder-root]');
 						if ( root ) root.setAttribute('data-character-id', charId);
-						// Re-init Lucide icons if available
 						if ( window.lucide ) window.lucide.createIcons();
 					} else {
 						if ( inner ) inner.style.opacity = '1';
@@ -269,6 +236,82 @@ function tw_shortcode_deck_library( $atts ): string {
 	</script>
 	<?php
 	return ob_get_clean();
+}
+
+/**
+ * Render a single card using .nw-card classes from cards.css.
+ *
+ * @param array  $card     Card data array.
+ * @param string $location 'active' or 'library'.
+ * @return string  HTML string.
+ */
+function tw_render_library_card( array $card, string $location ): string {
+	$rarity_map = [
+		'common'    => 'nw-card--common',
+		'uncommon'  => 'nw-card--uncommon',
+		'rare'      => 'nw-card--rare',
+		'epic'      => 'nw-card--epic',
+		'legendary' => 'nw-card--legendary',
+	];
+	$cat_map = [
+		'magic'     => 'nw-card--magic',
+		'combat'    => 'nw-card--combat',
+		'action'    => 'nw-card--action',
+		'social'    => 'nw-card--social',
+		'equipment' => 'nw-card--equipment',
+		'tech'      => 'nw-card--tech',
+	];
+
+	$rarity_key  = strtolower( $card['rarity'] );
+	$cat_key     = strtolower( $card['category'] );
+	$rarity_cls  = $rarity_map[ $rarity_key ] ?? 'nw-card--common';
+	$cat_cls     = $cat_map[ $cat_key ] ?? '';
+	$active_cls  = ( 'active' === $location ) ? 'nw-card--ready' : '';
+	$ctx_cls     = 'nw-card--library';
+
+	$classes = trim( implode( ' ', array_filter( [
+		'nw-card',
+		$rarity_cls,
+		$cat_cls,
+		$active_cls,
+		$ctx_cls,
+	] ) ) );
+
+	$name    = esc_html( $card['name'] );
+	$level   = (int) $card['level'];
+	$desc    = esc_html( $card['description'] );
+	$iid     = esc_attr( (string) $card['instance_id'] );
+	$loc     = esc_attr( $location );
+	$cat_lbl = esc_html( ucfirst( $cat_key ) );
+
+	$img_html = '';
+	if ( ! empty( $card['img_url'] ) ) {
+		$img_html = sprintf(
+			'<img src="%s" alt="%s" loading="lazy" width="200" height="200" style="width:100%%;height:120px;object-fit:cover;">',
+			esc_url( $card['img_url'] ),
+			$name
+		);
+	}
+
+	return <<<HTML
+<div class="{$classes}"
+	 draggable="true"
+	 data-instance-id="{$iid}"
+	 data-card-location="{$loc}">
+	{$img_html}
+	<div class="nw-card__header">
+		<span class="nw-card__name">{$name}</span>
+		<span class="nw-card__level">LVL&nbsp;{$level}</span>
+		<span class="nw-card__rarity-dot"></span>
+	</div>
+	<div class="nw-card__body">
+		<p class="nw-card__desc">{$desc}</p>
+		<div class="nw-card__tags">
+			<span class="nw-card__tag">{$cat_lbl}</span>
+		</div>
+	</div>
+</div>
+HTML;
 }
 
 // ── AJAX handler: zwraca tylko inner HTML deck-builder-container ────────────
@@ -332,10 +375,11 @@ function tw_ajax_deck_library_switch(): void {
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
-			'img_url'     => (string) ( $cdata['img_url']  ?? '' ),
-			'name'        => (string) ( $cdata['name']     ?? '' ),
+			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
+			'name'        => (string) ( $cdata['name']        ?? '' ),
+			'description' => (string) ( $cdata['description'] ?? '' ),
 			'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
-			'rarity'      => (string) ( $cdata['rarity']   ?? '' ),
+			'rarity'      => (string) ( $cdata['rarity']      ?? '' ),
 		];
 
 		if ( in_array( $rid, $active_deck_ids, true ) ) {
@@ -355,48 +399,22 @@ function tw_ajax_deck_library_switch(): void {
 					<?php echo count( $active_cards ); ?>/50
 				</span>
 			</h3>
-			<div id="active-deck" class="card-slot-container">
+			<div id="active-deck" class="nw-cards-grid">
 				<?php if ( empty( $active_cards ) ) : ?>
-					<p class="deck-empty-note">No cards in active play.</p>
+					<p class="nw-cards-empty">No cards in active play.</p>
 				<?php else : foreach ( $active_cards as $card ) : ?>
-					<div class="cyber-card cyber-card--active" draggable="true"
-						data-instance-id="<?php echo esc_attr( $card['instance_id'] ); ?>"
-						data-card-location="active">
-						<?php if ( ! empty( $card['img_url'] ) ) : ?>
-							<img src="<?php echo esc_url( $card['img_url'] ); ?>" alt="<?php echo esc_attr( $card['name'] ); ?>" loading="lazy" width="120" height="118">
-						<?php endif; ?>
-						<div class="card-info">
-							<div class="card-name"><?php echo esc_html( $card['name'] ); ?></div>
-							<div class="card-lvl">LVL <?php echo esc_html( $card['level'] ); ?></div>
-							<?php if ( ! empty( $card['category'] ) ) : ?>
-								<span class="card-zone"><?php echo esc_html( strtoupper( $card['category'] ) ); ?></span>
-							<?php endif; ?>
-						</div>
-					</div>
+					<?php echo tw_render_library_card( $card, 'active' ); ?>
 				<?php endforeach; endif; ?>
 			</div>
 		</div>
 
 		<div class="deck-section">
 			<h3>Library</h3>
-			<div id="library-deck" class="card-slot-container">
+			<div id="library-deck" class="nw-cards-grid">
 				<?php if ( empty( $library_cards ) ) : ?>
-					<p class="deck-empty-note">Library is empty.</p>
+					<p class="nw-cards-empty">Library is empty.</p>
 				<?php else : foreach ( $library_cards as $card ) : ?>
-					<div class="cyber-card" draggable="true"
-						data-instance-id="<?php echo esc_attr( $card['instance_id'] ); ?>"
-						data-card-location="library">
-						<?php if ( ! empty( $card['img_url'] ) ) : ?>
-							<img src="<?php echo esc_url( $card['img_url'] ); ?>" alt="<?php echo esc_attr( $card['name'] ); ?>" loading="lazy" width="120" height="118">
-						<?php endif; ?>
-						<div class="card-info">
-							<div class="card-name"><?php echo esc_html( $card['name'] ); ?></div>
-							<div class="card-lvl">LVL <?php echo esc_html( $card['level'] ); ?></div>
-							<?php if ( ! empty( $card['category'] ) ) : ?>
-								<span class="card-zone"><?php echo esc_html( strtoupper( $card['category'] ) ); ?></span>
-							<?php endif; ?>
-						</div>
-					</div>
+					<?php echo tw_render_library_card( $card, 'library' ); ?>
 				<?php endforeach; endif; ?>
 			</div>
 		</div>
