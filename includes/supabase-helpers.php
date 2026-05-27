@@ -26,6 +26,28 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 // ============================================================
+// UUID SANITIZATION — single source of truth
+// ============================================================
+
+if ( ! function_exists( 'nw_sanitize_uuid' ) ) {
+	/**
+	 * Sanitize a UUID v4 string for safe use in Supabase query parameters.
+	 *
+	 * Lowercases the input, then strips every character that is not a
+	 * lowercase hex digit (a-f, 0-9) or a hyphen. This guarantees:
+	 *  - consistent casing (string comparisons are safe)
+	 *  - only UUID-legal characters remain
+	 *  - no SQL/URL injection via the ID field
+	 *
+	 * @param string $raw Raw UUID string from user input or DB.
+	 * @return string     Sanitized UUID, or '' if nothing valid remains.
+	 */
+	function nw_sanitize_uuid( string $raw ): string {
+		return preg_replace( '/[^a-f0-9\-]/', '', strtolower( $raw ) );
+	}
+}
+
+// ============================================================
 // BASE HELPERS
 // ============================================================
 
@@ -299,7 +321,7 @@ if ( ! function_exists( 'tw_get_data' ) ) {
 
 if ( ! function_exists( 'get_character_equipped_items' ) ) {
 	function get_character_equipped_items( string $character_id ): array {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+		$safe_id = nw_sanitize_uuid( $character_id );
 
 		if ( empty( $safe_id ) ) {
 			error_log( 'TW get_character_equipped_items: invalid character_id.' );
@@ -325,10 +347,10 @@ if ( ! function_exists( 'tw_save_user_setting' ) ) {
 	 *
 	 * Uses PATCH on an exact (wp_user_id, key) match so PostgREST updates
 	 * the existing row, and falls back to POST with on_conflict when the row
-	 * doesn’t yet exist. The simpler approach is a true upsert via POST with
+	 * doesn't yet exist. The simpler approach is a true upsert via POST with
 	 * Prefer: resolution=merge-duplicates AND on_conflict=wp_user_id,key —
 	 * which requires a UNIQUE constraint on (wp_user_id, key) in Supabase.
-	 * That constraint is assumed to exist; if it doesn’t, add it:
+	 * That constraint is assumed to exist; if it doesn't, add it:
 	 *   ALTER TABLE cyber_user_settings
 	 *     ADD CONSTRAINT uq_user_settings_user_key UNIQUE (wp_user_id, key);
 	 */
@@ -417,7 +439,7 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 			return false;
 		}
 
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $char_id );
+		$safe_id = nw_sanitize_uuid( $char_id );
 		if ( empty( $safe_id ) ) {
 			return false;
 		}
@@ -470,7 +492,7 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 
 if ( ! function_exists( 'fetch_foundry_data' ) ) {
 	function fetch_foundry_data( string $character_id ) {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+		$safe_id = nw_sanitize_uuid( $character_id );
 
 		if ( empty( $safe_id ) ) {
 			return new WP_Error( 'tw_foundry', 'Invalid character_id.' );
@@ -534,7 +556,7 @@ if ( ! function_exists( 'fetch_foundry_data' ) ) {
 
 if ( ! function_exists( 'get_cyber_player_credits' ) ) {
 	function get_cyber_player_credits( string $character_id ): int {
-		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
+		$safe_id = nw_sanitize_uuid( $character_id );
 
 		if ( empty( $safe_id ) ) {
 			return 0;

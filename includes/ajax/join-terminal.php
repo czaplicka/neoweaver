@@ -38,7 +38,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			'Authorization' => 'Bearer ' . $anon,
 		);
 
-		$safe_char_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', $character_id );
+		$safe_char_id = nw_sanitize_uuid( $character_id );
 
 		$char_url = add_query_arg(
 			array(
