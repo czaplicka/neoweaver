@@ -1,79 +1,106 @@
 <?php
 /**
  * fetch-foundry.php
- *
- * Thin wrapper — all actual Foundry/Supabase fetching lives in supabase-helpers.php.
- * This file exists so the $always loader in neoweaver-wp-core.php doesn't silently skip it,
- * and as the canonical place for any future Foundry-specific fetch helpers.
- *
- * If you need a new fetch function specific to the Foundry (world nodes, node data, etc.),
- * add it here rather than polluting supabase-helpers.php.
+ * Helper functions for fetching Foundry (item/gear catalog) data from Supabase.
+ * Pure PHP — no HTML, no echo. Returns arrays only.
  */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 /**
- * Fetch a single node (world location) from Supabase by its UUID.
+ * Fetch a single item from cyber_items by UUID.
  *
- * @param string $node_id  UUID of the node.
- * @return array|null      Row array or null on failure.
+ * @param string $item_id UUID of the item.
+ * @return array Item row or empty array on failure.
  */
-function nw_fetch_node( string $node_id ): ?array {
-	$base = function_exists( 'nw_supabase_base' ) ? nw_supabase_base() : '';
-	if ( ! $base || ! $node_id ) {
-		return null;
+function nw_foundry_get_item( string $item_id ): array {
+	if ( ! $item_id || ! function_exists( 'tw_supabase_first' ) ) {
+		return [];
 	}
 
-	$safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', $node_id );
-	$url  = add_query_arg( [
-		'id'     => 'eq.' . $safe,
-		'select' => '*',
-		'limit'  => 1,
-	], $base . 'cyber_nodes' );
-
-	$res  = wp_remote_get( $url, [
-		'headers' => function_exists( 'nw_supabase_service_headers' ) ? nw_supabase_service_headers() : [],
-		'timeout' => 10,
-	] );
-
-	if ( is_wp_error( $res ) ) {
-		error_log( 'nw_fetch_node — error: ' . $res->get_error_message() );
-		return null;
-	}
-
-	$rows = json_decode( wp_remote_retrieve_body( $res ), true );
-	return ! empty( $rows[0] ) ? $rows[0] : null;
+	return tw_supabase_first(
+		'cyber_items',
+		[
+			'id'     => 'eq.' . tw_sanitize_uuid( $item_id ),
+			'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
+			'limit'  => 1,
+		]
+	);
 }
 
 /**
- * Fetch all nodes belonging to a world.
+ * Fetch all items for a given type (e.g. 'weapon', 'armor', 'consumable').
  *
- * @param string $world_id  UUID of the world.
- * @return array            Array of node rows (may be empty).
+ * @param string $type  Item type slug.
+ * @param int    $limit Max rows to return.
+ * @return array List of item rows.
  */
-function nw_fetch_nodes_by_world( string $world_id ): array {
-	$base = function_exists( 'nw_supabase_base' ) ? nw_supabase_base() : '';
-	if ( ! $base || ! $world_id ) {
+function nw_foundry_get_items_by_type( string $type, int $limit = 50 ): array {
+	if ( ! $type || ! function_exists( 'tw_supabase_get' ) ) {
 		return [];
 	}
 
-	$safe = preg_replace( '/[^a-zA-Z0-9\-]/', '', $world_id );
-	$url  = add_query_arg( [
-		'world_id' => 'eq.' . $safe,
-		'select'   => 'id,name,description,node_type,created_at',
-		'order'    => 'created_at.asc',
-	], $base . 'cyber_nodes' );
+	$rows = tw_supabase_get(
+		'cyber_items',
+		[
+			'type'   => 'eq.' . sanitize_text_field( $type ),
+			'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
+			'order'  => 'name.asc',
+			'limit'  => max( 1, min( 200, $limit ) ),
+		]
+	);
 
-	$res  = wp_remote_get( $url, [
-		'headers' => function_exists( 'nw_supabase_service_headers' ) ? nw_supabase_service_headers() : [],
-		'timeout' => 10,
-	] );
+	return is_array( $rows ) ? $rows : [];
+}
 
-	if ( is_wp_error( $res ) ) {
-		error_log( 'nw_fetch_nodes_by_world — error: ' . $res->get_error_message() );
+/**
+ * Fetch items matching one or more tags (PostgREST array contains @>).
+ *
+ * @param array $tags  Array of tag strings.
+ * @param int   $limit Max rows.
+ * @return array List of item rows.
+ */
+function nw_foundry_get_items_by_tags( array $tags, int $limit = 50 ): array {
+	if ( empty( $tags ) || ! function_exists( 'tw_supabase_get' ) ) {
 		return [];
 	}
 
-	return json_decode( wp_remote_retrieve_body( $res ), true ) ?: [];
+	$encoded = '{' . implode( ',', array_map( 'sanitize_text_field', $tags ) ) . '}';
+
+	$rows = tw_supabase_get(
+		'cyber_items',
+		[
+			'tags'   => 'cs.' . $encoded,
+			'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
+			'order'  => 'name.asc',
+			'limit'  => max( 1, min( 200, $limit ) ),
+		]
+	);
+
+	return is_array( $rows ) ? $rows : [];
+}
+
+/**
+ * Fetch spells from cyber_spells.
+ *
+ * @param int $limit Max rows.
+ * @return array List of spell rows.
+ */
+function nw_foundry_get_spells( int $limit = 50 ): array {
+	if ( ! function_exists( 'tw_supabase_get' ) ) {
+		return [];
+	}
+
+	$rows = tw_supabase_get(
+		'cyber_spells',
+		[
+			'select' => 'id,name,description,tags,cost,effect,spell_type',
+			'order'  => 'name.asc',
+			'limit'  => max( 1, min( 200, $limit ) ),
+		]
+	);
+
+	return is_array( $rows ) ? $rows : [];
 }

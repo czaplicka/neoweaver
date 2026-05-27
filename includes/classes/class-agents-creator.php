@@ -1,100 +1,119 @@
 <?php
+/**
+ * class-agents-creator.php
+ * Handles creation of new Field Agents (characters) in Supabase.
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * Neoweaver_Agents_Creator
- *
- * Handles inserting a new character (agent) into Supabase.
- * Called from neoweaver_create_character() in api-endpoints.php.
- */
 class Neoweaver_Agents_Creator {
 
 	/**
-	 * Create a new agent in cyber_characters and run seeding RPCs.
+	 * Create a new character row in cyber_characters.
 	 *
-	 * @param array $data       Sanitised character fields (character_name, race, class, pronouns,
-	 *                          backstory, node_id, attr_body, attr_reflex, attr_mind, attr_spirit).
-	 * @param int   $wp_user_id WordPress user ID of the owner.
-	 *
-	 * @return string|null  UUID of the new character, or null on failure.
+	 * @param array $data {
+	 *   @type string $name        Character name (required).
+	 *   @type string $race_id     UUID of the race.
+	 *   @type string $class_id    UUID of the class.
+	 *   @type string $world_id    UUID of the world (required).
+	 *   @type int    $wp_user_id  WordPress user ID.
+	 *   @type string $bio         Optional bio.
+	 *   @type string $avatar      Optional avatar URL.
+	 * }
+	 * @return array|WP_Error Created row (with id) or WP_Error on failure.
 	 */
-	public function create( array $data, int $wp_user_id ): ?string {
-		$base = function_exists( 'nw_supabase_base' ) ? nw_supabase_base() : '';
-		if ( ! $base ) {
-			error_log( 'Neoweaver_Agents_Creator::create — supabase base missing' );
-			return null;
+	public function create( array $data ) {
+		if ( empty( $data['name'] ) || empty( $data['world_id'] ) ) {
+			return new WP_Error( 'missing_fields', 'name and world_id are required.' );
+		}
+
+		if ( ! function_exists( 'tw_supabase_request' ) || ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			return new WP_Error( 'supabase_unavailable', 'Supabase service key not configured.' );
 		}
 
 		$payload = [
-			'wp_user_id'    => $wp_user_id,
-			'name'          => $data['character_name'] ?? '',
-			'pronouns'      => $data['pronouns']       ?? '',
-			'race_id'       => $data['race']           ?? '',
-			'class_id'      => $data['class']          ?? '',
-			'node_id'       => $data['node_id']        ?? null,
-			'backstory'     => $data['backstory']      ?? '',
-			'attr_body'     => (int) ( $data['attr_body']    ?? 3 ),
-			'attr_reflex'   => (int) ( $data['attr_reflex']  ?? 3 ),
-			'attr_mind'     => (int) ( $data['attr_mind']    ?? 3 ),
-			'attr_spirit'   => (int) ( $data['attr_spirit']  ?? 3 ),
-			'status'        => 'active',
+			'name'       => sanitize_text_field( $data['name'] ),
+			'world_id'   => tw_sanitize_uuid( (string) $data['world_id'] ),
+			'wp_user_id' => ! empty( $data['wp_user_id'] ) ? (int) $data['wp_user_id'] : get_current_user_id(),
+			'bio'        => sanitize_textarea_field( $data['bio'] ?? '' ),
+			'avatar'     => esc_url_raw( $data['avatar'] ?? '' ),
+			'lvl'        => 1,
+			'gold'       => 0,
+			'body'       => 0,
+			'mind'       => 0,
+			'reflex'     => 0,
+			'spirit'     => 0,
+			'hp'         => 10,
+			'mp'         => 10,
 		];
 
-		// Remove null node_id so Supabase doesn't reject with a type error.
-		if ( null === $payload['node_id'] ) {
-			unset( $payload['node_id'] );
+		if ( ! empty( $data['race_id'] ) ) {
+			$payload['race_id'] = tw_sanitize_uuid( (string) $data['race_id'] );
 		}
 
-		$response = wp_remote_post( $base . 'cyber_characters', [
-			'headers' => function_exists( 'nw_supabase_service_headers' )
-				? nw_supabase_service_headers( true )
-				: [],
-			'body'    => wp_json_encode( $payload ),
-			'timeout' => 15,
-		] );
-
-		if ( is_wp_error( $response ) ) {
-			error_log( 'Neoweaver_Agents_Creator::create — wp_remote_post error: ' . $response->get_error_message() );
-			return null;
+		if ( ! empty( $data['class_id'] ) ) {
+			$payload['class_id'] = tw_sanitize_uuid( (string) $data['class_id'] );
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		$result = tw_supabase_request(
+			'POST',
+			'cyber_characters',
+			[],
+			$payload,
+			[
+				'headers' => [
+					'apikey'        => TW_SUPABASE_SERVICE_KEY,
+					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+					'Prefer'        => 'return=representation',
+				],
+			]
+		);
 
-		if ( $code < 200 || $code >= 300 ) {
-			error_log( 'Neoweaver_Agents_Creator::create — Supabase HTTP ' . $code . ': ' . wp_remote_retrieve_body( $response ) );
-			return null;
+		if ( is_wp_error( $result ) ) {
+			error_log( 'NW Agents_Creator::create error: ' . $result->get_error_message() );
+			return $result;
 		}
 
-		$agent_id = $body[0]['id'] ?? null;
-		if ( ! $agent_id ) {
-			error_log( 'Neoweaver_Agents_Creator::create — no ID returned in response' );
-			return null;
+		// PostgREST returns an array with the inserted row.
+		if ( is_array( $result ) && isset( $result[0] ) && is_array( $result[0] ) ) {
+			return $result[0];
 		}
 
-		$safe_id  = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $agent_id );
-		$rpc_base = $base . 'rpc/';
-		$rpc_args = wp_json_encode( [ 'p_character_id' => $safe_id ] );
+		return new WP_Error( 'unexpected_response', 'Unexpected response from Supabase.' );
+	}
 
-		// Seed starting stats, inventory, and abilities via RPCs.
-		foreach ( [ 'fn_seed_character_stats', 'fn_seed_character_inventory', 'fn_seed_character_abilities' ] as $rpc ) {
-			$rpc_res = wp_remote_post( $rpc_base . $rpc, [
-				'headers' => function_exists( 'nw_supabase_service_headers' ) ? nw_supabase_service_headers() : [],
-				'body'    => $rpc_args,
-				'timeout' => 30,
-			] );
-			if ( is_wp_error( $rpc_res ) ) {
-				error_log( 'Neoweaver_Agents_Creator::create — RPC ' . $rpc . ' error: ' . $rpc_res->get_error_message() );
-			} else {
-				$rpc_code = wp_remote_retrieve_response_code( $rpc_res );
-				if ( $rpc_code < 200 || $rpc_code >= 300 ) {
-					error_log( 'Neoweaver_Agents_Creator::create — RPC ' . $rpc . ' HTTP ' . $rpc_code . ': ' . wp_remote_retrieve_body( $rpc_res ) );
-				}
-			}
+	/**
+	 * Check whether the current user already owns a character in the given world.
+	 *
+	 * @param string $world_id UUID of the world.
+	 * @param int    $wp_user_id WP user ID (0 = current user).
+	 * @return bool
+	 */
+	public function user_has_character_in_world( string $world_id, int $wp_user_id = 0 ): bool {
+		if ( ! function_exists( 'tw_supabase_first' ) ) {
+			return false;
 		}
 
-		return $safe_id;
+		if ( ! $wp_user_id ) {
+			$wp_user_id = get_current_user_id();
+		}
+
+		if ( ! $wp_user_id || ! $world_id ) {
+			return false;
+		}
+
+		$row = tw_supabase_first(
+			'cyber_characters',
+			[
+				'world_id'   => 'eq.' . tw_sanitize_uuid( $world_id ),
+				'wp_user_id' => 'eq.' . $wp_user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			]
+		);
+
+		return ! empty( $row );
 	}
 }
