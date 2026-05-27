@@ -6,6 +6,9 @@
     var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
     var nonce = cfg.nonce || '';
 
+    // Lista typów załadowana z Supabase przy starcie
+    var allTypes = [];
+
     var cards = [];
     var currentId = '';
     var activeXhr = null;
@@ -25,14 +28,8 @@
     function notice(msg, type) {
         var $msg = $('#nw-deck-msg');
         var color = (type === 'error') ? '#ff6b6b' : '#adff00';
-
         clearNoticeTimer();
-
-        $msg.stop(true, true)
-            .css('color', color)
-            .text(msg)
-            .show();
-
+        $msg.stop(true, true).css('color', color).text(msg).show();
         noticeTimer = setTimeout(function () {
             $msg.fadeOut(250);
             noticeTimer = null;
@@ -64,11 +61,68 @@
     }
 
     function imageThumb(url) {
-        if (!url) {
-            return '<div class="nw-deck-thumb nw-deck-thumb-placeholder">—</div>';
-        }
-
+        if (!url) return '<div class="nw-deck-thumb nw-deck-thumb-placeholder">—</div>';
         return '<img src="' + esc(url) + '" alt="" class="nw-deck-thumb" loading="lazy">';
+    }
+
+    // Zwraca category_id z obiektu cyber_card_types (nested join)
+    function getCategoryFromCard(card) {
+        var t = card.cyber_card_types;
+        if (!t) return '';
+        if (Array.isArray(t)) return (t[0] && t[0].category_id) || '';
+        return t.category_id || '';
+    }
+
+    function getTypeLabelFromCard(card) {
+        var t = card.cyber_card_types;
+        if (!t) return card.type || '';
+        if (Array.isArray(t)) return (t[0] && t[0].label) || card.type || '';
+        return t.label || card.type || '';
+    }
+
+    // Załaduj typy z Supabase przez WP AJAX i wypełnij <select id="nw-deck-type">
+    function loadTypes(selectedTypeId) {
+        if (!hasAjaxConfig()) return;
+        $.post(ajax, {
+            action: 'nw_deck_types_list',
+            nonce: nonce
+        }, function (res) {
+            if (!res || !res.success) return;
+            allTypes = Array.isArray(res.data) ? res.data : [];
+            buildTypeSelect(selectedTypeId || '');
+        });
+    }
+
+    function buildTypeSelect(selectedId) {
+        var $sel = $('#nw-deck-type');
+        $sel.empty().append('<option value="">— select —</option>');
+
+        // Grupuj po category_id
+        var groups = {};
+        allTypes.forEach(function (t) {
+            var cat = t.category_id || 'other';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(t);
+        });
+
+        Object.keys(groups).sort().forEach(function (cat) {
+            var $og = $('<optgroup>').attr('label', cat.charAt(0).toUpperCase() + cat.slice(1));
+            groups[cat].forEach(function (t) {
+                var $opt = $('<option>').val(t.id).text(t.label);
+                if (t.id === selectedId) $opt.prop('selected', true);
+                $og.append($opt);
+            });
+            $sel.append($og);
+        });
+
+        updateTypeCategoryHint();
+    }
+
+    function updateTypeCategoryHint() {
+        var typeId = $('#nw-deck-type').val();
+        var found = allTypes.filter(function (t) { return t.id === typeId; })[0];
+        var hint = found ? 'Category: ' + (found.category_id || '—') : '';
+        $('#nw-deck-type-category-hint').text(hint);
     }
 
     function openModal() {
@@ -86,24 +140,16 @@
         var url = ($('#nw-deck-img-url').val() || '').trim();
         var $wrap = $('#nw-deck-image-preview-wrap');
         var $img = $('#nw-deck-image-preview');
-
-        if (!url) {
-            $img.attr('src', '');
-            $wrap.hide();
-            return;
-        }
-
+        if (!url) { $img.attr('src', ''); $wrap.hide(); return; }
         $img.attr('src', url);
         $wrap.show();
     }
 
     function resetForm() {
         currentId = '';
-
         $('#nw-deck-id').val('');
         $('#nw-deck-name').val('');
-        $('#nw-deck-category').val('action');
-        $('#nw-deck-type').val('');
+        buildTypeSelect('');
         $('#nw-deck-rarity').val('common');
         $('#nw-deck-description').val('');
         $('#nw-deck-effect').val('');
@@ -130,10 +176,8 @@
         $('#nw-deck-is-leveling').prop('checked', true);
         $('#nw-deck-is-disposable').prop('checked', false);
         $('#nw-deck-is-active').prop('checked', true);
-
         $('#nw-deck-image-preview').attr('src', '');
         $('#nw-deck-image-preview-wrap').hide();
-
         $('#nw-deck-modal-title').text('Add Card');
         $('#nw-deck-delete-btn').hide();
         $('#nw-deck-msg').hide().text('');
@@ -142,11 +186,9 @@
 
     function fillForm(card) {
         currentId = normalizeId(card.id);
-
         $('#nw-deck-id').val(currentId);
         $('#nw-deck-name').val(card.name || '');
-        $('#nw-deck-category').val(card.deck_category || 'action');
-        $('#nw-deck-type').val(card.type || '');
+        buildTypeSelect(card.type || '');
         $('#nw-deck-rarity').val(card.rarity || 'common');
         $('#nw-deck-description').val(card.description || '');
         $('#nw-deck-effect').val(card.effect || '');
@@ -173,9 +215,7 @@
         $('#nw-deck-is-leveling').prop('checked', boolVal(card.is_leveling));
         $('#nw-deck-is-disposable').prop('checked', boolVal(card.is_disposable));
         $('#nw-deck-is-active').prop('checked', boolVal(card.is_active));
-
         updateImagePreview();
-
         $('#nw-deck-modal-title').text('Edit Card');
         $('#nw-deck-delete-btn').show();
         $('#nw-deck-msg').hide().text('');
@@ -184,22 +224,21 @@
 
     function renderTable(rows) {
         var $tbody = $('#nw-deck-tbody');
-
         if (!rows || !rows.length) {
             $tbody.html('<tr><td colspan="7">No cards found.</td></tr>');
             return;
         }
-
         var html = rows.map(function (card) {
             var active = boolVal(card.is_active);
             var id = normalizeId(card.id);
-
+            var category = esc(getCategoryFromCard(card));
+            var typeLabel = esc(getTypeLabelFromCard(card));
             return ''
                 + '<tr data-id="' + esc(id) + '">'
                 + '<td>' + imageThumb(card.img_url) + '</td>'
                 + '<td>' + esc(card.name || '') + '</td>'
-                + '<td>' + esc(card.deck_category || '') + '</td>'
-                + '<td>' + esc(card.type || '') + '</td>'
+                + '<td>' + category + '</td>'
+                + '<td>' + typeLabel + '</td>'
                 + '<td>' + rarityBadge(card.rarity) + '</td>'
                 + '<td><input type="checkbox" class="nw-deck-toggle" data-id="' + esc(id) + '"' + (active ? ' checked' : '') + '></td>'
                 + '<td>'
@@ -208,7 +247,6 @@
                 + '</td>'
                 + '</tr>';
         }).join('');
-
         $tbody.html(html);
     }
 
@@ -218,7 +256,6 @@
             notice('Missing AJAX config.', 'error');
             return;
         }
-
         var data = {
             action: 'nw_deck_list',
             nonce: nonce,
@@ -227,20 +264,14 @@
             active: $('#nw-deck-filter-active').val() || '',
             search: ($('#nw-deck-search').val() || '').trim()
         };
-
-        if (activeXhr && activeXhr.readyState !== 4) {
-            activeXhr.abort();
-        }
-
+        if (activeXhr && activeXhr.readyState !== 4) activeXhr.abort();
         $('#nw-deck-tbody').html('<tr><td colspan="7">Loading…</td></tr>');
-
         activeXhr = $.post(ajax, data, function (res) {
             if (!res || !res.success) {
                 $('#nw-deck-tbody').html('<tr><td colspan="7">Error loading cards.</td></tr>');
                 notice((res && res.data) || 'Load error', 'error');
                 return;
             }
-
             cards = Array.isArray(res.data) ? res.data : [];
             renderTable(cards);
         }).fail(function (xhr, status) {
@@ -248,24 +279,13 @@
                 $('#nw-deck-tbody').html('<tr><td colspan="7">Request failed.</td></tr>');
                 notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
             }
-        }).always(function () {
-            activeXhr = null;
-        });
+        }).always(function () { activeXhr = null; });
     }
 
     function loadSingle(id) {
         var normalizedId = normalizeId(id);
-
-        if (!hasAjaxConfig()) {
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-
-        if (!normalizedId) {
-            notice('Invalid card ID.', 'error');
-            return;
-        }
-
+        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
+        if (!normalizedId) { notice('Invalid card ID.', 'error'); return; }
         $.post(ajax, {
             action: 'nw_deck_get',
             nonce: nonce,
@@ -275,7 +295,6 @@
                 notice((res && res.data) || 'Cannot load card.', 'error');
                 return;
             }
-
             fillForm(res.data);
             openModal();
         }).fail(function (xhr) {
@@ -285,13 +304,11 @@
 
     function collectPayload() {
         var id = normalizeId($('#nw-deck-id').val());
-
         return {
             action: 'nw_deck_save',
             nonce: nonce,
             id: id,
             name: ($('#nw-deck-name').val() || '').trim(),
-            deck_category: $('#nw-deck-category').val(),
             type: ($('#nw-deck-type').val() || '').trim(),
             rarity: $('#nw-deck-rarity').val(),
             description: ($('#nw-deck-description').val() || '').trim(),
@@ -322,6 +339,9 @@
         };
     }
 
+    // Zmiana typu → aktualizuj hint kategorii
+    $(document).on('change', '#nw-deck-type', updateTypeCategoryHint);
+
     $('#nw-deck-add-btn').on('click', function (e) {
         e.preventDefault();
         resetForm();
@@ -334,10 +354,7 @@
     });
 
     $('#nw-deck-search').on('keydown', function (e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            loadCards();
-        }
+        if (e.key === 'Enter') { e.preventDefault(); loadCards(); }
     });
 
     $('#nw-deck-cancel-btn, #nw-deck-modal-close').on('click', function (e) {
@@ -346,19 +363,14 @@
     });
 
     $('#nw-deck-modal').on('click', function (e) {
-        if (e.target === this) {
-            closeModal();
-        }
+        if (e.target === this) closeModal();
     });
 
     $('#nw-deck-img-url').on('input change blur', updateImagePreview);
 
     $(document).on('click', '.nw-deck-edit', function () {
         var id = normalizeId($(this).attr('data-id'));
-        if (!id) {
-            notice('Invalid card ID.', 'error');
-            return;
-        }
+        if (!id) { notice('Invalid card ID.', 'error'); return; }
         loadSingle(id);
     });
 
@@ -366,19 +378,8 @@
         var id = normalizeId($(this).attr('data-id'));
         var state = $(this).is(':checked') ? 1 : 0;
         var $checkbox = $(this);
-
-        if (!hasAjaxConfig()) {
-            $checkbox.prop('checked', !$checkbox.is(':checked'));
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-
-        if (!id) {
-            $checkbox.prop('checked', !$checkbox.is(':checked'));
-            notice('Invalid card ID.', 'error');
-            return;
-        }
-
+        if (!hasAjaxConfig()) { $checkbox.prop('checked', !$checkbox.is(':checked')); notice('Missing AJAX config.', 'error'); return; }
+        if (!id) { $checkbox.prop('checked', !$checkbox.is(':checked')); notice('Invalid card ID.', 'error'); return; }
         $.post(ajax, {
             action: 'nw_deck_toggle',
             nonce: nonce,
@@ -390,7 +391,6 @@
                 notice((res && res.data) || 'Toggle failed.', 'error');
                 return;
             }
-
             notice('Card updated.', 'success');
         }).fail(function (xhr) {
             $checkbox.prop('checked', !$checkbox.is(':checked'));
@@ -400,31 +400,15 @@
 
     $('#nw-deck-save-btn').on('click', function (e) {
         e.preventDefault();
-
-        if (!hasAjaxConfig()) {
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-
+        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
         var payload = collectPayload();
         var $btn = $(this);
         var originalText = $btn.text();
-
-        if (!payload.name) {
-            notice('Name is required.', 'error');
-            return;
-        }
-
+        if (!payload.name) { notice('Name is required.', 'error'); return; }
         $btn.prop('disabled', true).text('Saving…');
-
         $.post(ajax, payload, function (res) {
             $btn.prop('disabled', false).text(originalText);
-
-            if (!res || !res.success) {
-                notice((res && res.data) || 'Save failed.', 'error');
-                return;
-            }
-
+            if (!res || !res.success) { notice((res && res.data) || 'Save failed.', 'error'); return; }
             notice('Card saved.', 'success');
             closeModal();
             loadCards();
@@ -436,29 +420,16 @@
 
     $('#nw-deck-delete-btn').on('click', function (e) {
         e.preventDefault();
-
-        if (!hasAjaxConfig()) {
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-
+        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
         var id = normalizeId($('#nw-deck-id').val());
         if (!id) return;
-
-        if (!window.confirm('Delete this card? This cannot be undone.')) {
-            return;
-        }
-
+        if (!window.confirm('Delete this card? This cannot be undone.')) return;
         $.post(ajax, {
             action: 'nw_deck_delete',
             nonce: nonce,
             id: id
         }, function (res) {
-            if (!res || !res.success) {
-                notice((res && res.data) || 'Delete failed.', 'error');
-                return;
-            }
-
+            if (!res || !res.success) { notice((res && res.data) || 'Delete failed.', 'error'); return; }
             notice('Card deleted.', 'success');
             closeModal();
             loadCards();
@@ -469,28 +440,15 @@
 
     $(document).on('click', '.nw-deck-delete-row', function () {
         var id = normalizeId($(this).attr('data-id'));
-
-        if (!hasAjaxConfig()) {
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-
+        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
         if (!id) return;
-
-        if (!window.confirm('Delete this card? This cannot be undone.')) {
-            return;
-        }
-
+        if (!window.confirm('Delete this card? This cannot be undone.')) return;
         $.post(ajax, {
             action: 'nw_deck_delete',
             nonce: nonce,
             id: id
         }, function (res) {
-            if (!res || !res.success) {
-                notice((res && res.data) || 'Delete failed.', 'error');
-                return;
-            }
-
+            if (!res || !res.success) { notice((res && res.data) || 'Delete failed.', 'error'); return; }
             notice('Card deleted.', 'success');
             loadCards();
         }).fail(function (xhr) {
@@ -498,6 +456,8 @@
         });
     });
 
+    // Init: najpierw typy, potem karty
+    loadTypes();
     loadCards();
 
 })(jQuery);

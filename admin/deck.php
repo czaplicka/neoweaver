@@ -20,7 +20,7 @@ class NW_Deck_Admin {
 
 	private string $page_slug = 'neoweaver-deck';
 
-	private const CATEGORIES = [ 'action', 'magic', 'equipment' ];
+	private const CATEGORIES = [ 'magic', 'combat', 'action', 'social', 'equipment', 'tech' ];
 	private const RARITIES   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
 
 	public function __construct() {
@@ -76,8 +76,9 @@ class NW_Deck_Admin {
 			'nw-deck-script',
 			'NWDeck',
 			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'neoweaver_deck' ),
+				'ajaxurl'    => admin_url( 'admin-ajax.php' ),
+				'nonce'      => wp_create_nonce( 'neoweaver_deck' ),
+				'categories' => self::CATEGORIES,
 			]
 		);
 	}
@@ -319,18 +320,13 @@ class NW_Deck_Admin {
 							<td><input type="text" id="nw-deck-name" class="regular-text" required></td>
 						</tr>
 						<tr>
-							<th><label for="nw-deck-category"><?php esc_html_e( 'Category', 'neoweaver' ); ?></label></th>
-							<td>
-								<select id="nw-deck-category">
-									<?php foreach ( self::CATEGORIES as $c ) : ?>
-										<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</td>
-						</tr>
-						<tr>
 							<th><label for="nw-deck-type"><?php esc_html_e( 'Type', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-type" class="regular-text"></td>
+							<td>
+								<select id="nw-deck-type">
+									<option value=""><?php esc_html_e( '— select —', 'neoweaver' ); ?></option>
+								</select>
+								<p class="description" id="nw-deck-type-category-hint"></p>
+							</td>
 						</tr>
 						<tr>
 							<th><label for="nw-deck-rarity"><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></label></th>
@@ -473,10 +469,13 @@ class NW_Deck_Admin {
 		$search   = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
 		$active   = sanitize_text_field( wp_unslash( $_POST['active'] ?? '' ) );
 
-		$endpoint = 'cyber_deck?select=id,name,deck_category,type,rarity,img_url,is_active&order=name.asc';
+		// Nested select: pobierz dane typu (label, icon, color, category_id) przez FK
+		$select = 'id,name,type,rarity,img_url,is_active,cyber_card_types!cyber_deck_type_fkey(id,label,icon,color,category_id)';
+		$endpoint = 'cyber_deck?select=' . rawurlencode( $select ) . '&order=name.asc';
 
+		// Filtr po kategorii — przez relację cyber_card_types
 		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
-			$endpoint .= '&deck_category=eq.' . rawurlencode( $category );
+			$endpoint .= '&cyber_card_types.category_id=eq.' . rawurlencode( $category );
 		}
 
 		if ( $rarity && in_array( $rarity, self::RARITIES, true ) ) {
@@ -491,11 +490,7 @@ class NW_Deck_Admin {
 			$endpoint .= '&name=ilike.*' . rawurlencode( $search ) . '*';
 		}
 
-		$result = $this->supa(
-			'GET',
-			$endpoint,
-			[],
-		);
+		$result = $this->supa( 'GET', $endpoint );
 
 		if ( ! $result['ok'] ) {
 			wp_send_json_error( $result['error'] ?? 'Failed to load deck.' );
@@ -513,16 +508,17 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$id = $this->get_uuid_from_post( 'id' );
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 
 		if ( ! $id ) {
 			wp_send_json_error( 'Invalid ID.' );
 			return;
 		}
 
+		$select = rawurlencode( '*,cyber_card_types!cyber_deck_type_fkey(id,label,icon,color,category_id)' );
 		$result = $this->supa(
 			'GET',
-			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=*'
+			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=' . $select
 		);
 
 		if ( ! $result['ok'] ) {
@@ -555,13 +551,7 @@ class NW_Deck_Admin {
 			return;
 		}
 
-		$category = sanitize_text_field( wp_unslash( $_POST['deck_category'] ?? 'action' ) );
-		$rarity   = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
-
-		if ( ! in_array( $category, self::CATEGORIES, true ) ) {
-			wp_send_json_error( 'Invalid category.' );
-			return;
-		}
+		$rarity = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
 
 		if ( ! in_array( $rarity, self::RARITIES, true ) ) {
 			wp_send_json_error( 'Invalid rarity.' );
@@ -571,7 +561,6 @@ class NW_Deck_Admin {
 		$payload = [
 			'name'                    => $name,
 			'description'             => $this->maybe_null_textarea( wp_unslash( $_POST['description'] ?? '' ) ),
-			'deck_category'           => $category,
 			'type'                    => $this->maybe_null_text( wp_unslash( $_POST['type'] ?? '' ) ) ?: 'action',
 			'mechanic'                => $this->maybe_null_text( wp_unslash( $_POST['mechanic'] ?? '' ) ),
 			'mechanic_goal'           => $this->maybe_null_text( wp_unslash( $_POST['mechanic_goal'] ?? '' ) ),
@@ -599,10 +588,12 @@ class NW_Deck_Admin {
 			'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
 			'class_id'                => $this->maybe_uuid( wp_unslash( $_POST['class_id'] ?? '' ) ),
 		];
-if ( ! $id ) {
-    $payload['xp_current'] = 0;
-    $payload['xp_to_next'] = 10;
-}
+
+		if ( ! $id ) {
+			$payload['xp_current'] = 0;
+			$payload['xp_to_next'] = 10;
+		}
+
 		if ( $id ) {
 			$result = $this->supa(
 				'PATCH',
