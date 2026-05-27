@@ -3,20 +3,22 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 	function tw_get_cyber_world_news_ajax(): void {
-		check_ajax_referer( 'tw_world_news_nonce', 'nonce' );
-
+		// Login check first — prevents WordPress from dying with -1 on nonce failure
+		// for unauthenticated requests, ensuring a clean JSON error response.
 		if ( ! is_user_logged_in() ) {
 			wp_send_json_error( [ 'message' => 'Unauthorized.' ], 401 );
 			return;
 		}
+
+		check_ajax_referer( 'tw_world_news_nonce', 'nonce' );
 
 		if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 			wp_send_json_error( [ 'message' => 'Supabase config missing.' ], 500 );
 			return;
 		}
 
-		$world_id     = sanitize_text_field( (string) ( $_POST['world_id']     ?? '' ) );
-		$character_id = sanitize_text_field( (string) ( $_POST['character_id'] ?? '' ) );
+		$world_id     = nw_sanitize_uuid( (string) ( $_POST['world_id']     ?? '' ) );
+		$character_id = nw_sanitize_uuid( (string) ( $_POST['character_id'] ?? '' ) );
 		$current_day  = intval( $_POST['current_day']  ?? 0 );
 		$current_hour = intval( $_POST['current_hour'] ?? 0 );
 		$clearance    = isset( $_POST['clearance'] ) ? intval( $_POST['clearance'] ) : 0;
