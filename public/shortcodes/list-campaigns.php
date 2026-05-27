@@ -28,7 +28,7 @@ if ( ! function_exists( 'tw_list_campaigns_final_v8_modes' ) ) {
 					'nonce'       => wp_create_nonce( 'tw_game_nonce' ),
 					'restNonce'   => wp_create_nonce( 'wp_rest' ),
 					'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ),
-					'terminalUrl' => home_url( '/game/' ),
+					'terminalUrl' => home_url( '/terminal/' ),
 					'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
 					'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
 				)
