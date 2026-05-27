@@ -512,30 +512,6 @@ function tw_prepare_character_data( array $game_data ): array {
 	return $result;
 }
 
-/** active campaign */
-/**
- * Returns active campaign_id for the current WP user.
- * Reads from cyber_state_of_the_campaign — last active row.
- */
-function nw_get_active_campaign_id( int $wp_user_id = 0 ): string {
-    if ( ! $wp_user_id ) {
-        $wp_user_id = get_current_user_id();
-    }
-    if ( ! $wp_user_id || ! function_exists( 'tw_supabase_first' ) ) {
-        return '';
-    }
-    $row = tw_supabase_first(
-        'cyber_state_of_the_campaign',
-        [
-            'wp_user_id' => 'eq.' . $wp_user_id,
-            'select'     => 'campaign_id',
-            'order'      => 'updated_at.desc',
-            'limit'      => 1,
-        ]
-    );
-    return tw_sanitize_uuid( (string) ( $row['campaign_id'] ?? '' ) );
-}
-
 /**
  * Fetches and prepares tactical map / battle-grid data.
  */
