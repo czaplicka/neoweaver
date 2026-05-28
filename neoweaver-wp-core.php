@@ -159,7 +159,7 @@ final class NeoWeaver_Core {
 			'public/shortcodes/achievements.php',
 			'public/shortcodes/adventure-terminal.php',
 			'public/shortcodes/agents-list.php',
-			'includes/shortcodes/ascension.php';
+			'includes/shortcodes/ascension.php',
 			'public/shortcodes/connect-campaign-world.php',
 			'public/shortcodes/connect-character-campaign.php',
 			'public/shortcodes/essences.php',
@@ -196,7 +196,7 @@ final class NeoWeaver_Core {
 		];
 
 		$ajax_only = [
-			'includes/ajax/ascension.php';
+			'includes/ajax/ascension.php',
 			'includes/ajax/buffer.php',
 			'includes/ajax/deck-scenarios.php',
 			'includes/ajax/ensure-world-state.php',
