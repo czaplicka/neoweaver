@@ -72,7 +72,7 @@ if ( ! function_exists( 'tw_sanitize_supabase_id' ) ) {
 }
 
 if ( ! function_exists( 'tw_update_game_session_status' ) ) {
-	function tw_update_game_session_status( $campaign_id, string $status, $scenario_id = 0 ): bool {
+	function tw_update_game_session_status( $campaign_id, string $status, $scenario_id = '' ): bool {
 		$url = tw_supa_url(
 			'cyber_game_sessions',
 			array(
@@ -103,8 +103,9 @@ if ( ! function_exists( 'tw_update_game_session_status' ) ) {
 			'updated_at'      => gmdate( 'Y-m-d\\TH:i:s\\Z' ),
 		);
 
-		if ( $scenario_id > 0 ) {
-			$body['active_scenario_id'] = (int) $scenario_id;
+		$safe_scenario_id = tw_sanitize_supabase_id( (string) $scenario_id );
+		if ( '' !== $safe_scenario_id ) {
+			$body['active_scenario_id'] = $safe_scenario_id;
 		}
 
 		$response = wp_remote_request(
@@ -185,7 +186,7 @@ if ( ! function_exists( 'tw_get_game_session_status' ) ) {
 }
 
 if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
-	function tw_get_chat_channel_id_by_session( $session_id ): ?int {
+	function tw_get_chat_channel_id_by_session( $session_id ): ?string {
 		$url = tw_supa_url(
 			'cyber_game_sessions',
 			array(
@@ -226,7 +227,7 @@ if ( ! function_exists( 'tw_get_chat_channel_id_by_session' ) ) {
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		$raw  = $data[0]['chat_channel_id'] ?? null;
 
-		return null !== $raw ? (int) $raw : null;
+		return null !== $raw ? tw_sanitize_supabase_id( (string) $raw ) : null;
 	}
 }
 
@@ -251,10 +252,10 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			return;
 		}
 
-		$scenario_id = (int) ( $_POST['scenario_id'] ?? 0 );
+		$scenario_id = tw_sanitize_supabase_id( $_POST['scenario_id'] ?? '' );
 		$campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? '' );
 
-		if ( ! $scenario_id || ! $campaign_id ) {
+		if ( '' === $scenario_id || '' === $campaign_id ) {
 			wp_send_json_error( array( 'message' => 'Missing IDs' ), 400 );
 			return;
 		}
