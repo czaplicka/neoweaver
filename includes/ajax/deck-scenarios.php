@@ -17,15 +17,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ---------------------------------------------------------------------------
 // 1. Localize deck config vars on the terminal page
+// Hooked directly on wp_enqueue_scripts (priority 11) with is_page() guard.
+// The previous 'wp' wrapper caused localization to be skipped on AJAX requests.
 // ---------------------------------------------------------------------------
 
-add_action( 'wp', function () {
-	if ( is_page( 'terminal' ) ) {
-		add_action( 'wp_enqueue_scripts', 'tw_localize_deck_vars', 11 );
-	}
-} );
+add_action( 'wp_enqueue_scripts', 'tw_localize_deck_vars', 11 );
 
 function tw_localize_deck_vars() {
+
+	if ( ! is_page( 'terminal' ) ) {
+		return;
+	}
 
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
@@ -151,8 +153,17 @@ function tw_get_scenarios_ajax(): void {
 		return;
 	}
 
-	$played     = $played ?: [];
-	$played_ids = ! empty( $played ) ? array_map( 'intval', array_column( $played, 'scenario_id' ) ) : [];
+	// UUID-safe: keep scenario_id as string, never cast to int.
+	$played      = $played ?: [];
+	$played_ids  = ! empty( $played )
+		? array_filter(
+			array_map(
+				static fn( $row ) => preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $row['scenario_id'] ?? '' ) ),
+				$played
+			),
+			static fn( $v ) => '' !== $v
+		)
+		: [];
 
 	error_log( 'tw_get_scenarios_ajax: played_ids=' . ( $played_ids ? implode( ',', $played_ids ) : 'none' ) );
 
@@ -166,7 +177,7 @@ function tw_get_scenarios_ajax(): void {
 	$query = [
 		'difficulty' => 'in.(' . implode( ',', $difficulty_values ) . ')',
 		'type'       => 'eq.main',
-		'order'      => 'id.desc',
+		'order'      => 'created_at.desc',
 		'limit'      => 3,
 	];
 
