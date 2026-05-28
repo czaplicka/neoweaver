@@ -129,13 +129,14 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
 		}
 
 		$found = array_map(
-			static function ( $row ) {
-				return isset( $row['id'] ) ? (int) $row['id'] : 0;
-			},
-			is_array( $defs ) ? $defs : array()
-		);
+    static function ( $row ) {
+        return isset( $row['id'] ) ? (string) $row['id'] : '';
+    },
+    is_array( $defs ) ? $defs : array()
+);
 
-		$missing = array_values( array_diff( $requested, $found ) );
+$requested_str = array_map( 'strval', $requested );
+$missing = array_values( array_diff( $requested_str, $found ) );
 
 		error_log( 'NW BACKSTORY found IDs ' . wp_json_encode( $found ) );
 		error_log( 'NW BACKSTORY missing IDs ' . wp_json_encode( $missing ) );
