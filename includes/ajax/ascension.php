@@ -12,7 +12,7 @@ add_action( 'wp_ajax_nw_ascend_card', 'nw_ajax_ascend_card' );
 function nw_ajax_ascend_card(): void {
 	check_ajax_referer( 'nw_ascension_nonce', 'nonce' );
 
-	$character_id = sanitize_text_field( $_POST['character_id'] ?? '' );
+	$character_id = nw_sanitize_uuid( (string) ( $_POST['character_id'] ?? '' ) );
 	$deck_id      = absint( $_POST['deck_id'] ?? 0 );
 
 	if ( ! $character_id || ! $deck_id ) {
@@ -22,7 +22,7 @@ function nw_ajax_ascend_card(): void {
 	// Validate user owns this character
 	$user_id    = get_current_user_id();
 	$characters = tw_supabase_get( 'cyber_characters', [
-		'id'        => 'eq.' . tw_sanitize_uuid( $character_id ),
+		'id'        => 'eq.' . nw_sanitize_uuid( $character_id ),
 		'wp_user_id' => 'eq.' . $user_id,
 		'select'    => 'id',
 		'limit'     => 1,
@@ -33,7 +33,7 @@ function nw_ajax_ascend_card(): void {
 
 	// Fetch all copies of this card for this character (only non-ascended = ascension_level = 0)
 	$copies = tw_supabase_get( 'cyber_character_deck', [
-		'character_id'   => 'eq.' . tw_sanitize_uuid( $character_id ),
+		'character_id'   => 'eq.' . nw_sanitize_uuid( $character_id ),
 		'deck_id'        => 'eq.' . $deck_id,
 		'ascension_level' => 'eq.0',
 		'is_locked'      => 'eq.false',
