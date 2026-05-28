@@ -84,6 +84,7 @@ final class NeoWeaver_Core {
 			'includes/rest-ai-chat.php',
 			'includes/api-endpoints.php',
 			'includes/api-endpoints-character-data.php',
+			'includes/api-endpoints-character-write.php',
 
 			// Shared classes / repositories.
 			'includes/classes/class-supabase.php',
