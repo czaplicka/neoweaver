@@ -87,8 +87,8 @@ if ( ! function_exists( 'nw_normalize_tag_label' ) ) {
 	function nw_normalize_tag_label( $value ) {
 		$value = sanitize_text_field( (string) $value );
 		$value = strtolower( $value );
-		$value = preg_replace( '/[^a-z0-9\-\s]+/', '', $value );
-		$value = preg_replace( '/[\s\-]+/', '-', $value );
+		$value = preg_replace( '/[^a-z0-9\\-\\s]+/', '', $value );
+		$value = preg_replace( '/[\\s\\-]+/', '-', $value );
 		return trim( $value, '-' );
 	}
 }
@@ -362,7 +362,7 @@ if ( ! function_exists( 'nw_map_skill_card_shape' ) ) {
 }
 
 if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
-	function nw_map_starting_package_shape( array $rows, string $class_name = '' ): array {
+	function nw_map_starting_package_shape( array $rows ): array {
 		return array_map(
 			static function ( $row ) {
 				return array(
@@ -643,7 +643,7 @@ if ( ! function_exists( 'nw_get_starting_packages_handler' ) ) {
 			return;
 		}
 		$filtered = '' !== $class_name ? nw_filter_packages_by_class_name( $rows, $class_name ) : $rows;
-		wp_send_json_success( nw_map_starting_package_shape( $filtered, $class_name ) );
+		wp_send_json_success( nw_map_starting_package_shape( $filtered ) );
 	}
 	add_action( 'wp_ajax_neoweaver_get_starting_packages', 'nw_get_starting_packages_handler' );
 	add_action( 'wp_ajax_nopriv_neoweaver_get_starting_packages', 'nw_get_starting_packages_handler' );
