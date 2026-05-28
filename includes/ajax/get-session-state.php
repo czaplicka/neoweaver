@@ -12,7 +12,7 @@ function tw_get_session_state_handler(): void {
 		return;
 	}
 
-	check_ajax_referer( 'tw_nonce', 'nonce' );
+	check_ajax_referer( 'neoweaver_chat', 'nonce' );
 
 	if ( empty( $_POST['session_id'] ) ) {
 		wp_send_json_error( [ 'message' => 'Missing session_id' ], 400 );

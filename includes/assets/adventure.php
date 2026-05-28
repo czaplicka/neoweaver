@@ -45,6 +45,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'neoweaver-header-node'  => [ 'assets/js/public/header-node.js', [] ],
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
 			'nw-chat-engine'         => [ 'assets/js/chat-engine.js', [] ],
+			'nw-adventure-init'      => [ 'assets/js/public/adventure.js', [] ],
 		];
 
 		foreach ( $scripts as $handle => [ $relative_path, $deps ] ) {
@@ -70,6 +71,26 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 				'ajax_url' => admin_url( 'admin-ajax.php' ),
 				'nonce'    => wp_create_nonce( 'neoweaver_chat' ),
 				'is_admin' => current_user_can( 'manage_options' ),
+			]
+		);
+
+		// twAdventureData — required by adventure.js (hydration + session state AJAX)
+		$wp_user_id = get_current_user_id();
+		$game_data  = function_exists( 'get_user_game_data_from_supabase' )
+			? get_user_game_data_from_supabase( $wp_user_id )
+			: [];
+
+		wp_localize_script(
+			'nw-adventure-init',
+			'twAdventureData',
+			[
+				'ajax_url'            => admin_url( 'admin-ajax.php' ),
+				'nonce'               => wp_create_nonce( 'neoweaver_chat' ),
+				'active_session_id'   => $game_data['active_session_id']   ?? '',
+				'active_campaign_id'  => $game_data['active_campaign_id']  ?? '',
+				'active_character_id' => $game_data['active_character_id'] ?? '',
+				'active_world_id'     => $game_data['active_world_id']     ?? '',
+				'active_location_id'  => $game_data['active_location_id']  ?? '',
 			]
 		);
 	}
