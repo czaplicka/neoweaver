@@ -251,3 +251,25 @@ function _nw_asc_selector( array $characters, string $current_id ): string {
 add_shortcode( 'nw_ascension', 'nw_shortcode_ascension' );
 
 endif;
+
+add_shortcode( 'nw_asc_debug', function() {
+    if ( ! is_user_logged_in() ) return 'not logged in';
+    
+    $user_id = get_current_user_id();
+    $chars   = tw_get_user_characters( $user_id );
+    
+    if ( empty( $chars ) ) return '<pre>NO CHARACTERS</pre>';
+    
+    $char_id = is_object( $chars[0] ) ? $chars[0]->id : $chars[0]['id'];
+    
+    $owned = tw_supabase_get( 'cyber_character_deck', [
+        'character_id' => 'eq.' . $char_id,
+        'is_locked'    => 'eq.false',
+        'select'       => 'id,deck_id,current_level,ascension_level',
+    ] );
+    
+    return '<pre>'
+        . 'CHAR ID: ' . $char_id . "\n\n"
+        . 'OWNED CARDS: ' . print_r( $owned, true )
+        . '</pre>';
+} );
