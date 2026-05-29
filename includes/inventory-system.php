@@ -4,43 +4,61 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * TALE WEAVER - INVENTORY SYSTEM
+ * NEOWEAVER - INVENTORY SYSTEM
  * Drag & drop, paperdoll, ekwipunek postaci.
- * Ładuje się tylko na stronie gry (templates/adventure.php).
+ * ᐚduje się tylko na stronie gry (templates/adventure.php).
  */
 
-/** Canonical list of valid equipment slots. */
-const NW_VALID_SLOTS = [
-	'head',
-	'torso',
-	'hand_l',
-	'hand_r',
-	'belt_1',
-	'belt_2',
-	'belt_3',
-	'legs',
-	'feet',
-	'accessory_1',
-	'accessory_2',
-];
+/**
+ * Canonical list of valid equipment slots.
+ *
+ * define() zamiast const:
+ * - PHP const na poziomie pliku (poza klasą) jest legalne, ale staje się
+ *   fatal error gdy plik zostanie dołączony wewnątrz funkcji lub warunku.
+ * - define() działa bezpiecznie w każdym kontekstu include/require.
+ * - Wartości zamrożone — stałe globalne dla całego request.
+ */
+if ( ! defined( 'NW_VALID_SLOTS' ) ) {
+	define(
+		'NW_VALID_SLOTS',
+		array(
+			'head',
+			'torso',
+			'hand_l',
+			'hand_r',
+			'belt_1',
+			'belt_2',
+			'belt_3',
+			'legs',
+			'feet',
+			'accessory_1',
+			'accessory_2',
+		)
+	);
+}
 
 /**
  * Map each slot to the item slot_type tag(s) that may be equipped there.
  * Values must match the slot_type tags used in cyber_items.
  */
-const NW_SLOT_ALLOWED_TYPES = [
-	'head'        => [ 'head' ],
-	'torso'       => [ 'torso', 'armor' ],
-	'hand_l'      => [ 'hand', 'shield', 'weapon' ],
-	'hand_r'      => [ 'hand', 'weapon' ],
-	'belt_1'      => [ 'belt', 'consumable', 'tool' ],
-	'belt_2'      => [ 'belt', 'consumable', 'tool' ],
-	'belt_3'      => [ 'belt', 'consumable', 'tool' ],
-	'legs'        => [ 'legs' ],
-	'feet'        => [ 'feet', 'boots' ],
-	'accessory_1' => [ 'accessory', 'implant' ],
-	'accessory_2' => [ 'accessory', 'implant' ],
-];
+if ( ! defined( 'NW_SLOT_ALLOWED_TYPES' ) ) {
+	define(
+		'NW_SLOT_ALLOWED_TYPES',
+		array(
+			'head'        => array( 'head' ),
+			'torso'       => array( 'torso', 'armor' ),
+			'hand_l'      => array( 'hand', 'shield', 'weapon' ),
+			'hand_r'      => array( 'hand', 'weapon' ),
+			'belt_1'      => array( 'belt', 'consumable', 'tool' ),
+			'belt_2'      => array( 'belt', 'consumable', 'tool' ),
+			'belt_3'      => array( 'belt', 'consumable', 'tool' ),
+			'legs'        => array( 'legs' ),
+			'feet'        => array( 'feet', 'boots' ),
+			'accessory_1' => array( 'accessory', 'implant' ),
+			'accessory_2' => array( 'accessory', 'implant' ),
+		)
+	);
+}
 
 add_action(
 	'wp_enqueue_scripts',
@@ -65,7 +83,7 @@ add_action(
 	40
 );
 
-// ─── AJAX handler: tw_update_inventory_slot ────────────────────────────────────────────
+// ─── AJAX handler: tw_update_inventory_slot ─────────────────────────────────────────────────
 add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot' );
 
 if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
@@ -129,6 +147,23 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			)
 		);
 
+		/**
+		 * KOLEJNOŚĆ sprawdzeń ma znaczenie:
+		 *
+		 * 1. is_wp_error() MUSI być PRZED empty().
+		 *
+		 *    empty() na obiekcie WP_Error zwraca FALSE (obiekt nie jest pusty),
+		 *    więc stary kod przechodził dalej z błędnym $ownership_rows[0]
+		 *    przy każdym błędzie sieciowym — PHP Warning + PATCH bez sprawdzenia właśności.
+		 *
+		 * 2. empty() sprawdza czy Supabase zwróciło puste array (brak wiersza = brak właśności).
+		 */
+		if ( is_wp_error( $ownership_rows ) ) {
+			error_log( '[NeoWeaver] tw_handle_update_inventory_slot: Supabase ownership check failed – ' . $ownership_rows->get_error_message() );
+			wp_send_json_error( array( 'message' => 'Database error during ownership check' ) );
+			return;
+		}
+
 		if ( empty( $ownership_rows ) ) {
 			wp_send_json_error( array( 'message' => 'Inventory item not found or not owned by current character' ) );
 			return;
@@ -136,8 +171,8 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 
 		// Enforce item slot_type restriction when equipping.
 		if ( $is_equipped && null !== $slot_name ) {
+			$allowed_types  = NW_SLOT_ALLOWED_TYPES[ $slot_name ] ?? array();
 			$item_slot_type = $ownership_rows[0]['cyber_items']['slot_type'] ?? null;
-			$allowed_types  = NW_SLOT_ALLOWED_TYPES[ $slot_name ] ?? [];
 
 			if ( null === $item_slot_type || ! in_array( $item_slot_type, $allowed_types, true ) ) {
 				wp_send_json_error( array( 'message' => 'Item type not allowed in this slot' ) );
@@ -163,7 +198,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 		}
 
 		if ( is_array( $result ) && isset( $result['code'] ) && ( (int) $result['code'] < 200 || (int) $result['code'] >= 300 ) ) {
-			error_log( 'TW tw_handle_update_inventory_slot: Supabase PATCH failed, code=' . $result['code'] );
+			error_log( 'NW tw_handle_update_inventory_slot: Supabase PATCH failed, code=' . $result['code'] );
 			wp_send_json_error( array( 'message' => 'Database update failed', 'code' => $result['code'] ) );
 			return;
 		}
