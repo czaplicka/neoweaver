@@ -8,6 +8,22 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+/**
+ * Zwraca pole 'id' z elementu postaci (array lub object).
+ */
+function nw_char_id( $char ): string {
+	if ( is_array( $char ) ) return (string) ( $char['id'] ?? '' );
+	return (string) ( $char->id ?? '' );
+}
+
+/**
+ * Zwraca pole po nazwie z elementu postaci (array lub object).
+ */
+function nw_char_field( $char, string $field ): string {
+	if ( is_array( $char ) ) return (string) ( $char[ $field ] ?? '' );
+	return (string) ( $char->$field ?? '' );
+}
+
 if ( ! function_exists( 'nw_shortcode_ascension' ) ) :
 
 function nw_shortcode_ascension( array $atts ): string {
@@ -29,19 +45,19 @@ function nw_shortcode_ascension( array $atts ): string {
 		return '<p class="nw-notice">No character found. Create a character first.</p>';
 	}
 
-	// Jeśli nie podano character_id z atrybutu, weź z query string lub pierwszą postać
+	// Jeśli nie podano character_id, weź z query string lub pierwszą postać
 	if ( ! $character_id ) {
 		$qs_id = isset( $_GET['nw_char'] ) ? nw_sanitize_uuid( $_GET['nw_char'] ) : '';
 		if ( $qs_id ) {
 			foreach ( $characters as $c ) {
-				if ( (string) $c->id === $qs_id ) {
+				if ( nw_char_id( $c ) === $qs_id ) {
 					$character_id = $qs_id;
 					break;
 				}
 			}
 		}
 		if ( ! $character_id ) {
-			$character_id = (string) $characters[0]->id;
+			$character_id = nw_char_id( $characters[0] );
 		}
 	}
 
@@ -69,10 +85,10 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $no_cards;
 	}
 
-	// Grupowanie po deck_id — INT przez cały czas, spójny klucz tablicy
+	// Grupowanie po deck_id — zawsze int
 	$groups = [];
 	foreach ( $owned as $card ) {
-		$did = (int) $card['deck_id'];  // zawsze int
+		$did = (int) $card['deck_id'];
 		if ( ! isset( $groups[ $did ] ) ) {
 			$groups[ $did ] = [ 'copies' => [], 'ascended' => [] ];
 		}
@@ -83,7 +99,7 @@ function nw_shortcode_ascension( array $atts ): string {
 		}
 	}
 
-	// Koszty wzniesienia: [poziom_docelowy => wymagane_kopie]
+	// Koszty wzniesienia
 	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
 
 	// Karty kwalifikujące się do Ascension
@@ -92,7 +108,7 @@ function nw_shortcode_ascension( array $atts ): string {
 		$base_count   = count( $group['copies'] );
 		$has_ascended = ! empty( $group['ascended'] );
 		if ( $base_count >= 2 || $has_ascended ) {
-			$eligible_ids[] = (int) $did;  // int
+			$eligible_ids[] = (int) $did;
 		}
 	}
 
@@ -104,7 +120,7 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $msg;
 	}
 
-	// Pobierz definicje kart — intval zamiast esc_sql (to jest REST API, nie SQL)
+	// Pobierz definicje kart
 	$id_list   = implode( ',', array_map( 'intval', $eligible_ids ) );
 	$card_defs = tw_supabase_get( 'cyber_deck', [
 		'id'     => 'in.(' . $id_list . ')',
@@ -112,7 +128,7 @@ function nw_shortcode_ascension( array $atts ): string {
 	] );
 	$defs_by_id = [];
 	foreach ( (array) $card_defs as $def ) {
-		$defs_by_id[ (int) $def['id'] ] = $def;  // int klucz
+		$defs_by_id[ (int) $def['id'] ] = $def;
 	}
 
 	// Render
@@ -201,10 +217,6 @@ function nw_shortcode_ascension( array $atts ): string {
 
 /**
  * Renderuje dropdown wyboru postaci.
- *
- * @param object[] $characters  Wynik tw_get_user_characters().
- * @param string   $current_id  Aktualnie wybrany character UUID.
- * @return string               HTML selektora.
  */
 function nw_ascension_selector( array $characters, string $current_id ): string {
 	$current_url = esc_url( strtok( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ), '?' ) );
@@ -213,11 +225,15 @@ function nw_ascension_selector( array $characters, string $current_id ): string 
 	<div class="nw-char-selector">
 		<label for="nw-char-select"><i data-lucide="user"></i> Character</label>
 		<select id="nw-char-select" onchange="window.location = '<?php echo $current_url; ?>?nw_char=' + this.value">
-			<?php foreach ( $characters as $char ) : ?>
-				<option value="<?php echo esc_attr( $char->id ); ?>"
-					<?php selected( (string) $char->id, $current_id ); ?>>
-					<?php echo esc_html( $char->name ); ?>
-					<?php if ( isset( $char->lvl ) ) : ?>(Lvl <?php echo (int) $char->lvl; ?>)<?php endif; ?>
+			<?php foreach ( $characters as $char ) :
+				$cid  = nw_char_id( $char );
+				$name = nw_char_field( $char, 'name' );
+				$lvl  = nw_char_field( $char, 'lvl' );
+			?>
+				<option value="<?php echo esc_attr( $cid ); ?>"
+					<?php selected( $cid, $current_id ); ?>>
+					<?php echo esc_html( $name ); ?>
+					<?php if ( $lvl !== '' ) : ?>(Lvl <?php echo (int) $lvl; ?>)<?php endif; ?>
 				</option>
 			<?php endforeach; ?>
 		</select>
