@@ -31,11 +31,27 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		}
 
 		$base = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$anon = tw_supabase_service_key();
 
-		$headers = array(
-			'apikey'        => $anon,
-			'Authorization' => 'Bearer ' . $anon,
+		// Reads use the anon key (respects RLS). Service key is used only for the
+		// signup INSERT below, where elevated privileges are required.
+		$anon_key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+		$service_key  = tw_supabase_service_key();
+
+		if ( ! $anon_key ) {
+			wp_send_json_error( array( 'message' => 'supabase_config_missing' ) );
+			return;
+		}
+
+		$read_headers = array(
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
+		);
+
+		$write_headers = array(
+			'apikey'        => $service_key,
+			'Authorization' => 'Bearer ' . $service_key,
+			'Content-Type'  => 'application/json',
+			'Prefer'        => 'return=minimal',
 		);
 
 		$safe_char_id = nw_sanitize_uuid( $character_id );
@@ -60,8 +76,8 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			$base . 'cyber_campaign'
 		);
 
-		$char_resp = wp_remote_get( $char_url, array( 'headers' => $headers, 'timeout' => 10 ) );
-		$camp_resp = wp_remote_get( $camp_url, array( 'headers' => $headers, 'timeout' => 10 ) );
+		$char_resp = wp_remote_get( $char_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
+		$camp_resp = wp_remote_get( $camp_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
 
 		if ( is_wp_error( $char_resp ) || 200 !== (int) wp_remote_retrieve_response_code( $char_resp ) ) {
 			wp_send_json_error( array( 'message' => 'character_lookup_failed' ) );
@@ -89,7 +105,17 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			return;
 		}
 
-		$campaign_id = sanitize_text_field( (string) $camp_rows[0]['id'] );
+		// nw_sanitize_uuid() strips everything that isn’t a valid UUID character.
+		// sanitize_text_field() only strips tags/whitespace — not safe for UUID values
+		// that go directly into a Supabase query string.
+		$campaign_id = function_exists( 'nw_sanitize_uuid' )
+			? nw_sanitize_uuid( (string) $camp_rows[0]['id'] )
+			: sanitize_text_field( (string) $camp_rows[0]['id'] );
+
+		if ( empty( $campaign_id ) ) {
+			wp_send_json_error( array( 'message' => 'invalid_campaign_id' ) );
+			return;
+		}
 
 		$existing_url = add_query_arg(
 			array(
@@ -101,7 +127,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			$base . 'cyber_campaign_signups'
 		);
 
-		$existing_resp = wp_remote_get( $existing_url, array( 'headers' => $headers, 'timeout' => 10 ) );
+		$existing_resp = wp_remote_get( $existing_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
 
 		if ( ! is_wp_error( $existing_resp ) && 200 === (int) wp_remote_retrieve_response_code( $existing_resp ) ) {
 			$existing = json_decode( wp_remote_retrieve_body( $existing_resp ), true );
@@ -120,13 +146,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		$insert_resp = wp_remote_post(
 			$base . 'cyber_campaign_signups',
 			array(
-				'headers' => array_merge(
-					$headers,
-					array(
-						'Content-Type' => 'application/json',
-						'Prefer'       => 'return=minimal',
-					)
-				),
+				'headers' => $write_headers,
 				'body'    => wp_json_encode(
 					array(
 						'campaign_id'  => $campaign_id,
