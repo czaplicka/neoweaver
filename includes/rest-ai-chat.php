@@ -46,7 +46,7 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		// 1. Kontekst
 		$context = tw_rest_ai_build_context( $char_id );
 		if ( is_wp_error( $context ) ) {
-			return tw_rest_ai_broadcast_error( $session_id, $context->get_error_message() );
+			return tw_rest_ai_broadcast_error( $session_id, $context->get_error_message(), $context->get_error_code() );
 		}
 
 		// 2. Historia
@@ -68,9 +68,9 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 		$gm_text = $gm_result['text'];
 		$gm_tags = $gm_result['tags'];
 
-		// BUG FIX: Zapisuj oba komunikaty tylko gdy GM zwrócił niepustą odpowiedź.
-		// Dzięki temu historia nigdy nie będzie zawierała "wiadomości gracza bez odpowiedzi GM",
-		// co łamałoby zasadę alternacji user/assistant wymaganą przez Claude API.
+		// Zapisuj oba komunikaty tylko gdy GM zwrócił niepustą odpowiedź.
+		// Zapobiega sytuacji "wiadomość gracza bez odpowiedzi GM" w historii,
+		// co łamałoby alternację user/assistant wymaganą przez Claude API.
 		if ( ! empty( $gm_text ) ) {
 			tw_rest_ai_supa_post( 'cyber_chat_messages', [
 				'channel_id'   => $channel_id,
@@ -105,51 +105,50 @@ if ( ! function_exists( 'tw_rest_ai_chat_handler' ) ) {
 }
 
 // ============================================================
-// HELPER: Buduj kontekst — service key, dane z cyber_characters
+// HELPER: Buduj kontekst
 // ============================================================
 
 if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
-	/**
-	 * @param string $char_id
-	 * @return array|WP_Error
-	 *
-	 * POPRAWKA: cyber_characters używa snake_case:
-	 *   current_hp, max_hp, location_id, world_id, class_id, race_id
-	 * (nie: currenthp, maxhp, locationid, worldid, race, class)
-	 */
 	function tw_rest_ai_build_context( string $char_id ) {
 
 		$safe_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char_id ) );
 
-		// Pobierz postać (service key — omija RLS)
 		$char = tw_rest_ai_supa_get(
 			'cyber_characters',
-			'id=eq.' . $safe_id
-				. '&select=id,name,wp_user_id,current_hp,max_hp,mp,satiety,hydration,gold,echo_tags,location_id,world_id,archetype,level,class_id,race_id'
-				. '&limit=1'
+			[
+				'id'     => 'eq.' . $safe_id,
+				'select' => 'id,name,wp_user_id,current_hp,max_hp,mp,satiety,hydration,gold,echo_tags,location_id,world_id,archetype,level,class_id,race_id',
+				'limit'  => '1',
+			]
 		)[0] ?? null;
 
 		if ( empty( $char ) ) {
-			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id );
+			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id, [ 'status' => 404 ] );
 		}
 
-		// Pobierz lokację z FK w postaci
 		$location = [];
 		if ( ! empty( $char['location_id'] ) ) {
 			$safe_loc = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['location_id'] ) );
 			$location = tw_rest_ai_supa_get(
 				'cyber_world_map',
-				'id=eq.' . $safe_loc . '&select=id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type&limit=1'
+				[
+					'id'     => 'eq.' . $safe_loc,
+					'select' => 'id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type',
+					'limit'  => '1',
+				]
 			)[0] ?? [];
 		}
 
-		// Pobierz świat z FK w postaci
 		$world = [];
 		if ( ! empty( $char['world_id'] ) ) {
 			$safe_world = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['world_id'] ) );
 			$world = tw_rest_ai_supa_get(
 				'cyber_worlds',
-				'id=eq.' . $safe_world . '&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype,tech_vs_nature,chaos_vs_order,gold_vs_thief&limit=1'
+				[
+					'id'     => 'eq.' . $safe_world,
+					'select' => 'id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype,tech_vs_nature,chaos_vs_order,gold_vs_thief',
+					'limit'  => '1',
+				]
 			)[0] ?? [];
 		}
 
@@ -166,38 +165,52 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 
 		$rows = tw_rest_ai_supa_get(
 			'cyber_chat_messages',
-			'channel_id=eq.' . rawurlencode( $channel_id )
-				. '&order=created_at.desc&limit=14&select=message_type,content'
+			[
+				'channel_id'   => 'eq.' . $channel_id,
+				'message_type' => 'in.(player,gm)',
+				'order'        => 'created_at.desc',
+				'limit'        => '20',
+				'select'       => 'message_type,content',
+			]
 		);
 
 		if ( empty( $rows ) ) {
 			return [];
 		}
 
+		// Pobieramy 20 (więcej niż potrzeba), żeby po odwróceniu mieć zapas
+		// do wycięcia osieroconych wpisów. Zwracamy max 14 do Claude.
 		$rows = array_reverse( $rows );
 
-		// BUG FIX: Claude wymaga ścisłej alternacji user → assistant → user → …
-		// Filtrujemy: usuwamy wiersze z pustą treścią oraz scalamy kolejne wiersze
-		// tego samego typu (zachowujemy tylko ostatni w grupie), żeby uniknąć 400.
-		$history  = [];
+		// Strategia deduplicacji:
+		// Zamiast zastępować poprzedni wpis (co osierdzi wcześniejsze pary),
+		// pomijamy nowe wejście gdy bieżąca rola == poprzednia.
+		// Dzięki temu zachowujemy PIERWSZE wystąpienie w grupie (kompletną parę)
+		// zamiast ostatniego (które może być sierotą po retry).
+		$history   = [];
 		$prev_role = null;
 
 		foreach ( $rows as $row ) {
 			$content = trim( $row['content'] ?? '' );
 			if ( $content === '' ) {
-				continue; // pomiń puste
+				continue;
 			}
 			$role = ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant';
 
 			if ( $role === $prev_role ) {
-				// Ten sam typ pod rząd — zastąp poprzedni wpis, by zachować alternację
-				array_pop( $history );
+				// Duplikat roli — pomiń; zachowaj pierwszą (kompletną) parę.
+				continue;
 			}
-			$history[]  = [ 'role' => $role, 'content' => $content ];
-			$prev_role   = $role;
+
+			$history[] = [ 'role' => $role, 'content' => $content ];
+			$prev_role  = $role;
+
+			if ( count( $history ) >= 14 ) {
+				break;
+			}
 		}
 
-		// Claude musi zaczynać od 'user' — odrzuć ewentualny wiodący 'assistant'
+		// Claude musi zaczynać od 'user'
 		while ( ! empty( $history ) && $history[0]['role'] === 'assistant' ) {
 			array_shift( $history );
 		}
@@ -283,10 +296,13 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					}
 					break;
 				case 'ENTROPY_UP':
+					// Zmiany entropii muszą przechodzić przez pipeline tagów (Make.com),
+					// nie bezpośrednio przez RPC. Emitujemy action hook — dedykowany
+					// handler (np. Make.com webhook lub osobny moduł) odbierze zdarzenie.
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
 					if ( $delta !== 0 && $world_id ) {
-						tw_rest_ai_supa_rpc( 'fn_apply_entropy', [ 'p_world_id' => $world_id, 'p_delta' => $delta ] );
+						do_action( 'tw_entropy_change', $world_id, $delta, $context );
 					}
 					break;
 				case 'STATUS_ADD':
@@ -323,11 +339,38 @@ if ( ! function_exists( 'tw_rest_ai_realtime_send' ) ) {
 // ============================================================
 
 if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
-	function tw_rest_ai_broadcast_error( ?string $session_id, string $message ): WP_REST_Response {
-		if ( $session_id ) {
-			tw_rest_ai_realtime_send( 'game:' . $session_id, 'gm_error', [ 'message' => $message ] );
+	/**
+	 * Zwraca błąd REST z kodem HTTP dopasowanym do typu błędu.
+	 * Kod odczytywany z WP_Error->get_error_data()['status'] lub z $error_code.
+	 *
+	 * @param string|null $session_id
+	 * @param string      $message
+	 * @param string      $error_code  WP_Error code (np. 'tw_ai_no_char')
+	 * @param int         $http_status Opcjonalne nadpisanie kodu HTTP.
+	 */
+	function tw_rest_ai_broadcast_error(
+		?string $session_id,
+		string $message,
+		string $error_code = '',
+		int $http_status = 0
+	): WP_REST_Response {
+
+		if ( $http_status === 0 ) {
+			// Mapuj znane kody błędów WP na HTTP status.
+			$map = [
+				'tw_ai_no_char'      => 404,
+				'tw_ai_unauthorized' => 401,
+				'tw_ai_forbidden'    => 403,
+				'tw_ai_bad_request'  => 400,
+			];
+			$http_status = $map[ $error_code ] ?? 500;
 		}
-		return new WP_REST_Response( [ 'message' => $message ], 500 );
+
+		if ( $session_id ) {
+			tw_rest_ai_realtime_send( 'game:' . $session_id, 'gm_error', [ 'message' => $message, 'code' => $error_code ] );
+		}
+
+		return new WP_REST_Response( [ 'message' => $message, 'code' => $error_code ], $http_status );
 	}
 }
 
@@ -335,8 +378,18 @@ if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
 // PRYWATNE HELPERY SUPABASE — service key, tylko wewnętrzne
 // ============================================================
 
-function tw_rest_ai_supa_get( string $table, string $params ): array {
-	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table . '?' . $params;
+/**
+ * GET z Supabase. Parametry przekazywane jako tablica — zostaną
+ * zakodowane przez http_build_query(), co eliminuje problemy
+ * ze spacjami i nawiasami w wartościach filtrów PostgREST.
+ *
+ * @param string $table
+ * @param array  $params  np. [ 'id' => 'eq.abc', 'select' => 'id,name', 'limit' => '1' ]
+ * @return array
+ */
+function tw_rest_ai_supa_get( string $table, array $params ): array {
+	$query    = http_build_query( $params, '', '&', PHP_QUERY_RFC3986 );
+	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . rawurlencode( $table ) . '?' . $query;
 	$response = wp_remote_get( $url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
