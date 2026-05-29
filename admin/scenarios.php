@@ -1,62 +1,36 @@
 <?php
 /**
- * NeoWeaver Admin Panel — Scenarios (cyber_scenarios)
- *
- * Real schema fields:
- * id, name, type, category, goal, gm_instruction, tags, required_tags,
- * success_tags, failure_tags, victory_condition, fail_conditions, difficulty,
- * min_entropy, max_entropy, is_boss, is_key_arc, is_active, area_id, img_url,
- * reward_credits, reward_items, kingdom_tech, kingdom_magic, kingdom_wealth,
- * required_archetype_id, giver_npc_tag, is_repeatable, created_at
- *
- * Instantiated exclusively by NW_Admin_Bootstrap.
- *
- * @package NeoWeaver
+ * NeoWeaver Scenarios Admin
+ * Tabela: cyber_scenarios
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( class_exists( 'NeoWeaver_Scenarios_Admin', false ) ) {
-	return;
-}
+class NWScenariosAdmin {
 
-class NeoWeaver_Scenarios_Admin {
-
-	private string $table        = 'cyber_scenarios';
 	private string $page_slug    = 'nw-scenarios';
+	private string $menu_parent  = 'neoweaver';
+	private string $table        = 'cyber_scenarios';
 	private string $nonce_action = 'nw_scenarios_nonce';
-	private string $supabase_url = '';
-	private string $supabase_key = '';
 
-	private const TYPES = [ 'main', 'personal', 'social', 'world' ];
+	private const TYPES      = [ 'main', 'personal', 'social', 'world' ];
 	private const CATEGORIES = [ 'combat', 'social', 'magic', 'investigation', 'worlds', 'sidequest', 'family' ];
 
 	public function __construct() {
-		if ( function_exists( 'tw_supabase_url' ) ) {
-			$this->supabase_url = rtrim( (string) tw_supabase_url(), '/' );
-		}
-
-		if ( function_exists( 'tw_supabase_anon_key' ) ) {
-			$this->supabase_key = (string) tw_supabase_anon_key();
-		}
-
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-		add_action( 'wp_ajax_nw_scenarios_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_scenarios_get_one', [ $this, 'ajax_get_one' ] );
-		add_action( 'wp_ajax_nw_scenarios_save', [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_scenarios_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_scenarios_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_scenarios_load',      [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_scenarios_save',      [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_scenarios_delete',    [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_scenarios_duplicate', [ $this, 'ajax_duplicate' ] );
 	}
 
 	public function register_menu(): void {
 		add_submenu_page(
-			'neoweaver',
+			$this->menu_parent,
 			'Scenarios',
-			'📋 Scenarios',
+			'neoweaver',
+			'<span data-lucide="scroll-text"></span> Scenarios',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
@@ -64,634 +38,556 @@ class NeoWeaver_Scenarios_Admin {
 	}
 
 	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
-			return;
+		if ( ! str_contains( $hook, $this->page_slug ) ) return;
+
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style( 'chakra-petch', 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
 		}
 
-		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
-		);
+		wp_enqueue_style( 'nw-admin-core',       NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',    [ 'chakra-petch' ],                    NW_VERSION );
+		wp_enqueue_style( 'nw-scenarios-style',  NW_PLUGIN_URL . 'assets/css/admin/scenarios.css',     [ 'chakra-petch', 'nw-admin-core' ],   NW_VERSION );
 
-		wp_enqueue_style(
-			'nw-scenarios-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/scenarios.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
-		);
+		wp_enqueue_script( 'lucide',              'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js', [], '0.468.0', true );
+		wp_enqueue_script( 'nw-scenarios-script', NW_PLUGIN_URL . 'assets/js/admin/scenarios.js', [ 'jquery', 'lucide' ], NW_VERSION, true );
 
-		wp_enqueue_script(
-			'nw-scenarios-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/scenarios.js',
-			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			'nw-scenarios-script',
-			'NWScenarios',
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( $this->nonce_action ),
-			]
-		);
+		wp_localize_script( 'nw-scenarios-script', 'NWScenarios', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( $this->nonce_action ),
+		] );
 	}
 
-	public function render_page(): void {
-		?>
-		<div class="wrap nw-admin-wrap nw-scenarios-admin">
-			<h1>Scenarios</h1>
+	/* ------------------------------------------------------------------ */
+	/* Helpers                                                              */
+	/* ------------------------------------------------------------------ */
 
-			<div id="nw-notice" style="display:none;margin:12px 0;padding:10px 12px;border-radius:8px;"></div>
-
-			<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 18px;">
-				<input type="text" id="nw-search" class="regular-text" placeholder="Search scenarios…">
-
-				<select id="nw-filter-type">
-					<option value="">All types</option>
-					<?php foreach ( self::TYPES as $type ) : ?>
-						<option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-filter-category">
-					<option value="">All categories</option>
-					<?php foreach ( self::CATEGORIES as $category ) : ?>
-						<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( ucfirst( $category ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-filter-difficulty">
-					<option value="">All difficulties</option>
-					<option value="1">1</option>
-					<option value="2">2</option>
-					<option value="3">3</option>
-					<option value="4">4</option>
-					<option value="5">5</option>
-				</select>
-
-				<button id="nw-refresh-btn" class="button">Refresh</button>
-				<button id="nw-add-btn" class="button button-primary">+ Add Scenario</button>
-			</div>
-
-			<div style="display:flex;gap:16px;margin-bottom:16px;">
-				<div><strong>Total:</strong> <span id="nw-total">0</span></div>
-				<div><strong>Active:</strong> <span id="nw-active-count">0</span></div>
-			</div>
-
-			<table class="wp-list-table widefat striped" id="nw-scenarios-table">
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>Type</th>
-						<th>Category</th>
-						<th>Difficulty</th>
-						<th>Rewards</th>
-						<th>Active</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody id="nw-scenarios-tbody">
-					<tr><td colspan="7" style="text-align:center;padding:32px;">Loading…</td></tr>
-				</tbody>
-			</table>
-
-			<div id="nw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.74);z-index:9999;overflow-y:auto;padding:24px;">
-				<div style="max-width:1040px;margin:24px auto;background:#050505;color:#f2f2f2;border-radius:14px;border:1px solid #2b2b2b;padding:32px 28px;position:relative;">
-					<button id="nw-modal-close" style="position:absolute;right:14px;top:14px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer;line-height:1;">✕</button>
-					<h2 id="nw-modal-title" style="margin-top:0;margin-bottom:20px;">New Scenario</h2>
-
-					<form id="nw-scenario-form">
-						<input type="hidden" id="nw-field-id" name="id">
-
-						<table class="form-table" role="presentation">
-							<tr>
-								<th><label for="nw-field-name">Name *</label></th>
-								<td><input type="text" id="nw-field-name" name="name" class="regular-text" required></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-type">Type</label></th>
-								<td>
-									<select id="nw-field-type" name="type">
-										<?php foreach ( self::TYPES as $type ) : ?>
-											<option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-category">Category</label></th>
-								<td>
-									<select id="nw-field-category" name="category">
-										<?php foreach ( self::CATEGORIES as $category ) : ?>
-											<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( ucfirst( $category ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-difficulty">Difficulty (1–5)</label></th>
-								<td><input type="number" id="nw-field-difficulty" name="difficulty" class="small-text" min="1" max="5" value="3"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-goal">Goal</label></th>
-								<td><textarea id="nw-field-goal" name="goal" class="large-text" rows="3"></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-gm_instruction">GM Instruction</label></th>
-								<td><textarea id="nw-field-gm_instruction" name="gm_instruction" class="large-text" rows="3"></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-victory_condition">Victory Condition</label></th>
-								<td><textarea id="nw-field-victory_condition" name="victory_condition" class="large-text" rows="2"></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-fail_conditions">Fail Conditions</label></th>
-								<td><textarea id="nw-field-fail_conditions" name="fail_conditions" class="large-text" rows="2"></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-tags">Tags</label></th>
-								<td><input type="text" id="nw-field-tags" name="tags" class="large-text" placeholder="comma,separated,tags"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-required_tags">Required Tags</label></th>
-								<td><textarea id="nw-field-required_tags" name="required_tags" class="large-text" rows="2" placeholder='["city","night"] or one per line'></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-success_tags">Success Tags</label></th>
-								<td><textarea id="nw-field-success_tags" name="success_tags" class="large-text" rows="2" placeholder='["saved","allied"] or one per line'></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-failure_tags">Failure Tags</label></th>
-								<td><textarea id="nw-field-failure_tags" name="failure_tags" class="large-text" rows="2" placeholder='["burned","enemy_alerted"] or one per line'></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-reward_credits">Reward Credits</label></th>
-								<td><input type="number" id="nw-field-reward_credits" name="reward_credits" class="small-text" min="0" value="100"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-reward_items">Reward Items</label></th>
-								<td><textarea id="nw-field-reward_items" name="reward_items" class="large-text" rows="3" placeholder='["item_slug"] or JSON array'></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-min_entropy">Min Entropy</label></th>
-								<td><input type="number" id="nw-field-min_entropy" name="min_entropy" class="small-text" min="0"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-max_entropy">Max Entropy</label></th>
-								<td><input type="number" id="nw-field-max_entropy" name="max_entropy" class="small-text" min="0"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-kingdom_tech">Kingdom Tech</label></th>
-								<td><input type="number" id="nw-field-kingdom_tech" name="kingdom_tech" class="small-text" min="0" max="5"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-kingdom_magic">Kingdom Magic</label></th>
-								<td><input type="number" id="nw-field-kingdom_magic" name="kingdom_magic" class="small-text" min="0" max="5"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-kingdom_wealth">Kingdom Wealth</label></th>
-								<td><input type="number" id="nw-field-kingdom_wealth" name="kingdom_wealth" class="small-text" min="0" max="5"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-area_id">Area ID</label></th>
-								<td><input type="text" id="nw-field-area_id" name="area_id" class="regular-text"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-required_archetype_id">Required Archetype ID</label></th>
-								<td><input type="text" id="nw-field-required_archetype_id" name="required_archetype_id" class="regular-text"></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-giver_npc_tag">Giver NPC Tag</label></th>
-								<td><textarea id="nw-field-giver_npc_tag" name="giver_npc_tag" class="large-text" rows="2" placeholder='["merchant"] or JSON'></textarea></td>
-							</tr>
-
-							<tr>
-								<th><label for="nw-field-img_url">Image URL</label></th>
-								<td><input type="url" id="nw-field-img_url" name="img_url" class="large-text"></td>
-							</tr>
-
-							<tr>
-								<th>Flags</th>
-								<td>
-									<label><input type="checkbox" id="nw-field-is_boss" name="is_boss"> Is boss</label><br>
-									<label><input type="checkbox" id="nw-field-is_key_arc" name="is_key_arc"> Is key arc</label><br>
-									<label><input type="checkbox" id="nw-field-is_repeatable" name="is_repeatable"> Is repeatable</label><br>
-									<label><input type="checkbox" id="nw-field-is_active" name="is_active" checked> Is active</label>
-								</td>
-							</tr>
-						</table>
-					</form>
-
-					<p style="margin-top:20px;">
-						<button id="nw-save-btn" class="button button-primary">Save Scenario</button>
-						<button id="nw-cancel-btn" class="button" style="margin-left:8px;">Cancel</button>
-						<button id="nw-delete-btn" class="button button-link-delete" style="display:none;margin-left:16px;">Delete</button>
-					</p>
-
-					<div id="nw-form-notice" role="alert" aria-live="polite"></div>
-				</div>
-			</div>
-		</div>
-		<?php
-	}
-
-	private function supa( string $method, string $path, array $body = [], array $extra_headers = [] ): array {
-		if ( empty( $this->supabase_url ) || empty( $this->supabase_key ) ) {
-			return [
-				'ok'    => false,
-				'code'  => 0,
-				'data'  => null,
-				'error' => 'Supabase configuration not available.',
-			];
-		}
-
-		$headers = array_merge(
-			[
-				'apikey'        => $this->supabase_key,
-				'Authorization' => 'Bearer ' . $this->supabase_key,
-				'Content-Type'  => 'application/json',
-			],
-			$extra_headers
-		);
-
-		$args = [
-			'method'  => strtoupper( $method ),
-			'timeout' => 20,
-			'headers' => $headers,
-		];
-
-		if ( ! empty( $body ) ) {
-			$args['body'] = wp_json_encode( $body );
-		}
-
-		$url      = $this->supabase_url . '/rest/v1/' . ltrim( $path, '/' );
-		$response = wp_remote_request( $url, $args );
-
-		if ( is_wp_error( $response ) ) {
-			return [
-				'ok'    => false,
-				'code'  => 0,
-				'data'  => null,
-				'error' => $response->get_error_message(),
-			];
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$raw  = wp_remote_retrieve_body( $response );
-		$data = json_decode( $raw, true );
-
-		if ( $code >= 400 ) {
-			$msg = is_array( $data ) && isset( $data['message'] )
-				? $data['message']
-				: 'Supabase error ' . $code;
-
-			return [
-				'ok'    => false,
-				'code'  => $code,
-				'data'  => $data,
-				'error' => $msg,
-			];
-		}
-
+	private function sk(): array {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) return [];
 		return [
-			'ok'    => true,
-			'code'  => $code,
-			'data'  => $data,
-			'error' => null,
+			'apikey'        => TW_SUPABASE_SERVICE_KEY,
+			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
 		];
 	}
 
-	private function is_uuid( string $value ): bool {
-		return (bool) preg_match(
-			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
-			$value
-		);
-	}
+	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
+		$method = strtoupper( $method );
 
-	private function maybe_uuid( $value ): ?string {
-		$value = trim( sanitize_text_field( (string) $value ) );
-
-		if ( '' === $value ) {
-			return null;
+		if ( $method === 'GET' && function_exists( 'tw_supabase_get' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) parse_str( $qs, $query );
+			$data = tw_supabase_get( $table, $query, array_merge( $this->sk(), $extra_headers ) );
+			if ( ! is_array( $data ) ) return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Non-array response' ];
+			if ( isset( $data['code'], $data['message'] ) ) return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
 
-		return $this->is_uuid( $value ) ? $value : null;
-	}
-
-	private function required_uuid_from_post( string $key = 'id' ): string {
-		$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ?? '' ) );
-
-		if ( ! $value || ! $this->is_uuid( $value ) ) {
-			return '';
-		}
-
-		return $value;
-	}
-
-	private function parse_csv_tags( $value ): array {
-		$value = trim( (string) $value );
-
-		if ( '' === $value ) {
-			return [];
-		}
-
-		$items = array_map( 'trim', explode( ',', $value ) );
-		$items = array_map( 'sanitize_text_field', $items );
-
-		return array_values( array_filter( array_unique( $items ), static fn( $v ) => '' !== $v ) );
-	}
-
-	private function parse_json_or_lines( $raw ): array {
-		$raw = trim( (string) $raw );
-
-		if ( '' === $raw ) {
-			return [];
-		}
-
-		$decoded = json_decode( $raw, true );
-		if ( JSON_ERROR_NONE === json_last_error() ) {
-			if ( is_array( $decoded ) ) {
-				return $decoded;
+		if ( function_exists( 'tw_supabase_request' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query      = [];
+			if ( $qs ) parse_str( $qs, $query );
+			$extra_args = [];
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
 			}
-			return [];
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+			if ( ! $ok ) {
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+			}
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
 
-		return array_values(
-			array_filter(
-				array_map(
-					'trim',
-					preg_split( '/\\r\\n|\\r|\\n/', $raw )
-				)
-			)
-		);
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helpers not available.' ];
 	}
 
-	private function clamp_nullable_int( $value, int $min, int $max ): ?int {
-		if ( '' === (string) $value || null === $value ) {
-			return null;
-		}
-
-		$n = (int) $value;
-		return max( $min, min( $max, $n ) );
+	private function get_cache_key( string $suffix ): string {
+		return 'nw_' . md5( $suffix );
 	}
 
-	public function ajax_get_all(): void {
+	private function bust_cache(): void {
+		delete_transient( $this->get_cache_key( $this->table . '_all' ) );
+	}
+
+	private function cached_get_all(): array {
+		$cache_key = $this->get_cache_key( $this->table . '_all' );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached && is_array( $cached ) ) return $cached;
+
+		$res = $this->supa( 'GET', $this->table . '?select=*&order=name.asc', [], $this->sk() );
+		if ( ! $res['ok'] ) return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
+
+		$rows = is_array( $res['data'] ) ? $res['data'] : [];
+		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+		return $rows;
+	}
+
+	private function bool_from_post( string $key, bool $default = false ): bool {
+		if ( ! isset( $_POST[ $key ] ) ) return $default;
+		return (bool) intval( wp_unslash( $_POST[ $key ] ) );
+	}
+
+	private function sanitize_type( string $v ): string {
+		return in_array( $v, self::TYPES, true ) ? $v : 'main';
+	}
+
+	private function sanitize_category( string $v ): string {
+		return in_array( $v, self::CATEGORIES, true ) ? $v : 'combat';
+	}
+
+	private function sanitize_json( string $raw, mixed $default ): mixed {
+		$raw = trim( $raw );
+		if ( $raw === '' ) return $default;
+		$decoded = json_decode( $raw, true );
+		return ( JSON_ERROR_NONE === json_last_error() ) ? $decoded : $default;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* AJAX                                                                 */
+	/* ------------------------------------------------------------------ */
+
+	public function ajax_load(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$type       = sanitize_text_field( wp_unslash( $_POST['filter_type'] ?? '' ) );
-		$category   = sanitize_text_field( wp_unslash( $_POST['filter_category'] ?? '' ) );
-		$difficulty = sanitize_text_field( wp_unslash( $_POST['filter_difficulty'] ?? '' ) );
-
-		$qs = $this->table . '?select=*&order=created_at.desc';
-
-		if ( $type && in_array( $type, self::TYPES, true ) ) {
-			$qs .= '&type=eq.' . rawurlencode( $type );
-		}
-
-		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
-			$qs .= '&category=eq.' . rawurlencode( $category );
-		}
-
-		if ( '' !== $difficulty ) {
-			$qs .= '&difficulty=eq.' . rawurlencode( (string) max( 1, min( 5, (int) $difficulty ) ) );
-		}
-
-		$res = $this->supa( 'GET', $qs );
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to load scenarios.' );
-			return;
-		}
-
-		wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
-	}
-
-	public function ajax_get_one(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id = $this->required_uuid_from_post( 'id' );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID' );
-			return;
-		}
-
-		$res = $this->supa(
-			'GET',
-			$this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*'
-		);
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Failed to fetch scenario.' );
-			return;
-		}
-
-		$data = is_array( $res['data'] ) ? $res['data'] : [];
-		$item = $data[0] ?? null;
-
-		if ( ! $item ) {
-			wp_send_json_error( 'Scenario not found' );
-			return;
-		}
-
-		wp_send_json_success( $item );
+		$rows = $this->cached_get_all();
+		if ( isset( $rows['error'] ) ) { wp_send_json_error( $rows['error'] ); return; }
+		wp_send_json_success( $rows );
 	}
 
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
+		$id         = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+		$name       = sanitize_text_field( wp_unslash( $_POST['name']      ?? '' ) );
+		$type       = $this->sanitize_type( sanitize_text_field( wp_unslash( $_POST['type']     ?? 'main' ) ) );
+		$category   = $this->sanitize_category( sanitize_text_field( wp_unslash( $_POST['category'] ?? 'combat' ) ) );
+		$goal             = sanitize_textarea_field( wp_unslash( $_POST['goal']              ?? '' ) );
+		$gm_instruction   = sanitize_textarea_field( wp_unslash( $_POST['gm_instruction']    ?? '' ) );
+		$victory_condition = sanitize_textarea_field( wp_unslash( $_POST['victory_condition'] ?? '' ) );
+		$fail_conditions  = sanitize_textarea_field( wp_unslash( $_POST['fail_conditions']   ?? '' ) );
+		$img_url          = esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) );
+		$area_id          = sanitize_text_field( wp_unslash( $_POST['area_id'] ?? '' ) );
 
-		$id       = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name     = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$type     = sanitize_text_field( wp_unslash( $_POST['type'] ?? 'main' ) );
-		$category = sanitize_text_field( wp_unslash( $_POST['category'] ?? 'combat' ) );
+		$difficulty        = max( 1, min( 5, intval( wp_unslash( $_POST['difficulty']        ?? 3 ) ) ) );
+		$min_entropy_raw   = wp_unslash( $_POST['min_entropy'] ?? '' );
+		$max_entropy_raw   = wp_unslash( $_POST['max_entropy'] ?? '' );
+		$min_entropy       = $min_entropy_raw !== '' ? intval( $min_entropy_raw ) : null;
+		$max_entropy       = $max_entropy_raw !== '' ? intval( $max_entropy_raw ) : null;
+		$reward_credits    = wp_unslash( $_POST['reward_credits'] ?? '' ) !== '' ? intval( wp_unslash( $_POST['reward_credits'] ) ) : null;
+		$kingdom_tech      = wp_unslash( $_POST['kingdom_tech']   ?? '' ) !== '' ? intval( wp_unslash( $_POST['kingdom_tech'] ) )   : null;
+		$kingdom_magic     = wp_unslash( $_POST['kingdom_magic']  ?? '' ) !== '' ? intval( wp_unslash( $_POST['kingdom_magic'] ) )  : null;
+		$kingdom_wealth    = wp_unslash( $_POST['kingdom_wealth'] ?? '' ) !== '' ? intval( wp_unslash( $_POST['kingdom_wealth'] ) ) : null;
+		$required_archetype_id = wp_unslash( $_POST['required_archetype_id'] ?? '' ) !== '' ? intval( wp_unslash( $_POST['required_archetype_id'] ) ) : null;
 
-		if ( '' === $name ) {
-			wp_send_json_error( 'Name is required' );
-			return;
-		}
+		$tags              = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['tags']           ?? '[]' ) ), [] );
+		$required_tags     = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['required_tags']  ?? '[]' ) ), [] );
+		$success_tags      = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['success_tags']   ?? '[]' ) ), [] );
+		$failure_tags      = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['failure_tags']   ?? '[]' ) ), [] );
+		$reward_items      = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['reward_items']   ?? '' ) ), null );
+		$giver_npc_tag     = $this->sanitize_json( sanitize_textarea_field( wp_unslash( $_POST['giver_npc_tag']  ?? '' ) ), null );
 
-		if ( $id && ! $this->is_uuid( $id ) ) {
-			wp_send_json_error( 'Invalid ID' );
-			return;
-		}
+		if ( ! is_array( $tags ) )          $tags          = [];
+		if ( ! is_array( $required_tags ) ) $required_tags = [];
+		if ( ! is_array( $success_tags ) )  $success_tags  = [];
+		if ( ! is_array( $failure_tags ) )  $failure_tags  = [];
 
-		if ( ! in_array( $type, self::TYPES, true ) ) {
-			wp_send_json_error( 'Invalid type' );
-			return;
-		}
+		$is_boss        = $this->bool_from_post( 'is_boss',        false );
+		$is_key_arc     = $this->bool_from_post( 'is_key_arc',     false );
+		$is_active      = $this->bool_from_post( 'is_active',      true );
+		$is_repeatable  = $this->bool_from_post( 'is_repeatable',  false );
 
-		if ( ! in_array( $category, self::CATEGORIES, true ) ) {
-			wp_send_json_error( 'Invalid category' );
-			return;
-		}
+		if ( ! $name ) { wp_send_json_error( 'Name is required.' ); return; }
 
-		$difficulty = max( 1, min( 5, (int) ( wp_unslash( $_POST['difficulty'] ?? 3 ) ) ) );
-
-		$min_entropy = $this->clamp_nullable_int( wp_unslash( $_POST['min_entropy'] ?? null ), 0, 999 );
-		$max_entropy = $this->clamp_nullable_int( wp_unslash( $_POST['max_entropy'] ?? null ), 0, 999 );
-
-		if ( null !== $min_entropy && null !== $max_entropy && $min_entropy > $max_entropy ) {
-			wp_send_json_error( 'Min entropy cannot be greater than max entropy' );
-			return;
+		// entropy validation
+		if ( $min_entropy !== null && $max_entropy !== null && $min_entropy > $max_entropy ) {
+			wp_send_json_error( 'Min entropy cannot be greater than max entropy.' ); return;
 		}
 
 		$payload = [
 			'name'                  => $name,
 			'type'                  => $type,
 			'category'              => $category,
-			'goal'                  => sanitize_textarea_field( wp_unslash( $_POST['goal'] ?? '' ) ) ?: null,
-			'gm_instruction'        => sanitize_textarea_field( wp_unslash( $_POST['gm_instruction'] ?? '' ) ) ?: null,
-			'tags'                  => $this->parse_csv_tags( wp_unslash( $_POST['tags'] ?? '' ) ),
-			'required_tags'         => $this->parse_json_or_lines( wp_unslash( $_POST['required_tags'] ?? '' ) ),
-			'success_tags'          => $this->parse_json_or_lines( wp_unslash( $_POST['success_tags'] ?? '' ) ),
-			'failure_tags'          => $this->parse_json_or_lines( wp_unslash( $_POST['failure_tags'] ?? '' ) ),
-			'victory_condition'     => sanitize_textarea_field( wp_unslash( $_POST['victory_condition'] ?? '' ) ) ?: null,
-			'fail_conditions'       => sanitize_textarea_field( wp_unslash( $_POST['fail_conditions'] ?? '' ) ) ?: null,
+			'goal'                  => $goal ?: null,
+			'gm_instruction'        => $gm_instruction ?: null,
+			'victory_condition'     => $victory_condition ?: null,
+			'fail_conditions'       => $fail_conditions ?: null,
+			'img_url'               => $img_url ?: null,
+			'area_id'               => $area_id ?: null,
 			'difficulty'            => $difficulty,
 			'min_entropy'           => $min_entropy,
 			'max_entropy'           => $max_entropy,
-			'is_boss'               => ! empty( $_POST['is_boss'] ),
-			'is_key_arc'            => ! empty( $_POST['is_key_arc'] ),
-			'is_active'             => ! empty( $_POST['is_active'] ),
-			'area_id'               => sanitize_text_field( wp_unslash( $_POST['area_id'] ?? '' ) ) ?: null,
-			'img_url'               => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
-			'reward_credits'        => max( 0, (int) wp_unslash( $_POST['reward_credits'] ?? 100 ) ),
-			'reward_items'          => $this->parse_json_or_lines( wp_unslash( $_POST['reward_items'] ?? '' ) ),
-			'kingdom_tech'          => $this->clamp_nullable_int( wp_unslash( $_POST['kingdom_tech'] ?? null ), 0, 5 ),
-			'kingdom_magic'         => $this->clamp_nullable_int( wp_unslash( $_POST['kingdom_magic'] ?? null ), 0, 5 ),
-			'kingdom_wealth'        => $this->clamp_nullable_int( wp_unslash( $_POST['kingdom_wealth'] ?? null ), 0, 5 ),
-			'required_archetype_id' => $this->maybe_uuid( wp_unslash( $_POST['required_archetype_id'] ?? '' ) ),
-			'giver_npc_tag'         => $this->parse_json_or_lines( wp_unslash( $_POST['giver_npc_tag'] ?? '' ) ),
-			'is_repeatable'         => ! empty( $_POST['is_repeatable'] ),
+			'reward_credits'        => $reward_credits,
+			'kingdom_tech'          => $kingdom_tech,
+			'kingdom_magic'         => $kingdom_magic,
+			'kingdom_wealth'        => $kingdom_wealth,
+			'required_archetype_id' => $required_archetype_id,
+			'tags'                  => $tags,
+			'required_tags'         => $required_tags,
+			'success_tags'          => $success_tags,
+			'failure_tags'          => $failure_tags,
+			'reward_items'          => $reward_items,
+			'giver_npc_tag'         => $giver_npc_tag,
+			'is_boss'               => $is_boss,
+			'is_key_arc'            => $is_key_arc,
+			'is_active'             => $is_active,
+			'is_repeatable'         => $is_repeatable,
 		];
 
-		$res = $id
-			? $this->supa(
-				'PATCH',
-				$this->table . '?id=eq.' . rawurlencode( $id ),
-				$payload,
-				[ 'Prefer' => 'return=representation' ]
-			)
-			: $this->supa(
-				'POST',
-				$this->table,
-				$payload,
-				[ 'Prefer' => 'return=representation' ]
-			);
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Save failed.' );
-			return;
-		}
-
-		$data = $res['data'];
-		$item = is_array( $data ) && isset( $data[0] ) ? $data[0] : $data;
-
-		wp_send_json_success( $item );
-	}
-
-	public function ajax_toggle(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id        = $this->required_uuid_from_post( 'id' );
-		$is_active = filter_var( wp_unslash( $_POST['is_active'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
 		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID' );
-			return;
+			$res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		} else {
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload, $this->sk() );
 		}
 
-		$res = $this->supa(
-			'PATCH',
-			$this->table . '?id=eq.' . rawurlencode( $id ),
-			[ 'is_active' => $is_active ]
-		);
+		if ( ! $res['ok'] ) { wp_send_json_error( $res['error'] ?? 'Save failed.' ); return; }
 
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Toggle failed.' );
-			return;
-		}
-
-		wp_send_json_success(
-			[
-				'id'        => $id,
-				'is_active' => $is_active,
-			]
-		);
+		$this->bust_cache();
+		$row = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+		wp_send_json_success( $row );
 	}
 
 	public function ajax_delete(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
+		$id = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+		if ( ! $id ) { wp_send_json_error( 'Invalid scenario ID.' ); return; }
 
-		$id = $this->required_uuid_from_post( 'id' );
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], $this->sk() );
+		if ( ! $res['ok'] ) { wp_send_json_error( $res['error'] ?? 'Delete failed.' ); return; }
 
-		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID' );
-			return;
-		}
-
-		$res = $this->supa(
-			'DELETE',
-			$this->table . '?id=eq.' . rawurlencode( $id ),
-			[],
-			[ 'Prefer' => '' ]
-		);
-
-		if ( ! $res['ok'] ) {
-			wp_send_json_error( $res['error'] ?? 'Delete failed.' );
-			return;
-		}
-
+		$this->bust_cache();
 		wp_send_json_success( 'deleted' );
+	}
+
+	public function ajax_duplicate(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+
+		$id = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+		if ( ! $id ) { wp_send_json_error( 'Invalid scenario ID.' ); return; }
+
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*', [], $this->sk() );
+		if ( ! $res['ok'] || empty( $res['data'] ) ) { wp_send_json_error( 'Original scenario not found.' ); return; }
+
+		$orig = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+		if ( empty( $orig ) ) { wp_send_json_error( 'Failed to read original.' ); return; }
+
+		$payload              = $orig;
+		unset( $payload['id'], $payload['created_at'] );
+		$payload['name']      = ( $orig['name'] ?? 'Scenario' ) . ' (Copy)';
+		$payload['is_active'] = false;
+
+		$dup = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		if ( ! $dup['ok'] ) { wp_send_json_error( $dup['error'] ?? 'Duplicate failed.' ); return; }
+
+		$this->bust_cache();
+		$row = is_array( $dup['data'] ) ? ( $dup['data'][0] ?? $dup['data'] ) : $dup['data'];
+		wp_send_json_success( $row );
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Render                                                               */
+	/* ------------------------------------------------------------------ */
+
+	public function render_page(): void { ?>
+<div class="nw-panel nw-scenarios-panel">
+
+	<!-- Header -->
+	<div class="nw-panel-header">
+		<div>
+			<h1 class="nw-panel-title">
+				<i data-lucide="scroll-text" style="width:22px;height:22px;vertical-align:middle;margin-right:6px"></i>
+				Scenarios
+			</h1>
+			<p class="nw-panel-subtitle">Create and manage game scenarios, quests and encounters.</p>
+		</div>
+		<div class="nw-header-actions">
+			<button id="nw-refresh-btn" class="nw-btn nw-btn-ghost" title="Refresh">
+				<i data-lucide="refresh-cw" style="width:14px;height:14px;vertical-align:middle"></i>
+			</button>
+			<button id="nw-add-btn" class="nw-btn nw-btn-primary">
+				<i data-lucide="plus" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>
+				New Scenario
+			</button>
+		</div>
+	</div>
+
+	<!-- Notice -->
+	<div id="nw-notice" class="nw-notice" style="display:none"></div>
+
+	<!-- Stats -->
+	<div class="nw-stats-bar">
+		<span class="nw-stat-pill">Total <strong id="nw-total"></strong></span>
+		<span class="nw-stat-pill nw-pill-active">Active <strong id="nw-active"></strong></span>
+		<span class="nw-stat-pill nw-pill-inactive">Inactive <strong id="nw-inactive"></strong></span>
+		<span class="nw-stat-pill nw-pill-boss">Boss <strong id="nw-boss"></strong></span>
+		<span class="nw-stat-pill nw-pill-arc">Key Arc <strong id="nw-arc"></strong></span>
+	</div>
+
+	<!-- Filters -->
+	<div class="nw-filters-bar">
+		<input id="nw-search" type="text" class="nw-search-input" placeholder="Search name, goal…">
+		<select id="nw-filter-type" class="nw-select-filter">
+			<option value="">All types</option>
+			<?php foreach ( self::TYPES as $t ) : ?>
+				<option value="<?= esc_attr( $t ) ?>"><?= esc_html( ucfirst( $t ) ) ?></option>
+			<?php endforeach; ?>
+		</select>
+		<select id="nw-filter-category" class="nw-select-filter">
+			<option value="">All categories</option>
+			<?php foreach ( self::CATEGORIES as $c ) : ?>
+				<option value="<?= esc_attr( $c ) ?>"><?= esc_html( ucfirst( $c ) ) ?></option>
+			<?php endforeach; ?>
+		</select>
+		<select id="nw-filter-difficulty" class="nw-select-filter">
+			<option value="">All difficulties</option>
+			<?php for ( $i = 1; $i <= 5; $i++ ) : ?>
+				<option value="<?= $i ?>">Difficulty <?= $i ?></option>
+			<?php endfor; ?>
+		</select>
+		<select id="nw-filter-active" class="nw-select-filter">
+			<option value="">All status</option>
+			<option value="1">Active</option>
+			<option value="0">Inactive</option>
+		</select>
+		<button id="nw-clear-filters" class="nw-btn nw-btn-ghost nw-btn-sm" style="display:none">
+			<i data-lucide="x" style="width:12px;height:12px;vertical-align:middle"></i> Clear
+		</button>
+	</div>
+
+	<!-- Table -->
+	<div class="nw-table-wrap">
+		<table class="nw-table">
+			<thead>
+				<tr>
+					<th style="width:52px">Img</th>
+					<th>Name</th>
+					<th style="width:90px">Type</th>
+					<th style="width:110px">Category</th>
+					<th style="width:100px">Difficulty</th>
+					<th style="width:80px">Entropy</th>
+					<th>Flags</th>
+					<th style="width:72px">Active</th>
+					<th style="width:170px">Actions</th>
+				</tr>
+			</thead>
+			<tbody id="nw-scenarios-tbody">
+				<tr class="nw-loading-row"><td colspan="9"><span class="nw-spinner"></span> Loading scenarios…</td></tr>
+			</tbody>
+		</table>
+	</div>
+
+</div><!-- .nw-panel -->
+
+<!-- ===================== MODAL ===================== -->
+<div id="nw-modal-overlay" class="nw-modal-overlay" style="display:none">
+<div class="nw-modal nw-modal-wide">
+
+	<div class="nw-modal-header">
+		<h2 id="nw-modal-title">New Scenario</h2>
+		<button id="nw-modal-close" class="nw-modal-close" aria-label="Close">
+			<i data-lucide="x" style="width:16px;height:16px"></i>
+		</button>
+	</div>
+
+	<div class="nw-modal-body">
+	<form id="nw-scenario-form" autocomplete="off">
+		<input type="hidden" id="nw-field-id">
+
+		<!-- Basic Info -->
+		<div class="nw-section-label">Basic Info</div>
+		<div class="nw-form-grid">
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-name">Name <span class="nw-req">*</span></label>
+				<input type="text" id="nw-field-name" maxlength="200">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-type">Type</label>
+				<select id="nw-field-type" class="nw-select">
+					<?php foreach ( self::TYPES as $t ) : ?>
+						<option value="<?= esc_attr( $t ) ?>"><?= esc_html( ucfirst( $t ) ) ?></option>
+					<?php endforeach; ?>
+				</select>
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-category">Category</label>
+				<select id="nw-field-category" class="nw-select">
+					<?php foreach ( self::CATEGORIES as $c ) : ?>
+						<option value="<?= esc_attr( $c ) ?>"><?= esc_html( ucfirst( $c ) ) ?></option>
+					<?php endforeach; ?>
+				</select>
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-area-id">Area ID <span class="nw-hint">(FK → cyber_areas)</span></label>
+				<input type="text" id="nw-field-area-id" placeholder="e.g. area-slug">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-img-url">Image URL</label>
+				<input type="url" id="nw-field-img-url" placeholder="https://…">
+			</div>
+			<div id="nw-img-preview-wrap" class="nw-field-full" style="display:none">
+				<img id="nw-img-preview" src="" alt="Preview" style="max-height:120px;border-radius:6px;border:1px solid #2a2a2a" loading="lazy">
+			</div>
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-goal">Goal</label>
+				<textarea id="nw-field-goal" rows="2" placeholder="What must the player achieve?"></textarea>
+			</div>
+		</div>
+
+		<!-- Difficulty & Entropy -->
+		<div class="nw-section-label">
+			<i data-lucide="gauge" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>
+			Difficulty &amp; Entropy
+		</div>
+		<div class="nw-form-grid">
+			<div class="nw-field">
+				<label for="nw-field-difficulty">Difficulty <span class="nw-hint">(1–5)</span></label>
+				<div class="nw-diff-wrap">
+					<input type="number" id="nw-field-difficulty" min="1" max="5" value="3">
+					<div class="nw-diff-stars" id="nw-diff-stars"></div>
+				</div>
+			</div>
+			<div class="nw-field">
+				<label>Entropy Range <span class="nw-hint">(optional)</span></label>
+				<div class="nw-entropy-row">
+					<input type="number" id="nw-field-min-entropy" placeholder="min" min="0">
+					<span class="nw-entropy-sep">–</span>
+					<input type="number" id="nw-field-max-entropy" placeholder="max" min="0">
+				</div>
+			</div>
+		</div>
+
+		<!-- Conditions -->
+		<div class="nw-section-label">Conditions</div>
+		<div class="nw-form-grid">
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-victory">Victory Condition</label>
+				<textarea id="nw-field-victory" rows="2"></textarea>
+			</div>
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-fail">Fail Conditions</label>
+				<textarea id="nw-field-fail" rows="2"></textarea>
+			</div>
+		</div>
+
+		<!-- Tags -->
+		<div class="nw-section-label">
+			<i data-lucide="tags" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>
+			Tags (JSON arrays)
+		</div>
+		<div class="nw-form-grid">
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-tags">Tags <span class="nw-hint">general tags for this scenario</span></label>
+				<textarea id="nw-field-tags" rows="2" class="nw-code-field" placeholder='["urban","stealth"]'>[]</textarea>
+			</div>
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-required-tags">Required Tags <span class="nw-hint">world must have these</span></label>
+				<textarea id="nw-field-required-tags" rows="2" class="nw-code-field" placeholder='["has_tech","no_magic"]'>[]</textarea>
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-success-tags">Success Tags <span class="nw-hint">added on win</span></label>
+				<textarea id="nw-field-success-tags" rows="2" class="nw-code-field" placeholder='["boss_defeated"]'>[]</textarea>
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-failure-tags">Failure Tags <span class="nw-hint">added on loss</span></label>
+				<textarea id="nw-field-failure-tags" rows="2" class="nw-code-field" placeholder='["fled_battle"]'>[]</textarea>
+			</div>
+		</div>
+
+		<!-- Rewards -->
+		<div class="nw-section-label">
+			<i data-lucide="coins" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>
+			Rewards &amp; Kingdom Impact
+		</div>
+		<div class="nw-form-grid">
+			<div class="nw-field">
+				<label for="nw-field-credits">Reward Credits</label>
+				<input type="number" id="nw-field-credits" min="0" value="100">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-kingdom-tech">Kingdom Tech Δ</label>
+				<input type="number" id="nw-field-kingdom-tech" placeholder="e.g. 2 or -1">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-kingdom-magic">Kingdom Magic Δ</label>
+				<input type="number" id="nw-field-kingdom-magic" placeholder="e.g. 1">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-kingdom-wealth">Kingdom Wealth Δ</label>
+				<input type="number" id="nw-field-kingdom-wealth" placeholder="e.g. 3">
+			</div>
+			<div class="nw-field nw-field-full">
+				<label for="nw-field-reward-items">Reward Items <span class="nw-hint">JSON array</span></label>
+				<textarea id="nw-field-reward-items" rows="2" class="nw-code-field" placeholder='[{"item_id":"xxx","qty":1}]'></textarea>
+			</div>
+		</div>
+
+		<!-- NPC & Archetype -->
+		<div class="nw-section-label">NPC &amp; Archetype</div>
+		<div class="nw-form-grid">
+			<div class="nw-field">
+				<label for="nw-field-archetype-id">Required Archetype ID <span class="nw-hint">(FK)</span></label>
+				<input type="number" id="nw-field-archetype-id" min="1" placeholder="optional">
+			</div>
+			<div class="nw-field">
+				<label for="nw-field-giver-npc-tag">Giver NPC Tag <span class="nw-hint">JSON</span></label>
+				<input type="text" id="nw-field-giver-npc-tag" class="nw-code-field" placeholder='{"role":"merchant"}'>
+			</div>
+		</div>
+
+		<!-- GM Instructions -->
+		<div class="nw-section-label">GM Instructions</div>
+		<div class="nw-form-grid">
+			<div class="nw-field nw-field-full">
+				<textarea id="nw-field-gm-instruction" rows="3" placeholder="Private notes for the Game Master…"></textarea>
+			</div>
+		</div>
+
+		<!-- Flags -->
+		<div class="nw-section-label">Flags</div>
+		<div class="nw-flags-row">
+			<label class="nw-toggle-label">
+				<span class="nw-toggle"><input type="checkbox" id="nw-field-is-active" checked><span class="nw-toggle-slider"></span></span>
+				Active
+			</label>
+			<label class="nw-toggle-label">
+				<span class="nw-toggle"><input type="checkbox" id="nw-field-is-boss"><span class="nw-toggle-slider"></span></span>
+				<span class="nw-flag-boss">Boss</span>
+			</label>
+			<label class="nw-toggle-label">
+				<span class="nw-toggle"><input type="checkbox" id="nw-field-is-key-arc"><span class="nw-toggle-slider"></span></span>
+				<span class="nw-flag-arc">Key Arc</span>
+			</label>
+			<label class="nw-toggle-label">
+				<span class="nw-toggle"><input type="checkbox" id="nw-field-is-repeatable"><span class="nw-toggle-slider"></span></span>
+				Repeatable
+			</label>
+		</div>
+
+	</form>
+	</div><!-- .nw-modal-body -->
+
+	<div class="nw-modal-footer">
+		<button id="nw-delete-btn" class="nw-btn nw-btn-danger" style="display:none;margin-right:auto">
+			<i data-lucide="trash-2" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>Delete
+		</button>
+		<button id="nw-cancel-btn" class="nw-btn nw-btn-ghost">Cancel</button>
+		<button id="nw-save-btn" class="nw-btn nw-btn-primary">
+			<i data-lucide="save" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>
+			<span id="nw-save-label">Create Scenario</span>
+		</button>
+	</div>
+
+</div><!-- .nw-modal -->
+</div><!-- #nw-modal-overlay -->
+<?php
 	}
 }
