@@ -33,12 +33,14 @@ class Neoweaver_Agents_List {
 			</div>';
 		}
 
+		$default_avatar = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'assets/images/Avatar.svg';
+
 		ob_start();
 		?>
 		<div class="tw-grid">
 			<?php foreach ( $characters as $char ) : ?>
 				<?php
-				$avatar       = ! empty( $char['avatar'] ) ? $char['avatar'] : 'https://neoweaver.nieodparady.pl/wp-content/uploads/Avatar.svg';
+				$avatar       = ! empty( $char['avatar'] ) ? $char['avatar'] : $default_avatar;
 				$camp_data    = $char['cyber_campaign_characters'][0]['cyber_campaign'] ?? null;
 				$camp_name    = $camp_data['name'] ?? 'Unassigned';
 				$world_name   = $camp_data['cyber_campaign_worlds'][0]['cyber_worlds']['name'] ?? 'Unknown World';
