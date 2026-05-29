@@ -9,16 +9,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * tw_sanitize_uuid — backward-compat alias for nw_sanitize_uuid.
- * Defined here because adventure-data.php loads before supabase-helpers.php
- * in some contexts. The alias is a no-op if nw_sanitize_uuid already exists.
- */
-if ( ! function_exists( 'tw_sanitize_uuid' ) ) {
-	function tw_sanitize_uuid( string $raw ): string {
-		return nw_sanitize_uuid( $raw );
-	}
-}
+// tw_sanitize_uuid() was a duplicate of nw_sanitize_uuid() (same regex, same logic).
+// Removed — all callers in this file now use nw_sanitize_uuid() directly.
+// If any external caller still references tw_sanitize_uuid(), add a shim in a
+// backward-compat file, not here.
 
 /**
  * Default game_data values when Supabase is unavailable.
@@ -78,13 +72,6 @@ function tw_supabase_first( string $table, array $params ): array {
 
 /**
  * Returns the active campaign_id for a given WP user.
- *
- * Reads the most recently updated row in cyber_state_of_the_campaign
- * for the user. Used by shortcodes that need campaign context without
- * requiring a manual campaign_id attribute.
- *
- * @param int $wp_user_id WP user ID. Defaults to current user.
- * @return string UUID string, or empty string if not found.
  */
 function nw_get_active_campaign_id( int $wp_user_id = 0 ): string {
 	if ( ! $wp_user_id ) {
@@ -110,10 +97,10 @@ function nw_get_active_campaign_id( int $wp_user_id = 0 ): string {
 
 /**
  * Ensure a state row exists for the given campaign+character.
- * If missing, inserts defaults so the HUD always has something to show.
  * Uses service key — server-side write that must bypass RLS.
  */
 function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp_user_id ): void {
+	// Bail early on obviously missing deps before any I/O.
 	if ( ! function_exists( 'tw_supabase_request' ) ) {
 		return;
 	}
@@ -121,6 +108,9 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
 	if ( ! $campaign_id || ! $character_id ) {
 		return;
 	}
+
+	// tw_supabase_request() guards TW_SUPABASE_SERVICE_KEY internally and returns
+	// WP_Error when it is missing — no need for a redundant defined() check here.
 
 	// Check first — avoid unnecessary write.
 	$existing = tw_supabase_first(
@@ -137,12 +127,6 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
 		return;
 	}
 
-	if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
-		error_log( 'TW tw_ensure_state_row: TW_SUPABASE_SERVICE_KEY not defined — skipping insert.' );
-		return;
-	}
-
-	// Insert with all defaults from table definition.
 	$result = tw_supabase_request(
 		'POST',
 		'cyber_state_of_the_campaign',
@@ -160,8 +144,8 @@ function tw_ensure_state_row( string $campaign_id, string $character_id, int $wp
 		],
 		[
 			'headers' => [
-				'apikey'        => TW_SUPABASE_SERVICE_KEY,
-				'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+				'apikey'        => defined( 'TW_SUPABASE_SERVICE_KEY' ) ? TW_SUPABASE_SERVICE_KEY : '',
+				'Authorization' => 'Bearer ' . ( defined( 'TW_SUPABASE_SERVICE_KEY' ) ? TW_SUPABASE_SERVICE_KEY : '' ),
 				'Prefer'        => 'return=minimal',
 			],
 		]
@@ -223,6 +207,7 @@ function tw_prepare_character_data( array $game_data ): array {
 
 	/**
 	 * 1. Core character row.
+	 * cyber_characters stores max HP/MP as `hp` and `mp` (verified in schema).
 	 */
 	$char_row = tw_supabase_first(
 		'cyber_characters',
@@ -245,6 +230,7 @@ function tw_prepare_character_data( array $game_data ): array {
 		$result['char_data']['spirit'] = (int) tw_num( $char_row['spirit'] ?? 0, 0 );
 		$result['char_data']['avatar'] = (string) ( $char_row['avatar'] ?? '' );
 
+		// hp/mp in cyber_characters = max values (pool size at character creation/level-up).
 		$result['m_hp'] = max( 1, (int) tw_num( $char_row['hp'] ?? 10, 10 ) );
 		$result['m_mp'] = max( 1, (int) tw_num( $char_row['mp'] ?? 10, 10 ) );
 
@@ -260,7 +246,6 @@ function tw_prepare_character_data( array $game_data ): array {
 					'limit'  => 1,
 				]
 			);
-
 			if ( ! empty( $race_row['name'] ) ) {
 				$result['char_data']['race'] = (string) $race_row['name'];
 			}
@@ -275,7 +260,6 @@ function tw_prepare_character_data( array $game_data ): array {
 					'limit'  => 1,
 				]
 			);
-
 			if ( ! empty( $class_row['name'] ) ) {
 				$result['char_data']['class'] = (string) $class_row['name'];
 			}
@@ -283,8 +267,8 @@ function tw_prepare_character_data( array $game_data ): array {
 	}
 
 	/**
-	 * 2. HUD current state — filtrujemy po OBU kluczach: campaign_id + character_id.
-	 * Jeśli brak wiersza, tw_ensure_state_row() tworzy go z defaultami.
+	 * 2. HUD current state.
+	 * cyber_state_of_the_campaign stores current hp/mp (verified in schema).
 	 */
 	if ( $campaign_id ) {
 		tw_ensure_state_row( $campaign_id, $char_id, $wp_user_id );
@@ -310,7 +294,6 @@ function tw_prepare_character_data( array $game_data ): array {
 		$result['c_rest']      = max( 0, min( 100, (int) tw_num( $hud_row['rest'] ?? 100, 100 ) ) );
 		$result['sync_p']      = max( 0, min( 100, (int) tw_num( $hud_row['sync_rate'] ?? 100, 100 ) ) );
 	} else {
-		// Fallback: HP/MP z cyber_characters, reszta 100.
 		$result['c_hp'] = $result['m_hp'];
 		$result['c_mp'] = $result['m_mp'];
 	}
@@ -385,12 +368,15 @@ function tw_prepare_character_data( array $game_data ): array {
 
 	/**
 	 * 5b. Abilities.
+	 * Table: cyber_character_abilities  (columns: character_id, ability_id)
+	 * Join:  cyber_abilities            (column:  ability_type — not abilitytype)
+	 * Old code used non-existent cyber_characterabilities / cyberabilities / characterid.
 	 */
 	$abilities_raw = tw_supabase_get(
-		'cyber_characterabilities',
+		'cyber_character_abilities',
 		[
-			'characterid' => 'eq.' . $char_id,
-			'select'      => 'id,abilityid,source,cyberabilities(id,name,description,cost,abilitytype)',
+			'character_id' => 'eq.' . $char_id,
+			'select'       => 'id,ability_id,source,cyber_abilities(id,name,description,cost,ability_type)',
 		]
 	);
 
@@ -400,7 +386,7 @@ function tw_prepare_character_data( array $game_data ): array {
 				continue;
 			}
 
-			$ability_info = tw_pick_relation_row( $row['cyberabilities'] ?? [] );
+			$ability_info = tw_pick_relation_row( $row['cyber_abilities'] ?? [] );
 
 			if ( empty( $ability_info ) ) {
 				continue;
@@ -409,7 +395,7 @@ function tw_prepare_character_data( array $game_data ): array {
 			$result['skills_and_abilities'][] = [
 				'entry_type' => 'ability',
 				'id'         => $row['id'] ?? null,
-				'ability_id' => $row['abilityid'] ?? null,
+				'ability_id' => $row['ability_id'] ?? null,
 				'source'     => (string) ( $row['source'] ?? '' ),
 				'info'       => [
 					'name'        => (string) ( $ability_info['name'] ?? '' ),
@@ -421,7 +407,13 @@ function tw_prepare_character_data( array $game_data ): array {
 	}
 
 	/**
-	 * 6. Inventory.
+	 * 6. Inventory — single batched query.
+	 *
+	 * OLD: foreach inventory row → tw_supabase_get('cyber_items', ['id'=>'eq.'.$item_id])
+	 *      = N sequential HTTP requests (1 per item). Breaks on Hostinger with >~5 items.
+	 *
+	 * NEW: collect all item_ids → one request with id=in.(uuid1,uuid2,...)
+	 *      then build a lookup map — O(n) total, 2 HTTP requests regardless of inventory size.
 	 */
 	$inv_raw = tw_supabase_get(
 		'cyber_character_inventory',
@@ -431,7 +423,37 @@ function tw_prepare_character_data( array $game_data ): array {
 		]
 	);
 
-	if ( is_array( $inv_raw ) ) {
+	if ( is_array( $inv_raw ) && count( $inv_raw ) > 0 ) {
+		// Collect unique, valid item UUIDs.
+		$item_ids = [];
+		foreach ( $inv_raw as $row ) {
+			$iid = nw_sanitize_uuid( (string) ( $row['item_id'] ?? '' ) );
+			if ( $iid ) {
+				$item_ids[ $iid ] = true;
+			}
+		}
+
+		// Single batched request for all items.
+		$items_map = [];
+		if ( ! empty( $item_ids ) ) {
+			$ids_csv   = implode( ',', array_keys( $item_ids ) );
+			$items_raw = tw_supabase_get(
+				'cyber_items',
+				[
+					'id'     => 'in.(' . $ids_csv . ')',
+					'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
+				]
+			);
+
+			if ( is_array( $items_raw ) ) {
+				foreach ( $items_raw as $item ) {
+					if ( is_array( $item ) && isset( $item['id'] ) ) {
+						$items_map[ $item['id'] ] = $item;
+					}
+				}
+			}
+		}
+
 		$total_mass  = 0.0;
 		$total_power = 0.0;
 
@@ -440,23 +462,8 @@ function tw_prepare_character_data( array $game_data ): array {
 				continue;
 			}
 
-			$item_id = $row['item_id'] ?? null;
-			$item    = [];
-
-			if ( $item_id ) {
-				$item_rows = tw_supabase_get(
-					'cyber_items',
-					[
-						'id'     => 'eq.' . $item_id,
-						'select' => 'id,name,description,type,tags,slot,power_value,img_url,rarity,size,mass,stack_limit,is_container',
-						'limit'  => 1,
-					]
-				);
-
-				if ( is_array( $item_rows ) && isset( $item_rows[0] ) && is_array( $item_rows[0] ) ) {
-					$item = $item_rows[0];
-				}
-			}
+			$item_id = nw_sanitize_uuid( (string) ( $row['item_id'] ?? '' ) );
+			$item    = $item_id ? ( $items_map[ $item_id ] ?? [] ) : [];
 
 			$quantity = max( 1, (int) tw_num( $row['quantity'] ?? 1, 1 ) );
 			$mass     = (float) tw_num( $item['mass'] ?? 0, 0 );
@@ -546,24 +553,28 @@ function tw_prepare_tactical_data( array $game_data, int $userid ): array {
 		'timeout' => 12,
 	];
 
-	$map_rows = tw_get_data(
+	// v_cyber_map_view — filter by wp_user_id, limit 1.
+	$map_raw = tw_get_data(
 		$supabase_base . 'v_cyber_map_view?wp_user_id=eq.' . rawurlencode( (string) $userid ) . '&limit=1',
 		$auth_headers
 	);
 
-	$grid_units = tw_get_data(
-		$supabase_base . 'cyber_battle_grid'
-			. '?select=*'
-			. '&session_id=eq.' . rawurlencode( $active_session_id ),
+	if ( is_wp_error( $map_raw ) ) {
+		error_log( 'TW tw_prepare_tactical_data map error: ' . $map_raw->get_error_message() );
+	} elseif ( is_array( $map_raw ) && isset( $map_raw[0] ) && is_array( $map_raw[0] ) ) {
+		$result['map_data'] = $map_raw[0];
+	}
+
+	// cyber_battle_grid — filter by session_id.
+	$grid_raw = tw_get_data(
+		$supabase_base . 'cyber_battle_grid?select=*&session_id=eq.' . rawurlencode( $active_session_id ),
 		$auth_headers
 	);
 
-	$result['map_data'] = ( is_array( $map_rows ) && isset( $map_rows[0] ) && is_array( $map_rows[0] ) )
-		? $map_rows[0]
-		: [];
-
-	if ( is_array( $grid_units ) ) {
-		foreach ( $grid_units as $u ) {
+	if ( is_wp_error( $grid_raw ) ) {
+		error_log( 'TW tw_prepare_tactical_data grid error: ' . $grid_raw->get_error_message() );
+	} elseif ( is_array( $grid_raw ) ) {
+		foreach ( $grid_raw as $u ) {
 			if ( ! is_array( $u ) || ! isset( $u['slot_index'], $u['unit_type'] ) ) {
 				continue;
 			}
