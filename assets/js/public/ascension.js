@@ -1,4 +1,8 @@
 (function() {
+		var ajaxUrl = (typeof NwAscension !== 'undefined' && NwAscension.ajaxUrl)
+			? NwAscension.ajaxUrl
+			: '/wp-admin/admin-ajax.php';
+
 		document.querySelectorAll('.nw-asc-btn:not([disabled])').forEach(function(btn) {
 			btn.addEventListener('click', function() {
 				var wrap   = btn.closest('[data-character]');
@@ -16,14 +20,13 @@
 				fd.append('character_id', charId);
 				fd.append('deck_id',      deckId);
 
-				fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, {
+				fetch(ajaxUrl, {
 					method: 'POST',
 					body: fd
 				})
 				.then(function(r) { return r.json(); })
 				.then(function(data) {
 					if (data.success) {
-						// Animate and reload
 						var card = btn.closest('.nw-asc-card');
 						if (card) { card.classList.add('ascending'); }
 						setTimeout(function() { location.reload(); }, 900);
@@ -40,6 +43,5 @@
 			});
 		});
 
-		// Init Lucide icons if available
 		if (typeof lucide !== 'undefined') { lucide.createIcons(); }
 	})();
