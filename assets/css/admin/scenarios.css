@@ -1,110 +1,141 @@
-/* ============================================================
-   NeoWeaver Admin — SCENARIOS PANEL
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver Scenarios admin — extends admin-core.css */
 
-/* ---- Scenarios Toolbar (Table Top Extension) ---- */
-.nw-toolbar {
-	display: flex;
-	gap: 10px;
+.nw-modal.nw-modal-wide {
+	max-width: 860px;
+	width: 96vw;
+}
+
+/* type badges */
+.nw-type-badge,
+.nw-cat-badge,
+.nw-entropy-pill,
+.nw-flag-chip {
+	display: inline-flex;
 	align-items: center;
-	margin-bottom: 16px;
-	flex-wrap: wrap;
-}
-
-.nw-toolbar select,
-.nw-toolbar input[type="text"] {
-	font-family: 'Chakra Petch', monospace;
-	font-size: 12px;
-	padding: 6px 12px;
-	background: #111;
-	border: 1px solid #2a2a2a;
-	border-radius: 5px;
-	color: #e0e0e0;
-	outline: none;
-	transition: border-color .15s;
-}
-
-.nw-toolbar select:focus,
-.nw-toolbar input[type="text"]:focus {
-	border-color: #adff00;
-}
-
-/* ---- Scenarios Tabs System ---- */
-.nw-tabs {
-	display: flex;
-	gap: 2px;
-	padding: 12px 24px 0;
-	border-bottom: 1px solid #1e1e1e;
-}
-
-.nw-tab {
-	font-family: 'Chakra Petch', monospace;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 999px;
 	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: .6px;
-	padding: 7px 16px;
-	background: none;
-	border: none;
-	border-bottom: 2px solid transparent;
-	color: #555;
-	cursor: pointer;
-	transition: all .15s ease;
-	margin-bottom: -1px;
+	font-family: 'Chakra Petch', monospace;
+	white-space: nowrap;
 }
 
-.nw-tab:hover { color: #aaa; }
-.nw-tab.active { 
-    color: #adff00; 
-    border-bottom-color: #adff00; 
+.nw-type-main { background: rgba(173,255,0,0.10); border: 1px solid rgba(173,255,0,0.25); color: #adff00; }
+.nw-type-personal { background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.25); color: #60a5fa; }
+.nw-type-social { background: rgba(244,114,182,0.10); border: 1px solid rgba(244,114,182,0.25); color: #f472b6; }
+.nw-type-world { background: rgba(167,139,250,0.10); border: 1px solid rgba(167,139,250,0.25); color: #a78bfa; }
+
+.nw-cat-combat { background: rgba(248,113,113,0.10); border: 1px solid rgba(248,113,113,0.25); color: #f87171; }
+.nw-cat-social { background: rgba(244,114,182,0.10); border: 1px solid rgba(244,114,182,0.25); color: #f472b6; }
+.nw-cat-magic { background: rgba(167,139,250,0.10); border: 1px solid rgba(167,139,250,0.25); color: #a78bfa; }
+.nw-cat-investigation { background: rgba(250,204,21,0.10); border: 1px solid rgba(250,204,21,0.25); color: #facc15; }
+.nw-cat-worlds { background: rgba(52,211,153,0.10); border: 1px solid rgba(52,211,153,0.25); color: #34d399; }
+.nw-cat-sidequest { background: rgba(251,146,60,0.10); border: 1px solid rgba(251,146,60,0.25); color: #fb923c; }
+.nw-cat-family { background: rgba(125,211,252,0.10); border: 1px solid rgba(125,211,252,0.25); color: #7dd3fc; }
+
+.nw-entropy-pill {
+	background: rgba(255,255,255,0.05);
+	border: 1px solid rgba(255,255,255,0.10);
+	color: #d4d4d4;
 }
 
-.nw-tab-panel { 
-    padding: 20px 24px; 
-}
-
-/* ---- Specialized Form Elements ---- */
-.nw-help-text {
-	font-size: 12px;
-	color: #555;
-	margin-bottom: 10px;
+/* difficulty */
+.nw-diff-dots {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	font-family: 'Chakra Petch', monospace;
 }
-
-.nw-checkbox-label {
-	text-transform: none !important;
-	letter-spacing: 0 !important;
-	flex-direction: row !important;
-	align-items: center !important;
-	gap: 8px !important;
-	cursor: pointer;
-	color: #aaa !important;
+.nw-diff-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 999px;
+	background: rgba(255,255,255,0.12);
+	display: inline-block;
 }
-
-.nw-checkbox-label input[type="checkbox"] {
-	width: 16px;
-	height: 16px;
-	accent-color: #adff00;
-	cursor: pointer;
+.nw-diff-dot.is-on {
+	background: #adff00;
+	box-shadow: 0 0 0 1px rgba(173,255,0,0.25);
 }
-
-/* ---- Layout Helpers ---- */
-.nw-modal--wide { max-width: 840px; }
-.nw-span-2 { grid-column: 1 / -1; }
-
-/* ---- Button Variants (Module-Specific Labels) ---- */
-.nw-action-btn--secondary {
-	background: transparent;
+.nw-diff-wrap {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.nw-diff-stars {
+	display: flex;
+	gap: 5px;
+	font-size: 13px;
+	line-height: 1;
+}
+.nw-star {
+	color: rgba(255,255,255,0.18);
+	transition: color .18s ease;
+}
+.nw-star.is-on {
 	color: #adff00;
-	border-color: #2e2e2e;
+	text-shadow: 0 0 8px rgba(173,255,0,0.22);
 }
-.nw-action-btn--secondary:hover { border-color: #adff00; background: transparent; }
 
-.nw-action-btn--danger {
-	background: transparent;
-	color: #ff4444;
-	border-color: #3a0000;
+/* entropy row */
+.nw-entropy-row {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	gap: 8px;
+	align-items: center;
 }
-.nw-action-btn--danger:hover { border-color: #ff4444; }
+.nw-entropy-sep {
+	font-family: 'Chakra Petch', monospace;
+	color: #777;
+}
 
-.nw-action-btn--small { font-size: 11px; padding: 4px 10px; }
+/* code fields */
+.nw-code-field {
+	font-family: 'Chakra Petch', monospace !important;
+	font-size: 12px !important;
+	color: #adff00 !important;
+	background: rgba(173,255,0,0.04) !important;
+	border-color: rgba(173,255,0,0.18) !important;
+}
+.nw-code-field:focus {
+	border-color: rgba(173,255,0,0.5) !important;
+}
+
+/* flags */
+.nw-flags-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px 18px;
+	margin-top: 4px;
+}
+.nw-flag-chip { margin-right: 4px; }
+.nw-chip-boss,
+.nw-flag-boss {
+	background: rgba(248,113,113,0.10);
+	color: #f87171;
+}
+.nw-chip-arc,
+.nw-flag-arc {
+	background: rgba(167,139,250,0.10);
+	color: #a78bfa;
+}
+.nw-chip-repeat {
+	background: rgba(96,165,250,0.10);
+	color: #60a5fa;
+}
+.nw-pill-boss {
+	background: rgba(248,113,113,0.08);
+	border: 1px solid rgba(248,113,113,0.18);
+	color: #fca5a5;
+}
+.nw-pill-arc {
+	background: rgba(167,139,250,0.08);
+	border: 1px solid rgba(167,139,250,0.18);
+	color: #c4b5fd;
+}
+
+/* responsive */
+@media (max-width: 720px) {
+	.nw-flags-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+	.nw-diff-wrap { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
