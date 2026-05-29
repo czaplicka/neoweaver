@@ -1,542 +1,491 @@
 <?php
 /**
- * NeoWeaver Admin Panel — Starting Packages (cyber_starting_packages)
- *
- * Columns: id, package_name, description, items_list, compatibility_tags,
- *          attack_cards_pool, defense_cards_pool, base_armor,
- *          is_player_selectable, head_item_id, torso_item_id,
- *          hand_r_item_id, hand_l_item_id, belt_item_id,
- *          compatible_class_ids, created_at
+ * NeoWeaver — Starting Packages Admin
+ * Table: cyber_starting_packages
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( class_exists( 'NeoWeaver_Starting_Packages_Admin', false ) ) {
-	return;
-}
+class NWStartingPackagesAdmin {
 
-class NeoWeaver_Starting_Packages_Admin {
-
-	private string $page_slug    = 'neoweaver-starting-packages';
-	private string $parent_slug  = 'neoweaver';
-	private string $nonce_action = 'neoweaver_sp';
+	private string $page_slug    = 'nw-starting-packages';
+	private string $nonce_action = 'nwpackagesnonce';
+	private string $table        = 'cyber_starting_packages';
+	private string $table_items  = 'cyber_items';
 
 	public function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-		add_action( 'wp_ajax_nw_sp_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_sp_get_items', [ $this, 'ajax_get_items' ] );
-		add_action( 'wp_ajax_nw_sp_save', [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_sp_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_sp_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nwpackagesload',      [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nwpackagesloaditems', [ $this, 'ajax_load_items' ] );
+		add_action( 'wp_ajax_nwpackagessave',      [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nwpackagesdelete',    [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nwpackagesduplicate', [ $this, 'ajax_duplicate' ] );
 	}
 
+	// ── Menu ─────────────────────────────────────────────────────────────────
 	public function register_menu(): void {
+		$menu_parent = 'nw-dashboard';
 		add_submenu_page(
-			$this->parent_slug,
-			'NeoWeaver — Starting Packages',
-			'🎯 Starting Packages',
+			$menu_parent,
+			__( 'Starting Packages', 'neoweaver' ),
+			'<i data-lucide="package-check" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"></i> Starting Packages',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
 		);
 	}
 
+	// ── Assets ───────────────────────────────────────────────────────────────
 	public function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, $this->page_slug ) ) {
 			return;
 		}
-
-		$ver  = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
-		$base = trailingslashit( NEOWEAVER_PLUGIN_URL );
-
-		if ( ! wp_style_is( 'nw-font-chakra-petch', 'registered' ) && ! wp_style_is( 'nw-font-chakra-petch', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'nw-font-chakra-petch',
-				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
-				[],
-				null
-			);
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style( 'chakra-petch', 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
 		}
-
-		wp_enqueue_style(
-			'nw-admin-core',
-			$base . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			$ver
-		);
-
-		wp_enqueue_style(
-			'nw-starting-packages-style',
-			$base . 'assets/css/admin/starting-packages.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			$ver
-		);
-
+		wp_enqueue_style( 'nw-admin-core',      NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',      [ 'chakra-petch' ], NW_VERSION );
+		wp_enqueue_style( 'nw-packages-style',  NW_PLUGIN_URL . 'assets/css/admin/starting-packages.css', [ 'chakra-petch', 'nw-admin-core' ], NW_VERSION );
+		wp_enqueue_script( 'lucide', 'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js', [], '0.468.0', true );
 		wp_enqueue_script(
-			'nw-starting-packages-script',
-			$base . 'assets/js/admin/starting-packages.js',
-			[ 'jquery', 'nw-lucide' ],
-			$ver,
+			'nw-packages-script',
+			NW_PLUGIN_URL . 'assets/js/admin/starting-packages.js',
+			[ 'jquery', 'lucide' ],
+			NW_VERSION,
 			true
 		);
-
-		wp_localize_script(
-			'nw-starting-packages-script',
-			'NW_SP',
-			[
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( $this->nonce_action ),
-			]
-		);
+		wp_localize_script( 'nw-packages-script', 'NWPackages', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( $this->nonce_action ),
+		] );
 	}
 
-	public function render_page(): void {
-		?>
-		<div class="wrap nw-panel" id="nw-sp-panel">
-			<div class="nw-panel-header">
-				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Starting Packages</span></h1>
-				<div class="nw-header-actions">
-					<button class="nw-btn nw-btn-ghost" id="nw-refresh-btn" type="button">↻ Refresh</button>
-					<button class="nw-btn nw-btn-primary" id="nw-add-btn" type="button">+ New Package</button>
-				</div>
-			</div>
-
-			<div id="nw-notice" class="nw-notice" style="display:none;"></div>
-
-			<div class="nw-stats-bar">
-				<span class="nw-stat-pill">Total: <strong id="nw-total">—</strong></span>
-				<span class="nw-stat-pill nw-pill-active">Player Selectable: <strong id="nw-selectable">—</strong></span>
-				<span class="nw-stat-pill nw-pill-inactive">Hidden: <strong id="nw-hidden">—</strong></span>
-			</div>
-
-			<div class="nw-table-wrap">
-				<table class="nw-table">
-					<thead>
-						<tr>
-							<th>Package Name</th>
-							<th>Base Armor</th>
-							<th>Slots</th>
-							<th>Compat. Tags</th>
-							<th>Class IDs</th>
-							<th>Player Selectable</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody id="nw-sp-tbody">
-						<tr class="nw-loading-row">
-							<td colspan="7"><div class="nw-spinner"></div> Loading packages…</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-
-			<div class="nw-modal-overlay" id="nw-modal-overlay" style="display:none;">
-				<div class="nw-modal">
-					<div class="nw-modal-header">
-						<h2 id="nw-modal-title">Edit Package</h2>
-						<button class="nw-modal-close" id="nw-modal-close" type="button">✕</button>
-					</div>
-
-					<div class="nw-modal-body">
-						<form id="nw-sp-form">
-							<input type="hidden" id="nw-field-id" name="id">
-
-							<div class="nw-section-label">Identity</div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-full">
-									<label for="nw-field-package_name">Package Name <span class="nw-req">*</span></label>
-									<input type="text" id="nw-field-package_name" name="package_name" required placeholder="e.g. Street Runner Starter">
-								</div>
-
-								<div class="nw-field nw-field-full">
-									<label for="nw-field-description">Description</label>
-									<textarea id="nw-field-description" name="description" rows="3" placeholder="Brief description of this starting package…"></textarea>
-								</div>
-							</div>
-
-							<div class="nw-section-label">Equipment Slots <span class="nw-hint">(pick from cyber_items)</span></div>
-							<div class="nw-form-grid">
-								<div class="nw-field"><label for="nw-field-head_item_id">Head Slot</label><select id="nw-field-head_item_id" name="head_item_id" class="nw-select nw-item-select"><option value="">— none —</option></select></div>
-								<div class="nw-field"><label for="nw-field-torso_item_id">Torso Slot</label><select id="nw-field-torso_item_id" name="torso_item_id" class="nw-select nw-item-select"><option value="">— none —</option></select></div>
-								<div class="nw-field"><label for="nw-field-hand_r_item_id">Right Hand Slot</label><select id="nw-field-hand_r_item_id" name="hand_r_item_id" class="nw-select nw-item-select"><option value="">— none —</option></select></div>
-								<div class="nw-field"><label for="nw-field-hand_l_item_id">Left Hand Slot</label><select id="nw-field-hand_l_item_id" name="hand_l_item_id" class="nw-select nw-item-select"><option value="">— none —</option></select></div>
-								<div class="nw-field"><label for="nw-field-belt_item_id">Belt Slot</label><select id="nw-field-belt_item_id" name="belt_item_id" class="nw-select nw-item-select"><option value="">— none —</option></select></div>
-								<div class="nw-field"><label for="nw-field-base_armor">Base Armor <span class="nw-hint">(≥ 0)</span></label><input type="number" id="nw-field-base_armor" name="base_armor" min="0" value="0"></div>
-							</div>
-
-							<div class="nw-section-label">Card Pools &amp; Lists <span class="nw-hint">(comma-separated → JSON array)</span></div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-full"><label for="nw-field-items_list">Items List</label><input type="text" id="nw-field-items_list" name="items_list" placeholder="item-uuid-1, item-uuid-2"></div>
-								<div class="nw-field nw-field-full"><label for="nw-field-attack_cards_pool">Attack Cards Pool</label><input type="text" id="nw-field-attack_cards_pool" name="attack_cards_pool" placeholder="card-id-1, card-id-2"></div>
-								<div class="nw-field nw-field-full"><label for="nw-field-defense_cards_pool">Defense Cards Pool</label><input type="text" id="nw-field-defense_cards_pool" name="defense_cards_pool" placeholder="card-id-1, card-id-2"></div>
-							</div>
-
-							<div class="nw-section-label">Compatibility <span class="nw-hint">(comma-separated → JSON array)</span></div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-full"><label for="nw-field-compatibility_tags">Compatibility Tags</label><input type="text" id="nw-field-compatibility_tags" name="compatibility_tags" placeholder="e.g. melee, urban, stealth"></div>
-								<div class="nw-field nw-field-full"><label for="nw-field-compatible_class_ids">Compatible Class IDs</label><input type="text" id="nw-field-compatible_class_ids" name="compatible_class_ids" placeholder="class-uuid-1, class-uuid-2"></div>
-							</div>
-
-							<div class="nw-section-label">Visibility</div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-center">
-									<label for="nw-field-is_player_selectable">Player Selectable (visible on character creation)</label>
-									<label class="nw-toggle">
-										<input type="checkbox" id="nw-field-is_player_selectable" name="is_player_selectable">
-										<span class="nw-toggle-slider"></span>
-									</label>
-								</div>
-							</div>
-						</form>
-					</div>
-
-					<div class="nw-modal-footer">
-						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" type="button" style="display:none;margin-right:auto;">🗑 Delete</button>
-						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn" type="button">Cancel</button>
-						<button class="nw-btn nw-btn-primary" id="nw-save-btn" type="button"><span id="nw-save-label">Save Package</span></button>
-					</div>
-				</div>
-			</div>
-
-			<input type="hidden" id="nw-nonce" value="<?php echo esc_attr( wp_create_nonce( $this->nonce_action ) ); ?>">
-		</div>
-		<?php
-	}
-
-	private function get_supabase_url(): string {
-		if ( function_exists( 'tw_supabase_url' ) ) {
-			return rtrim( (string) tw_supabase_url(), '/' );
+	// ── Helpers ──────────────────────────────────────────────────────────────
+	private function sk(): array {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+			return [];
 		}
-
-		return '';
-	}
-
-	private function get_supabase_key(): string {
-		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
-			return (string) tw_supabase_service_key();
-		}
-
-		if ( function_exists( 'tw_supabase_anon_key' ) && tw_supabase_anon_key() ) {
-			return (string) tw_supabase_anon_key();
-		}
-
-		return '';
+		return [
+			'apikey'        => TW_SUPABASE_SERVICE_KEY,
+			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+		];
 	}
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
-		$supabase_url = $this->get_supabase_url();
-		$supabase_key = $this->get_supabase_key();
-
-		if ( '' === $supabase_url || '' === $supabase_key ) {
-			return [
-				'code'  => 0,
-				'data'  => null,
-				'error' => 'Supabase configuration not available.',
-			];
+		$method = strtoupper( $method );
+		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+			$data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
+			if ( ! is_array( $data ) ) {
+				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
+			}
+			if ( isset( $data['code'], $data['message'] ) ) {
+				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+			}
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
-
-		$headers = array_merge(
-			[
-				'apikey'        => $supabase_key,
-				'Authorization' => 'Bearer ' . $supabase_key,
-				'Content-Type'  => 'application/json',
-				'Prefer'        => 'return=representation',
-			],
-			$extra_headers
-		);
-
-		if ( array_key_exists( 'Prefer', $headers ) && '' === $headers['Prefer'] ) {
-			unset( $headers['Prefer'] );
+		if ( function_exists( 'tw_supabase_request' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) {
+				parse_str( $qs, $query );
+			}
+			$extra_args = [];
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
+			}
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+			if ( ! $ok ) {
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+			}
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
-
-		$args = [
-			'method'  => strtoupper( $method ),
-			'timeout' => 15,
-			'headers' => $headers,
-		];
-
-		if ( ! empty( $body ) && ! in_array( strtoupper( $method ), [ 'GET', 'DELETE' ], true ) ) {
-			$args['body'] = wp_json_encode( $body );
-		}
-
-		$res = wp_remote_request(
-			$supabase_url . '/rest/v1/' . ltrim( $endpoint, '/' ),
-			$args
-		);
-
-		if ( is_wp_error( $res ) ) {
-			return [
-				'code'  => 0,
-				'data'  => null,
-				'error' => $res->get_error_message(),
-			];
-		}
-
-		$body_raw = wp_remote_retrieve_body( $res );
-		$data     = '' !== $body_raw ? json_decode( $body_raw, true ) : null;
-
-		return [
-			'code'  => (int) wp_remote_retrieve_response_code( $res ),
-			'data'  => $data,
-			'error' => null,
-		];
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
 	}
 
-	private function csv_to_array( string $value ): array {
-		$value = sanitize_text_field( $value );
+	private function get_cache_key( string $suffix ): string {
+		return 'nw_' . md5( $suffix );
+	}
 
-		if ( '' === $value ) {
+	private function bust_cache(): void {
+		delete_transient( $this->get_cache_key( $this->table . '_all' ) );
+		delete_transient( $this->get_cache_key( $this->table_items . '_all' ) );
+	}
+
+	private function cached_get_all(): array {
+		$cache_key = $this->get_cache_key( $this->table . '_all' );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+		$res = $this->supa( 'GET', $this->table . '?select=*&order=created_at.desc', [], $this->sk() );
+		if ( ! $res['ok'] ) {
+			return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
+		}
+		$rows = is_array( $res['data'] ) ? $res['data'] : [];
+		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+		return $rows;
+	}
+
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match( '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/', $value );
+	}
+
+	private function bool_from_post( string $key, bool $default = false ): bool {
+		if ( ! isset( $_POST[ $key ] ) ) {
+			return $default;
+		}
+		return (bool) intval( wp_unslash( $_POST[ $key ] ) );
+	}
+
+	private function parse_json_field( string $raw ): array {
+		$raw = trim( $raw );
+		if ( '' === $raw ) {
 			return [];
 		}
-
-		return array_values(
-			array_filter(
-				array_map(
-					static function ( $item ) {
-						return sanitize_text_field( trim( (string) $item ) );
-					},
-					explode( ',', $value )
-				),
-				static fn( $item ) => '' !== $item
-			)
-		);
+		$decoded = json_decode( $raw, true );
+		return is_array( $decoded ) ? $decoded : [];
 	}
 
-	private function uuid_or_null( string $value ): ?string {
-		$value = sanitize_text_field( $value );
-
-		if ( '' === $value ) {
-			return null;
-		}
-
-		return preg_match( '/^[0-9a-f-]{36}$/i', $value ) ? $value : null;
-	}
-
-	private function normalize_package( array $pkg ): array {
-		$pkg['id']                   = isset( $pkg['id'] ) ? (string) $pkg['id'] : '';
-		$pkg['package_name']         = isset( $pkg['package_name'] ) ? (string) $pkg['package_name'] : '';
-		$pkg['description']          = isset( $pkg['description'] ) ? (string) $pkg['description'] : '';
-		$pkg['items_list']           = isset( $pkg['items_list'] ) && is_array( $pkg['items_list'] ) ? $pkg['items_list'] : [];
-		$pkg['compatibility_tags']   = isset( $pkg['compatibility_tags'] ) && is_array( $pkg['compatibility_tags'] ) ? $pkg['compatibility_tags'] : [];
-		$pkg['attack_cards_pool']    = isset( $pkg['attack_cards_pool'] ) && is_array( $pkg['attack_cards_pool'] ) ? $pkg['attack_cards_pool'] : [];
-		$pkg['defense_cards_pool']   = isset( $pkg['defense_cards_pool'] ) && is_array( $pkg['defense_cards_pool'] ) ? $pkg['defense_cards_pool'] : [];
-		$pkg['compatible_class_ids'] = isset( $pkg['compatible_class_ids'] ) && is_array( $pkg['compatible_class_ids'] ) ? $pkg['compatible_class_ids'] : [];
-		$pkg['head_item_id']         = isset( $pkg['head_item_id'] ) ? (string) $pkg['head_item_id'] : '';
-		$pkg['torso_item_id']        = isset( $pkg['torso_item_id'] ) ? (string) $pkg['torso_item_id'] : '';
-		$pkg['hand_r_item_id']       = isset( $pkg['hand_r_item_id'] ) ? (string) $pkg['hand_r_item_id'] : '';
-		$pkg['hand_l_item_id']       = isset( $pkg['hand_l_item_id'] ) ? (string) $pkg['hand_l_item_id'] : '';
-		$pkg['belt_item_id']         = isset( $pkg['belt_item_id'] ) ? (string) $pkg['belt_item_id'] : '';
-		$pkg['is_player_selectable'] = ! empty( $pkg['is_player_selectable'] );
-		$pkg['base_armor']           = isset( $pkg['base_armor'] ) ? (int) $pkg['base_armor'] : 0;
-		$pkg['created_at']           = isset( $pkg['created_at'] ) ? (string) $pkg['created_at'] : '';
-
-		return $pkg;
-	}
-
-	public function ajax_get_all(): void {
+	// ── AJAX ─────────────────────────────────────────────────────────────────
+	public function ajax_load(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
-
-		$qs  = 'cyber_starting_packages?select=id,package_name,description,items_list,compatibility_tags,attack_cards_pool,defense_cards_pool,base_armor,is_player_selectable,head_item_id,torso_item_id,hand_r_item_id,hand_l_item_id,belt_item_id,compatible_class_ids,created_at&order=package_name.asc';
-		$res = $this->supa( 'GET', $qs );
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
+		$rows = $this->cached_get_all();
+		if ( isset( $rows['error'] ) ) {
+			wp_send_json_error( $rows['error'] );
+			return;
 		}
-
-		if ( $res['code'] < 200 || $res['code'] >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $res['code'];
-			wp_send_json_error( $msg, 500 );
-		}
-
-		$rows = is_array( $res['data'] ) ? $res['data'] : [];
-		$rows = array_map( [ $this, 'normalize_package' ], $rows );
-
 		wp_send_json_success( $rows );
 	}
 
-	public function ajax_get_items(): void {
+	public function ajax_load_items(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
-
-		$res = $this->supa( 'GET', 'cyber_items?select=id,name,slot,type&order=name.asc&is_active=eq.true' );
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
+		$res = $this->supa( 'GET', $this->table_items . '?select=id,name,img_url,slot,type&order=name.asc', [], $this->sk() );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Failed to fetch items.' );
+			return;
 		}
-
-		if ( $res['code'] < 200 || $res['code'] >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $res['code'];
-			wp_send_json_error( $msg, 500 );
-		}
-
-		$items = is_array( $res['data'] ) ? $res['data'] : [];
-
-		$items = array_map(
-			static function ( array $item ): array {
-				return [
-					'id'   => isset( $item['id'] ) ? (string) $item['id'] : '',
-					'name' => isset( $item['name'] ) ? (string) $item['name'] : '',
-					'slot' => isset( $item['slot'] ) ? (string) $item['slot'] : '',
-					'type' => isset( $item['type'] ) ? (string) $item['type'] : '',
-				];
-			},
-			$items
-		);
-
-		wp_send_json_success( $items );
+		wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
 	}
 
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
 
-		$raw = wp_unslash( $_POST['pkg'] ?? [] );
+		$id           = sanitize_text_field( wp_unslash( $_POST['id']           ?? '' ) );
+		$package_name = sanitize_text_field( wp_unslash( $_POST['package_name'] ?? '' ) );
+		$description  = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$base_armor   = max( 0, intval( wp_unslash( $_POST['base_armor'] ?? 0 ) ) );
 
-		if ( ! is_array( $raw ) ) {
-			wp_send_json_error( 'Invalid payload', 400 );
+		// UUID foreign keys (equipment slots)
+		$slot_fields = [ 'head_item_id', 'torso_item_id', 'hand_r_item_id', 'hand_l_item_id', 'belt_item_id' ];
+		$slots = [];
+		foreach ( $slot_fields as $field ) {
+			$val = sanitize_text_field( wp_unslash( $_POST[ $field ] ?? '' ) );
+			$slots[ $field ] = ( '' !== $val && $this->is_uuid( $val ) ) ? $val : null;
 		}
 
-		$id = sanitize_text_field( $raw['id'] ?? '' );
+		// JSON fields
+		$items_list        = $this->parse_json_field( wp_unslash( $_POST['items_list']        ?? '' ) );
+		$compatibility_tags = $this->parse_json_field( wp_unslash( $_POST['compatibility_tags'] ?? '' ) );
+		$attack_cards_pool  = $this->parse_json_field( wp_unslash( $_POST['attack_cards_pool']  ?? '' ) );
+		$defense_cards_pool = $this->parse_json_field( wp_unslash( $_POST['defense_cards_pool'] ?? '' ) );
+		$compatible_class_ids = $this->parse_json_field( wp_unslash( $_POST['compatible_class_ids'] ?? '' ) );
 
-		$payload = [
-			'package_name'         => sanitize_text_field( $raw['package_name'] ?? '' ),
-			'description'          => sanitize_textarea_field( $raw['description'] ?? '' ) ?: null,
-			'base_armor'           => max( 0, (int) ( $raw['base_armor'] ?? 0 ) ),
-			'is_player_selectable' => filter_var( $raw['is_player_selectable'] ?? false, FILTER_VALIDATE_BOOLEAN ),
-			'head_item_id'         => $this->uuid_or_null( (string) ( $raw['head_item_id'] ?? '' ) ),
-			'torso_item_id'        => $this->uuid_or_null( (string) ( $raw['torso_item_id'] ?? '' ) ),
-			'hand_r_item_id'       => $this->uuid_or_null( (string) ( $raw['hand_r_item_id'] ?? '' ) ),
-			'hand_l_item_id'       => $this->uuid_or_null( (string) ( $raw['hand_l_item_id'] ?? '' ) ),
-			'belt_item_id'         => $this->uuid_or_null( (string) ( $raw['belt_item_id'] ?? '' ) ),
-			'items_list'           => $this->csv_to_array( (string) ( $raw['items_list'] ?? '' ) ),
-			'attack_cards_pool'    => $this->csv_to_array( (string) ( $raw['attack_cards_pool'] ?? '' ) ),
-			'defense_cards_pool'   => $this->csv_to_array( (string) ( $raw['defense_cards_pool'] ?? '' ) ),
-			'compatibility_tags'   => $this->csv_to_array( (string) ( $raw['compatibility_tags'] ?? '' ) ),
-			'compatible_class_ids' => $this->csv_to_array( (string) ( $raw['compatible_class_ids'] ?? '' ) ),
-		];
+		$is_player_selectable = $this->bool_from_post( 'is_player_selectable', false );
 
-		if ( '' === $payload['package_name'] ) {
-			wp_send_json_error( 'Package name is required', 400 );
+		if ( ! $package_name ) {
+			wp_send_json_error( 'Package name is required.' );
+			return;
+		}
+		if ( $id && ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid package ID.' );
+			return;
 		}
 
-		$res = '' !== $id
-			? $this->supa( 'PATCH', 'cyber_starting_packages?id=eq.' . rawurlencode( $id ), $payload )
-			: $this->supa( 'POST', 'cyber_starting_packages', $payload );
+		$payload = array_merge( [
+			'package_name'          => $package_name,
+			'description'           => '' !== $description ? $description : null,
+			'base_armor'            => $base_armor,
+			'items_list'            => $items_list,
+			'compatibility_tags'    => $compatibility_tags,
+			'attack_cards_pool'     => $attack_cards_pool,
+			'defense_cards_pool'    => $defense_cards_pool,
+			'compatible_class_ids'  => $compatible_class_ids,
+			'is_player_selectable'  => $is_player_selectable,
+		], $slots );
 
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
+		if ( ! $id ) {
+			$res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		} else {
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload, $this->sk() );
 		}
 
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Save failed.' );
+			return;
 		}
-
-		$item = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
-
-		if ( is_array( $item ) ) {
-			$item = $this->normalize_package( $item );
-		}
-
-		wp_send_json_success( $item );
-	}
-
-	public function ajax_toggle(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
-
-		$id    = sanitize_text_field( wp_unslash( $_POST['pkg_id'] ?? '' ) );
-		$state = filter_var( wp_unslash( $_POST['is_player_selectable'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-		}
-
-		$res = $this->supa(
-			'PATCH',
-			'cyber_starting_packages?id=eq.' . rawurlencode( $id ),
-			[ 'is_player_selectable' => $state ]
-		);
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
-		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
-		wp_send_json_success(
-			[
-				'id'                   => $id,
-				'is_player_selectable' => $state,
-			]
-		);
+		$this->bust_cache();
+		$row = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+		wp_send_json_success( $row );
 	}
 
 	public function ajax_delete(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( 'Forbidden', 403 );
+			return;
 		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['pkg_id'] ?? '' ) );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		if ( ! $id || ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid package ID.' );
+			return;
 		}
-
-		$res = $this->supa(
-			'DELETE',
-			'cyber_starting_packages?id=eq.' . rawurlencode( $id ),
-			[],
-			[ 'Prefer' => '' ]
-		);
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], $this->sk() );
+		if ( ! $res['ok'] ) {
+			wp_send_json_error( $res['error'] ?? 'Delete failed.' );
+			return;
 		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
+		$this->bust_cache();
 		wp_send_json_success( 'deleted' );
+	}
+
+	public function ajax_duplicate(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+			return;
+		}
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		if ( ! $id || ! $this->is_uuid( $id ) ) {
+			wp_send_json_error( 'Invalid package ID.' );
+			return;
+		}
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*', [], $this->sk() );
+		if ( ! $res['ok'] || empty( $res['data'] ) ) {
+			wp_send_json_error( 'Original package not found.' );
+			return;
+		}
+		$original = is_array( $res['data'] ) ? ( $res['data'][0] ?? [] ) : [];
+		if ( empty( $original ) ) {
+			wp_send_json_error( 'Failed to read original package.' );
+			return;
+		}
+		$payload = $original;
+		unset( $payload['id'], $payload['created_at'] );
+		$payload['package_name']         = $original['package_name'] . ' (Copy)';
+		$payload['is_player_selectable'] = false;
+
+		$dup_res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		if ( ! $dup_res['ok'] ) {
+			wp_send_json_error( $dup_res['error'] ?? 'Duplicate failed.' );
+			return;
+		}
+		$this->bust_cache();
+		$row = is_array( $dup_res['data'] ) ? ( $dup_res['data'][0] ?? $dup_res['data'] ) : $dup_res['data'];
+		wp_send_json_success( $row );
+	}
+
+	// ── Render ───────────────────────────────────────────────────────────────
+	public function render_page(): void {
+		?>
+<div class="wrap nw-packages-panel">
+
+	<div class="nw-admin-header">
+		<div class="nw-admin-header-left">
+			<i data-lucide="package-check" class="nw-header-icon"></i>
+			<div>
+				<h1 class="nw-admin-title">Starting Packages</h1>
+				<p class="nw-admin-subtitle">Equipment sets assigned to characters at game start</p>
+			</div>
+		</div>
+		<button id="nw-add-btn" class="nw-btn nw-btn-primary">
+			<i data-lucide="plus"></i> New Package
+		</button>
+	</div>
+
+	<div id="nw-notice" class="nw-notice" style="display:none;"></div>
+
+	<div class="nw-stats-bar">
+		<div class="nw-stat-card"><span class="nw-stat-value" id="nw-total">—</span><span class="nw-stat-label">Total</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value nw-stat-green" id="nw-selectable">—</span><span class="nw-stat-label">Player Selectable</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value" id="nw-with-slots">—</span><span class="nw-stat-label">With Equipment</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value" id="nw-with-classes">—</span><span class="nw-stat-label">Class-locked</span></div>
+	</div>
+
+	<div class="nw-filters-bar">
+		<div class="nw-search-wrap">
+			<i data-lucide="search" class="nw-search-icon"></i>
+			<input type="text" id="nw-search" class="nw-input" placeholder="Search packages…">
+		</div>
+		<select id="nw-filter-selectable" class="nw-select">
+			<option value="">All visibility</option>
+			<option value="1">Player selectable</option>
+			<option value="0">GM only</option>
+		</select>
+		<select id="nw-filter-armor" class="nw-select">
+			<option value="">All armor</option>
+			<option value="0">No armor (0)</option>
+			<option value="1">Has armor (>0)</option>
+		</select>
+		<button id="nw-clear-filters" class="nw-btn nw-btn-ghost">
+			<i data-lucide="x"></i> Clear
+		</button>
+	</div>
+
+	<div class="nw-table-wrap">
+		<table class="nw-table">
+			<thead>
+				<tr>
+					<th>Package</th>
+					<th>Armor</th>
+					<th>Equipment Slots</th>
+					<th>Cards Pool</th>
+					<th>Classes</th>
+					<th>Player?</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody id="nw-packages-tbody">
+				<tr><td colspan="7" class="nw-loading"><i data-lucide="loader-2" class="nw-spin"></i> Loading packages…</td></tr>
+			</tbody>
+		</table>
+	</div>
+
+</div>
+
+<!-- ── MODAL ──────────────────────────────────────────────────────────── -->
+<div id="nw-modal" class="nw-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title">
+	<div class="nw-modal nw-modal-wide">
+		<div class="nw-modal-header">
+			<h2 id="nw-modal-title">New Package</h2>
+			<button id="nw-modal-close" class="nw-modal-close" aria-label="Close"><i data-lucide="x"></i></button>
+		</div>
+		<div class="nw-modal-body">
+			<input type="hidden" id="nw-field-id">
+
+			<!-- Row 1 -->
+			<div class="nw-form-row nw-form-cols-2">
+				<div class="nw-form-group">
+					<label for="nw-field-package_name">Package Name <span class="nw-required">*</span></label>
+					<input type="text" id="nw-field-package_name" class="nw-input" placeholder="e.g. Hacker Starter Kit">
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-base_armor">Base Armor</label>
+					<input type="number" id="nw-field-base_armor" class="nw-input" min="0" value="0">
+				</div>
+			</div>
+
+			<!-- Description -->
+			<div class="nw-form-group">
+				<label for="nw-field-description">Description</label>
+				<textarea id="nw-field-description" class="nw-textarea" rows="2" placeholder="Short description of this package…"></textarea>
+			</div>
+
+			<!-- Equipment slots -->
+			<div class="nw-section-label"><i data-lucide="shield"></i> Equipment Slots</div>
+			<div class="nw-form-row nw-form-cols-3">
+				<div class="nw-form-group">
+					<label for="nw-field-head_item_id">Head</label>
+					<select id="nw-field-head_item_id" class="nw-select nw-item-select" data-slot="head"></select>
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-torso_item_id">Torso</label>
+					<select id="nw-field-torso_item_id" class="nw-select nw-item-select" data-slot="torso"></select>
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-belt_item_id">Belt</label>
+					<select id="nw-field-belt_item_id" class="nw-select nw-item-select" data-slot="belt"></select>
+				</div>
+			</div>
+			<div class="nw-form-row nw-form-cols-2">
+				<div class="nw-form-group">
+					<label for="nw-field-hand_r_item_id">Hand Right</label>
+					<select id="nw-field-hand_r_item_id" class="nw-select nw-item-select" data-slot="hand_r"></select>
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-hand_l_item_id">Hand Left</label>
+					<select id="nw-field-hand_l_item_id" class="nw-select nw-item-select" data-slot="hand_l"></select>
+				</div>
+			</div>
+
+			<!-- JSON fields -->
+			<div class="nw-section-label"><i data-lucide="list"></i> JSON Fields</div>
+			<div class="nw-form-row nw-form-cols-2">
+				<div class="nw-form-group">
+					<label for="nw-field-items_list">Items List
+						<span class="nw-field-hint">JSON array of item IDs / objects</span>
+					</label>
+					<textarea id="nw-field-items_list" class="nw-textarea nw-json-field" rows="3" placeholder='["uuid1","uuid2"]'></textarea>
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-compatibility_tags">Compatibility Tags
+						<span class="nw-field-hint">JSON array of tag strings</span>
+					</label>
+					<textarea id="nw-field-compatibility_tags" class="nw-textarea nw-json-field" rows="3" placeholder='["stealth","hacker"]'></textarea>
+				</div>
+			</div>
+			<div class="nw-form-row nw-form-cols-2">
+				<div class="nw-form-group">
+					<label for="nw-field-attack_cards_pool">Attack Cards Pool
+						<span class="nw-field-hint">JSON array</span>
+					</label>
+					<textarea id="nw-field-attack_cards_pool" class="nw-textarea nw-json-field" rows="3" placeholder='["card_id_1"]'></textarea>
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-defense_cards_pool">Defense Cards Pool
+						<span class="nw-field-hint">JSON array</span>
+					</label>
+					<textarea id="nw-field-defense_cards_pool" class="nw-textarea nw-json-field" rows="3" placeholder='["card_id_2"]'></textarea>
+				</div>
+			</div>
+			<div class="nw-form-group">
+				<label for="nw-field-compatible_class_ids">Compatible Class IDs
+					<span class="nw-field-hint">JSON array of class UUIDs — empty = all classes</span>
+				</label>
+				<textarea id="nw-field-compatible_class_ids" class="nw-textarea nw-json-field" rows="2" placeholder='["uuid-class-1","uuid-class-2"]'></textarea>
+			</div>
+
+			<!-- Flags -->
+			<div class="nw-form-group nw-checkbox-row">
+				<label class="nw-checkbox-label">
+					<input type="checkbox" id="nw-field-is_player_selectable">
+					<span>Player selectable (visible in character creation)</span>
+				</label>
+			</div>
+		</div>
+		<div class="nw-modal-footer">
+			<button id="nw-modal-cancel" class="nw-btn nw-btn-ghost">Cancel</button>
+			<button id="nw-modal-save"   class="nw-btn nw-btn-primary">
+				<i data-lucide="save"></i> Save Package
+			</button>
+		</div>
+	</div>
+</div>
+		<?php
 	}
 }
