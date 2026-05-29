@@ -5,9 +5,10 @@
  * Uses Supabase helpers from includes/supabase-config.php and
  * includes/supabase-helpers.php.
  *
- * get_cyber_character_id_by_wp_id() is defined in supabase-helpers.php —
- * it queries cyber_game_sessions WHERE status='active' AND wp_user_id=X.
- * Do NOT redefine it here.
+ * Character resolution:
+ *   get_cyber_active_session_character_id() — used here, requires active game session
+ *   get_cyber_character_id_by_wp_id()       — for character lists/selection, NOT for in-game actions
+ * Both are defined in supabase-helpers.php. Do NOT redefine them here.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -195,9 +196,9 @@ if ( ! function_exists( 'handle_save_cyber_deck_rpc' ) ) {
 			return;
 		}
 
-		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$character_id = get_cyber_active_session_character_id( $user_id );
 		if ( ! cyber_is_valid_uuid( $character_id ) ) {
-			wp_send_json_error( [ 'message' => 'Invalid or missing active character.' ], 400 );
+			wp_send_json_error( [ 'message' => 'No active game session found.' ], 400 );
 			return;
 		}
 
@@ -300,9 +301,9 @@ if ( ! function_exists( 'handle_use_buffer_card' ) ) {
 			return;
 		}
 
-		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$character_id = get_cyber_active_session_character_id( $user_id );
 		if ( ! cyber_is_valid_uuid( $character_id ) ) {
-			wp_send_json_error( [ 'message' => 'No active character found.' ], 400 );
+			wp_send_json_error( [ 'message' => 'No active game session found.' ], 400 );
 			return;
 		}
 
@@ -374,9 +375,9 @@ if ( ! function_exists( 'handle_foundry_upgrade' ) ) {
 			return;
 		}
 
-		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$character_id = get_cyber_active_session_character_id( $user_id );
 		if ( ! cyber_is_valid_uuid( $character_id ) ) {
-			wp_send_json_error( [ 'message' => 'Character not found.' ], 400 );
+			wp_send_json_error( [ 'message' => 'No active game session found.' ], 400 );
 			return;
 		}
 

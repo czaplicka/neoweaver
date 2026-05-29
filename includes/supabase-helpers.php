@@ -342,18 +342,6 @@ if ( ! function_exists( 'get_character_equipped_items' ) ) {
 }
 
 if ( ! function_exists( 'tw_save_user_setting' ) ) {
-	/**
-	 * Upsert a user setting row in cyber_user_settings.
-	 *
-	 * Uses PATCH on an exact (wp_user_id, key) match so PostgREST updates
-	 * the existing row, and falls back to POST with on_conflict when the row
-	 * doesn't yet exist. The simpler approach is a true upsert via POST with
-	 * Prefer: resolution=merge-duplicates AND on_conflict=wp_user_id,key —
-	 * which requires a UNIQUE constraint on (wp_user_id, key) in Supabase.
-	 * That constraint is assumed to exist; if it doesn't, add it:
-	 *   ALTER TABLE cyber_user_settings
-	 *     ADD CONSTRAINT uq_user_settings_user_key UNIQUE (wp_user_id, key);
-	 */
 	function tw_save_user_setting( int $wp_user_id, string $key, string $value ): bool {
 		$result = tw_supabase_request(
 			'POST',
@@ -461,19 +449,61 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 // ============================================================
 // get_cyber_character_id_by_wp_id()
 //
-// Zwraca character_id z AKTYWNEJ sesji gry danego usera.
-// Pyta cyber_game_sessions (status=active, wp_user_id=X), nie cyber_characters.
-// Dzięki unique index idx_one_active_session_per_user zawsze max 1 wynik.
+// Zwraca ID pierwszej postaci usera z cyber_characters.
+// Używane przy listach postaci, kreatorze, przypisywaniu do kampanii —
+// wszędzie gdzie postac nie musi być w aktywnej grze.
 // ============================================================
 
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 	/**
-	 * Get the character_id from the user's current active game session.
+	 * Get the first character ID belonging to a WP user (from cyber_characters).
+	 * Use this for character lists and selection screens — NOT for in-game actions.
+	 * For in-game handlers use get_cyber_active_session_character_id() instead.
 	 *
 	 * @param int $wp_user_id WordPress user ID.
-	 * @return string         Character UUID, or '' if no active session found.
+	 * @return string         Character UUID, or '' if user has no characters.
 	 */
 	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
+		if ( $wp_user_id <= 0 ) {
+			return '';
+		}
+
+		$result = tw_supabase_get_admin(
+			'cyber_characters',
+			[
+				'wp_user_id' => 'eq.' . $wp_user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			]
+		);
+
+		if ( is_wp_error( $result ) || empty( $result ) ) {
+			return '';
+		}
+
+		$id = $result[0]['id'] ?? '';
+		return is_string( $id ) ? $id : '';
+	}
+}
+
+// ============================================================
+// get_cyber_active_session_character_id()
+//
+// Zwraca character_id z AKTYWNEJ sesji gry (status=active).
+// Używane przez buffer.php i inne handlery działające w trakcie rozgrywki.
+// Paused i ended sesje są ignorowane — gracz musi mieć aktywną grzeć.
+// ============================================================
+
+if ( ! function_exists( 'get_cyber_active_session_character_id' ) ) {
+	/**
+	 * Get the character_id from the user's currently active game session.
+	 * Returns '' if the user has no active session (paused/ended sessions ignored).
+	 * Use this in adventure/buffer/in-game AJAX handlers.
+	 *
+	 * @param int $wp_user_id WordPress user ID.
+	 * @return string         Character UUID, or '' if no active session.
+	 */
+	function get_cyber_active_session_character_id( int $wp_user_id ): string {
 		if ( $wp_user_id <= 0 ) {
 			return '';
 		}
@@ -489,7 +519,7 @@ if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			error_log( 'TW get_cyber_character_id_by_wp_id: Supabase error — ' . $result->get_error_message() );
+			error_log( 'TW get_cyber_active_session_character_id: Supabase error — ' . $result->get_error_message() );
 			return '';
 		}
 
@@ -513,7 +543,7 @@ if ( ! function_exists( 'tw_get_user_characters' ) ) {
 	 * Pobiera wszystkie postacie danego użytkownika WP z cyber_characters.
 	 *
 	 * @param int $user_id  WordPress user ID.
-	 * @return object[]     Tablica obiektów z polami: id, name, lvl, avatar.
+	 * @return array        Tablica z polami: id, name, lvl, avatar.
 	 */
 	function tw_get_user_characters( int $user_id ): array {
 		if ( $user_id <= 0 ) {
