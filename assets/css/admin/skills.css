@@ -1,83 +1,105 @@
-/* ============================================================
-   NeoWeaver Admin — SKILLS MODULE
-   Unique category indicators and skill-specific UI
-   ============================================================ */
+/* NeoWeaver Skills admin — extends admin-core.css */
 
-/* ---- Skill Images (Larger variant for Skills list) ---- */
-.nw-col-img { width: 60px; }
-
-.nw-skill-img {
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
-    object-fit: cover;
-    border: 1px solid #2e2e2e;
-    background: #1a1a1a;
+.nw-modal-skills {
+	max-width: 720px;
+	width: 96vw;
 }
 
-.nw-skill-img-placeholder {
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
-    background: #1a1a1a;
-    border: 1px solid #2e2e2e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 20px;
+/* 2-col form row */
+.nw-form-2col {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
 }
 
-/* ---- Skill Typography Extensions ---- */
-.nw-skill-name { font-weight: 600; color: #fff; }
-.nw-skill-sub { font-size: 11px; color: #555; margin-top: 2px; }
-
-/* ---- Category Badges (Skill Types) ---- */
-.nw-category-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    color: #aaa;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    white-space: nowrap;
+/* category badges */
+.nw-cat-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	border: 1px solid transparent;
+	background: rgba(255,255,255,0.04);
+	white-space: nowrap;
 }
 
-/* Specific Category Colors */
-.nw-cat-Physical    { border-color: #ff6b35; color: #ff6b35; }
-.nw-cat-Social      { border-color: #4da6ff; color: #4da6ff; }
-.nw-cat-Mental      { border-color: #b04dff; color: #b04dff; }
-.nw-cat-Exploration { border-color: #4fc874; color: #4fc874; }
-
-/* ---- Tag Styling ---- */
-.nw-tags { 
-    display: flex; 
-    flex-wrap: wrap; 
-    gap: 4px; 
+/* stat bar category items */
+.nw-stat-cat {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
 }
 
-.nw-tag {
-    font-size: 10px;
-    padding: 2px 7px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    border-radius: 3px;
-    color: #888;
+/* tag chip editor */
+.nw-tag-input-wrap {
+	border: 1px solid rgba(255,255,255,0.12);
+	border-radius: 6px;
+	background: rgba(255,255,255,0.03);
+	padding: 6px 8px;
+	min-height: 38px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	align-items: flex-start;
+	cursor: text;
+	transition: border-color .18s;
 }
-
-/* ---- Card Mechanics Preview ---- */
-.nw-card-effect {
-    font-size: 11px;
-    color: #adff00;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.nw-tag-input-wrap:focus-within {
+	border-color: rgba(173,255,0,0.45);
 }
+.nw-tag-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+}
+.nw-tag-text-input {
+	background: transparent;
+	border: none;
+	outline: none;
+	color: #e4e4e7;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 12px;
+	min-width: 100px;
+	flex: 1;
+}
+.nw-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	background: rgba(173,255,0,0.08);
+	border: 1px solid rgba(173,255,0,0.20);
+	color: #adff00;
+	white-space: nowrap;
+}
+.nw-tag-chip.nw-tag-more {
+	background: rgba(255,255,255,0.06);
+	border-color: rgba(255,255,255,0.12);
+	color: #a1a1aa;
+}
+.nw-tag-removable {
+	gap: 6px;
+}
+.nw-tag-remove {
+	background: none;
+	border: none;
+	color: rgba(173,255,0,0.5);
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0 1px;
+	transition: color .15s;
+}
+.nw-tag-remove:hover { color: #f87171; }
 
-/* Row state for disabled skills */
-.nw-row-inactive td:not(:last-child):not(:first-child) { 
-    opacity: .4; 
+/* table small text */
+.nw-skills-tbody small { line-height: 1.35; }
+
+@media (max-width: 640px) {
+	.nw-form-2col { grid-template-columns: 1fr; }
 }
