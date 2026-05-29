@@ -33,7 +33,6 @@ function nw_shortcode_ascension( array $atts ): string {
 	if ( ! $character_id ) {
 		$qs_id = isset( $_GET['nw_char'] ) ? nw_sanitize_uuid( $_GET['nw_char'] ) : '';
 		if ( $qs_id ) {
-			// Sprawdź czy ta postać należy do usera
 			foreach ( $characters as $c ) {
 				if ( (string) $c->id === $qs_id ) {
 					$character_id = $qs_id;
@@ -70,10 +69,10 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $no_cards;
 	}
 
-	// Grupowanie po deck_id
+	// Grupowanie po deck_id — INT przez cały czas, spójny klucz tablicy
 	$groups = [];
 	foreach ( $owned as $card ) {
-		$did = (string) $card['deck_id'];
+		$did = (int) $card['deck_id'];  // zawsze int
 		if ( ! isset( $groups[ $did ] ) ) {
 			$groups[ $did ] = [ 'copies' => [], 'ascended' => [] ];
 		}
@@ -88,13 +87,12 @@ function nw_shortcode_ascension( array $atts ): string {
 	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
 
 	// Karty kwalifikujące się do Ascension
-	$deck_ids     = array_keys( $groups );
 	$eligible_ids = [];
-	foreach ( $deck_ids as $did ) {
-		$base_count   = count( $groups[ $did ]['copies'] );
-		$has_ascended = ! empty( $groups[ $did ]['ascended'] );
+	foreach ( $groups as $did => $group ) {
+		$base_count   = count( $group['copies'] );
+		$has_ascended = ! empty( $group['ascended'] );
 		if ( $base_count >= 2 || $has_ascended ) {
-			$eligible_ids[] = $did;
+			$eligible_ids[] = (int) $did;  // int
 		}
 	}
 
@@ -106,15 +104,15 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $msg;
 	}
 
-	// Pobierz definicje kart
-	$id_list   = implode( ',', array_map( 'esc_sql', $eligible_ids ) );
+	// Pobierz definicje kart — intval zamiast esc_sql (to jest REST API, nie SQL)
+	$id_list   = implode( ',', array_map( 'intval', $eligible_ids ) );
 	$card_defs = tw_supabase_get( 'cyber_deck', [
 		'id'     => 'in.(' . $id_list . ')',
 		'select' => 'id,name,rarity,level,deck_category,img_url',
 	] );
 	$defs_by_id = [];
 	foreach ( (array) $card_defs as $def ) {
-		$defs_by_id[ (string) $def['id'] ] = $def;
+		$defs_by_id[ (int) $def['id'] ] = $def;  // int klucz
 	}
 
 	// Render
@@ -132,6 +130,7 @@ function nw_shortcode_ascension( array $atts ): string {
 
 		<div class="nw-ascension-grid">
 		<?php foreach ( $eligible_ids as $did ) :
+			$did        = (int) $did;
 			$def        = $defs_by_id[ $did ] ?? null;
 			if ( ! $def ) continue;
 			$base_copies = $groups[ $did ]['copies'];
@@ -202,7 +201,6 @@ function nw_shortcode_ascension( array $atts ): string {
 
 /**
  * Renderuje dropdown wyboru postaci.
- * Po wyborze przeładowuje stronę z ?nw_char={id}.
  *
  * @param object[] $characters  Wynik tw_get_user_characters().
  * @param string   $current_id  Aktualnie wybrany character UUID.
