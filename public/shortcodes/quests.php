@@ -81,8 +81,58 @@ if ( ! function_exists( 'tw_render_quest_card' ) ) {
 	}
 }
 
+if ( ! function_exists( 'tw_verify_character_ownership' ) ) {
+	/**
+	 * Confirms that $character_id belongs to the current WP user.
+	 * Queries Supabase directly — bypasses any cached/transient data.
+	 *
+	 * @return bool  true = ownership confirmed, false = denied or error.
+	 */
+	function tw_verify_character_ownership( string $character_id, int $wp_user_id ): bool {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return false;
+		}
+
+		$url = add_query_arg(
+			array(
+				'id'         => 'eq.' . rawurlencode( $character_id ),
+				'wp_user_id' => 'eq.' . (int) $wp_user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			),
+			trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_characters'
+		);
+
+		$anon_key = tw_supabase_anon_key();
+		$res      = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'apikey'        => $anon_key,
+					'Authorization' => 'Bearer ' . $anon_key,
+				),
+				'timeout' => 10,
+			)
+		);
+
+		if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
+			return false;
+		}
+
+		$rows = json_decode( wp_remote_retrieve_body( $res ), true );
+
+		return is_array( $rows ) && ! empty( $rows );
+	}
+}
+
 if ( ! function_exists( 'tw_display_active_scenarios_shortcode' ) ) {
 	function tw_display_active_scenarios_shortcode(): string {
+		$wp_user_id = get_current_user_id();
+
+		if ( ! $wp_user_id ) {
+			return '<div class="echo-stream-container">// ERROR: OPERATOR NOT IDENTIFIED</div>';
+		}
+
 		if ( ! function_exists( 'tw_get_current_character_id' ) ) {
 			return '<div class="echo-stream-container">// ERROR: SESSION HELPER MISSING</div>';
 		}
@@ -95,6 +145,11 @@ if ( ! function_exists( 'tw_display_active_scenarios_shortcode' ) ) {
 
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG MISSING</div>';
+		}
+
+		// Explicit ownership check — guards against stale transients and disabled RLS.
+		if ( ! tw_verify_character_ownership( (string) $character_id, $wp_user_id ) ) {
+			return '<div class="echo-stream-container">// ERROR: ACCESS DENIED</div>';
 		}
 
 		if ( function_exists( 'tw_enqueue_quests_assets' ) ) {
