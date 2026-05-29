@@ -22,10 +22,10 @@ function nw_ajax_ascend_card(): void {
 	// Validate user owns this character
 	$user_id    = get_current_user_id();
 	$characters = tw_supabase_get( 'cyber_characters', [
-		'id'        => 'eq.' . nw_sanitize_uuid( $character_id ),
+		'id'         => 'eq.' . nw_sanitize_uuid( $character_id ),
 		'wp_user_id' => 'eq.' . $user_id,
-		'select'    => 'id',
-		'limit'     => 1,
+		'select'     => 'id',
+		'limit'      => 1,
 	] );
 	if ( empty( $characters ) ) {
 		wp_send_json_error( [ 'message' => 'Character not found or not yours.' ] );
@@ -33,12 +33,12 @@ function nw_ajax_ascend_card(): void {
 
 	// Fetch all copies of this card for this character (only non-ascended = ascension_level = 0)
 	$copies = tw_supabase_get( 'cyber_character_deck', [
-		'character_id'   => 'eq.' . nw_sanitize_uuid( $character_id ),
-		'deck_id'        => 'eq.' . $deck_id,
+		'character_id'    => 'eq.' . nw_sanitize_uuid( $character_id ),
+		'deck_id'         => 'eq.' . $deck_id,
 		'ascension_level' => 'eq.0',
-		'is_locked'      => 'eq.false',
-		'select'         => 'id,current_level,current_xp,ascension_level',
-		'order'          => 'current_level.desc,current_xp.desc',
+		'is_locked'       => 'eq.false',
+		'select'          => 'id,current_level,current_xp,ascension_level',
+		'order'           => 'current_level.desc,current_xp.desc',
 	] );
 
 	if ( ! is_array( $copies ) ) {
@@ -86,52 +86,60 @@ function nw_ajax_ascend_card(): void {
 /**
  * Generic Supabase DELETE by row id.
  */
-function nw_supabase_delete( string $table, int $row_id ): bool {
-	if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
-	$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
-	$res = nw_supabase_request( 'DELETE', $url, null, [ 'Prefer: return=minimal' ] );
-	return $res !== false;
+if ( ! function_exists( 'nw_supabase_delete' ) ) {
+	function nw_supabase_delete( string $table, int $row_id ): bool {
+		if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
+		$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
+		$res = nw_supabase_request( 'DELETE', $url, null, [ 'Prefer: return=minimal' ] );
+		return $res !== false;
+	}
 }
 
 /**
  * Generic Supabase PATCH by row id.
  */
-function nw_supabase_patch( string $table, int $row_id, array $data ): bool {
-	if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
-	$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
-	$res = nw_supabase_request( 'PATCH', $url, $data, [ 'Prefer: return=minimal' ] );
-	return $res !== false;
+if ( ! function_exists( 'nw_supabase_patch' ) ) {
+	function nw_supabase_patch( string $table, int $row_id, array $data ): bool {
+		if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
+		$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
+		$res = nw_supabase_request( 'PATCH', $url, $data, [ 'Prefer: return=minimal' ] );
+		return $res !== false;
+	}
 }
 
-function nw_supabase_url( string $table ): string {
-	return rtrim( defined( 'NW_SUPABASE_URL' ) ? NW_SUPABASE_URL : get_option( 'nw_supabase_url', '' ), '/' ) . '/rest/v1/' . $table;
+if ( ! function_exists( 'nw_supabase_url' ) ) {
+	function nw_supabase_url( string $table ): string {
+		return rtrim( defined( 'NW_SUPABASE_URL' ) ? NW_SUPABASE_URL : get_option( 'nw_supabase_url', '' ), '/' ) . '/rest/v1/' . $table;
+	}
 }
 
 /**
  * Low-level Supabase HTTP request.
  */
-function nw_supabase_request( string $method, string $url, ?array $body, array $extra_headers = [] ) {
-	$service_key = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : get_option( 'nw_supabase_service_key', '' );
+if ( ! function_exists( 'nw_supabase_request' ) ) {
+	function nw_supabase_request( string $method, string $url, ?array $body, array $extra_headers = [] ) {
+		$service_key = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : get_option( 'nw_supabase_service_key', '' );
 
-	$headers = array_merge( [
-		'apikey'        => $service_key,
-		'Authorization' => 'Bearer ' . $service_key,
-		'Content-Type'  => 'application/json',
-	], $extra_headers );
+		$headers = array_merge( [
+			'apikey'        => $service_key,
+			'Authorization' => 'Bearer ' . $service_key,
+			'Content-Type'  => 'application/json',
+		], $extra_headers );
 
-	$args = [
-		'method'  => $method,
-		'headers' => $headers,
-		'timeout' => 10,
-	];
+		$args = [
+			'method'  => $method,
+			'headers' => $headers,
+			'timeout' => 10,
+		];
 
-	if ( $body !== null ) {
-		$args['body'] = wp_json_encode( $body );
+		if ( $body !== null ) {
+			$args['body'] = wp_json_encode( $body );
+		}
+
+		$response = wp_remote_request( $url, $args );
+
+		if ( is_wp_error( $response ) ) { return false; }
+		$code = wp_remote_retrieve_response_code( $response );
+		return ( $code >= 200 && $code < 300 );
 	}
-
-	$response = wp_remote_request( $url, $args );
-
-	if ( is_wp_error( $response ) ) { return false; }
-	$code = wp_remote_retrieve_response_code( $response );
-	return ( $code >= 200 && $code < 300 );
 }
