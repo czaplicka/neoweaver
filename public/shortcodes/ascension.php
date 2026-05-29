@@ -3,7 +3,7 @@
  * ascension.php  — shortcode [nw_ascension]
  * Shows cards eligible for Ascension for a given character.
  * Usage: [nw_ascension character_id="{uuid}"]
- *        or just [nw_ascension] — picks active character automatically
+ *        or just [nw_ascension] — auto-detects / shows selector
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -18,24 +18,40 @@ function nw_shortcode_ascension( array $atts ): string {
 	}
 
 	$user_id      = get_current_user_id();
-	$character_id = sanitize_text_field( $atts['character_id'] );
+	$character_id = nw_sanitize_uuid( $atts['character_id'] );
 
-	// Auto-detect active character if not provided
-	if ( ! $character_id && function_exists( 'tw_supabase_first' ) ) {
-		$char = tw_supabase_first( 'cyber_characters', [
-			'wp_user_id' => 'eq.' . $user_id,
-			'select'     => 'id,name',
-			'limit'      => 1,
-			'order'      => 'created_at.desc',
-		] );
-		$character_id = $char['id'] ?? '';
+	// Pobierz wszystkie postacie usera
+	$characters = function_exists( 'tw_get_user_characters' )
+		? tw_get_user_characters( $user_id )
+		: [];
+
+	if ( empty( $characters ) ) {
+		return '<p class="nw-notice">No character found. Create a character first.</p>';
 	}
 
+	// Jeśli nie podano character_id z atrybutu, weź z query string lub pierwszą postać
 	if ( ! $character_id ) {
-		return '<p class="nw-notice">No character found.</p>';
+		$qs_id = isset( $_GET['nw_char'] ) ? nw_sanitize_uuid( $_GET['nw_char'] ) : '';
+		if ( $qs_id ) {
+			// Sprawdź czy ta postać należy do usera
+			foreach ( $characters as $c ) {
+				if ( (string) $c->id === $qs_id ) {
+					$character_id = $qs_id;
+					break;
+				}
+			}
+		}
+		if ( ! $character_id ) {
+			$character_id = (string) $characters[0]->id;
+		}
 	}
 
-	// Fetch all non-locked, non-ascended cards for this character
+	// Weryfikacja właściciela
+	if ( function_exists( 'tw_user_owns_character' ) && ! tw_user_owns_character( $character_id, $user_id ) ) {
+		return '<p class="nw-notice">Character not found.</p>';
+	}
+
+	// --- Fetch kart postaci ---
 	if ( ! function_exists( 'tw_supabase_get' ) ) {
 		return '<p class="nw-notice">Supabase not configured.</p>';
 	}
@@ -46,14 +62,18 @@ function nw_shortcode_ascension( array $atts ): string {
 		'select'       => 'id,deck_id,current_level,current_xp,ascension_level',
 	] );
 
-	if ( ! is_array( $owned ) || empty( $owned ) ) {
-		return '<div class="nw-ascension-empty"><i data-lucide="layers"></i><p>No cards available for Ascension.</p></div>';
+	if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
+		$no_cards = '<div class="nw-ascension-empty"><i data-lucide="layers"></i><p>No cards available for Ascension.</p></div>';
+		if ( count( $characters ) > 1 ) {
+			return nw_ascension_selector( $characters, $character_id ) . $no_cards;
+		}
+		return $no_cards;
 	}
 
-	// Group by deck_id — count base copies (ascension_level = 0)
+	// Grupowanie po deck_id
 	$groups = [];
 	foreach ( $owned as $card ) {
-		$did = (int) $card['deck_id'];
+		$did = (string) $card['deck_id'];
 		if ( ! isset( $groups[ $did ] ) ) {
 			$groups[ $did ] = [ 'copies' => [], 'ascended' => [] ];
 		}
@@ -64,33 +84,37 @@ function nw_shortcode_ascension( array $atts ): string {
 		}
 	}
 
-	// Ascension costs: [ascension_level_target => copies_needed]
+	// Koszty wzniesienia: [poziom_docelowy => wymagane_kopie]
 	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
 
-	// Fetch card definitions for groups that have ≥2 base copies OR already ascended
-	$deck_ids = array_keys( $groups );
+	// Karty kwalifikujące się do Ascension
+	$deck_ids     = array_keys( $groups );
 	$eligible_ids = [];
 	foreach ( $deck_ids as $did ) {
-		$base_count     = count( $groups[ $did ]['copies'] );
-		$has_ascended   = ! empty( $groups[ $did ]['ascended'] );
+		$base_count   = count( $groups[ $did ]['copies'] );
+		$has_ascended = ! empty( $groups[ $did ]['ascended'] );
 		if ( $base_count >= 2 || $has_ascended ) {
 			$eligible_ids[] = $did;
 		}
 	}
 
 	if ( empty( $eligible_ids ) ) {
-		return '<div class="nw-ascension-empty"><i data-lucide="layers"></i><p>Collect duplicate cards to unlock Ascension.</p></div>';
+		$msg = '<div class="nw-ascension-empty"><i data-lucide="layers"></i><p>Collect duplicate cards to unlock Ascension.</p></div>';
+		if ( count( $characters ) > 1 ) {
+			return nw_ascension_selector( $characters, $character_id ) . $msg;
+		}
+		return $msg;
 	}
 
-	// Batch fetch card definitions
-	$id_list  = implode( ',', $eligible_ids );
+	// Pobierz definicje kart
+	$id_list   = implode( ',', array_map( 'esc_sql', $eligible_ids ) );
 	$card_defs = tw_supabase_get( 'cyber_deck', [
 		'id'     => 'in.(' . $id_list . ')',
 		'select' => 'id,name,rarity,level,deck_category,img_url',
 	] );
 	$defs_by_id = [];
 	foreach ( (array) $card_defs as $def ) {
-		$defs_by_id[ (int) $def['id'] ] = $def;
+		$defs_by_id[ (string) $def['id'] ] = $def;
 	}
 
 	// Render
@@ -100,11 +124,15 @@ function nw_shortcode_ascension( array $atts ): string {
 	ob_start();
 	?>
 	<div class="nw-ascension-wrap" data-character="<?php echo esc_attr( $character_id ); ?>">
+		<?php if ( count( $characters ) > 1 ) : ?>
+			<?php echo nw_ascension_selector( $characters, $character_id ); ?>
+		<?php endif; ?>
+
 		<h2 class="nw-ascension-title">⬡ Ascension Forge</h2>
 
 		<div class="nw-ascension-grid">
 		<?php foreach ( $eligible_ids as $did ) :
-			$def         = $defs_by_id[ $did ] ?? null;
+			$def        = $defs_by_id[ $did ] ?? null;
 			if ( ! $def ) continue;
 			$base_copies = $groups[ $did ]['copies'];
 			$base_count  = count( $base_copies );
@@ -167,6 +195,34 @@ function nw_shortcode_ascension( array $atts ): string {
 			</div>
 		<?php endforeach; ?>
 		</div>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+
+/**
+ * Renderuje dropdown wyboru postaci.
+ * Po wyborze przeładowuje stronę z ?nw_char={id}.
+ *
+ * @param object[] $characters  Wynik tw_get_user_characters().
+ * @param string   $current_id  Aktualnie wybrany character UUID.
+ * @return string               HTML selektora.
+ */
+function nw_ascension_selector( array $characters, string $current_id ): string {
+	$current_url = esc_url( strtok( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ), '?' ) );
+	ob_start();
+	?>
+	<div class="nw-char-selector">
+		<label for="nw-char-select"><i data-lucide="user"></i> Character</label>
+		<select id="nw-char-select" onchange="window.location = '<?php echo $current_url; ?>?nw_char=' + this.value">
+			<?php foreach ( $characters as $char ) : ?>
+				<option value="<?php echo esc_attr( $char->id ); ?>"
+					<?php selected( (string) $char->id, $current_id ); ?>>
+					<?php echo esc_html( $char->name ); ?>
+					<?php if ( isset( $char->lvl ) ) : ?>(Lvl <?php echo (int) $char->lvl; ?>)<?php endif; ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
 	</div>
 	<?php
 	return ob_get_clean();
