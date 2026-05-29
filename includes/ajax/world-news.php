@@ -19,9 +19,12 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 
 		$world_id     = nw_sanitize_uuid( (string) ( $_POST['world_id']     ?? '' ) );
 		$character_id = nw_sanitize_uuid( (string) ( $_POST['character_id'] ?? '' ) );
-		$current_day  = intval( $_POST['current_day']  ?? 0 );
-		$current_hour = intval( $_POST['current_hour'] ?? 0 );
-		$clearance    = isset( $_POST['clearance'] ) ? intval( $_POST['clearance'] ) : 0;
+
+		// Clamp to realistic in-game ranges to prevent timeline-bypass attacks.
+		// current_day: 1–9999 (game days); current_hour: 0–23 (hours in a day).
+		$current_day  = max( 1,  min( 9999, intval( $_POST['current_day']  ?? 1 ) ) );
+		$current_hour = max( 0,  min( 23,   intval( $_POST['current_hour'] ?? 0 ) ) );
+		$clearance    = max( 0,  min( 10,   intval( $_POST['clearance']    ?? 0 ) ) );
 
 		if ( '' === $world_id || '' === $character_id ) {
 			wp_send_json_error( [ 'message' => 'Missing required fields.' ], 400 );
@@ -73,5 +76,7 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 		wp_send_json_success( [ 'news' => $news, 'unread_count' => $unread_count ] );
 	}
 
-	add_action( 'wp_ajax_get_cyber_news', 'tw_get_cyber_world_news_ajax' );
+	add_action( 'wp_ajax_get_cyber_news',        'tw_get_cyber_world_news_ajax' );
+	// nopriv — zwraca 401 dzięki is_user_logged_in() na początku funkcji
+	add_action( 'wp_ajax_nopriv_get_cyber_news', 'tw_get_cyber_world_news_ajax' );
 }
