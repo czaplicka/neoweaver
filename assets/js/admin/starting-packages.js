@@ -1,461 +1,313 @@
-/* NeoWeaver Admin — Starting Packages Panel JS */
-jQuery(function ($) {
+/* NeoWeaver — Starting Packages Admin JS */
+/* globals NWPackages, lucide, jQuery */
+(function ($) {
 	'use strict';
 
-	var ajaxUrl = (window.NW_SP && window.NW_SP.ajax_url) ? window.NW_SP.ajax_url : '';
-	var nonce = (window.NW_SP && window.NW_SP.nonce) ? window.NW_SP.nonce : ($('#nw-nonce').val() || '');
-	var editId = null;
-	var allItems = [];
-	var itemsCacheLoaded = false;
-	var itemsCacheXhr = null;
+	const A = NWPackages.ajaxurl;
+	const N = NWPackages.nonce;
 
-	if (!ajaxUrl || !nonce) {
-		console.error('NeoWeaver Starting Packages: missing AJAX config.');
-		return;
+	let allRows  = [];
+	let allItems = []; // cyber_items for slot dropdowns
+
+	// ── Lucide ───────────────────────────────────────────────────────────────
+	function icons() {
+		if (window.lucide) lucide.createIcons();
 	}
 
-	function request(data, onSuccess, fallbackError) {
-		return $.ajax({
-			url: ajaxUrl,
-			method: 'POST',
-			dataType: 'json',
-			data: data
-		})
-		.done(function (res) {
-			if (typeof onSuccess === 'function') {
-				onSuccess(res);
-			}
-		})
-		.fail(function (xhr, status) {
-			if (status === 'abort') {
-				return;
-			}
-			showNotice('error', extractError(xhr, fallbackError || 'Request failed.'));
-		});
+	// ── Notice ───────────────────────────────────────────────────────────────
+	function notice(msg, type = 'success') {
+		const $n = $('#nw-notice');
+		$n.removeClass('nw-notice-success nw-notice-error')
+			.addClass(type === 'error' ? 'nw-notice-error' : 'nw-notice-success')
+			.html(msg).show();
+		setTimeout(() => $n.fadeOut(), 4000);
 	}
 
-	function extractError(xhr, fallback) {
-		if (xhr && xhr.responseJSON) {
-			if (typeof xhr.responseJSON.data === 'string' && xhr.responseJSON.data) {
-				return xhr.responseJSON.data;
-			}
-			if (
-				xhr.responseJSON.data &&
-				typeof xhr.responseJSON.data.message === 'string' &&
-				xhr.responseJSON.data.message
-			) {
-				return xhr.responseJSON.data.message;
-			}
-		}
-
-		if (xhr && typeof xhr.responseText === 'string' && xhr.responseText.trim()) {
-			try {
-				var parsed = JSON.parse(xhr.responseText);
-				if (parsed && typeof parsed.data === 'string' && parsed.data) {
-					return parsed.data;
-				}
-			} catch (e) {}
-		}
-
-		return fallback || 'Request failed.';
+	// ── Stats ────────────────────────────────────────────────────────────────
+	function updateStats(rows) {
+		$('#nw-total').text(rows.length);
+		$('#nw-selectable').text(rows.filter(r => r.is_player_selectable).length);
+		$('#nw-with-slots').text(rows.filter(r =>
+			r.head_item_id || r.torso_item_id || r.hand_r_item_id || r.hand_l_item_id || r.belt_item_id
+		).length);
+		$('#nw-with-classes').text(rows.filter(r =>
+			Array.isArray(r.compatible_class_ids) && r.compatible_class_ids.length > 0
+		).length);
 	}
 
-	function invalidateItemsCache() {
-		allItems = [];
-		itemsCacheLoaded = false;
-		if (itemsCacheXhr && itemsCacheXhr.readyState !== 4) {
-			itemsCacheXhr.abort();
-		}
-		itemsCacheXhr = null;
+	// ── Item name lookup ─────────────────────────────────────────────────────
+	function itemName(id) {
+		if (!id) return '—';
+		const item = allItems.find(i => i.id === id);
+		return item ? `<span class="nw-item-chip">${item.name}</span>` : `<span class="nw-item-chip nw-chip-missing">unknown</span>`;
 	}
 
-	function loadItemsCache(cb, forceRefresh) {
-		if (itemsCacheLoaded && !forceRefresh) {
-			if (typeof cb === 'function') {
-				cb();
-			}
+	// ── Slot summary ─────────────────────────────────────────────────────────
+	function slotSummary(row) {
+		const slots = [
+			{ icon: 'hard-hat', id: row.head_item_id   },
+			{ icon: 'shirt',    id: row.torso_item_id  },
+			{ icon: 'swords',   id: row.hand_r_item_id },
+			{ icon: 'shield',   id: row.hand_l_item_id },
+			{ icon: 'belt',     id: row.belt_item_id   },
+		];
+		const filled = slots.filter(s => s.id).length;
+		if (!filled) return '<span class="nw-text-muted">None</span>';
+		return `<span class="nw-slots-pill">${filled}/5 slots</span>`;
+	}
+
+	// ── Cards pool summary ───────────────────────────────────────────────────
+	function cardsSummary(row) {
+		const atk = Array.isArray(row.attack_cards_pool)  ? row.attack_cards_pool.length  : 0;
+		const def = Array.isArray(row.defense_cards_pool) ? row.defense_cards_pool.length : 0;
+		if (!atk && !def) return '<span class="nw-text-muted">—</span>';
+		return `<span class="nw-pill nw-pill-atk">⚔ ${atk}</span> <span class="nw-pill nw-pill-def">🛡 ${def}</span>`;
+	}
+
+	// ── Classes summary ──────────────────────────────────────────────────────
+	function classesSummary(row) {
+		const ids = Array.isArray(row.compatible_class_ids) ? row.compatible_class_ids : [];
+		if (!ids.length) return '<span class="nw-text-muted">All</span>';
+		return `<span class="nw-pill nw-pill-class">${ids.length} class${ids.length > 1 ? 'es' : ''}</span>`;
+	}
+
+	// ── Render table ─────────────────────────────────────────────────────────
+	function renderTable(rows) {
+		const $tbody = $('#nw-packages-tbody');
+		if (!rows.length) {
+			$tbody.html('<tr><td colspan="7" class="nw-empty">No packages found.</td></tr>');
+			icons();
 			return;
 		}
-
-		if (itemsCacheXhr && itemsCacheXhr.readyState !== 4) {
-			itemsCacheXhr.abort();
-		}
-
-		itemsCacheXhr = request(
-			{
-				action: 'nw_sp_get_items',
-				nonce: nonce
-			},
-			function (r) {
-				itemsCacheXhr = null;
-
-				if (r && r.success) {
-					allItems = Array.isArray(r.data) ? r.data : [];
-					itemsCacheLoaded = true;
-				} else {
-					allItems = [];
-					itemsCacheLoaded = false;
-				}
-
-				if (typeof cb === 'function') {
-					cb();
-				}
-			},
-			'Failed to load items.'
-		);
+		const html = rows.map(row => `
+			<tr data-id="${row.id}">
+				<td class="nw-col-name">
+					<div class="nw-row-title">${escHtml(row.package_name)}</div>
+					${row.description ? `<div class="nw-row-desc">${escHtml(row.description.slice(0, 60))}${row.description.length > 60 ? '…' : ''}</div>` : ''}
+				</td>
+				<td><span class="nw-armor-val">${row.base_armor ?? 0}</span></td>
+				<td>${slotSummary(row)}</td>
+				<td>${cardsSummary(row)}</td>
+				<td>${classesSummary(row)}</td>
+				<td>${row.is_player_selectable
+					? '<span class="nw-badge nw-badge-active">Yes</span>'
+					: '<span class="nw-badge nw-badge-inactive">GM only</span>'}</td>
+				<td class="nw-col-actions">
+					<button class="nw-btn-icon nw-edit-btn" title="Edit" data-id="${row.id}"><i data-lucide="pencil"></i></button>
+					<button class="nw-btn-icon nw-dup-btn"  title="Duplicate" data-id="${row.id}"><i data-lucide="copy"></i></button>
+					<button class="nw-btn-icon nw-del-btn nw-btn-danger" title="Delete" data-id="${row.id}"><i data-lucide="trash-2"></i></button>
+				</td>
+			</tr>`).join('');
+		$tbody.html(html);
+		icons();
 	}
 
-	function populateItemSelects(pkg) {
-		var selects = [
-			'nw-field-head_item_id',
-			'nw-field-torso_item_id',
-			'nw-field-hand_r_item_id',
-			'nw-field-hand_l_item_id',
-			'nw-field-belt_item_id'
-		];
+	// ── Filters ──────────────────────────────────────────────────────────────
+	function applyFilters() {
+		const search     = $('#nw-search').val().toLowerCase();
+		const selectable = $('#nw-filter-selectable').val();
+		const armor      = $('#nw-filter-armor').val();
 
-		selects.forEach(function (selId) {
-			var $sel = $('#' + selId);
-			var grouped = {};
-
-			$sel.empty().append('<option value="">— none —</option>');
-
-			$.each(allItems, function (_, it) {
-				var groupName = (it.slot || it.type || 'other').toString();
-				if (!grouped[groupName]) {
-					grouped[groupName] = [];
-				}
-				grouped[groupName].push(it);
-			});
-
-			$.each(grouped, function (grpName, items) {
-				var $og = $('<optgroup>').attr('label', String(grpName).toUpperCase());
-
-				$.each(items, function (_, it) {
-					var label = it.name || '(unnamed item)';
-					if (it.slot) {
-						label += ' [' + it.slot + ']';
-					}
-					$og.append(
-						$('<option>').val(it.id).text(label)
-					);
-				});
-
-				$sel.append($og);
-			});
-
-			var fieldName = selId.replace('nw-field-', '');
-			var curVal = pkg && pkg[fieldName] ? pkg[fieldName] : '';
-			$sel.val(curVal);
+		const filtered = allRows.filter(r => {
+			if (search && !r.package_name.toLowerCase().includes(search)) return false;
+			if (selectable === '1' && !r.is_player_selectable) return false;
+			if (selectable === '0' && r.is_player_selectable)  return false;
+			if (armor === '0' && (r.base_armor ?? 0) !== 0)    return false;
+			if (armor === '1' && (r.base_armor ?? 0) === 0)    return false;
+			return true;
 		});
+		renderTable(filtered);
 	}
 
+	// ── Load ─────────────────────────────────────────────────────────────────
 	function loadPackages() {
-		$('#nw-sp-tbody').html(
-			'<tr class="nw-loading-row"><td colspan="7"><div class="nw-spinner"></div> Loading packages…</td></tr>'
-		);
+		$('#nw-packages-tbody').html('<tr><td colspan="7" class="nw-loading"><i data-lucide="loader-2" class="nw-spin"></i> Loading…</td></tr>');
+		icons();
 
-		request(
-			{
-				action: 'nw_sp_get_all',
-				nonce: nonce
-			},
-			function (r) {
-				if (!r || !r.success) {
-					showNotice('error', r && r.data ? r.data : 'Could not load packages.');
-					$('#nw-sp-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#d63638;">Failed to load packages.</td></tr>');
-					return;
-				}
-				renderTable(Array.isArray(r.data) ? r.data : []);
-			},
-			'Failed to load packages.'
-		);
-	}
-
-	function renderTable(rows) {
-		var total = rows.length;
-		var sel = 0;
-		var hidden = 0;
-		var html = '';
-
-		if (!rows.length) {
-			html = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#555;">No packages found.</td></tr>';
-		}
-
-		$.each(rows, function (_, p) {
-			if (p.is_player_selectable) {
-				sel++;
-			} else {
-				hidden++;
-			}
-
-			var slots = '';
-			var slotFields = ['head_item_id', 'torso_item_id', 'hand_r_item_id', 'hand_l_item_id', 'belt_item_id'];
-			var slotLabels = {
-				head_item_id: 'Head',
-				torso_item_id: 'Torso',
-				hand_r_item_id: 'R-Hand',
-				hand_l_item_id: 'L-Hand',
-				belt_item_id: 'Belt'
-			};
-
-			$.each(slotFields, function (_, f) {
-				if (p[f]) {
-					slots += '<span class="nw-slot-chip">' + escH(slotLabels[f]) + '</span>';
-				}
-			});
-
-			if (!slots) {
-				slots = '<span style="color:#333">—</span>';
-			}
-
-			var tags = '';
-			if (Array.isArray(p.compatibility_tags) && p.compatibility_tags.length) {
-				$.each(p.compatibility_tags, function (_, t) {
-					tags += '<span class="nw-tag">' + escH(t) + '</span>';
-				});
-			}
-			if (!tags) {
-				tags = '<span style="color:#333">—</span>';
-			}
-
-			var classCount = (Array.isArray(p.compatible_class_ids) && p.compatible_class_ids.length)
-				? p.compatible_class_ids.length
-				: 0;
-
-			html += ''
-				+ '<tr data-id="' + escH(p.id) + '">'
-				+ '<td><div class="nw-pkg-name">' + escH(p.package_name) + '</div>'
-				+ (p.description ? '<div class="nw-pkg-sub">' + escH(truncate(p.description, 60)) + '</div>' : '')
-				+ '</td>'
-				+ '<td><span class="nw-armor-val">' + escH(p.base_armor) + '</span></td>'
-				+ '<td>' + slots + '</td>'
-				+ '<td><div class="nw-tags">' + tags + '</div></td>'
-				+ '<td>' + (classCount ? '<span class="nw-tag">' + escH(classCount) + ' class' + (classCount > 1 ? 'es' : '') + '</span>' : '<span style="color:#333">—</span>') + '</td>'
-				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-toggle-sel" data-id="' + escH(p.id) + '"' + (p.is_player_selectable ? ' checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
-				+ '<td><div class="nw-row-actions"><button type="button" class="nw-action-btn nw-edit-btn" data-id="' + escH(p.id) + '">Edit</button></div></td>'
-				+ '</tr>';
+		$.post(A, { action: 'nwpackagesload', nonce: N }, res => {
+			if (!res.success) { notice(res.data || 'Load error', 'error'); return; }
+			allRows = res.data || [];
+			updateStats(allRows);
+			applyFilters();
 		});
-
-		$('#nw-sp-tbody').html(html);
-		$('#nw-total').text(total);
-		$('#nw-selectable').text(sel);
-		$('#nw-hidden').text(hidden);
 	}
 
-	function openModal(pkg) {
-		editId = pkg ? pkg.id : null;
+	function loadItems(cb) {
+		$.post(A, { action: 'nwpackagesloaditems', nonce: N }, res => {
+			allItems = res.success ? (res.data || []) : [];
+			if (cb) cb();
+		});
+	}
 
-		$('#nw-modal-title').text(pkg ? 'Edit Package' : 'New Package');
-		$('#nw-save-label').text(pkg ? 'Save Package' : 'Create Package');
-		$('#nw-delete-btn').toggle(!!pkg);
+	// ── Build slot dropdowns ─────────────────────────────────────────────────
+	function buildItemDropdowns() {
+		const emptyOption = '<option value="">— none —</option>';
+		const options = allItems.map(i =>
+			`<option value="${i.id}">${escHtml(i.name)}${i.slot ? ' [' + i.slot + ']' : ''}</option>`
+		).join('');
+		$('.nw-item-select').html(emptyOption + options);
+	}
 
-		$('#nw-field-id').val(pkg ? pkg.id : '');
-		$('#nw-field-package_name').val(pkg ? (pkg.package_name || '') : '');
-		$('#nw-field-description').val(pkg ? (pkg.description || '') : '');
-		$('#nw-field-base_armor').val(pkg ? (parseInt(pkg.base_armor, 10) || 0) : 0);
-		$('#nw-field-is_player_selectable').prop('checked', pkg ? !!pkg.is_player_selectable : false);
+	// ── Modal ────────────────────────────────────────────────────────────────
+	function openModal(row = null) {
+		$('#nw-field-id').val(row ? row.id : '');
+		$('#nw-modal-title').text(row ? 'Edit Package' : 'New Package');
 
-		var arrToStr = function (a) {
-			return (Array.isArray(a) && a.length) ? a.join(', ') : '';
-		};
+		$('#nw-field-package_name').val(row ? row.package_name : '');
+		$('#nw-field-description').val(row ? (row.description || '') : '');
+		$('#nw-field-base_armor').val(row ? (row.base_armor ?? 0) : 0);
 
-		$('#nw-field-items_list').val(arrToStr(pkg && pkg.items_list));
-		$('#nw-field-attack_cards_pool').val(arrToStr(pkg && pkg.attack_cards_pool));
-		$('#nw-field-defense_cards_pool').val(arrToStr(pkg && pkg.defense_cards_pool));
-		$('#nw-field-compatibility_tags').val(arrToStr(pkg && pkg.compatibility_tags));
-		$('#nw-field-compatible_class_ids').val(arrToStr(pkg && pkg.compatible_class_ids));
+		// Slot selects
+		$('#nw-field-head_item_id').val(row ? (row.head_item_id   || '') : '');
+		$('#nw-field-torso_item_id').val(row ? (row.torso_item_id || '') : '');
+		$('#nw-field-hand_r_item_id').val(row ? (row.hand_r_item_id || '') : '');
+		$('#nw-field-hand_l_item_id').val(row ? (row.hand_l_item_id || '') : '');
+		$('#nw-field-belt_item_id').val(row ? (row.belt_item_id   || '') : '');
 
-		loadItemsCache(function () {
-			populateItemSelects(pkg);
-		}, true);
+		// JSON fields
+		$('#nw-field-items_list').val(row ? jsonPretty(row.items_list) : '[]');
+		$('#nw-field-compatibility_tags').val(row ? jsonPretty(row.compatibility_tags) : '[]');
+		$('#nw-field-attack_cards_pool').val(row ? jsonPretty(row.attack_cards_pool) : '[]');
+		$('#nw-field-defense_cards_pool').val(row ? jsonPretty(row.defense_cards_pool) : '[]');
+		$('#nw-field-compatible_class_ids').val(row ? jsonPretty(row.compatible_class_ids) : '[]');
 
-		$('#nw-modal-overlay').show();
+		$('#nw-field-is_player_selectable').prop('checked', row ? !!row.is_player_selectable : false);
+
+		$('#nw-modal').show();
+		$('#nw-field-package_name').focus();
+		icons();
 	}
 
 	function closeModal() {
-		$('#nw-modal-overlay').hide();
-
-		if ($('#nw-sp-form').length && $('#nw-sp-form')[0]) {
-			$('#nw-sp-form')[0].reset();
-		}
-
-		$('#nw-field-id').val('');
-		editId = null;
-		$('#nw-delete-btn').hide();
-		$('#nw-save-btn').prop('disabled', false);
-		$('#nw-save-label').text('Save Package');
+		$('#nw-modal').hide();
 	}
 
-	function savePkg() {
-		var packageName = ($('#nw-field-package_name').val() || '').trim();
+	// ── Save ─────────────────────────────────────────────────────────────────
+	function savePackage() {
+		const name = $('#nw-field-package_name').val().trim();
+		if (!name) { notice('Package name is required.', 'error'); return; }
 
-		if (!packageName) {
-			showNotice('error', 'Package name is required.');
-			return;
-		}
-
-		var data = {
-			action: 'nw_sp_save',
-			nonce: nonce,
-			pkg: {
-				id: ($('#nw-field-id').val() || '').trim(),
-				package_name: packageName,
-				description: ($('#nw-field-description').val() || '').trim(),
-				base_armor: ($('#nw-field-base_armor').val() || '0').trim(),
-				items_list: ($('#nw-field-items_list').val() || '').trim(),
-				attack_cards_pool: ($('#nw-field-attack_cards_pool').val() || '').trim(),
-				defense_cards_pool: ($('#nw-field-defense_cards_pool').val() || '').trim(),
-				compatibility_tags: ($('#nw-field-compatibility_tags').val() || '').trim(),
-				compatible_class_ids: ($('#nw-field-compatible_class_ids').val() || '').trim(),
-				is_player_selectable: $('#nw-field-is_player_selectable').is(':checked') ? '1' : '0',
-				head_item_id: $('#nw-field-head_item_id').val() || '',
-				torso_item_id: $('#nw-field-torso_item_id').val() || '',
-				hand_r_item_id: $('#nw-field-hand_r_item_id').val() || '',
-				hand_l_item_id: $('#nw-field-hand_l_item_id').val() || '',
-				belt_item_id: $('#nw-field-belt_item_id').val() || ''
+		// Validate JSON fields
+		const jsonFields = ['items_list','compatibility_tags','attack_cards_pool','defense_cards_pool','compatible_class_ids'];
+		for (const f of jsonFields) {
+			const raw = $(`#nw-field-${f}`).val().trim();
+			if (raw && raw !== '[]') {
+				try { JSON.parse(raw); } catch(e) {
+					notice(`Invalid JSON in "${f}".`, 'error'); return;
+				}
 			}
-		};
-
-		$('#nw-save-btn').prop('disabled', true);
-		$('#nw-save-label').text(editId ? 'Saving…' : 'Creating…');
-
-		request(
-			data,
-			function (r) {
-				$('#nw-save-btn').prop('disabled', false);
-				$('#nw-save-label').text(editId ? 'Save Package' : 'Create Package');
-
-				if (!r || !r.success) {
-					showNotice('error', r && r.data ? r.data : 'Could not save package.');
-					return;
-				}
-
-				showNotice('success', editId ? 'Package updated.' : 'Package created.');
-				closeModal();
-				loadPackages();
-			},
-			'Failed to save package.'
-		);
-	}
-
-	function loadPackageById(id) {
-		request(
-			{
-				action: 'nw_sp_get_one',
-				nonce: nonce,
-				pkg_id: id
-			},
-			function (r) {
-				if (!r || !r.success || !r.data) {
-					showNotice('error', r && r.data ? r.data : 'Could not load package details.');
-					return;
-				}
-
-				openModal(r.data);
-			},
-			'Failed to load package details.'
-		);
-	}
-
-	$(document).on('change', '.nw-toggle-sel', function () {
-		var $el = $(this);
-		var id = $el.data('id');
-		var state = $el.is(':checked');
-
-		request(
-			{
-				action: 'nw_sp_toggle',
-				nonce: nonce,
-				pkg_id: id,
-				is_player_selectable: state ? 1 : 0
-			},
-			function (r) {
-				if (!r || !r.success) {
-					$el.prop('checked', !state);
-					showNotice('error', r && r.data ? r.data : 'Could not update package visibility.');
-					return;
-				}
-				loadPackages();
-			},
-			'Failed to update package visibility.'
-		);
-	});
-
-	$('#nw-delete-btn').on('click', function () {
-		if (!editId || !window.confirm('Delete this package? This cannot be undone.')) {
-			return;
 		}
 
-		request(
-			{
-				action: 'nw_sp_delete',
-				nonce: nonce,
-				pkg_id: editId
-			},
-			function (r) {
-				if (!r || !r.success) {
-					showNotice('error', r && r.data ? r.data : 'Could not delete package.');
-					return;
-				}
-				showNotice('success', 'Package deleted.');
-				closeModal();
-				loadPackages();
-			},
-			'Failed to delete package.'
-		);
-	});
+		const $btn = $('#nw-modal-save').prop('disabled', true).html('<i data-lucide="loader-2" class="nw-spin"></i> Saving…');
+		icons();
 
-	$('#nw-add-btn').on('click', function () {
-		invalidateItemsCache();
-		openModal(null);
-	});
-
-	$('#nw-refresh-btn').on('click', function () {
-		invalidateItemsCache();
-		loadPackages();
-	});
-
-	$('#nw-modal-close, #nw-cancel-btn').on('click', function () {
-		closeModal();
-	});
-
-	$('#nw-modal-overlay').on('click', function (e) {
-		if ($(e.target).is('#nw-modal-overlay')) {
+		$.post(A, {
+			action:                 'nwpackagessave',
+			nonce:                  N,
+			id:                     $('#nw-field-id').val(),
+			package_name:           name,
+			description:            $('#nw-field-description').val(),
+			base_armor:             $('#nw-field-base_armor').val(),
+			head_item_id:           $('#nw-field-head_item_id').val(),
+			torso_item_id:          $('#nw-field-torso_item_id').val(),
+			hand_r_item_id:         $('#nw-field-hand_r_item_id').val(),
+			hand_l_item_id:         $('#nw-field-hand_l_item_id').val(),
+			belt_item_id:           $('#nw-field-belt_item_id').val(),
+			items_list:             $('#nw-field-items_list').val(),
+			compatibility_tags:     $('#nw-field-compatibility_tags').val(),
+			attack_cards_pool:      $('#nw-field-attack_cards_pool').val(),
+			defense_cards_pool:     $('#nw-field-defense_cards_pool').val(),
+			compatible_class_ids:   $('#nw-field-compatible_class_ids').val(),
+			is_player_selectable:   $('#nw-field-is_player_selectable').is(':checked') ? 1 : 0,
+		}, res => {
+			$btn.prop('disabled', false).html('<i data-lucide="save"></i> Save Package');
+			icons();
+			if (!res.success) { notice(res.data || 'Save failed.', 'error'); return; }
+			notice('Package saved!');
 			closeModal();
-		}
-	});
-
-	$('#nw-save-btn').on('click', function (e) {
-		e.preventDefault();
-		savePkg();
-	});
-
-	$(document).on('click', '.nw-edit-btn', function () {
-		var id = $(this).data('id');
-		loadPackageById(id);
-	});
-
-	function showNotice(type, msg) {
-		var $n = $('#nw-notice');
-		$n.removeClass('nw-notice-success nw-notice-error')
-			.addClass('nw-notice-' + type)
-			.text(msg)
-			.show();
-
-		setTimeout(function () {
-			$n.fadeOut();
-		}, 4000);
+			loadPackages();
+		});
 	}
 
-	function truncate(str, len) {
-		str = String(str || '');
-		return str.length > len ? str.substring(0, len) + '…' : str;
+	// ── Delete ───────────────────────────────────────────────────────────────
+	function deletePackage(id) {
+		if (!confirm('Delete this package? This cannot be undone.')) return;
+		$.post(A, { action: 'nwpackagesdelete', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Delete failed.', 'error'); return; }
+			notice('Package deleted.');
+			loadPackages();
+		});
 	}
 
-	function escH(s) {
-		return $('<div>').text(String(s || '')).html();
+	// ── Duplicate ────────────────────────────────────────────────────────────
+	function duplicatePackage(id) {
+		$.post(A, { action: 'nwpackagesduplicate', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Duplicate failed.', 'error'); return; }
+			notice('Package duplicated.');
+			loadPackages();
+		});
 	}
 
-	loadPackages();
-});
+	// ── Utils ────────────────────────────────────────────────────────────────
+	function escHtml(str) {
+		return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+	}
+	function jsonPretty(val) {
+		if (!val) return '[]';
+		if (typeof val === 'string') return val;
+		return JSON.stringify(val, null, 2);
+	}
+
+	// ── Init ─────────────────────────────────────────────────────────────────
+	$(document).ready(function () {
+		// Load items first, then packages
+		loadItems(() => {
+			buildItemDropdowns();
+			loadPackages();
+		});
+
+		// Add button
+		$('#nw-add-btn').on('click', () => openModal());
+
+		// Edit
+		$('#nw-packages-tbody').on('click', '.nw-edit-btn', function () {
+			const id  = $(this).data('id');
+			const row = allRows.find(r => r.id === id);
+			if (row) openModal(row);
+		});
+
+		// Duplicate
+		$('#nw-packages-tbody').on('click', '.nw-dup-btn', function () {
+			duplicatePackage($(this).data('id'));
+		});
+
+		// Delete
+		$('#nw-packages-tbody').on('click', '.nw-del-btn', function () {
+			deletePackage($(this).data('id'));
+		});
+
+		// Modal close
+		$('#nw-modal-close, #nw-modal-cancel').on('click', closeModal);
+		$('#nw-modal').on('click', function (e) {
+			if ($(e.target).is('#nw-modal')) closeModal();
+		});
+
+		// Save
+		$('#nw-modal-save').on('click', savePackage);
+
+		// Filters
+		$('#nw-search, #nw-filter-selectable, #nw-filter-armor').on('input change', applyFilters);
+		$('#nw-clear-filters').on('click', () => {
+			$('#nw-search').val('');
+			$('#nw-filter-selectable').val('');
+			$('#nw-filter-armor').val('');
+			applyFilters();
+		});
+
+		// Keyboard: Esc closes modal
+		$(document).on('keydown', e => {
+			if (e.key === 'Escape') closeModal();
+		});
+	});
+
+}(jQuery));
