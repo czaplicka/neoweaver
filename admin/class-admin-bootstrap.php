@@ -78,7 +78,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'scenarios.php',
-			'class' => 'NeoWeaver_Scenarios_Admin',
+			'class' => 'NWScenariosAdmin',
 			'slug'  => 'nw-scenarios',
 			'root'  => false,
 		],
