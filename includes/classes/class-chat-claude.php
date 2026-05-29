@@ -115,16 +115,20 @@ Rules:
 PROMPT;
 
 		// Block B: Dynamic world state
-		$char_name  = esc_html( $char['name']             ?? 'Unknown' );
-		$hp         = (int) ( $char['currenthp']          ?? 0 );
-		$hp_max     = (int) ( $char['maxhp']              ?? 0 );
-		$mp         = (int) ( $char['mp']                 ?? 0 );
-		$gold       = (int) ( $char['gold']               ?? 0 );
-		$loc_name   = esc_html( $location['locationname'] ?? 'Unknown location' );
-		$loc_tags   = esc_html( $location['instancetags'] ?? '' );
-		$loc_prompt = esc_html( $location['aiprompt']     ?? '' );
-		$entropy    = (int) ( $world['entropy']           ?? 0 );
-		$w_tags     = esc_html( $world['globaltag1']      ?? '' );
+		// Field names match current schema:
+		//   cyber_characters: current_hp, max_hp (snake_case)
+		//   cyber_worlds:     globaltag1
+		//   cyber_world_map:  location_name, instance_tags, ai_prompt
+		$char_name  = esc_html( $char['name']              ?? 'Unknown' );
+		$hp         = (int) ( $char['current_hp']          ?? 0 );
+		$hp_max     = (int) ( $char['max_hp']              ?? 0 );
+		$mp         = (int) ( $char['mp']                  ?? 0 );
+		$gold       = (int) ( $char['gold']                ?? 0 );
+		$loc_name   = esc_html( $location['location_name'] ?? 'Unknown location' );
+		$loc_tags   = esc_html( $location['instance_tags'] ?? '' );
+		$loc_prompt = esc_html( $location['ai_prompt']     ?? '' );
+		$entropy    = (int) ( $world['entropy']            ?? 0 );
+		$w_tags     = esc_html( $world['globaltag1']       ?? '' );
 
 		$block_b  = "AGENT: {$char_name} | HP: {$hp}/{$hp_max} | MP: {$mp} | Gold: {$gold}g\n";
 		$block_b .= "LOCATION: {$loc_name} | TAGS: {$loc_tags}\n";
@@ -154,21 +158,29 @@ PROMPT;
 			return [];
 		}
 
+		// message_type stores 'player' and 'gm' — map to Claude roles after fetch.
+		// The column is message_type, not role.
 		$rows = tw_supabase_get( 'cyber_chat_messages', [
-			'channel_id' => 'eq.' . $channel_id,
-			'role'       => 'in.(user,assistant)',
-			'order'      => 'created_at.desc',
-			'limit'      => $this->history_len,
-			'select'     => 'role,content',
+			'channel_id'   => 'eq.' . $channel_id,
+			'message_type' => 'in.(player,gm)',
+			'order'        => 'created_at.desc',
+			'limit'        => $this->history_len,
+			'select'       => 'message_type,content',
 		] );
 
 		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
 			return [];
 		}
 
-		// Reverse to chronological order (oldest first) — Claude requires user first
+		// Reverse to chronological order (oldest first) — Claude requires user first.
+		// Map message_type → Claude role: player → user, gm → assistant.
 		return array_map(
-			fn( $r ) => [ 'role' => $r['role'], 'content' => $r['content'] ],
+			function( $r ) {
+				return [
+					'role'    => ( $r['message_type'] === 'player' ) ? 'user' : 'assistant',
+					'content' => $r['content'],
+				];
+			},
 			array_reverse( $rows )
 		);
 	}
