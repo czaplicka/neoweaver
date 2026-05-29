@@ -460,28 +460,44 @@ if ( ! function_exists( 'tw_user_owns_character' ) ) {
 
 // ============================================================
 // get_cyber_character_id_by_wp_id()
+//
+// Zwraca character_id z AKTYWNEJ sesji gry danego usera.
+// Pyta cyber_game_sessions (status=active, wp_user_id=X), nie cyber_characters.
+// Dzięki unique index idx_one_active_session_per_user zawsze max 1 wynik.
 // ============================================================
 
 if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
+	/**
+	 * Get the character_id from the user's current active game session.
+	 *
+	 * @param int $wp_user_id WordPress user ID.
+	 * @return string         Character UUID, or '' if no active session found.
+	 */
 	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
 		if ( $wp_user_id <= 0 ) {
 			return '';
 		}
 
 		$result = tw_supabase_get_admin(
-			'cyber_characters',
+			'cyber_game_sessions',
 			[
 				'wp_user_id' => 'eq.' . $wp_user_id,
-				'select'     => 'id',
+				'status'     => 'eq.active',
+				'select'     => 'character_id',
 				'limit'      => 1,
 			]
 		);
 
-		if ( is_wp_error( $result ) || empty( $result ) ) {
+		if ( is_wp_error( $result ) ) {
+			error_log( 'TW get_cyber_character_id_by_wp_id: Supabase error — ' . $result->get_error_message() );
 			return '';
 		}
 
-		$id = $result[0]['id'] ?? '';
+		if ( empty( $result[0]['character_id'] ) ) {
+			return '';
+		}
+
+		$id = $result[0]['character_id'];
 		return is_string( $id ) ? $id : '';
 	}
 }
@@ -513,108 +529,11 @@ if ( ! function_exists( 'tw_get_user_characters' ) ) {
 			]
 		);
 
-		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
-			return [];
-		}
-
-		$results = [];
-		foreach ( $rows as $row ) {
-			$results[] = (object) $row;
-		}
-
-		return $results;
-	}
-}
-
-// ============================================================
-// fetch_foundry_data()
-// ============================================================
-
-if ( ! function_exists( 'fetch_foundry_data' ) ) {
-	function fetch_foundry_data( string $character_id ) {
-		$safe_id = nw_sanitize_uuid( $character_id );
-
-		if ( empty( $safe_id ) ) {
-			return new WP_Error( 'tw_foundry', 'Invalid character_id.' );
-		}
-
-		$rows = tw_supabase_get_admin(
-			'cyber_character_deck',
-			[
-				'character_id' => 'eq.' . $safe_id,
-				'select'       => 'id,deck_id,current_level,cyber_deck(name)',
-				'order'        => 'deck_id.asc',
-			]
-		);
-
 		if ( is_wp_error( $rows ) ) {
-			error_log( 'TW fetch_foundry_data error: ' . $rows->get_error_message() );
-			return $rows;
-		}
-
-		if ( ! is_array( $rows ) ) {
+			error_log( 'TW tw_get_user_characters: Supabase error — ' . $rows->get_error_message() );
 			return [];
 		}
 
-		$grouped = [];
-		foreach ( $rows as $row ) {
-			// deck_id is a UUID — keep it as string, never cast to int.
-			$deck_id = (string) ( $row['deck_id'] ?? '' );
-			if ( '' === $deck_id ) {
-				continue;
-			}
-			if ( ! isset( $grouped[ $deck_id ] ) ) {
-				$grouped[ $deck_id ] = [
-					'instance_id'     => (string) ( $row['id'] ?? '' ),
-					'name'            => (string) ( $row['cyber_deck']['name'] ?? '[UNKNOWN]' ),
-					'level'           => (int) ( $row['current_level'] ?? 1 ),
-					'duplicate_count' => 0,
-				];
-			} else {
-				$grouped[ $deck_id ]['duplicate_count']++;
-			}
-		}
-
-		$result = [];
-		foreach ( $grouped as $item ) {
-			$obj                  = new stdClass();
-			$obj->instance_id     = $item['instance_id'];
-			$obj->name            = $item['name'];
-			$obj->level           = $item['level'];
-			$obj->duplicate_count = $item['duplicate_count'];
-			$result[]             = $obj;
-		}
-
-		return $result;
-	}
-}
-
-// ============================================================
-// get_cyber_player_credits()
-// Zwraca gold gracza z cyber_characters.
-// ============================================================
-
-if ( ! function_exists( 'get_cyber_player_credits' ) ) {
-	function get_cyber_player_credits( string $character_id ): int {
-		$safe_id = nw_sanitize_uuid( $character_id );
-
-		if ( empty( $safe_id ) ) {
-			return 0;
-		}
-
-		$result = tw_supabase_get_admin(
-			'cyber_characters',
-			[
-				'id'     => 'eq.' . $safe_id,
-				'select' => 'gold',
-				'limit'  => 1,
-			]
-		);
-
-		if ( is_wp_error( $result ) || empty( $result ) ) {
-			return 0;
-		}
-
-		return (int) ( $result[0]['gold'] ?? 0 );
+		return is_array( $rows ) ? $rows : [];
 	}
 }

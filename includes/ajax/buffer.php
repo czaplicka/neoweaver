@@ -4,25 +4,14 @@
  *
  * Uses Supabase helpers from includes/supabase-config.php and
  * includes/supabase-helpers.php.
+ *
+ * get_cyber_character_id_by_wp_id() is defined in supabase-helpers.php —
+ * it queries cyber_game_sessions WHERE status='active' AND wp_user_id=X.
+ * Do NOT redefine it here.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
-}
-
-/**
- * Helper: resolve active character_id from WP user.
- */
-if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
-	function get_cyber_character_id_by_wp_id( int $wp_user_id ): string {
-		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
-			return '';
-		}
-
-		$game_data = get_user_game_data_from_supabase( $wp_user_id );
-
-		return (string) ( $game_data['active_character_id'] ?? '' );
-	}
 }
 
 /**
