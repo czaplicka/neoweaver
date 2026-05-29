@@ -78,8 +78,10 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			$sqlstate = (string) ( $data['code'] ?? '' );
 		}
 
+		// PostgREST returns HTTP 409 for unique constraint violations (SQLSTATE 23505).
+		// $status holds the HTTP status code, not the PostgreSQL SQLSTATE.
 		$is_unique_violation =
-			23505 === $status ||
+			409 === $status ||
 			'23505' === $sqlstate ||
 			false !== stripos( $body_raw, 'duplicate key value violates unique constraint' );
 
