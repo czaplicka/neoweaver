@@ -1,59 +1,153 @@
-/* ============================================================
-   NeoWeaver Admin — STATUS TAGS
-   Module-specific overrides for WP List Tables
-   ============================================================ */
+/* NeoWeaver — Status Tags admin (extends admin-core.css) */
 
-/* ---- Layout & Toolbar ---- */
-.nw-status-tags-admin .nw-subtitle {
-	margin: 6px 0 18px;
-	color: #666;
+.nw-statustags-panel {
+	font-family: 'Chakra Petch', monospace;
 }
 
-.nw-status-tags-admin .nw-toolbar {
-	margin: 0 0 16px;
-}
-
-/* ---- Card Container (Unique light-theme variant) ---- */
-.nw-status-tags-admin .nw-card {
-	background: #141414; /* Zmieniono na ciemny, by pasował do reszty */
-	border: 1px solid #2a2a2a;
-	border-radius: 12px;
-	padding: 20px;
-	margin: 16px 0 24px;
-	box-shadow: 0 4px 12px rgba(0,0,0,.2);
-}
-
-/* ---- Table Adjustments ---- */
-.nw-status-tags-admin .form-table th {
-	width: 180px;
-	color: #aaa;
-	font-size: 12px;
-	text-transform: uppercase;
-}
-
-.nw-status-tags-admin .wp-list-table td,
-.nw-status-tags-admin .wp-list-table th {
+/* ── Color dot ─────────────────────────────────────────────────────────── */
+.nw-color-dot {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin-right: 6px;
+	flex-shrink: 0;
 	vertical-align: middle;
-	border-color: #1d1d1d;
+	border: 1px solid rgba(255,255,255,0.15);
 }
 
-/* ---- Specialized Inputs ---- */
-.nw-status-tags-admin input[type="color"] {
-	width: 64px;
-	height: 40px;
-	padding: 2px;
-	border: 1px solid #2a2a2a;
+/* ── Label cell ────────────────────────────────────────────────────────── */
+.nw-col-label {
+	display: flex;
+	align-items: flex-start;
+	gap: 0;
+	flex-direction: column;
+}
+.nw-col-label > * { display: inline; }
+.nw-tag-label {
+	font-weight: 600;
+	font-size: 13px;
+	color: #f0f0f0;
+}
+
+/* ── Category badges ───────────────────────────────────────────────────── */
+.nw-cat-badge {
+	border-radius: 10px;
+	padding: 2px 9px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	font-weight: 600;
+	display: inline-block;
+	white-space: nowrap;
+}
+.nw-cat-physical  { background: rgba(239, 68,  68,  0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+.nw-cat-condition { background: rgba(251, 146, 60,  0.15); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }
+.nw-cat-tech      { background: rgba(59,  130, 246, 0.15); color: #7ab4ff; border: 1px solid rgba(59,130,246,0.3); }
+.nw-cat-buff      { background: rgba(173, 255, 0,   0.12); color: #adff00; border: 1px solid rgba(173,255,0,0.28); }
+.nw-cat-glitch    { background: rgba(168, 85,  247, 0.15); color: #c07aff; border: 1px solid rgba(168,85,247,0.3); }
+
+/* ── Duration badges ───────────────────────────────────────────────────── */
+.nw-dur-badge {
 	border-radius: 8px;
-	background: #0d0d0d;
+	padding: 2px 8px;
+	font-size: 10px;
+	font-family: 'Chakra Petch', monospace;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	display: inline-block;
+	border: 1px solid rgba(255,255,255,0.1);
+	color: #bbb;
+	background: rgba(255,255,255,0.05);
+}
+.nw-dur-permanent  { color: #f87171; border-color: rgba(239,68,68,0.3);   background: rgba(239,68,68,0.08); }
+.nw-dur-scene      { color: #adff00; border-color: rgba(173,255,0,0.28);  background: rgba(173,255,0,0.06); }
+.nw-dur-encounter  { color: #7ab4ff; border-color: rgba(59,130,246,0.3);  background: rgba(59,130,246,0.08); }
+.nw-dur-turn       { color: #fb923c; border-color: rgba(251,146,60,0.3);  background: rgba(251,146,60,0.08); }
+.nw-dur-custom     { color: #c07aff; border-color: rgba(168,85,247,0.3);  background: rgba(168,85,247,0.08); }
+
+/* ── Type badges ───────────────────────────────────────────────────────── */
+.nw-badge-debuff { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 2px 8px; font-size: 11px; }
+.nw-badge-buff   { background: rgba(173,255,0,0.12);  color: #adff00; border: 1px solid rgba(173,255,0,0.28); border-radius: 8px; padding: 2px 8px; font-size: 11px; }
+.nw-badge-stack  { background: rgba(59,130,246,0.12); color: #7ab4ff; border: 1px solid rgba(59,130,246,0.28); border-radius: 8px; padding: 2px 8px; font-size: 11px; }
+
+/* ── Source col ────────────────────────────────────────────────────────── */
+.nw-col-source {
+	font-size: 12px;
+	color: #999;
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────────── */
+.nw-stat-red   { color: #f87171 !important; }
+.nw-stat-green { color: #adff00 !important; }
+.nw-stat-muted { color: #888    !important; }
+
+/* ── Color picker row ──────────────────────────────────────────────────── */
+.nw-color-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.nw-color-picker {
+	width: 42px;
+	height: 36px;
+	border: 1px solid rgba(255,255,255,0.15);
+	border-radius: 6px;
+	cursor: pointer;
+	padding: 2px;
+	background: transparent;
+	flex-shrink: 0;
+}
+.nw-color-text {
+	flex: 1;
+	font-family: 'Chakra Petch', monospace;
+}
+
+/* ── Flags row ─────────────────────────────────────────────────────────── */
+.nw-flags-row {
+	display: flex;
+	gap: 24px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+.nw-checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: 13px;
+	color: #d4d4d4;
+}
+.nw-checkbox-label input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: #adff00;
 	cursor: pointer;
 }
 
-/* ---- Actions ---- */
-.nw-status-tags-admin .button-link-delete {
-	color: #ff4444; /* Dostosowano do palety NeoWeaver */
-	text-decoration: none;
+/* ── Mechanic mono textarea ────────────────────────────────────────────── */
+.nw-mono {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 12px;
+	color: #adff00;
+	background: rgba(0,0,0,0.3);
 }
 
-.nw-status-tags-admin .button-link-delete:hover {
-	color: #ff6666;
+/* ── Field hint ────────────────────────────────────────────────────────── */
+.nw-field-hint {
+	font-size: 10px;
+	color: #888;
+	font-weight: 400;
+	margin-left: 6px;
 }
+
+/* ── Row desc ──────────────────────────────────────────────────────────── */
+.nw-row-desc {
+	font-size: 11px;
+	color: #777;
+	margin-top: 2px;
+}
+.nw-text-muted { color: #777; font-size: 12px; }
+
+/* ── Form grid ─────────────────────────────────────────────────────────── */
+.nw-form-cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 600px) { .nw-form-cols-2 { grid-template-columns: 1fr; } }
