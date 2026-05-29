@@ -1,158 +1,149 @@
-/* ============================================================
-   NeoWeaver Admin — SEASONS CONFIG
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver Seasons Config admin — extends admin-core.css */
 
-/* ---- Table Extensions ---- */
-.nw-season-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    font-size: 0.82rem; 
+.nw-modal-seasons {
+	max-width: 680px;
+	width: 96vw;
 }
 
-/* Mini weather bar in table */
-.nw-mini-bar { 
-    display: flex; 
-    height: 8px; 
-    border-radius: 4px; 
-    overflow: hidden; 
-    width: 120px; 
-    background: #222;
+/* form layout */
+.nw-form-3col {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1fr;
+	gap: 14px;
+	align-items: start;
 }
 
-.nw-mini-seg { 
-    height: 100%; 
-    transition: width .3s; 
+/* color picker row */
+.nw-color-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.nw-color-picker {
+	width: 42px;
+	height: 36px;
+	padding: 2px;
+	border-radius: var(--nw-radius, 4px);
+	border: 1px solid rgba(255,255,255,0.12);
+	background: transparent;
+	cursor: pointer;
+	flex-shrink: 0;
 }
 
-.nw-color-dot { 
-    display: inline-block; 
-    width: 12px; 
-    height: 12px; 
-    border-radius: 50%; 
-    vertical-align: middle; 
-    margin-right: 5px; 
-    border: 1px solid rgba(255,255,255,.15); 
+/* weights grid */
+.nw-weights-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 10px 14px;
+	margin-top: 8px;
+}
+.nw-weight-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.nw-weight-icon {
+	font-size: 18px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+.nw-weight-label {
+	font-size: 12px;
+	color: #a1a1aa;
+	min-width: 42px;
+}
+.nw-weight-input {
+	width: 68px !important;
+	text-align: center;
+	font-family: 'Chakra Petch', monospace !important;
 }
 
-/* ---- Weather Weights System (Unique Logic) ---- */
-.nw-weights-section { 
-    background: #1a1a1a; 
-    border: 1px solid var(--nw-border, #2a2a2a); 
-    border-radius: 6px; 
-    padding: 16px; 
-    margin-bottom: 20px; 
+/* total row */
+.nw-weights-total-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 10px;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+}
+.nw-weights-total {
+	font-size: 18px;
+	font-weight: 700;
+	color: #adff00;
+	min-width: 32px;
+	display: inline-block;
+	text-align: right;
+}
+.nw-weights-warning {
+	color: #f87171;
+	font-size: 12px;
+	margin-left: 4px;
 }
 
-.nw-weights-header { 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between; 
-    margin-bottom: 4px; 
+/* progress bar */
+.nw-weights-bar-wrap {
+	margin-top: 8px;
+	height: 8px;
+	border-radius: 999px;
+	overflow: hidden;
+	background: rgba(255,255,255,0.07);
+	display: flex;
+}
+.nw-wbar-seg {
+	display: inline-block;
+	height: 100%;
+	transition: width .22s ease;
+	flex-shrink: 0;
 }
 
-.nw-weights-note { 
-    font-size: 0.75rem; 
-    color: #888; 
-    margin: 0 0 14px; 
+/* table chips */
+.nw-wchips-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 5px;
+}
+.nw-wchip {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	padding: 1px 7px;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	background: rgba(255,255,255,0.04);
+}
+.nw-wbar-wrap {
+	height: 4px;
+	border-radius: 999px;
+	overflow: hidden;
+	display: flex;
+	background: rgba(255,255,255,0.06);
+	max-width: 200px;
 }
 
-.nw-weights-sum-badge { 
-    font-size: 0.8rem; 
-    padding: 3px 10px; 
-    border-radius: 99px; 
-    background: #222; 
-    border: 1px solid #2a2a2a; 
+/* temp pill */
+.nw-temp-pill {
+	display: inline-flex;
+	padding: 2px 10px;
+	border-radius: 999px;
+	border: 1px solid rgba(173,255,0,0.2);
+	color: #adff00;
+	font-size: 12px;
+	font-family: 'Chakra Petch', monospace;
+	background: rgba(173,255,0,0.06);
 }
 
-.nw-weights-sum-badge.ok strong  { color: #adff00; }
-.nw-weights-sum-badge.bad strong { color: #ff6b6b; }
+/* drag-drop */
+.nw-drag-handle { cursor: grab; text-align: center; }
+tr[draggable="true"] { transition: opacity .15s; }
+tr.is-dragging { opacity: .4; }
+tr.drag-over td { background: rgba(173,255,0,0.06) !important; }
 
-.nw-weights-grid { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px; 
-    margin-bottom: 14px; 
-}
-
-.nw-weight-row { 
-    display: grid; 
-    grid-template-columns: 28px 70px 1fr 64px 40px; 
-    align-items: center; 
-    gap: 8px; 
-}
-
-.nw-weight-icon { font-size: 1.1rem; text-align: center; }
-.nw-weight-label { font-size: 0.78rem; color: #888; }
-
-/* Custom Weather Range Slider */
-.nw-weight-range { 
-    -webkit-appearance: none; 
-    appearance: none; 
-    height: 4px; 
-    background: #2a2a2a; 
-    border-radius: 2px; 
-    cursor: pointer; 
-    outline: none; 
-}
-
-.nw-weight-range::-webkit-slider-thumb { 
-    -webkit-appearance: none; 
-    width: 14px; 
-    height: 14px; 
-    border-radius: 50%; 
-    background: #adff00; 
-    cursor: pointer; 
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
-}
-
-.nw-weight-num { 
-    width: 64px; 
-    text-align: center; 
-    padding: 4px 6px; 
-}
-
-.nw-weight-pct { 
-    font-size: 0.75rem; 
-    color: #888; 
-    text-align: right; 
-}
-
-/* ---- Visual Probability Bar ---- */
-.nw-weather-bar { 
-    display: flex; 
-    height: 12px; 
-    border-radius: 6px; 
-    overflow: hidden; 
-    margin-top: 8px; 
-    background: #111;
-}
-
-.nw-bar-seg { height: 100%; transition: width .25s ease; }
-
-/* Weather Palette */
-.nw-bar-sun    { background: #ffd700; }
-.nw-bar-cloudy { background: #9e9e9e; }
-.nw-bar-rain   { background: #4fc3f7; }
-.nw-bar-fog    { background: #b0bec5; }
-.nw-bar-storm  { background: #7e57c2; }
-.nw-bar-snow   { background: #e0f7fa; }
-
-/* ---- Component Specific Helpers ---- */
-.nw-textarea { 
-    width: 100%; 
-    resize: vertical; 
-    min-height: 55px; 
-}
-
-.nw-save-error { 
-    color: #ff6b6b; 
-    font-size: 0.8rem; 
-    flex: 1; 
-}
-
-.nw-empty { 
-    text-align: center; 
-    padding: 60px 20px; 
-    color: #888; 
+@media (max-width: 640px) {
+	.nw-form-3col { grid-template-columns: 1fr; }
+	.nw-weights-grid { grid-template-columns: repeat(2, 1fr); }
+	.nw-wchips-row { gap: 2px; }
 }
