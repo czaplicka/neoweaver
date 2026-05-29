@@ -46,6 +46,7 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 			'neoweaver-ai-chat'      => [ 'assets/js/public/neoweaver-ai-chat.js', [ 'jquery' ] ],
 			'nw-chat-engine'         => [ 'assets/js/chat-engine.js', [] ],
 			'nw-adventure-init'      => [ 'assets/js/public/adventure.js', [] ],
+			'nw-char-panel'          => [ 'assets/js/public/char-panel.js', [] ],
 		];
 
 		foreach ( $scripts as $handle => [ $relative_path, $deps ] ) {
@@ -91,6 +92,17 @@ if ( ! function_exists( 'tw_register_adventure_assets' ) ) {
 				'active_character_id' => $game_data['active_character_id'] ?? '',
 				'active_world_id'     => $game_data['active_world_id']     ?? '',
 				'active_location_id'  => $game_data['active_location_id']  ?? '',
+			]
+		);
+
+		// twCharacterPanelData — required by char-panel.js (save_player_notes AJAX).
+		// save-player-notes.php verifies nonce 'tw_adventure_nonce'.
+		wp_localize_script(
+			'nw-char-panel',
+			'twCharacterPanelData',
+			[
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'nonce'    => wp_create_nonce( 'tw_adventure_nonce' ),
 			]
 		);
 	}
