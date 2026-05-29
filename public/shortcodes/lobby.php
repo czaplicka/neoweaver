@@ -131,12 +131,14 @@ if ( ! function_exists( 'neoweave_user_labels' ) ) {
 
 		if ( ! is_user_logged_in() ) {
 			wp_send_json_error( array( 'message' => 'not_logged_in' ), 401 );
+			return;
 		}
 
 		$ids_raw = $_POST['ids'] ?? null;
 
 		if ( ! is_array( $ids_raw ) ) {
 			wp_send_json_error( array( 'message' => 'NO_IDS' ), 400 );
+			return;
 		}
 
 		$ids = array_unique(
@@ -147,6 +149,7 @@ if ( ! function_exists( 'neoweave_user_labels' ) ) {
 
 		if ( empty( $ids ) ) {
 			wp_send_json_success( array( 'map' => array() ) );
+			return;
 		}
 
 		$users = get_users(
@@ -174,6 +177,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( ! is_user_logged_in() ) {
 			wp_send_json_error( array( 'message' => 'not_logged_in' ), 401 );
+			return;
 		}
 
 		$raw_campaign_id = isset( $_POST['campaign_id'] ) && is_scalar( $_POST['campaign_id'] )
@@ -184,20 +188,29 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( empty( $campaign_id ) ) {
 			wp_send_json_error( array( 'message' => 'invalid_campaign' ), 400 );
+			return;
 		}
 
 		$current_user_id = get_current_user_id();
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			wp_send_json_error( array( 'message' => 'supabase_config_missing' ), 500 );
+			return;
 		}
 
-		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$supabase_key  = tw_supabase_anon_key();
+		$supabase_rest   = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+		$supabase_anon   = tw_supabase_anon_key();
+		$supabase_svc    = tw_supabase_service_key();
 
-		$headers = array(
-			'apikey'        => $supabase_key,
-			'Authorization' => 'Bearer ' . $supabase_key,
+		$read_headers = array(
+			'apikey'        => $supabase_anon,
+			'Authorization' => 'Bearer ' . $supabase_anon,
+		);
+
+		$write_headers = array(
+			'apikey'        => $supabase_svc,
+			'Authorization' => 'Bearer ' . $supabase_svc,
+			'Content-Type'  => 'application/json',
 		);
 
 		$camp_url = add_query_arg(
@@ -211,13 +224,14 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 		$camp_res = wp_remote_get(
 			$camp_url,
 			array(
-				'headers' => $headers,
+				'headers' => $read_headers,
 				'timeout' => 15,
 			)
 		);
 
 		if ( is_wp_error( $camp_res ) || 200 !== (int) wp_remote_retrieve_response_code( $camp_res ) ) {
 			wp_send_json_error( array( 'message' => 'campaign_fetch_error' ), 500 );
+			return;
 		}
 
 		$camp_data = json_decode( wp_remote_retrieve_body( $camp_res ), true );
@@ -225,6 +239,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( $host_id !== $current_user_id ) {
 			wp_send_json_error( array( 'message' => 'not_host' ), 403 );
+			return;
 		}
 
 		$world_id  = null;
@@ -239,7 +254,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 		$world_res = wp_remote_get(
 			$world_url,
 			array(
-				'headers' => $headers,
+				'headers' => $read_headers,
 				'timeout' => 15,
 			)
 		);
@@ -254,6 +269,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( ! $world_id ) {
 			wp_send_json_error( array( 'message' => 'no_world_linked' ), 400 );
+			return;
 		}
 
 		$location_id = null;
@@ -271,7 +287,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 		$loc_res = wp_remote_get(
 			$loc_url,
 			array(
-				'headers' => $headers,
+				'headers' => $read_headers,
 				'timeout' => 15,
 			)
 		);
@@ -286,6 +302,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( ! $location_id ) {
 			wp_send_json_error( array( 'message' => 'no_start_location' ), 400 );
+			return;
 		}
 
 		$signup_url = add_query_arg(
@@ -299,19 +316,21 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 		$signup_res = wp_remote_get(
 			$signup_url,
 			array(
-				'headers' => $headers,
+				'headers' => $read_headers,
 				'timeout' => 15,
 			)
 		);
 
 		if ( is_wp_error( $signup_res ) || 200 !== (int) wp_remote_retrieve_response_code( $signup_res ) ) {
 			wp_send_json_error( array( 'message' => 'signup_fetch_error' ), 500 );
+			return;
 		}
 
 		$signups = json_decode( wp_remote_retrieve_body( $signup_res ), true );
 
 		if ( ! is_array( $signups ) || empty( $signups ) ) {
 			wp_send_json_error( array( 'message' => 'no_signups' ), 400 );
+			return;
 		}
 
 		$user_ids = array_filter(
@@ -338,11 +357,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 				$cleanup_url,
 				array(
 					'method'  => 'PATCH',
-					'headers' => array(
-						'apikey'        => $supabase_key,
-						'Authorization' => 'Bearer ' . $supabase_key,
-						'Content-Type'  => 'application/json',
-					),
+					'headers' => $write_headers,
 					'body'    => wp_json_encode( array( 'status' => 'paused' ) ),
 					'timeout' => 15,
 				)
@@ -371,16 +386,16 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( empty( $sessions_payload ) ) {
 			wp_send_json_error( array( 'message' => 'no_valid_sessions' ), 400 );
+			return;
 		}
 
 		$session_url = $supabase_rest . 'cyber_game_sessions';
 		$session_res = wp_remote_post(
 			$session_url,
 			array(
-				'headers' => array(
-					'apikey'        => $supabase_key,
-					'Authorization' => 'Bearer ' . $supabase_key,
-					'Content-Type'  => 'application/json',
+				'headers' => array_merge(
+					$write_headers,
+					array( 'Prefer' => 'return=minimal' )
 				),
 				'body'    => wp_json_encode( $sessions_payload ),
 				'timeout' => 15,
@@ -389,6 +404,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 
 		if ( is_wp_error( $session_res ) || (int) wp_remote_retrieve_response_code( $session_res ) >= 300 ) {
 			wp_send_json_error( array( 'message' => 'session_insert_error' ), 500 );
+			return;
 		}
 
 		wp_send_json_success( array( 'message' => 'launched' ) );
