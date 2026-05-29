@@ -8,12 +8,12 @@
 	let allRows = [];
 
 	const WEATHERS = [
-		{ key: 'sun',    label: 'Sun',    icon: '☀️', color: '#facc15' },
-		{ key: 'cloudy', label: 'Cloudy', icon: '🌥️', color: '#94a3b8' },
-		{ key: 'rain',   label: 'Rain',   icon: '🌧️', color: '#60a5fa' },
-		{ key: 'fog',    label: 'Fog',    icon: '🌫️', color: '#a1a1aa' },
-		{ key: 'storm',  label: 'Storm',  icon: '⛈️', color: '#f87171' },
-		{ key: 'snow',   label: 'Snow',   icon: '❄️', color: '#bae6fd' },
+		{ key: 'sun',    label: 'Sun',    icon: '<span data-lucide-menu="sun"></span>', color: '#facc15' },
+		{ key: 'cloudy', label: 'Cloudy', icon: '<span data-lucide-menu="cloud"></span>', color: '#94a3b8' },
+		{ key: 'rain',   label: 'Rain',   icon: '<span data-lucide-menu="cloud-rain"></span>', color: '#60a5fa' },
+		{ key: 'fog',    label: 'Fog',    icon: '<span data-lucide-menu="cloud-fog"></span>', color: '#a1a1aa' },
+		{ key: 'storm',  label: 'Storm',  icon: '<span data-lucide-menu="cloud-lighting"></span>', color: '#f87171' },
+		{ key: 'snow',   label: 'Snow',   icon: '<span data-lucide-menu="snowflake"></span>', color: '#bae6fd' },
 	];
 
 	function icons() { if (window.lucide) lucide.createIcons(); }
