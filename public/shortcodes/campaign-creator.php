@@ -1,15 +1,12 @@
 <?php
 /**
  * Shortcode: [tw_create_campaign] — 8-step Deployment creation wizard.
+ * Registration is handled by Neoweaver_Public::__construct() via shortcode_campaign_creator().
  * @package Neoweaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
-}
-
-if ( ! defined( 'NW_CAMPAIGN_CREATOR_CACHE_TTL' ) ) {
-	define( 'NW_CAMPAIGN_CREATOR_CACHE_TTL', 60 );
 }
 
 if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
@@ -269,56 +266,3 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 		return '<div class="neoweaver-screen">' . ( ob_get_clean() ?: '' ) . '</div>';
 	}
 }
-
-if ( ! function_exists( 'neoweaver_campaign_creator_supabase_get' ) ) {
-	function neoweaver_campaign_creator_supabase_get( string $table, array $query_args, int $user_id = 0, int $ttl = 0 ): array {
-		$cache_key = '';
-
-		if ( $ttl > 0 && $user_id > 0 ) {
-			$cache_key = 'tw_sb_' . $user_id . '_' . md5( $table . wp_json_encode( $query_args ) );
-			$cached    = get_transient( $cache_key );
-
-			if ( false !== $cached && is_array( $cached ) ) {
-				return $cached;
-			}
-		}
-
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
-			return [];
-		}
-
-		$supabase_url = tw_supabase_url();
-		$anon_key     = tw_supabase_anon_key();
-
-		if ( empty( $supabase_url ) || empty( $anon_key ) ) {
-			return [];
-		}
-
-		$response = wp_remote_get(
-			add_query_arg( $query_args, trailingslashit( $supabase_url ) . 'rest/v1/' . ltrim( $table, '/' ) ),
-			[
-				'headers' => [
-					'apikey'        => $anon_key,
-					'Authorization' => 'Bearer ' . $anon_key,
-					'Content-Type'  => 'application/json',
-				],
-				'timeout' => 15,
-			]
-		);
-
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			return [];
-		}
-
-		$rows = json_decode( wp_remote_retrieve_body( $response ), true );
-		$rows = is_array( $rows ) ? $rows : [];
-
-		if ( $cache_key ) {
-			set_transient( $cache_key, $rows, $ttl );
-		}
-
-		return $rows;
-	}
-}
-
-add_shortcode( 'tw_create_campaign', 'neoweaver_shortcode_campaign_creator' );
