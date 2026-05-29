@@ -16,7 +16,7 @@ class NWSeasonsAdmin {
 		add_submenu_page(
 			'neoweaver',
 			'Seasons Config',
-			'Seasons',
+			'<span data-lucide-menu="sun"></span>Seasons',
 			'manage_options',
 			'nw-seasons',
 			[ $this, 'render_page' ]
