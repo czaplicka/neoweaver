@@ -53,6 +53,16 @@ if ( ! function_exists( 'tw_enqueue_library_assets' ) ) {
 
 		$done = true;
 
+		// Ensure ajaxUrl and nonce are always present regardless of caller.
+		// save-deck.php verifies nonce 'cyber_deck_builder'.
+		$config = array_merge(
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'cyber_deck_builder' ),
+			),
+			$config
+		);
+
 		wp_add_inline_script(
 			'neoweaver-library',
 			'window.NeoWeaverLibraryConfig = ' . wp_json_encode( $config ) . ';',
