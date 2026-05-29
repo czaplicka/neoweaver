@@ -1,579 +1,306 @@
 <?php
-/**
- * NeoWeaver Admin — Skills (cyber_skills)
- *
- */
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
-if ( class_exists( 'NW_Skills_Admin', false ) ) {
-	return;
-}
-
-if ( ! trait_exists( 'NW_Transient_Cache', false ) ) {
-	return;
-}
-
-class NW_Skills_Admin {
-
-	use NW_Transient_Cache;
-
-	private string $page_slug    = 'nw-skills';
-	private string $table        = 'cyber_skills';
-	private string $nonce_action = 'nw_skills_nonce';
-	private string $page_hook    = '';
-
-	private const CATEGORIES = [ 'Physical', 'Social', 'Mental', 'Exploration' ];
+class NWSkillsAdmin {
 
 	public function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
-
-		add_action( 'wp_ajax_nw_skills_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_skills_get_one', [ $this, 'ajax_get_one' ] );
-		add_action( 'wp_ajax_nw_skills_save', [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_skills_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_skills_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_skills_load',      [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_skills_save',      [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_skills_delete',    [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_skills_duplicate', [ $this, 'ajax_duplicate' ] );
 	}
 
-	public function register_menu(): void {
-		$this->page_hook = add_submenu_page(
+	public function register_menu() {
+		add_submenu_page(
 			'neoweaver',
 			'Skills',
-			'✨ Skills',
+			'Skills',
 			'manage_options',
-			$this->page_slug,
+			'nw-skills',
 			[ $this, 'render_page' ]
 		);
 	}
 
-	public function enqueue( string $hook ): void {
-		if ( $hook !== $this->page_hook ) {
-			return;
-		}
-
+	public function enqueue( $hook ) {
+		if ( strpos( $hook, 'nw-skills' ) === false ) return;
 		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
+			'nw-skills-css',
+			plugins_url( 'assets/css/admin/skills.css', NW_PLUGIN_FILE ),
+			[ 'nw-admin-core' ],
+			NW_VERSION
 		);
-
-		wp_enqueue_style(
-			'nw-skills-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/skills.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
-		);
-
 		wp_enqueue_script(
-			'nw-skills',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/skills.js',
-			[ 'jquery' ],
-			NEOWEAVER_VERSION,
+			'nw-skills-js',
+			plugins_url( 'assets/js/admin/skills.js', NW_PLUGIN_FILE ),
+			[ 'jquery', 'nw-admin-core' ],
+			NW_VERSION,
 			true
 		);
-
-		$uploads      = wp_get_upload_dir();
-		$uploads_base = ! empty( $uploads['baseurl'] )
-			? trailingslashit( $uploads['baseurl'] )
-			: '';
-
-		wp_localize_script(
-			'nw-skills',
-			'NW_SK',
-			[
-				'ajax_url'    => admin_url( 'admin-ajax.php' ),
-				'nonce'       => wp_create_nonce( $this->nonce_action ),
-				'categories'  => self::CATEGORIES,
-				'uploadsBase' => $uploads_base,
-			]
-		);
+		wp_localize_script( 'nw-skills-js', 'NWSkills', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'nwskillsnonce' ),
+		] );
 	}
 
-	/* ---------- dependencies ---------- */
-
-	private function supabase_ready(): bool {
-		return class_exists( 'NW_Supabase', false )
-			&& method_exists( 'NW_Supabase', 'insert' )
-			&& method_exists( 'NW_Supabase', 'patch' )
-			&& method_exists( 'NW_Supabase', 'delete' );
-	}
-
-	private function supabase_error_response( string $message = 'NW_Supabase is not available.' ): void {
-		wp_send_json_error( $message, 500 );
-	}
-
-	private function get_all_rows_cached(): array {
-		if ( ! method_exists( $this, 'cached_get_all' ) ) {
-			return [ 'error' => 'Transient cache dependency missing.' ];
-		}
-
-		return $this->cached_get_all( $this->table, 'name' );
-	}
-
-	private function bust_table_cache(): void {
-		if ( method_exists( $this, 'bust_cache' ) ) {
-			$this->bust_cache( $this->table );
-		}
-	}
-
-	/* ---------- helpers ---------- */
-
-	private function parse_csv_array( $value ): array {
-		$value = trim( (string) $value );
-
-		if ( '' === $value ) {
-			return [];
-		}
-
-		$decoded = json_decode( $value, true );
-		if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
-			$items = $decoded;
-		} else {
-			$items = array_map( 'trim', explode( ',', $value ) );
-		}
-
-		$items = array_map(
-			static function ( $item ) {
-				return sanitize_text_field( (string) $item );
-			},
-			$items
-		);
-
-		return array_values(
-			array_filter(
-				array_unique( $items ),
-				static fn( $item ) => '' !== $item
-			)
-		);
-	}
-
-	private function resolve_image_url( string $value ): ?string {
-		$value = trim( $value );
-
-		if ( '' === $value ) {
-			return null;
-		}
-
-		if ( filter_var( $value, FILTER_VALIDATE_URL ) ) {
-			return esc_url_raw( $value );
-		}
-
-		$uploads = wp_get_upload_dir();
-		$baseurl = isset( $uploads['baseurl'] ) ? trailingslashit( $uploads['baseurl'] ) : '';
-
-		if ( '' === $baseurl ) {
-			return null;
-		}
-
-		$value = ltrim( $value, '/' );
-
-		return esc_url_raw( $baseurl . $value );
-	}
-
-	private function image_input_from_url( $url ): string {
-		$url = trim( (string) $url );
-
-		if ( '' === $url ) {
-			return '';
-		}
-
-		$uploads = wp_get_upload_dir();
-		$baseurl = isset( $uploads['baseurl'] ) ? trailingslashit( $uploads['baseurl'] ) : '';
-
-		if ( $baseurl && 0 === strpos( $url, $baseurl ) ) {
-			return ltrim( substr( $url, strlen( $baseurl ) ), '/' );
-		}
-
-		return $url;
-	}
-
-	private function normalize_row( array $row ): array {
-		$row['id']                = isset( $row['id'] ) ? (string) $row['id'] : '';
-		$row['name']              = isset( $row['name'] ) ? (string) $row['name'] : '';
-		$row['description']       = isset( $row['description'] ) ? (string) $row['description'] : '';
-		$row['category']          = isset( $row['category'] ) ? (string) $row['category'] : '';
-		$row['application']       = isset( $row['application'] ) ? (string) $row['application'] : '';
-		$row['card_effect']       = isset( $row['card_effect'] ) ? (string) $row['card_effect'] : '';
-		$row['img_url']           = isset( $row['img_url'] ) ? (string) $row['img_url'] : '';
-		$row['tags']              = isset( $row['tags'] ) && is_array( $row['tags'] ) ? $row['tags'] : [];
-		$row['linked_attributes'] = isset( $row['linked_attributes'] ) && is_array( $row['linked_attributes'] ) ? $row['linked_attributes'] : [];
-		$row['is_active']         = ! empty( $row['is_active'] );
-		$row['img_input']         = $this->image_input_from_url( $row['img_url'] );
-
-		return $row;
-	}
-
-	/* ---------- render ---------- */
-
-	public function render_page(): void {
+	public function render_page() {
+		$categories = [ 'Physical', 'Social', 'Mental', 'Exploration' ];
 		?>
-		<div class="wrap nw-admin-wrap nw-skills-admin">
-			<h1>Skills</h1>
-
-			<div id="nw-notice" style="display:none;margin:12px 0;padding:10px 12px;border-radius:8px;"></div>
-
-			<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 18px;">
-				<input type="text" id="nw-search" class="regular-text" placeholder="Search skills…">
-
-				<select id="nw-filter-category">
-					<option value="">All categories</option>
-					<?php foreach ( self::CATEGORIES as $category ) : ?>
-						<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( $category ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<button id="nw-refresh-btn" type="button" class="button">Refresh</button>
-				<button id="nw-add-btn" type="button" class="button button-primary">+ Add Skill</button>
+		<div class="nw-admin-wrap" style="font-family:'Chakra Petch',monospace">
+			<div class="nw-admin-header">
+				<div class="nw-admin-header-left">
+					<h1><i data-lucide="zap" style="width:20px;height:20px;vertical-align:middle;margin-right:8px"></i> Skills</h1>
+					<p class="nw-admin-subtitle">Character skills — categories, linked attributes, card effects.</p>
+				</div>
+				<div class="nw-admin-header-right">
+					<button id="nw-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
+						<i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Refresh
+					</button>
+					<button id="nw-add-btn" class="nw-btn nw-btn-primary nw-btn-sm">
+						<i data-lucide="plus" style="width:13px;height:13px"></i> Add Skill
+					</button>
+				</div>
 			</div>
 
-			<div style="display:flex;gap:16px;margin-bottom:16px;">
-				<div><strong>Total:</strong> <span id="nw-total">0</span></div>
-				<div><strong>Active:</strong> <span id="nw-active">0</span></div>
-				<div><strong>Inactive:</strong> <span id="nw-inactive">0</span></div>
+			<div id="nw-notice" class="nw-notice" style="display:none"></div>
+
+			<div class="nw-stats-bar">
+				<div class="nw-stat-item"><span id="nw-total">0</span><small>total</small></div>
+				<div class="nw-stat-item"><span id="nw-active">0</span><small>active</small></div>
+				<div class="nw-stat-item nw-stat-cat" id="nw-stat-physical">0 <small>Physical</small></div>
+				<div class="nw-stat-item nw-stat-cat" id="nw-stat-social">0 <small>Social</small></div>
+				<div class="nw-stat-item nw-stat-cat" id="nw-stat-mental">0 <small>Mental</small></div>
+				<div class="nw-stat-item nw-stat-cat" id="nw-stat-exploration">0 <small>Exploration</small></div>
 			</div>
 
-			<table class="wp-list-table widefat striped" id="nw-skills-table">
-				<thead>
-					<tr>
-						<th style="width:80px;">Image</th>
-						<th>Name</th>
-						<th>Category</th>
-						<th>Application</th>
-						<th>Tags</th>
-						<th>Active</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody id="nw-skills-tbody">
-					<tr><td colspan="7" style="text-align:center;padding:32px;">Loading…</td></tr>
-				</tbody>
-			</table>
-
-			<div id="nw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.74);z-index:9999;overflow-y:auto;padding:24px;">
-				<div style="max-width:980px;margin:24px auto;background:#050505;color:#f2f2f2;border-radius:14px;border:1px solid #2b2b2b;padding:32px 28px;position:relative;">
-					<button id="nw-modal-close" type="button" style="position:absolute;right:14px;top:14px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer;line-height:1;">✕</button>
-					<h2 id="nw-modal-title" style="margin-top:0;margin-bottom:20px;">New Skill</h2>
-
-					<form id="nw-skill-form">
-						<input type="hidden" id="nw-field-id" name="id">
-
-						<table class="form-table" role="presentation">
+			<div class="nw-table-card">
+				<div class="nw-table-toolbar">
+					<input id="nw-search" class="nw-input nw-input-sm" type="search" placeholder="Search skills…">
+					<select id="nw-filter-category" class="nw-input nw-input-sm nw-select-sm">
+						<option value="">All categories</option>
+						<?php foreach ( $categories as $c ) : ?>
+						<option value="<?= esc_attr($c); ?>"><?= esc_html($c); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<select id="nw-filter-active" class="nw-input nw-input-sm nw-select-sm">
+						<option value="">All status</option>
+						<option value="1">Active</option>
+						<option value="0">Inactive</option>
+					</select>
+					<button id="nw-clear-filters" class="nw-btn nw-btn-ghost nw-btn-sm" style="display:none">
+						<i data-lucide="x" style="width:11px;height:11px"></i> Clear
+					</button>
+				</div>
+				<div class="nw-table-wrap">
+					<table class="nw-table">
+						<thead>
 							<tr>
-								<th><label for="nw-field-name">Name *</label></th>
-								<td><input type="text" id="nw-field-name" name="name" class="regular-text" required></td>
+								<th style="width:40px"></th>
+								<th>Name</th>
+								<th>Category</th>
+								<th>Application</th>
+								<th>Card Effect</th>
+								<th>Tags</th>
+								<th style="text-align:center;width:60px">Status</th>
+								<th style="width:80px">Actions</th>
 							</tr>
+						</thead>
+						<tbody id="nw-skills-tbody">
+							<tr class="nw-loading-row"><td colspan="8"><span class="nw-spinner"></span> Loading…</td></tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
 
-							<tr>
-								<th><label for="nw-field-description">Description</label></th>
-								<td><textarea id="nw-field-description" name="description" class="large-text" rows="3"></textarea></td>
-							</tr>
+			<!-- MODAL -->
+			<div id="nw-modal-overlay" class="nw-modal-overlay" style="display:none">
+				<div class="nw-modal nw-modal-skills">
+					<div class="nw-modal-header">
+						<h2 id="nw-modal-title">New Skill</h2>
+						<button id="nw-modal-close" class="nw-btn nw-btn-ghost nw-btn-sm"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+					</div>
+					<div class="nw-modal-body">
+						<form id="nw-skill-form" autocomplete="off">
+							<input type="hidden" id="nw-field-id">
 
-							<tr>
-								<th><label for="nw-field-category">Category</label></th>
-								<td>
-									<select id="nw-field-category" name="category">
-										<option value="">— Select —</option>
-										<?php foreach ( self::CATEGORIES as $category ) : ?>
-											<option value="<?php echo esc_attr( $category ); ?>"><?php echo esc_html( $category ); ?></option>
+							<div class="nw-form-2col">
+								<div class="nw-form-row">
+									<label class="nw-label">Name <span class="nw-required">*</span></label>
+									<input id="nw-field-name" class="nw-input" type="text" placeholder="Skill name" required>
+								</div>
+								<div class="nw-form-row">
+									<label class="nw-label">Category</label>
+									<select id="nw-field-category" class="nw-input">
+										<option value="">— none —</option>
+										<?php foreach ( $categories as $c ) : ?>
+										<option value="<?= esc_attr($c); ?>"><?= esc_html($c); ?></option>
 										<?php endforeach; ?>
 									</select>
-								</td>
-							</tr>
+								</div>
+							</div>
 
-							<tr>
-								<th><label for="nw-field-application">Application</label></th>
-								<td><input type="text" id="nw-field-application" name="application" class="regular-text"></td>
-							</tr>
+							<div class="nw-form-row">
+								<label class="nw-label">Description</label>
+								<textarea id="nw-field-description" class="nw-input nw-textarea" rows="2" placeholder="What this skill represents…"></textarea>
+							</div>
 
-							<tr>
-								<th><label for="nw-field-card_effect">Card Effect</label></th>
-								<td><textarea id="nw-field-card_effect" name="card_effect" class="large-text" rows="2"></textarea></td>
-							</tr>
+							<div class="nw-form-row">
+								<label class="nw-label">Application</label>
+								<textarea id="nw-field-application" class="nw-input nw-textarea" rows="2" placeholder="How the skill is used in-game…"></textarea>
+							</div>
 
-							<tr>
-								<th><label for="nw-field-img_url">Image file or URL</label></th>
-								<td>
-									<input
-										type="text"
-										id="nw-field-img_url"
-										name="img_url"
-										class="large-text"
-										placeholder="arcana.svg or full https://..."
-									>
-									<p class="description">You can enter only filename, e.g. <code>arcana.svg</code>.</p>
-									<div id="nw-img-preview-wrap" style="display:none;margin-top:10px;">
-										<img id="nw-img-preview" src="" alt="" style="display:block;max-width:160px;max-height:160px;border-radius:10px;border:1px solid #2b2b2b;background:#111;padding:6px;">
+							<div class="nw-form-row">
+								<label class="nw-label">Card Effect</label>
+								<textarea id="nw-field-card-effect" class="nw-input nw-textarea" rows="2" placeholder="Effect when drawn from the deck…"></textarea>
+							</div>
+
+							<div class="nw-form-2col">
+								<div class="nw-form-row">
+									<label class="nw-label">Tags</label>
+									<div id="nw-tags-wrap" class="nw-tag-input-wrap">
+										<div id="nw-tags-list" class="nw-tag-chips"></div>
+										<input id="nw-tag-input" class="nw-tag-text-input" type="text" placeholder="Add tag + Enter">
 									</div>
-								</td>
-							</tr>
+									<input type="hidden" id="nw-field-tags" value="[]">
+								</div>
+								<div class="nw-form-row">
+									<label class="nw-label">Linked Attributes</label>
+									<div id="nw-attrs-wrap" class="nw-tag-input-wrap">
+										<div id="nw-attrs-list" class="nw-tag-chips"></div>
+										<input id="nw-attr-input" class="nw-tag-text-input" type="text" placeholder="Add attribute + Enter">
+									</div>
+									<input type="hidden" id="nw-field-linked-attributes" value="[]">
+								</div>
+							</div>
 
-							<tr>
-								<th><label for="nw-field-tags">Tags</label></th>
-								<td><input type="text" id="nw-field-tags" name="tags" class="large-text" placeholder="comma,separated,tags"></td>
-							</tr>
+							<div class="nw-form-row">
+								<label class="nw-label">Image URL</label>
+								<input id="nw-field-img-url" class="nw-input" type="url" placeholder="https://…">
+								<div id="nw-img-preview-wrap" style="display:none;margin-top:8px">
+									<img id="nw-img-preview" src="" alt="" style="max-height:80px;border-radius:6px;object-fit:cover" loading="lazy">
+								</div>
+							</div>
 
-							<tr>
-								<th><label for="nw-field-linked_attributes">Linked Attributes</label></th>
-								<td><input type="text" id="nw-field-linked_attributes" name="linked_attributes" class="large-text" placeholder="comma,separated,attributes"></td>
-							</tr>
-
-							<tr>
-								<th>Active</th>
-								<td>
-									<label>
-										<input type="checkbox" id="nw-field-is_active" name="is_active" checked>
-										Is active
-									</label>
-								</td>
-							</tr>
-						</table>
-					</form>
-
-					<p style="margin-top:20px;">
-						<button id="nw-save-btn" type="button" class="button button-primary"><span id="nw-save-label">Save Skill</span></button>
-						<button id="nw-cancel-btn" type="button" class="button" style="margin-left:8px;">Cancel</button>
-						<button id="nw-delete-btn" type="button" class="button button-link-delete" style="display:none;margin-left:16px;">Delete</button>
-					</p>
-
-					<div id="nw-form-notice" role="alert" aria-live="polite"></div>
+							<div class="nw-form-row">
+								<label class="nw-toggle-row">
+									<input id="nw-field-is-active" type="checkbox" checked>
+									<span>Active</span>
+								</label>
+							</div>
+						</form>
+					</div>
+					<div class="nw-modal-footer">
+						<button id="nw-delete-btn" class="nw-btn nw-btn-danger nw-btn-sm" style="display:none">
+							<i data-lucide="trash-2" style="width:13px;height:13px"></i> Delete
+						</button>
+						<div class="nw-modal-footer-right">
+							<button id="nw-cancel-btn" class="nw-btn nw-btn-ghost nw-btn-sm">Cancel</button>
+							<button id="nw-save-btn" class="nw-btn nw-btn-primary nw-btn-sm">
+								<i data-lucide="save" style="width:13px;height:13px"></i>
+								<span id="nw-save-label">Create Skill</span>
+							</button>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
 		<?php
 	}
 
-	/* ---------- AJAX ---------- */
-
-	public function ajax_get_all(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$rows = $this->get_all_rows_cached();
-
-		if ( isset( $rows['error'] ) ) {
-			wp_send_json_error( $rows['error'], 500 );
-			return;
-		}
-
-		$rows = array_map( [ $this, 'normalize_row' ], is_array( $rows ) ? $rows : [] );
-
-		$filter_category = sanitize_text_field( wp_unslash( $_POST['filter_category'] ?? '' ) );
-		if ( '' !== $filter_category ) {
-			$rows = array_values(
-				array_filter(
-					$rows,
-					static fn( $row ) => ( $row['category'] ?? '' ) === $filter_category
-				)
-			);
-		}
-
-		wp_send_json_success( $rows );
+	/* ---- Supabase helper ---- */
+	private function supa( $method, $endpoint, $body = null ) {
+		$url    = TWSUPABASE_URL . '/rest/v1/' . $endpoint;
+		$apikey = TWSUPABASE_KEY;
+		$args   = [
+			'method'  => $method,
+			'headers' => [
+				'apikey'        => $apikey,
+				'Authorization' => 'Bearer ' . $apikey,
+				'Content-Type'  => 'application/json',
+				'Prefer'        => 'return=representation',
+			],
+		];
+		if ( $body !== null ) $args['body'] = wp_json_encode( $body );
+		$res = wp_remote_request( $url, $args );
+		if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
+		return [ 'code' => wp_remote_retrieve_response_code( $res ), 'data' => json_decode( wp_remote_retrieve_body( $res ), true ) ];
 	}
 
-	public function ajax_get_one(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-			return;
-		}
-
-		$rows = $this->get_all_rows_cached();
-
-		if ( isset( $rows['error'] ) ) {
-			wp_send_json_error( $rows['error'], 500 );
-			return;
-		}
-
-		$item = null;
-
-		foreach ( (array) $rows as $row ) {
-			if ( isset( $row['id'] ) && (string) $row['id'] === $id ) {
-				$item = $this->normalize_row( $row );
-				break;
-			}
-		}
-
-		if ( ! $item ) {
-			wp_send_json_error( 'Skill not found', 404 );
-			return;
-		}
-
-		wp_send_json_success( $item );
+	private function check_nonce() {
+		if ( ! check_ajax_referer( 'nwskillsnonce', 'nonce', false ) ) wp_send_json_error( 'Invalid nonce.' );
 	}
 
-	public function ajax_save(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
+	private function parse_json_field( $raw, $fallback = [] ) {
+		if ( empty( $raw ) || $raw === 'null' ) return $fallback;
+		$decoded = json_decode( stripslashes( $raw ), true );
+		return is_array( $decoded ) ? $decoded : $fallback;
+	}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
+	public function ajax_load() {
+		$this->check_nonce();
+		$res = $this->supa( 'GET', 'cyber_skills?order=name.asc' );
+		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+		wp_send_json_success( $res['data'] );
+	}
 
-		if ( ! $this->supabase_ready() ) {
-			$this->supabase_error_response();
-			return;
-		}
+	public function ajax_save() {
+		$this->check_nonce();
+		$id   = sanitize_text_field( $_POST['id'] ?? '' );
+		$name = sanitize_text_field( $_POST['name'] ?? '' );
+		if ( ! $name ) { wp_send_json_error( 'Name is required.' ); return; }
 
-		$id                = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name              = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$description       = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
-		$category          = sanitize_text_field( wp_unslash( $_POST['category'] ?? '' ) );
-		$application       = sanitize_text_field( wp_unslash( $_POST['application'] ?? '' ) );
-		$card_effect       = sanitize_textarea_field( wp_unslash( $_POST['card_effect'] ?? '' ) );
-		$img_url           = $this->resolve_image_url( (string) wp_unslash( $_POST['img_url'] ?? '' ) );
-		$tags              = $this->parse_csv_array( wp_unslash( $_POST['tags'] ?? '' ) );
-		$linked_attributes = $this->parse_csv_array( wp_unslash( $_POST['linked_attributes'] ?? '' ) );
-		$is_active         = filter_var( wp_unslash( $_POST['is_active'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
-		if ( '' === $name ) {
-			wp_send_json_error( 'Name is required', 400 );
-			return;
-		}
-
-		if ( '' !== $category && ! in_array( $category, self::CATEGORIES, true ) ) {
-			wp_send_json_error( 'Invalid category', 400 );
-			return;
-		}
+		$cat = sanitize_text_field( $_POST['category'] ?? '' );
+		$allowed_cats = [ 'Physical', 'Social', 'Mental', 'Exploration', '' ];
+		if ( ! in_array( $cat, $allowed_cats, true ) ) { wp_send_json_error( 'Invalid category.' ); return; }
 
 		$payload = [
-			'name'              => $name,
-			'description'       => $description ?: null,
-			'category'          => $category ?: null,
-			'application'       => $application ?: null,
-			'card_effect'       => $card_effect ?: null,
-			'img_url'           => $img_url,
-			'tags'              => $tags,
-			'linked_attributes' => $linked_attributes,
-			'is_active'         => $is_active,
+			'name'               => $name,
+			'description'        => sanitize_textarea_field( $_POST['description'] ?? '' ) ?: null,
+			'category'           => $cat ?: null,
+			'application'        => sanitize_textarea_field( $_POST['application'] ?? '' ) ?: null,
+			'card_effect'        => sanitize_textarea_field( $_POST['card_effect'] ?? '' ) ?: null,
+			'img_url'            => esc_url_raw( $_POST['img_url'] ?? '' ) ?: null,
+			'tags'               => $this->parse_json_field( $_POST['tags'] ?? '' ),
+			'linked_attributes'  => $this->parse_json_field( $_POST['linked_attributes'] ?? '' ),
+			'is_active'          => ! empty( $_POST['is_active'] ),
 		];
 
-		$res = $id
-			? NW_Supabase::patch( $this->table, $id, $payload )
-			: NW_Supabase::insert( $this->table, $payload );
-
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'], 500 );
-			return;
+		if ( $id ) {
+			$res = $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), $payload );
+		} else {
+			$res = $this->supa( 'POST', 'cyber_skills', $payload );
 		}
 
-		$code = $res['code'] ?? 0;
-		if ( $code >= 400 ) {
-			$message = $res['data']['message'] ?? 'Supabase error ' . $code;
-			wp_send_json_error( $message, 500 );
-			return;
+		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+		if ( ! in_array( $res['code'], [ 200, 201 ] ) ) {
+			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] ) ? $res['data']['message'] : 'Save failed (HTTP ' . $res['code'] . ').';
+			wp_send_json_error( $msg ); return;
 		}
-
-		$this->bust_table_cache();
-
-		$item = $res['data'][0] ?? null;
-		if ( is_array( $item ) ) {
-			$item = $this->normalize_row( $item );
-		}
-
-		wp_send_json_success( $item );
+		wp_send_json_success( $res['data'] );
 	}
 
-	public function ajax_toggle(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		if ( ! $this->supabase_ready() ) {
-			$this->supabase_error_response();
-			return;
-		}
-
-		$id        = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$is_active = filter_var( wp_unslash( $_POST['is_active'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-			return;
-		}
-
-		$res = NW_Supabase::patch(
-			$this->table,
-			$id,
-			[ 'is_active' => $is_active ]
-		);
-
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'], 500 );
-			return;
-		}
-
-		$code = $res['code'] ?? 0;
-		if ( $code >= 400 ) {
-			$message = $res['data']['message'] ?? 'Supabase error ' . $code;
-			wp_send_json_error( $message, 500 );
-			return;
-		}
-
-		$this->bust_table_cache();
-
-		wp_send_json_success(
-			[
-				'id'        => (string) $id,
-				'is_active' => $is_active,
-			]
-		);
+	public function ajax_delete() {
+		$this->check_nonce();
+		$id = sanitize_text_field( $_POST['id'] ?? '' );
+		if ( ! $id ) { wp_send_json_error( 'ID required.' ); return; }
+		$res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . rawurlencode( $id ) );
+		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+		wp_send_json_success( 'Deleted.' );
 	}
 
-	public function ajax_delete(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		if ( ! $this->supabase_ready() ) {
-			$this->supabase_error_response();
-			return;
-		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-			return;
-		}
-
-		$res = NW_Supabase::delete( $this->table, $id );
-
-		if ( isset( $res['error'] ) ) {
-			wp_send_json_error( $res['error'], 500 );
-			return;
-		}
-
-		$code = $res['code'] ?? 0;
-		if ( $code >= 400 ) {
-			$message = $res['data']['message'] ?? 'Supabase error ' . $code;
-			wp_send_json_error( $message, 500 );
-			return;
-		}
-
-		$this->bust_table_cache();
-
-		wp_send_json_success( 'deleted' );
+	public function ajax_duplicate() {
+		$this->check_nonce();
+		$id = sanitize_text_field( $_POST['id'] ?? '' );
+		if ( ! $id ) { wp_send_json_error( 'ID required.' ); return; }
+		$res = $this->supa( 'GET', 'cyber_skills?id=eq.' . rawurlencode( $id ) );
+		if ( isset( $res['error'] ) || empty( $res['data'][0] ) ) { wp_send_json_error( 'Skill not found.' ); return; }
+		$row = $res['data'][0];
+		unset( $row['id'], $row['created_at'] );
+		$row['name'] = $row['name'] . ' (copy)';
+		$res2 = $this->supa( 'POST', 'cyber_skills', $row );
+		if ( isset( $res2['error'] ) ) { wp_send_json_error( $res2['error'] ); return; }
+		if ( ! in_array( $res2['code'], [ 200, 201 ] ) ) { wp_send_json_error( 'Duplicate failed.' ); return; }
+		wp_send_json_success( $res2['data'] );
 	}
 }
