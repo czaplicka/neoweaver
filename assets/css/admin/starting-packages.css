@@ -1,63 +1,158 @@
-/* ============================================================
-   NeoWeaver Admin — STARTING PACKAGES
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver — Starting Packages admin (extends admin-core.css) */
 
-/* ---- Package Identity ---- */
-.nw-pkg-name { 
-    font-weight: 600; 
-    color: #fff; 
+/* ── Panel wrapper ─────────────────────────────────────────────────────── */
+.nw-packages-panel {
+	font-family: 'Chakra Petch', monospace;
 }
 
-.nw-pkg-sub { 
-    font-size: 11px; 
-    color: #555; 
-    margin-top: 2px; 
-}
-
-/* ---- Equipment & Armor Visuals ---- */
-.nw-armor-val { 
-    color: #adff00; 
-    font-weight: 700; 
-    font-size: 13px; 
-}
-
-/* Slots/Items Chips */
-.nw-slot-chip {
-	font-size: 10px;
-	padding: 2px 7px;
-	background: #0d1a2e;
-	border: 1px solid #1e3a5e;
-	border-radius: 3px;
-	color: #5599ff;
-	margin: 2px 1px;
+/* ── Armor value ───────────────────────────────────────────────────────── */
+.nw-armor-val {
 	display: inline-block;
+	min-width: 28px;
+	text-align: center;
+	font-weight: 700;
+	font-size: 13px;
+	color: #adff00;
+	font-family: 'Chakra Petch', monospace;
+}
+
+/* ── Slots pill ────────────────────────────────────────────────────────── */
+.nw-slots-pill {
+	background: rgba(173, 255, 0, 0.10);
+	border: 1px solid rgba(173, 255, 0, 0.28);
+	color: #adff00;
+	border-radius: 12px;
+	padding: 2px 9px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
 	white-space: nowrap;
 }
 
-/* ---- Form Select Extensions ---- */
-.nw-select-loading { 
-    color: #555; 
-    font-style: italic; 
-    font-size: 12px;
+/* ── Cards pool pills ──────────────────────────────────────────────────── */
+.nw-pill {
+	border-radius: 10px;
+	padding: 2px 8px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	display: inline-block;
+}
+.nw-pill-atk {
+	background: rgba(239, 68, 68, 0.15);
+	color: #f87171;
+	border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.nw-pill-def {
+	background: rgba(59, 130, 246, 0.15);
+	color: #7ab4ff;
+	border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.nw-pill-class {
+	background: rgba(168, 85, 247, 0.12);
+	color: #c07aff;
+	border: 1px solid rgba(168, 85, 247, 0.28);
 }
 
-.nw-select option { 
-    background: #111; 
+/* ── Item chip ─────────────────────────────────────────────────────────── */
+.nw-item-chip {
+	background: rgba(255, 255, 255, 0.07);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 4px;
+	padding: 1px 6px;
+	font-size: 11px;
+	color: #d4d4d4;
+}
+.nw-chip-missing {
+	color: #f87171;
+	border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* ---- Component Specific Helpers ---- */
-.nw-field-center { 
-    align-items: flex-start; 
+/* ── Section label ─────────────────────────────────────────────────────── */
+.nw-section-label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: #adff00;
+	margin: 18px 0 10px;
+	font-weight: 700;
+}
+.nw-section-label svg {
+	width: 13px;
+	height: 13px;
 }
 
-/* Custom row actions gap */
-.nw-row-actions { 
-    display: flex; 
-    gap: 6px; 
+/* ── JSON textarea ─────────────────────────────────────────────────────── */
+.nw-json-field {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 11px;
+	line-height: 1.5;
+	resize: vertical;
+	color: #adff00;
+	background: rgba(0, 0, 0, 0.3);
 }
 
-/* ---- Responsive Tweaks ---- */
-@media (max-width: 600px) {
-    .nw-form-grid { grid-template-columns: 1fr; }
+/* ── Field hint ────────────────────────────────────────────────────────── */
+.nw-field-hint {
+	font-size: 10px;
+	color: var(--nw-text-muted, #888);
+	font-weight: 400;
+	margin-left: 6px;
+}
+
+/* ── Checkbox row ──────────────────────────────────────────────────────── */
+.nw-checkbox-row {
+	margin-top: 6px;
+}
+.nw-checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	cursor: pointer;
+	font-size: 13px;
+	color: #d4d4d4;
+}
+.nw-checkbox-label input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: #adff00;
+	cursor: pointer;
+}
+
+/* ── Stat green ────────────────────────────────────────────────────────── */
+.nw-stat-green {
+	color: #adff00 !important;
+}
+
+/* ── Wide modal ────────────────────────────────────────────────────────── */
+.nw-modal-wide {
+	max-width: 860px;
+}
+
+/* ── Form cols ─────────────────────────────────────────────────────────── */
+.nw-form-cols-2 {
+	grid-template-columns: 1fr 1fr;
+}
+.nw-form-cols-3 {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+@media (max-width: 640px) {
+	.nw-form-cols-2,
+	.nw-form-cols-3 {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ── Row description ───────────────────────────────────────────────────── */
+.nw-row-desc {
+	font-size: 11px;
+	color: var(--nw-text-muted, #888);
+	margin-top: 2px;
+}
+
+/* ── Text muted utility ────────────────────────────────────────────────── */
+.nw-text-muted {
+	color: var(--nw-text-muted, #888);
+	font-size: 12px;
 }
