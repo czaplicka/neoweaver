@@ -23,6 +23,20 @@ class NW_Deck_Admin {
 	private const CATEGORIES = [ 'magic', 'combat', 'action', 'social', 'equipment', 'tech' ];
 	private const RARITIES   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
 
+	/** Typy bonusów dostępne w edytorze asc_bonuses */
+	private const BONUS_TYPES = [
+		'damage'        => 'Damage',
+		'defense'       => 'Defense',
+		'xp_gain'       => 'XP Gain',
+		'hp_max'        => 'Max HP',
+		'hp_regen'      => 'HP Regen',
+		'mana_max'      => 'Max Mana',
+		'mana_regen'    => 'Mana Regen',
+		'speed'         => 'Speed',
+		'crit_chance'   => 'Crit Chance %',
+		'unlock_effect' => 'Unlock Effect (special)',
+	];
+
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -79,6 +93,7 @@ class NW_Deck_Admin {
 				'ajaxurl'    => admin_url( 'admin-ajax.php' ),
 				'nonce'      => wp_create_nonce( 'neoweaver_deck' ),
 				'categories' => self::CATEGORIES,
+				'bonusTypes' => self::BONUS_TYPES,
 			]
 		);
 	}
@@ -259,7 +274,81 @@ class NW_Deck_Admin {
 		return $this->is_uuid( $value ) ? $value : null;
 	}
 
+	/**
+	 * Parsuje asc_bonuses z POST.
+	 * Oczekuje JSON obiektu: {"1":[{"type":"damage","value":10}], "3":[...]}.
+	 * Zwraca null jeśli puste, tablicę po walidacji jeśli wypełnione.
+	 */
+	private function parse_asc_bonuses( $raw ): ?array {
+		$raw = trim( (string) $raw );
+
+		if ( '' === $raw ) {
+			return null;
+		}
+
+		$decoded = json_decode( $raw, true );
+
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
+			return null;
+		}
+
+		$allowed_types = array_keys( self::BONUS_TYPES );
+		$clean = [];
+
+		foreach ( $decoded as $level => $bonuses ) {
+			$level_int = (int) $level;
+
+			if ( $level_int < 1 || $level_int > 20 ) {
+				continue;
+			}
+
+			if ( ! is_array( $bonuses ) ) {
+				continue;
+			}
+
+			$level_bonuses = [];
+
+			foreach ( $bonuses as $bonus ) {
+				if ( ! is_array( $bonus ) ) {
+					continue;
+				}
+
+				$type = sanitize_text_field( $bonus['type'] ?? '' );
+
+				if ( ! in_array( $type, $allowed_types, true ) ) {
+					continue;
+				}
+
+				$entry = [ 'type' => $type ];
+
+				if ( 'unlock_effect' !== $type ) {
+					$entry['value'] = (int) ( $bonus['value'] ?? 0 );
+				}
+
+				if ( isset( $bonus['special'] ) ) {
+					$entry['special'] = sanitize_text_field( $bonus['special'] );
+				}
+
+				$level_bonuses[] = $entry;
+			}
+
+			if ( ! empty( $level_bonuses ) ) {
+				$clean[ (string) $level_int ] = $level_bonuses;
+			}
+		}
+
+		return empty( $clean ) ? null : $clean;
+	}
+
 	public function render_page(): void {
+		$bonus_types_options = '';
+		foreach ( self::BONUS_TYPES as $val => $label ) {
+			$bonus_types_options .= sprintf(
+				'<option value="%s">%s</option>',
+				esc_attr( $val ),
+				esc_html( $label )
+			);
+		}
 		?>
 		<div class="wrap nw-deck-admin">
 			<h1><?php esc_html_e( 'NeoWeaver — Deck', 'neoweaver' ); ?></h1>
@@ -378,6 +467,32 @@ class NW_Deck_Admin {
 							<th><label for="nw-deck-bonus"><?php esc_html_e( 'Bonus JSON', 'neoweaver' ); ?></label></th>
 							<td><textarea id="nw-deck-bonus" rows="3" class="large-text" placeholder='{"damage":2}'></textarea></td>
 						</tr>
+
+						<!-- ═══════════════════════════════════════════════
+						     ASCENSION BONUSES — visual per-level editor
+						     ═══════════════════════════════════════════════ -->
+						<tr>
+							<th style="vertical-align:top; padding-top:14px;">
+								<?php esc_html_e( 'Ascension Bonuses', 'neoweaver' ); ?>
+								<p class="description" style="font-weight:normal;"><?php esc_html_e( 'Bonuses per ascension level (1–20).', 'neoweaver' ); ?></p>
+							</th>
+							<td>
+								<div id="nw-asc-levels-wrap" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;">
+									<!-- JS wstrzyknie wiersze poziomów tutaj -->
+								</div>
+								<button type="button" class="button" id="nw-asc-add-level">
+									+ <?php esc_html_e( 'Add level', 'neoweaver' ); ?>
+								</button>
+								<!-- hidden field przechowuje skompilowany JSON -->
+								<input type="hidden" id="nw-deck-asc-bonuses">
+								<details style="margin-top:8px;">
+									<summary style="cursor:pointer; color:#888; font-size:12px;"><?php esc_html_e( 'Raw JSON (read-only preview)', 'neoweaver' ); ?></summary>
+									<pre id="nw-asc-json-preview" style="background:#f0f0f0; padding:8px; font-size:11px; overflow:auto; max-height:120px;"></pre>
+								</details>
+							</td>
+						</tr>
+						<!-- ═══════════════════════════════════════════════ -->
+
 						<tr>
 							<th><label for="nw-deck-tags"><?php esc_html_e( 'Tags', 'neoweaver' ); ?></label></th>
 							<td><input type="text" id="nw-deck-tags" class="large-text" placeholder="comma,separated,tags"></td>
@@ -452,7 +567,135 @@ class NW_Deck_Admin {
 					</p>
 				</div>
 			</div>
+
+			<?php
+			// Template dla wiersza poziomu — używany przez deck.js via innerHTML
+			// data-bonus-types jest tylko do renderowania, JS czyta NWDeck.bonusTypes
+			?>
+			<template id="nw-asc-level-tpl">
+				<div class="nw-asc-level-row" style="border:1px solid #ddd; border-radius:4px; padding:8px; background:#fafafa;">
+					<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+						<strong style="min-width:60px;"><?php esc_html_e( 'Level', 'neoweaver' ); ?></strong>
+						<input type="number" class="nw-asc-level-num" min="1" max="20" value="1" style="width:60px;">
+						<button type="button" class="button nw-asc-add-bonus" style="margin-left:auto;">+ <?php esc_html_e( 'Add bonus', 'neoweaver' ); ?></button>
+						<button type="button" class="button nw-asc-remove-level" style="color:#a00;">✕ <?php esc_html_e( 'Remove level', 'neoweaver' ); ?></button>
+					</div>
+					<div class="nw-asc-bonuses-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+				</div>
+			</template>
+
+			<template id="nw-asc-bonus-tpl">
+				<div class="nw-asc-bonus-row" style="display:flex; align-items:center; gap:6px;">
+					<select class="nw-asc-bonus-type">
+						<?php echo $bonus_types_options; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					</select>
+					<input type="number" class="nw-asc-bonus-value" placeholder="value" style="width:70px;">
+					<input type="text" class="nw-asc-bonus-special" placeholder="special key (optional)" style="width:140px;">
+					<button type="button" class="button nw-asc-remove-bonus" style="color:#a00;">✕</button>
+				</div>
+			</template>
 		</div>
+
+		<script>
+		(function($){
+			'use strict';
+
+			// ─── ASC BONUSES EDITOR ───────────────────────────────────────
+
+			const wrap    = document.getElementById('nw-asc-levels-wrap');
+			const hidden  = document.getElementById('nw-deck-asc-bonuses');
+			const preview = document.getElementById('nw-asc-json-preview');
+			const lvlTpl  = document.getElementById('nw-asc-level-tpl');
+			const bonTpl  = document.getElementById('nw-asc-bonus-tpl');
+
+			function syncJson() {
+				const result = {};
+				wrap.querySelectorAll('.nw-asc-level-row').forEach(function(row) {
+					const lvl     = parseInt(row.querySelector('.nw-asc-level-num').value, 10);
+					const bonuses = [];
+					row.querySelectorAll('.nw-asc-bonus-row').forEach(function(bRow) {
+						const type    = bRow.querySelector('.nw-asc-bonus-type').value;
+						const valEl   = bRow.querySelector('.nw-asc-bonus-value');
+						const special = bRow.querySelector('.nw-asc-bonus-special').value.trim();
+						const entry   = { type: type };
+						if ( type !== 'unlock_effect' ) {
+							entry.value = parseInt(valEl.value, 10) || 0;
+						}
+						if ( special ) { entry.special = special; }
+						bonuses.push(entry);
+					});
+					if ( lvl >= 1 && lvl <= 20 && bonuses.length ) {
+						result[String(lvl)] = bonuses;
+					}
+				});
+				const json = Object.keys(result).length ? JSON.stringify(result) : '';
+				hidden.value    = json;
+				preview.textContent = json ? JSON.stringify(result, null, 2) : '(empty)';
+			}
+
+			function addBonusRow(listEl, data) {
+				const node = bonTpl.content.cloneNode(true);
+				const row  = node.querySelector('.nw-asc-bonus-row');
+				if ( data ) {
+					row.querySelector('.nw-asc-bonus-type').value = data.type || 'damage';
+					if ( data.value !== undefined ) {
+						row.querySelector('.nw-asc-bonus-value').value = data.value;
+					}
+					if ( data.special ) {
+						row.querySelector('.nw-asc-bonus-special').value = data.special;
+					}
+				}
+				row.querySelector('.nw-asc-remove-bonus').addEventListener('click', function(){
+					row.remove(); syncJson();
+				});
+				row.querySelectorAll('input, select').forEach(function(el){
+					el.addEventListener('input', syncJson);
+					el.addEventListener('change', syncJson);
+				});
+				listEl.appendChild(node);
+				syncJson();
+			}
+
+			function addLevelRow(level, bonuses) {
+				const node = lvlTpl.content.cloneNode(true);
+				const row  = node.querySelector('.nw-asc-level-row');
+				const numEl = row.querySelector('.nw-asc-level-num');
+				if ( level ) { numEl.value = level; }
+				numEl.addEventListener('input', syncJson);
+				row.querySelector('.nw-asc-remove-level').addEventListener('click', function(){
+					row.remove(); syncJson();
+				});
+				const listEl = row.querySelector('.nw-asc-bonuses-list');
+				row.querySelector('.nw-asc-add-bonus').addEventListener('click', function(){
+					addBonusRow(listEl, null);
+				});
+				if ( bonuses && bonuses.length ) {
+					bonuses.forEach(function(b){ addBonusRow(listEl, b); });
+				}
+				wrap.appendChild(node);
+				syncJson();
+			}
+
+			document.getElementById('nw-asc-add-level').addEventListener('click', function(){
+				addLevelRow(null, null);
+			});
+
+			// Eksponujemy funkcję do ładowania danych z zewnątrz (deck.js)
+			window.NWAscEditor = {
+				load: function(jsonData) {
+					wrap.innerHTML = '';
+					hidden.value  = '';
+					preview.textContent = '(empty)';
+					if ( ! jsonData || typeof jsonData !== 'object' ) { return; }
+					Object.keys(jsonData).sort(function(a,b){ return parseInt(a)-parseInt(b); }).forEach(function(lvl){
+						addLevelRow(parseInt(lvl, 10), jsonData[lvl]);
+					});
+				},
+				get: function() { return hidden.value; }
+			};
+
+		})(jQuery);
+		</script>
 		<?php
 	}
 
@@ -469,11 +712,9 @@ class NW_Deck_Admin {
 		$search   = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
 		$active   = sanitize_text_field( wp_unslash( $_POST['active'] ?? '' ) );
 
-		// Nested select: pobierz dane typu (label, icon, color, category_id) przez FK
 		$select = 'id,name,type,rarity,img_url,is_active,cyber_card_types!cyber_deck_type_fkey(id,label,icon,color,category_id)';
 		$endpoint = 'cyber_deck?select=' . rawurlencode( $select ) . '&order=name.asc';
 
-		// Filtr po kategorii — przez relację cyber_card_types
 		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
 			$endpoint .= '&cyber_card_types.category_id=eq.' . rawurlencode( $category );
 		}
@@ -558,6 +799,8 @@ class NW_Deck_Admin {
 			return;
 		}
 
+		$asc_bonuses = $this->parse_asc_bonuses( wp_unslash( $_POST['asc_bonuses'] ?? '' ) );
+
 		$payload = [
 			'name'                    => $name,
 			'description'             => $this->maybe_null_textarea( wp_unslash( $_POST['description'] ?? '' ) ),
@@ -568,6 +811,7 @@ class NW_Deck_Admin {
 			'cost_number'             => max( 0, intval( wp_unslash( $_POST['cost_number'] ?? 0 ) ) ),
 			'effect'                  => $this->maybe_null_textarea( wp_unslash( $_POST['effect'] ?? '' ) ),
 			'bonus'                   => $this->parse_json_object_field( wp_unslash( $_POST['bonus'] ?? '' ) ),
+			'asc_bonuses'             => $asc_bonuses,
 			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
 			'gm'                      => $this->maybe_null_textarea( wp_unslash( $_POST['gm'] ?? '' ) ),
 			'tags'                    => $this->parse_json_array_field( wp_unslash( $_POST['tags'] ?? '' ) ),
