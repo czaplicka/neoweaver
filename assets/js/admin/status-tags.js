@@ -1,375 +1,253 @@
-// assets/js/admin/status-tags.js
+/* NeoWeaver — Status Tags Admin JS */
+/* globals NWStatusTags, lucide, jQuery */
 (function ($) {
 	'use strict';
 
-	const NWStatusTags = {
-		currentId: '',
-		rows: [],
-		noticeTimer: null,
+	const A = NWStatusTags.ajaxurl;
+	const N = NWStatusTags.nonce;
 
-		init() {
-			if (!window.NW_ST || !window.NW_ST.ajax_url || !window.NW_ST.nonce) {
-				this.showGlobalNotice('Missing AJAX config. Refresh the page.', 'error');
-				return;
-			}
+	let allRows = [];
 
-			this.bindEvents();
-			this.load();
-		},
+	// ── Lucide ───────────────────────────────────────────────────────────────
+	function icons() { if (window.lucide) lucide.createIcons(); }
 
-		bindEvents() {
-			$('#nw-add-tag-btn').on('click', () => this.showForm());
-			$('#nw-save-tag-btn').on('click', (e) => {
-				e.preventDefault();
-				this.save();
-			});
-			$('#nw-cancel-tag-btn').on('click', (e) => {
-				e.preventDefault();
-				this.hideForm();
-			});
+	// ── Notice ───────────────────────────────────────────────────────────────
+	function notice(msg, type = 'success') {
+		const $n = $('#nw-notice');
+		$n.removeClass('nw-notice-success nw-notice-error')
+			.addClass(type === 'error' ? 'nw-notice-error' : 'nw-notice-success')
+			.html(msg).show();
+		setTimeout(() => $n.fadeOut(), 4000);
+	}
 
-			$(document).on('click', '.nw-edit-tag', (e) => this.edit(e));
-			$(document).on('click', '.nw-delete-tag', (e) => this.delete(e));
-			$(document).on('change', '.nw-toggle-tag', (e) => this.toggle(e));
-			$('#nw-delete-tag-btn').on('click', (e) => {
-				e.preventDefault();
-				this.deleteCurrent();
-			});
-		},
+	// ── Stats ────────────────────────────────────────────────────────────────
+	function updateStats(rows) {
+		$('#nw-total').text(rows.length);
+		$('#nw-debuffs').text(rows.filter(r => r.is_debuff).length);
+		$('#nw-buffs').text(rows.filter(r => !r.is_debuff).length);
+		$('#nw-inactive').text(rows.filter(r => !r.is_active).length);
+	}
 
-		normalizeId(value) {
-			if (value === null || typeof value === 'undefined') {
-				return '';
-			}
-			return String(value).trim();
-		},
-
-		request(data, onSuccess, fallbackMessage = 'Request failed.') {
-			return $.ajax({
-				url: window.NW_ST.ajax_url,
-				method: 'POST',
-				dataType: 'json',
-				data: Object.assign({}, data, { nonce: window.NW_ST.nonce }),
-				success: (res) => {
-					if (typeof onSuccess === 'function') {
-						onSuccess(res);
-					}
-				},
-				error: (xhr) => {
-					this.showFormNotice(this.extractError(xhr, fallbackMessage), 'error');
-				}
-			});
-		},
-
-		extractError(xhr, fallback) {
-			if (xhr && xhr.responseJSON) {
-				if (typeof xhr.responseJSON.data === 'string' && xhr.responseJSON.data.trim()) {
-					return xhr.responseJSON.data.trim();
-				}
-				if (
-					xhr.responseJSON.data &&
-					typeof xhr.responseJSON.data.message === 'string' &&
-					xhr.responseJSON.data.message.trim()
-				) {
-					return xhr.responseJSON.data.message.trim();
-				}
-			}
-			return fallback || 'Request failed.';
-		},
-
-		load() {
-			$('#nw-status-tag-table-wrap').html('<p>Loading…</p>');
-
-			this.request(
-				{ action: 'nw_status_tags_load' },
-				(res) => {
-					if (!res || !res.success) {
-						this.showGlobalNotice(res && res.data ? res.data : 'Failed to load status tags.', 'error');
-						$('#nw-status-tag-table-wrap').html('<p style="color:#d63638;">Failed to load status tags.</p>');
-						return;
-					}
-
-					this.rows = Array.isArray(res.data) ? res.data : [];
-					this.renderTable(this.rows);
-				},
-				'Failed to load status tags.'
-			);
-		},
-
-		renderTable(rows) {
-			if (!rows.length) {
-				$('#nw-status-tag-table-wrap').html('<p>No status tags found. Click "Add Status Tag" to create one.</p>');
-				return;
-			}
-
-			let html = '<table class="wp-list-table widefat fixed striped"><thead><tr>';
-			html += '<th>Label</th><th>Category</th><th>Duration</th><th>Flags</th><th>Color</th><th>Active</th><th>Actions</th>';
-			html += '</tr></thead><tbody>';
-
-			rows.forEach((tag) => {
-				try {
-					const tagId = this.normalizeId(tag && tag.id);
-					const flags = [
-						tag && tag.is_stackable ? 'Stackable' : null,
-						tag && tag.is_debuff ? 'Debuff' : 'Buff'
-					].filter(Boolean).join(' · ');
-
-					html += `<tr data-id="${this.esc(tagId)}">
-						<td>
-							<strong>${this.esc(tag && tag.label ? tag.label : '')}</strong>
-							${tag && tag.effect_description ? `<div style="color:#666;margin-top:4px;">${this.esc(this.truncate(tag.effect_description, 80))}</div>` : ''}
-						</td>
-						<td>${this.esc((tag && tag.category) || '—')}</td>
-						<td>${this.esc((tag && tag.duration) || 'scene')}</td>
-						<td>${this.esc(flags || '—')}</td>
-						<td>
-							<span style="display:inline-flex;align-items:center;gap:8px;">
-								<span style="width:14px;height:14px;border-radius:999px;background:${this.esc((tag && tag.color_hex) || '#ff0000')};border:1px solid #ccc;display:inline-block;"></span>
-								${this.esc((tag && tag.color_hex) || '#ff0000')}
-							</span>
-						</td>
-						<td>
-							<label>
-								<input type="checkbox" class="nw-toggle-tag" data-id="${this.esc(tagId)}" ${tag && tag.is_active ? 'checked' : ''}>
-								${tag && tag.is_active ? 'Active' : 'Inactive'}
-							</label>
-						</td>
-						<td>
-							<button type="button" class="button button-small nw-edit-tag" data-id="${this.esc(tagId)}">Edit</button>
-							<button type="button" class="button button-small button-link-delete nw-delete-tag" data-id="${this.esc(tagId)}">Delete</button>
-						</td>
-					</tr>`;
-				} catch (err) {
-					html += '<tr><td colspan="7" style="color:#d63638;">Could not render one status tag row.</td></tr>';
-				}
-			});
-
-			html += '</tbody></table>';
-			$('#nw-status-tag-table-wrap').html(html);
-		},
-
-		showForm(tag = null) {
-			this.currentId = tag ? this.normalizeId(tag.id) : '';
-
-			$('#nw-form-title').text(tag ? 'Edit Status Tag' : 'Add Status Tag');
-			$('#nw-save-tag-btn').text(tag ? 'Save Tag' : 'Create Tag');
-			$('#nw-delete-tag-btn').toggle(!!tag);
-
-			$('#nw-field-label').val(tag ? (tag.label || '') : '');
-			$('#nw-field-category').val(tag ? (tag.category || '') : '');
-			$('#nw-field-effect_description').val(tag ? (tag.effect_description || '') : '');
-			$('#nw-field-mechanic_modifier').val(tag ? (tag.mechanic_modifier || '') : '');
-			$('#nw-field-duration').val(tag ? (tag.duration || 'scene') : 'scene');
-			$('#nw-field-source').val(tag ? (tag.source || '') : '');
-			$('#nw-field-color_hex').val(tag ? (tag.color_hex || '#ff0000') : '#ff0000');
-			$('#nw-field-is_stackable').prop('checked', tag ? !!tag.is_stackable : false);
-			$('#nw-field-is_debuff').prop('checked', tag ? !!tag.is_debuff : true);
-			$('#nw-field-is_active').prop('checked', tag ? !!tag.is_active : true);
-
-			this.clearFormNotice();
-			$('#nw-status-tag-form-wrap').slideDown(180);
-		},
-
-		hideForm() {
-			const $form = $('#nw-status-tag-form');
-
-			this.currentId = '';
-
-			if ($form.length && $form[0]) {
-				$form[0].reset();
-			}
-
-			$('#nw-field-duration').val('scene');
-			$('#nw-field-color_hex').val('#ff0000');
-			$('#nw-field-is_stackable').prop('checked', false);
-			$('#nw-field-is_debuff').prop('checked', true);
-			$('#nw-field-is_active').prop('checked', true);
-
-			$('#nw-save-tag-btn').prop('disabled', false).text('Create Tag');
-			$('#nw-delete-tag-btn').hide();
-			this.clearFormNotice();
-			$('#nw-status-tag-form-wrap').slideUp(180);
-		},
-
-		edit(e) {
-			const id = this.normalizeId($(e.currentTarget).attr('data-id'));
-			const tag = this.rows.find((row) => this.normalizeId(row && row.id) === id);
-
-			if (!tag) {
-				this.showGlobalNotice('Status tag not found.', 'error');
-				return;
-			}
-
-			this.showForm(tag);
-		},
-
-		save() {
-			const label = ($('#nw-field-label').val() || '').trim();
-
-			if (!label) {
-				this.showFormNotice('Label is required.', 'error');
-				return;
-			}
-
-			$('#nw-save-tag-btn').prop('disabled', true).text('Saving…');
-
-			this.request(
-				{
-					action: 'nw_status_tags_save',
-					id: this.currentId || '',
-					label: label,
-					category: $('#nw-field-category').val() || '',
-					effect_description: $('#nw-field-effect_description').val() || '',
-					mechanic_modifier: $('#nw-field-mechanic_modifier').val() || '',
-					duration: $('#nw-field-duration').val() || 'scene',
-					source: $('#nw-field-source').val() || '',
-					color_hex: $('#nw-field-color_hex').val() || '#ff0000',
-					is_stackable: $('#nw-field-is_stackable').is(':checked') ? 1 : 0,
-					is_debuff: $('#nw-field-is_debuff').is(':checked') ? 1 : 0,
-					is_active: $('#nw-field-is_active').is(':checked') ? 1 : 0
-				},
-				(res) => {
-					$('#nw-save-tag-btn').prop('disabled', false).text(this.currentId ? 'Save Tag' : 'Create Tag');
-
-					if (!res || !res.success) {
-						this.showFormNotice(res && res.data ? res.data : 'Save failed.', 'error');
-						return;
-					}
-
-					this.showGlobalNotice(this.currentId ? 'Status tag updated.' : 'Status tag created.', 'success');
-					this.hideForm();
-					this.load();
-				},
-				'Failed to save status tag.'
-			);
-		},
-
-		toggle(e) {
-			const $el = $(e.currentTarget);
-			const id = this.normalizeId($el.attr('data-id'));
-			const value = $el.is(':checked');
-
-			if (!id) {
-				$el.prop('checked', !value);
-				this.showGlobalNotice('Invalid status tag ID.', 'error');
-				return;
-			}
-
-			this.request(
-				{
-					action: 'nw_status_tags_toggle',
-					id: id,
-					value: value ? 1 : 0
-				},
-				(res) => {
-					if (!res || !res.success) {
-						$el.prop('checked', !value);
-						this.showGlobalNotice(res && res.data ? res.data : 'Toggle failed.', 'error');
-						return;
-					}
-					this.showGlobalNotice('Status updated.', 'success');
-					this.load();
-				},
-				'Failed to toggle status tag.'
-			);
-		},
-
-		delete(e) {
-			const id = this.normalizeId($(e.currentTarget).attr('data-id'));
-			this.deleteById(id);
-		},
-
-		deleteCurrent() {
-			if (!this.currentId) {
-				return;
-			}
-			this.deleteById(this.currentId);
-		},
-
-		deleteById(id) {
-			id = this.normalizeId(id);
-
-			if (!id) {
-				this.showGlobalNotice('Invalid status tag ID.', 'error');
-				return;
-			}
-
-			if (!window.confirm('Delete this status tag? This cannot be undone.')) {
-				return;
-			}
-
-			this.request(
-				{
-					action: 'nw_status_tags_delete',
-					id: id
-				},
-				(res) => {
-					if (!res || !res.success) {
-						this.showGlobalNotice(res && res.data ? res.data : 'Delete failed.', 'error');
-						return;
-					}
-					this.showGlobalNotice('Status tag deleted.', 'success');
-
-					if (this.currentId && this.normalizeId(this.currentId) === id) {
-						this.hideForm();
-					}
-
-					this.load();
-				},
-				'Failed to delete status tag.'
-			);
-		},
-
-		showGlobalNotice(msg, type) {
-			const $n = $('#nw-notice');
-			const bg = type === 'error' ? '#3a1111' : '#112b14';
-			const color = type === 'error' ? '#ff8e8e' : '#9cff9c';
-			const border = type === 'error' ? '#7a1f1f' : '#215c28';
-
-			$n.stop(true, true)
-				.css({
-					background: bg,
-					color: color,
-					border: '1px solid ' + border
-				})
-				.text(msg || '')
-				.show();
-
-			clearTimeout(this.noticeTimer);
-			this.noticeTimer = setTimeout(() => {
-				$n.fadeOut(200);
-			}, 3500);
-		},
-
-		showFormNotice(msg, type) {
-			const cls = type === 'error' ? 'notice-error' : 'notice-success';
-			$('#nw-form-notice').html(`<div class="notice ${cls} is-dismissible"><p>${this.esc(msg)}</p></div>`);
-		},
-
-		clearFormNotice() {
-			$('#nw-form-notice').html('');
-		},
-
-		truncate(str, len) {
-			const s = String(str || '');
-			return s.length > len ? s.substring(0, len) + '…' : s;
-		},
-
-		esc(str) {
-			if (str === null || typeof str === 'undefined') {
-				return '';
-			}
-
-			try {
-				return $('<div>').text(String(str)).html();
-			} catch (e) {
-				return '';
-			}
-		}
+	// ── Category badge ───────────────────────────────────────────────────────
+	const CAT_CLASS = {
+		Physical:  'nw-cat-physical',
+		Condition: 'nw-cat-condition',
+		Tech:      'nw-cat-tech',
+		Buff:      'nw-cat-buff',
+		Glitch:    'nw-cat-glitch',
 	};
+	function catBadge(cat) {
+		if (!cat) return '<span class="nw-text-muted">—</span>';
+		const cls = CAT_CLASS[cat] || '';
+		return `<span class="nw-cat-badge ${cls}">${escHtml(cat)}</span>`;
+	}
 
+	// ── Duration badge ───────────────────────────────────────────────────────
+	function durBadge(dur) {
+		return `<span class="nw-dur-badge nw-dur-${dur}">${escHtml(dur)}</span>`;
+	}
+
+	// ── Color dot ────────────────────────────────────────────────────────────
+	function colorDot(hex) {
+		return `<span class="nw-color-dot" style="background:${escHtml(hex)};" title="${escHtml(hex)}"></span>`;
+	}
+
+	// ── Render table ─────────────────────────────────────────────────────────
+	function renderTable(rows) {
+		const $tbody = $('#nw-tags-tbody');
+		if (!rows.length) {
+			$tbody.html('<tr><td colspan="8" class="nw-empty">No status tags found.</td></tr>');
+			icons(); return;
+		}
+		const html = rows.map(row => `
+			<tr data-id="${row.id}">
+				<td class="nw-col-label">
+					${colorDot(row.color_hex || '#ff0000')}
+					<span class="nw-tag-label">${escHtml(row.label)}</span>
+					${row.effect_description
+						? `<div class="nw-row-desc">${escHtml(row.effect_description.slice(0,60))}${row.effect_description.length > 60 ? '…' : ''}</div>`
+						: ''}
+				</td>
+				<td>${catBadge(row.category)}</td>
+				<td>${durBadge(row.duration || 'scene')}</td>
+				<td>${row.is_debuff
+					? '<span class="nw-badge nw-badge-debuff">Debuff</span>'
+					: '<span class="nw-badge nw-badge-buff">Buff</span>'}</td>
+				<td>${row.is_stackable
+					? '<span class="nw-badge nw-badge-stack">Stack</span>'
+					: '<span class="nw-text-muted">—</span>'}</td>
+				<td class="nw-col-source">${row.source ? escHtml(row.source) : '<span class="nw-text-muted">—</span>'}</td>
+				<td>${row.is_active
+					? '<span class="nw-badge nw-badge-active">Active</span>'
+					: '<span class="nw-badge nw-badge-inactive">Off</span>'}</td>
+				<td class="nw-col-actions">
+					<button class="nw-btn-icon nw-edit-btn" title="Edit"      data-id="${row.id}"><i data-lucide="pencil"></i></button>
+					<button class="nw-btn-icon nw-dup-btn"  title="Duplicate" data-id="${row.id}"><i data-lucide="copy"></i></button>
+					<button class="nw-btn-icon nw-del-btn nw-btn-danger" title="Delete" data-id="${row.id}"><i data-lucide="trash-2"></i></button>
+				</td>
+			</tr>`).join('');
+		$tbody.html(html);
+		icons();
+	}
+
+	// ── Filters ──────────────────────────────────────────────────────────────
+	function applyFilters() {
+		const search   = $('#nw-search').val().toLowerCase();
+		const category = $('#nw-filter-category').val();
+		const duration = $('#nw-filter-duration').val();
+		const type     = $('#nw-filter-type').val();
+		const active   = $('#nw-filter-active').val();
+
+		const filtered = allRows.filter(r => {
+			if (search   && !r.label.toLowerCase().includes(search)) return false;
+			if (category && r.category !== category) return false;
+			if (duration && r.duration !== duration) return false;
+			if (type === 'debuff' && !r.is_debuff)   return false;
+			if (type === 'buff'   && r.is_debuff)     return false;
+			if (active === '1'    && !r.is_active)    return false;
+			if (active === '0'    && r.is_active)     return false;
+			return true;
+		});
+		renderTable(filtered);
+	}
+
+	// ── Load ─────────────────────────────────────────────────────────────────
+	function loadTags() {
+		$('#nw-tags-tbody').html('<tr><td colspan="8" class="nw-loading"><i data-lucide="loader-2" class="nw-spin"></i> Loading…</td></tr>');
+		icons();
+		$.post(A, { action: 'nwstatustagsload', nonce: N }, res => {
+			if (!res.success) { notice(res.data || 'Load error', 'error'); return; }
+			allRows = res.data || [];
+			updateStats(allRows);
+			applyFilters();
+		});
+	}
+
+	// ── Modal ────────────────────────────────────────────────────────────────
+	function openModal(row = null) {
+		$('#nw-field-id').val(row ? row.id : '');
+		$('#nw-modal-title').text(row ? 'Edit Status Tag' : 'New Status Tag');
+
+		const color = (row && row.color_hex) ? row.color_hex : '#ff0000';
+		$('#nw-field-label').val(row ? row.label : '');
+		$('#nw-field-color_hex').val(color);
+		$('#nw-field-color_picker').val(color);
+		$('#nw-field-category').val(row ? (row.category || '') : '');
+		$('#nw-field-duration').val(row ? (row.duration || 'scene') : 'scene');
+		$('#nw-field-effect_description').val(row ? (row.effect_description || '') : '');
+		$('#nw-field-mechanic_modifier').val(row ? (row.mechanic_modifier || '') : '');
+		$('#nw-field-source').val(row ? (row.source || '') : '');
+		$('#nw-field-is_debuff').prop('checked',    row ? !!row.is_debuff    : true);
+		$('#nw-field-is_stackable').prop('checked', row ? !!row.is_stackable : false);
+		$('#nw-field-is_active').prop('checked',    row ? !!row.is_active    : true);
+
+		updateColorPreview(color);
+		$('#nw-modal').show();
+		$('#nw-field-label').focus();
+		icons();
+	}
+
+	function closeModal() { $('#nw-modal').hide(); }
+
+	function updateColorPreview(hex) {
+		$('#nw-field-color_picker').val(hex);
+		$('#nw-field-color_hex').val(hex);
+		$('#nw-color-preview').css('background', hex);
+	}
+
+	// ── Save ─────────────────────────────────────────────────────────────────
+	function saveTag() {
+		const label = $('#nw-field-label').val().trim();
+		if (!label) { notice('Label is required.', 'error'); return; }
+
+		const hex = $('#nw-field-color_hex').val().trim();
+		if (!/^#[0-9a-fA-F]{6}$/.test(hex)) { notice('Color must be a valid hex (e.g. #ff0000).', 'error'); return; }
+
+		const $btn = $('#nw-modal-save').prop('disabled', true).html('<i data-lucide="loader-2" class="nw-spin"></i> Saving…');
+		icons();
+
+		$.post(A, {
+			action:             'nwstatustagssave',
+			nonce:              N,
+			id:                 $('#nw-field-id').val(),
+			label,
+			color_hex:          hex,
+			category:           $('#nw-field-category').val(),
+			duration:           $('#nw-field-duration').val(),
+			effect_description: $('#nw-field-effect_description').val(),
+			mechanic_modifier:  $('#nw-field-mechanic_modifier').val(),
+			source:             $('#nw-field-source').val(),
+			is_debuff:          $('#nw-field-is_debuff').is(':checked')    ? 1 : 0,
+			is_stackable:       $('#nw-field-is_stackable').is(':checked') ? 1 : 0,
+			is_active:          $('#nw-field-is_active').is(':checked')    ? 1 : 0,
+		}, res => {
+			$btn.prop('disabled', false).html('<i data-lucide="save"></i> Save Tag');
+			icons();
+			if (!res.success) { notice(res.data || 'Save failed.', 'error'); return; }
+			notice('Tag saved!');
+			closeModal();
+			loadTags();
+		});
+	}
+
+	// ── Delete ───────────────────────────────────────────────────────────────
+	function deleteTag(id) {
+		if (!confirm('Delete this status tag?')) return;
+		$.post(A, { action: 'nwstatustagsdelete', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Delete failed.', 'error'); return; }
+			notice('Tag deleted.');
+			loadTags();
+		});
+	}
+
+	// ── Duplicate ────────────────────────────────────────────────────────────
+	function duplicateTag(id) {
+		$.post(A, { action: 'nwstatustagsduplicate', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Duplicate failed.', 'error'); return; }
+			notice('Tag duplicated.');
+			loadTags();
+		});
+	}
+
+	// ── Utils ────────────────────────────────────────────────────────────────
+	function escHtml(str) {
+		return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+	}
+
+	// ── Init ─────────────────────────────────────────────────────────────────
 	$(document).ready(function () {
-		NWStatusTags.init();
+		loadTags();
+
+		$('#nw-add-btn').on('click', () => openModal());
+
+		$('#nw-tags-tbody').on('click', '.nw-edit-btn', function () {
+			const row = allRows.find(r => r.id == $(this).data('id'));
+			if (row) openModal(row);
+		});
+		$('#nw-tags-tbody').on('click', '.nw-dup-btn', function () { duplicateTag($(this).data('id')); });
+		$('#nw-tags-tbody').on('click', '.nw-del-btn', function () { deleteTag($(this).data('id')); });
+
+		$('#nw-modal-close, #nw-modal-cancel').on('click', closeModal);
+		$('#nw-modal').on('click', e => { if ($(e.target).is('#nw-modal')) closeModal(); });
+		$('#nw-modal-save').on('click', saveTag);
+
+		// Color picker sync
+		$('#nw-field-color_picker').on('input', function () { updateColorPreview($(this).val()); });
+		$('#nw-field-color_hex').on('input', function () {
+			const v = $(this).val().trim();
+			if (/^#[0-9a-fA-F]{6}$/.test(v)) updateColorPreview(v);
+		});
+
+		$('#nw-search, #nw-filter-category, #nw-filter-duration, #nw-filter-type, #nw-filter-active')
+			.on('input change', applyFilters);
+
+		$('#nw-clear-filters').on('click', () => {
+			$('#nw-search').val('');
+			$('#nw-filter-category, #nw-filter-duration, #nw-filter-type, #nw-filter-active').val('');
+			applyFilters();
+		});
+
+		$(document).on('keydown', e => { if (e.key === 'Escape') closeModal(); });
 	});
 
-})(jQuery);
+}(jQuery));
