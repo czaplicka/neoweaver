@@ -4,12 +4,14 @@
  * Shows cards eligible for Ascension for a given character.
  * Usage: [nw_ascension character_id="{uuid}"]
  *        or just [nw_ascension] — auto-detects / shows selector
+ *
+ * NOTE: All Supabase reads use tw_supabase_get_admin (service key) because
+ * this is a server-side render and RLS would block anon-key queries.
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-// Defensive accessors: work on both array rows AND stdClass objects.
 
 function _nw_asc_char_id( $char ): string {
 	if ( is_object( $char ) ) return (string) ( $char->id ?? '' );
@@ -22,6 +24,7 @@ function _nw_asc_char_field( $char, string $field ): string {
 	if ( is_array( $char ) )  return (string) ( $char[ $field ] ?? '' );
 	return '';
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 if ( ! function_exists( 'nw_shortcode_ascension' ) ) :
@@ -38,7 +41,6 @@ function nw_shortcode_ascension( array $atts ): string {
 		? nw_sanitize_uuid( $atts['character_id'] )
 		: preg_replace( '/[^a-f0-9\-]/', '', strtolower( $atts['character_id'] ) );
 
-	// Pobierz wszystkie postacie usera
 	$characters = function_exists( 'tw_get_user_characters' )
 		? tw_get_user_characters( $user_id )
 		: [];
@@ -47,7 +49,6 @@ function nw_shortcode_ascension( array $atts ): string {
 		return '<p class="nw-notice">No character found. Create a character first.</p>';
 	}
 
-	// Jeśli nie podano character_id, weź z query string lub pierwszą postać
 	if ( ! $character_id ) {
 		$qs_raw = isset( $_GET['nw_char'] ) ? (string) $_GET['nw_char'] : '';
 		$qs_id  = function_exists( 'nw_sanitize_uuid' )
@@ -67,17 +68,17 @@ function nw_shortcode_ascension( array $atts ): string {
 		}
 	}
 
-	// Weryfikacja właściciela
+	// Security: verify this character belongs to the current user
 	if ( function_exists( 'tw_user_owns_character' ) && ! tw_user_owns_character( $character_id, $user_id ) ) {
 		return '<p class="nw-notice">Character not found.</p>';
 	}
 
-	if ( ! function_exists( 'tw_supabase_get' ) ) {
+	if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 		return '<p class="nw-notice">Supabase not configured.</p>';
 	}
 
-	// --- Fetch kart postaci (deck_id to integer w cyber_character_deck) ---
-	$owned = tw_supabase_get( 'cyber_character_deck', [
+	// ── Fetch character's cards via service key (bypasses RLS) ──
+	$owned = tw_supabase_get_admin( 'cyber_character_deck', [
 		'character_id' => 'eq.' . $character_id,
 		'is_locked'    => 'eq.false',
 		'select'       => 'id,deck_id,current_level,current_xp,ascension_level',
@@ -90,7 +91,7 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $out . $no_cards;
 	}
 
-	// Grupowanie po deck_id (integer)
+	// ── Group by deck_id (integer) ──
 	$groups = [];
 	foreach ( $owned as $card ) {
 		$did = (int) $card['deck_id'];
@@ -104,7 +105,7 @@ function nw_shortcode_ascension( array $atts ): string {
 		}
 	}
 
-	// Koszty wzniesienia (tier => wymagane kopie bazowe)
+	// Ascension cost: tier => required base copies
 	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
 
 	$eligible_ids = [];
@@ -122,9 +123,9 @@ function nw_shortcode_ascension( array $atts ): string {
 		return $out . $msg;
 	}
 
-	// Pobierz definicje kart (id to integer w cyber_deck)
+	// ── Fetch card definitions via service key ──
 	$id_list   = implode( ',', array_map( 'intval', $eligible_ids ) );
-	$card_defs = tw_supabase_get( 'cyber_deck', [
+	$card_defs = tw_supabase_get_admin( 'cyber_deck', [
 		'id'     => 'in.(' . $id_list . ')',
 		'select' => 'id,name,rarity,level,deck_category,img_url',
 	] );
@@ -136,7 +137,6 @@ function nw_shortcode_ascension( array $atts ): string {
 		}
 	}
 
-	// Render
 	wp_enqueue_style( 'neoweaver-foundry' );
 	$nonce = wp_create_nonce( 'nw_ascension_nonce' );
 
@@ -151,8 +151,8 @@ function nw_shortcode_ascension( array $atts ): string {
 
 		<div class="nw-ascension-grid">
 		<?php foreach ( $eligible_ids as $did ) :
-			$did        = (int) $did;
-			$def        = $defs_by_id[ $did ] ?? null;
+			$did         = (int) $did;
+			$def         = $defs_by_id[ $did ] ?? null;
 			if ( ! $def ) continue;
 			$base_copies = $groups[ $did ]['copies'];
 			$base_count  = count( $base_copies );
@@ -220,10 +220,6 @@ function nw_shortcode_ascension( array $atts ): string {
 	return ob_get_clean();
 }
 
-/**
- * Renderuje dropdown wyboru postaci.
- * Prefiks _nw_asc_ żeby uniknąć konfliktów z innymi shortcode'ami.
- */
 function _nw_asc_selector( array $characters, string $current_id ): string {
 	$current_url = esc_url( strtok( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ), '?' ) );
 	ob_start();
@@ -251,25 +247,3 @@ function _nw_asc_selector( array $characters, string $current_id ): string {
 add_shortcode( 'nw_ascension', 'nw_shortcode_ascension' );
 
 endif;
-
-add_shortcode( 'nw_asc_debug', function() {
-    if ( ! is_user_logged_in() ) return 'not logged in';
-    
-    $user_id = get_current_user_id();
-    $chars   = tw_get_user_characters( $user_id );
-    
-    if ( empty( $chars ) ) return '<pre>NO CHARACTERS</pre>';
-    
-    $char_id = is_object( $chars[0] ) ? $chars[0]->id : $chars[0]['id'];
-    
-    $owned = tw_supabase_get( 'cyber_character_deck', [
-        'character_id' => 'eq.' . $char_id,
-        'is_locked'    => 'eq.false',
-        'select'       => 'id,deck_id,current_level,ascension_level',
-    ] );
-    
-    return '<pre>'
-        . 'CHAR ID: ' . $char_id . "\n\n"
-        . 'OWNED CARDS: ' . print_r( $owned, true )
-        . '</pre>';
-} );
