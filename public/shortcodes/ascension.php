@@ -6,7 +6,7 @@
  *        or just [nw_ascension] — auto-detects / shows selector
  *
  * Card layout mirrors library.php (tw_render_library_card):
- *   img → header (name + level) → body (desc, tags, stars, progress) → footer (button)
+ *   img → header (name + level) → body (desc, tags, stars, progress, bonuses) → footer (button)
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -46,6 +46,114 @@ function _nw_asc_category_class( string $cat ): string {
 		'tech'      => 'nw-card--tech',
 	];
 	return $map[ strtolower( $cat ) ] ?? '';
+}
+
+/**
+ * Renders the bonus pills for a given ascension level.
+ *
+ * @param array  $all_bonuses  Decoded asc_bonuses array from DB, keyed by level string.
+ * @param int    $asc_level    Current ascension level of the card (0 = base).
+ * @return string              HTML string with bonus pills, or '' if none.
+ */
+function _nw_asc_render_bonuses( array $all_bonuses, int $asc_level ): string {
+	// Collect bonuses for every level from 1 up to current asc_level
+	$active_bonuses = [];
+	for ( $lvl = 1; $lvl <= $asc_level; $lvl++ ) {
+		$key = (string) $lvl;
+		if ( ! empty( $all_bonuses[ $key ] ) && is_array( $all_bonuses[ $key ] ) ) {
+			foreach ( $all_bonuses[ $key ] as $bonus ) {
+				$active_bonuses[] = $bonus;
+			}
+		}
+	}
+
+	if ( empty( $active_bonuses ) ) {
+		return '';
+	}
+
+	$icons = [
+		'damage'        => 'sword',
+		'defense'       => 'shield',
+		'xp_gain'       => 'star',
+		'hp'            => 'heart',
+		'speed'         => 'zap',
+		'crit'          => 'crosshair',
+		'special'       => 'sparkles',
+		'unlock_effect' => 'unlock',
+	];
+
+	$pills = '';
+	foreach ( $active_bonuses as $bonus ) {
+		if ( ! is_array( $bonus ) ) continue;
+		$type  = (string) ( $bonus['type']  ?? 'bonus' );
+		$value = $bonus['value'] ?? null;
+		$icon  = $icons[ $type ] ?? 'plus';
+
+		if ( is_numeric( $value ) ) {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ' +' . esc_html( $value );
+		} elseif ( $value !== null ) {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ': ' . esc_html( $value );
+		} else {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) );
+		}
+
+		$pills .= '<span class="nw-asc-bonus-pill">';
+		$pills .= '<i data-lucide="' . esc_attr( $icon ) . '" style="width:10px;height:10px;vertical-align:middle;"></i> ';
+		$pills .= $label;
+		$pills .= '</span>';
+	}
+
+	return '<div class="nw-asc-bonuses">' . $pills . '</div>';
+}
+
+/**
+ * Renders a preview of bonuses unlocked at the NEXT ascension level.
+ *
+ * @param array $all_bonuses Decoded asc_bonuses.
+ * @param int   $next_asc    Next ascension level.
+ * @return string
+ */
+function _nw_asc_render_next_bonuses( array $all_bonuses, int $next_asc ): string {
+	$key = (string) $next_asc;
+	if ( empty( $all_bonuses[ $key ] ) || ! is_array( $all_bonuses[ $key ] ) ) {
+		return '';
+	}
+
+	$icons = [
+		'damage'        => 'sword',
+		'defense'       => 'shield',
+		'xp_gain'       => 'star',
+		'hp'            => 'heart',
+		'speed'         => 'zap',
+		'crit'          => 'crosshair',
+		'special'       => 'sparkles',
+		'unlock_effect' => 'unlock',
+	];
+
+	$pills = '';
+	foreach ( $all_bonuses[ $key ] as $bonus ) {
+		if ( ! is_array( $bonus ) ) continue;
+		$type  = (string) ( $bonus['type']  ?? 'bonus' );
+		$value = $bonus['value'] ?? null;
+		$icon  = $icons[ $type ] ?? 'plus';
+
+		if ( is_numeric( $value ) ) {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ' +' . esc_html( $value );
+		} elseif ( $value !== null ) {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ': ' . esc_html( $value );
+		} else {
+			$label = esc_html( ucwords( str_replace( '_', ' ', $type ) ) );
+		}
+
+		$pills .= '<span class="nw-asc-bonus-pill nw-asc-bonus-pill--next">';
+		$pills .= '<i data-lucide="' . esc_attr( $icon ) . '" style="width:10px;height:10px;vertical-align:middle;"></i> ';
+		$pills .= $label;
+		$pills .= '</span>';
+	}
+
+	if ( ! $pills ) return '';
+
+	return '<div class="nw-asc-bonuses nw-asc-bonuses--next">';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,11 +207,11 @@ function nw_shortcode_ascension( array $atts ): string {
 		return '<p class="nw-notice">Supabase not configured.</p>';
 	}
 
-	// ── Fetch character's cards (same JOIN as library: cyber_deck + cyber_card_types) ──
+	// ── Fetch character's cards — include asc_bonuses from cyber_deck ──
 	$owned = tw_supabase_get_admin( 'cyber_character_deck', [
 		'character_id' => 'eq.' . $character_id,
 		'is_locked'    => 'eq.false',
-		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,rarity,description,effect,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,rarity,description,effect,asc_bonuses,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
 	] );
 
 	$no_cards = '
@@ -119,7 +227,7 @@ function nw_shortcode_ascension( array $atts ): string {
 
 	// ── Group by deck_id ──
 	$groups   = [];
-	$defs_map = []; // deck_id => card definition (from first row)
+	$defs_map = [];
 
 	foreach ( $owned as $row ) {
 		$did   = (string) ( $row['deck_id'] ?? '' );
@@ -130,6 +238,13 @@ function nw_shortcode_ascension( array $atts ): string {
 
 		if ( ! isset( $groups[ $did ] ) ) {
 			$groups[ $did ]  = [ 'copies' => [], 'ascended' => [] ];
+
+			// Decode asc_bonuses — Supabase returns jsonb as array already
+			$raw_bonuses = $cdata['asc_bonuses'] ?? [];
+			if ( is_string( $raw_bonuses ) ) {
+				$raw_bonuses = json_decode( $raw_bonuses, true ) ?: [];
+			}
+
 			$defs_map[ $did ] = [
 				'id'          => $did,
 				'name'        => (string) ( $cdata['name']        ?? '' ),
@@ -137,6 +252,7 @@ function nw_shortcode_ascension( array $atts ): string {
 				'rarity'      => (string) ( $cdata['rarity']      ?? 'common' ),
 				'description' => (string) ( $cdata['description'] ?? '' ),
 				'effect'      => (string) ( $cdata['effect']      ?? '' ),
+				'asc_bonuses' => is_array( $raw_bonuses ) ? $raw_bonuses : [],
 				'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
 			];
 		}
@@ -150,8 +266,8 @@ function nw_shortcode_ascension( array $atts ): string {
 	}
 
 	// ── Eligibility ──
-	$asc_cost    = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
-	$eligible    = [];
+	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
+	$eligible = [];
 	foreach ( $groups as $did => $group ) {
 		if ( count( $group['copies'] ) >= 2 || ! empty( $group['ascended'] ) ) {
 			$eligible[] = $did;
@@ -186,16 +302,17 @@ function nw_shortcode_ascension( array $atts ): string {
 			$def        = $defs_map[ $did ] ?? null;
 			if ( ! $def ) continue;
 
-			$base_copies = $groups[ $did ]['copies'];
-			$base_count  = count( $base_copies );
-			$ascended    = $groups[ $did ]['ascended'];
-			$cur_asc     = ! empty( $ascended )
+			$base_copies  = $groups[ $did ]['copies'];
+			$base_count   = count( $base_copies );
+			$ascended     = $groups[ $did ]['ascended'];
+			$cur_asc      = ! empty( $ascended )
 				? (int) max( array_column( $ascended, 'ascension_level' ) )
 				: 0;
-			$next_asc    = $cur_asc + 1;
-			$required    = $asc_cost[ $next_asc ] ?? 999;
-			$can_ascend  = ( $base_count >= $required && $next_asc <= 5 );
-			$maxed       = ( $cur_asc >= 5 );
+			$next_asc     = $cur_asc + 1;
+			$required     = $asc_cost[ $next_asc ] ?? 999;
+			$can_ascend   = ( $base_count >= $required && $next_asc <= 5 );
+			$maxed        = ( $cur_asc >= 5 );
+			$all_bonuses  = $def['asc_bonuses'];
 
 			$rarity     = strtolower( $def['rarity'] );
 			$category   = strtolower( $def['category'] );
@@ -250,6 +367,41 @@ function nw_shortcode_ascension( array $atts ): string {
 							<span class="nw-asc-star <?php echo $i <= $cur_asc ? 'nw-asc-star--lit' : ''; ?>">⬡</span>
 						<?php endfor; ?>
 					</div>
+
+					<?php
+					// ── Active bonuses (current ASC level) ──
+					if ( $cur_asc > 0 && ! empty( $all_bonuses ) ) {
+						echo _nw_asc_render_bonuses( $all_bonuses, $cur_asc );
+					}
+
+					// ── Preview of next-level bonuses (only if not maxed) ──
+					if ( ! $maxed && ! empty( $all_bonuses ) ) {
+						$next_key = (string) $next_asc;
+						if ( ! empty( $all_bonuses[ $next_key ] ) ) : ?>
+							<div class="nw-asc-bonuses-preview">
+								<span class="nw-asc-preview-label">
+									<i data-lucide="chevron-right" style="width:10px;height:10px;vertical-align:middle;"></i>
+									ASC <?php echo $next_asc; ?> unlocks:
+								</span>
+								<?php
+								foreach ( $all_bonuses[ $next_key ] as $bonus ) :
+									if ( ! is_array( $bonus ) ) continue;
+									$type  = (string) ( $bonus['type']  ?? 'bonus' );
+									$value = $bonus['value'] ?? null;
+									$icons = [ 'damage' => 'sword', 'defense' => 'shield', 'xp_gain' => 'star', 'hp' => 'heart', 'speed' => 'zap', 'crit' => 'crosshair', 'special' => 'sparkles', 'unlock_effect' => 'unlock' ];
+									$icon  = $icons[ $type ] ?? 'plus';
+									$label = is_numeric( $value )
+										? esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ' +' . esc_html( $value )
+										: esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ( $value !== null ? ': ' . esc_html( $value ) : '' );
+									?>
+									<span class="nw-asc-bonus-pill nw-asc-bonus-pill--next">
+										<i data-lucide="<?php echo esc_attr( $icon ); ?>" style="width:10px;height:10px;vertical-align:middle;"></i>
+										<?php echo $label; ?>
+									</span>
+								<?php endforeach; ?>
+							</div>
+						<?php endif;
+					} ?>
 
 					<?php if ( ! $maxed ) : ?>
 					<div class="nw-card__progress">
@@ -307,7 +459,6 @@ function nw_shortcode_ascension( array $atts ): string {
 	@media (max-width: 560px) {
 		.nw-ascension-grid { grid-template-columns: 1fr; }
 	}
-	/* Effect text — smaller, muted italic, separator line */
 	.nw-card__effect {
 		font-size: 0.7rem;
 		font-style: italic;
@@ -326,6 +477,54 @@ function nw_shortcode_ascension( array $atts ): string {
 	}
 	.nw-asc-star { color: #2a2a2a; }
 	.nw-asc-star--lit { color: var(--nw-card-color, #adff00); }
+	/* Active bonus pills */
+	.nw-asc-bonuses {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin: 6px 0 4px;
+	}
+	.nw-asc-bonus-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		font-family: 'Chakra Petch', monospace;
+		font-size: 0.65rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		padding: 2px 6px;
+		border-radius: 3px;
+		background: rgba(173,255,0,0.12);
+		color: #adff00;
+		border: 1px solid rgba(173,255,0,0.25);
+	}
+	/* Next-level bonus preview */
+	.nw-asc-bonuses-preview {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+		margin: 4px 0;
+		padding: 5px 6px;
+		border-radius: 4px;
+		border: 1px dashed rgba(173,255,0,0.2);
+		background: rgba(173,255,0,0.04);
+	}
+	.nw-asc-preview-label {
+		width: 100%;
+		font-family: 'Chakra Petch', monospace;
+		font-size: 0.6rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: rgba(173,255,0,0.5);
+		margin-bottom: 2px;
+	}
+	.nw-asc-bonus-pill--next {
+		background: rgba(173,255,0,0.05);
+		color: rgba(173,255,0,0.55);
+		border-color: rgba(173,255,0,0.15);
+	}
 	</style>
 	<?php
 	return ob_get_clean();
