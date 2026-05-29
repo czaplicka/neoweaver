@@ -16,7 +16,7 @@ class NWSkillsAdmin {
 		add_submenu_page(
 			'neoweaver',
 			'Skills',
-			'Skills',
+			'<span data-lucide-menu="pocket-knife"></span>Skills',
 			'manage_options',
 			'nw-skills',
 			[ $this, 'render_page' ]
