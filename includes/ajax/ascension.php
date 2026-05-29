@@ -3,6 +3,10 @@
  * ascension.php
  * AJAX handler for Card Ascension.
  * Merges N duplicate cards into 1 upgraded (ascension_level++) card.
+ *
+ * Fixes:
+ *  - deck_id is a UUID string, not an integer — never cast with absint()
+ *  - required copies per tier follow the asc_cost table (2/3/4/5/6), not a hardcoded 2
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -13,133 +17,111 @@ function nw_ajax_ascend_card(): void {
 	check_ajax_referer( 'nw_ascension_nonce', 'nonce' );
 
 	$character_id = nw_sanitize_uuid( (string) ( $_POST['character_id'] ?? '' ) );
-	$deck_id      = absint( $_POST['deck_id'] ?? 0 );
+	$deck_id      = nw_sanitize_uuid( (string) ( $_POST['deck_id']      ?? '' ) ); // UUID, not int
 
 	if ( ! $character_id || ! $deck_id ) {
 		wp_send_json_error( [ 'message' => 'Missing parameters.' ] );
 	}
 
-	// Validate user owns this character
-	$user_id    = get_current_user_id();
-	$characters = tw_supabase_get( 'cyber_characters', [
-		'id'         => 'eq.' . nw_sanitize_uuid( $character_id ),
-		'wp_user_id' => 'eq.' . $user_id,
-		'select'     => 'id',
-		'limit'      => 1,
-	] );
-	if ( empty( $characters ) ) {
+	// Validate user owns this character (service key)
+	$user_id = get_current_user_id();
+	if ( ! function_exists( 'tw_user_owns_character' ) || ! tw_user_owns_character( $character_id, $user_id ) ) {
 		wp_send_json_error( [ 'message' => 'Character not found or not yours.' ] );
 	}
 
-	// Fetch all copies of this card for this character (only non-ascended = ascension_level = 0)
-	$copies = tw_supabase_get( 'cyber_character_deck', [
-		'character_id'    => 'eq.' . nw_sanitize_uuid( $character_id ),
+	// Cost table: next_ascension_level => required base copies
+	$asc_cost = [ 1 => 2, 2 => 3, 3 => 4, 4 => 5, 5 => 6 ];
+
+	// Fetch current ascension level for this card (look at ascended copies)
+	$ascended = tw_supabase_get_admin( 'cyber_character_deck', [
+		'character_id'    => 'eq.' . $character_id,
+		'deck_id'         => 'eq.' . $deck_id,
+		'is_locked'       => 'eq.false',
+		'select'          => 'id,ascension_level',
+		'order'           => 'ascension_level.desc',
+		'limit'           => 1,
+	] );
+
+	$cur_asc  = 0;
+	$asc_row  = null;
+	if ( is_array( $ascended ) && ! empty( $ascended ) ) {
+		$top = $ascended[0];
+		if ( (int) ( $top['ascension_level'] ?? 0 ) > 0 ) {
+			$cur_asc = (int) $top['ascension_level'];
+			$asc_row = $top;
+		}
+	}
+
+	$next_asc = $cur_asc + 1;
+
+	if ( $next_asc > 5 ) {
+		wp_send_json_error( [ 'message' => 'Card is already at maximum Ascension (5).' ] );
+	}
+
+	$required = $asc_cost[ $next_asc ] ?? 999;
+
+	// Fetch all base (non-ascended) copies, best first
+	$copies = tw_supabase_get_admin( 'cyber_character_deck', [
+		'character_id'    => 'eq.' . $character_id,
 		'deck_id'         => 'eq.' . $deck_id,
 		'ascension_level' => 'eq.0',
 		'is_locked'       => 'eq.false',
-		'select'          => 'id,current_level,current_xp,ascension_level',
+		'select'          => 'id,current_level,current_xp',
 		'order'           => 'current_level.desc,current_xp.desc',
 	] );
 
-	if ( ! is_array( $copies ) ) {
+	if ( is_wp_error( $copies ) || ! is_array( $copies ) ) {
 		wp_send_json_error( [ 'message' => 'Could not fetch cards.' ] );
 	}
 
 	$count = count( $copies );
 
-	// Determine required copies for Ascension I (2 cards needed)
-	$required = 2;
-
 	if ( $count < $required ) {
 		wp_send_json_error( [
-			'message' => sprintf( 'Need %d copies for Ascension I. You have %d.', $required, $count ),
+			'message' => sprintf(
+				'Need %d base copies for Ascension %d. You have %d.',
+				$required, $next_asc, $count
+			),
 		] );
 	}
 
-	// Keep the best card (highest level/xp — first in sorted result), consume the rest
+	// Keep the best card, consume the rest up to $required
 	$keeper     = $copies[0];
 	$to_delete  = array_slice( $copies, 1, $required - 1 );
 	$delete_ids = array_column( $to_delete, 'id' );
 
-	// Delete consumed copies
+	// Delete consumed copies via tw_supabase_request (service key)
 	foreach ( $delete_ids as $del_id ) {
-		nw_supabase_delete( 'cyber_character_deck', (int) $del_id );
+		$del_id = nw_sanitize_uuid( (string) $del_id );
+		if ( $del_id ) {
+			tw_supabase_request( 'DELETE', 'cyber_character_deck', [ 'id' => 'eq.' . $del_id ] );
+		}
 	}
 
-	// Upgrade the keeper: ascension_level = 1
-	$updated = nw_supabase_patch( 'cyber_character_deck', (int) $keeper['id'], [
-		'ascension_level' => 1,
-		'updated_at'      => gmdate( 'c' ),
-	] );
+	// Upgrade keeper: set ascension_level = next_asc
+	$keeper_id = nw_sanitize_uuid( (string) ( $keeper['id'] ?? '' ) );
+	if ( ! $keeper_id ) {
+		wp_send_json_error( [ 'message' => 'Invalid keeper card ID.' ] );
+	}
 
-	if ( ! $updated ) {
-		wp_send_json_error( [ 'message' => 'Failed to upgrade card.' ] );
+	$updated = tw_supabase_request(
+		'PATCH',
+		'cyber_character_deck',
+		[ 'id' => 'eq.' . $keeper_id ],
+		[
+			'ascension_level' => $next_asc,
+			'updated_at'      => gmdate( 'c' ),
+		],
+		[ 'headers' => [ 'Prefer' => 'return=minimal' ] ]
+	);
+
+	if ( is_wp_error( $updated ) ) {
+		wp_send_json_error( [ 'message' => 'Failed to upgrade card: ' . $updated->get_error_message() ] );
 	}
 
 	wp_send_json_success( [
-		'message'         => 'Ascension I complete.',
-		'ascension_level' => 1,
-		'card_id'         => (int) $keeper['id'],
+		'message'         => sprintf( 'Ascension %d complete.', $next_asc ),
+		'ascension_level' => $next_asc,
+		'card_id'         => $keeper_id,
 	] );
-}
-
-/**
- * Generic Supabase DELETE by row id.
- */
-if ( ! function_exists( 'nw_supabase_delete' ) ) {
-	function nw_supabase_delete( string $table, int $row_id ): bool {
-		if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
-		$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
-		$res = nw_supabase_request( 'DELETE', $url, null, [ 'Prefer: return=minimal' ] );
-		return $res !== false;
-	}
-}
-
-/**
- * Generic Supabase PATCH by row id.
- */
-if ( ! function_exists( 'nw_supabase_patch' ) ) {
-	function nw_supabase_patch( string $table, int $row_id, array $data ): bool {
-		if ( ! function_exists( 'nw_supabase_request' ) ) { return false; }
-		$url = nw_supabase_url( $table ) . '?id=eq.' . $row_id;
-		$res = nw_supabase_request( 'PATCH', $url, $data, [ 'Prefer: return=minimal' ] );
-		return $res !== false;
-	}
-}
-
-if ( ! function_exists( 'nw_supabase_url' ) ) {
-	function nw_supabase_url( string $table ): string {
-		return rtrim( defined( 'NW_SUPABASE_URL' ) ? NW_SUPABASE_URL : get_option( 'nw_supabase_url', '' ), '/' ) . '/rest/v1/' . $table;
-	}
-}
-
-/**
- * Low-level Supabase HTTP request.
- */
-if ( ! function_exists( 'nw_supabase_request' ) ) {
-	function nw_supabase_request( string $method, string $url, ?array $body, array $extra_headers = [] ) {
-		$service_key = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : get_option( 'nw_supabase_service_key', '' );
-
-		$headers = array_merge( [
-			'apikey'        => $service_key,
-			'Authorization' => 'Bearer ' . $service_key,
-			'Content-Type'  => 'application/json',
-		], $extra_headers );
-
-		$args = [
-			'method'  => $method,
-			'headers' => $headers,
-			'timeout' => 10,
-		];
-
-		if ( $body !== null ) {
-			$args['body'] = wp_json_encode( $body );
-		}
-
-		$response = wp_remote_request( $url, $args );
-
-		if ( is_wp_error( $response ) ) { return false; }
-		$code = wp_remote_retrieve_response_code( $response );
-		return ( $code >= 200 && $code < 300 );
-	}
 }
