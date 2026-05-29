@@ -1,501 +1,362 @@
-/**
- * NeoWeaver Admin — Scenarios (cyber_scenarios)
- * Works with the rewritten scenarios PHP backend.
- */
-/* global NWScenarios, jQuery, ajaxurl */
+/* NeoWeaver Scenarios Admin JS */
+/* globals NWScenarios, lucide, jQuery */
 (function ($) {
 	'use strict';
 
-	var cfg = window.NWScenarios || {};
-	var ajaxEndpoint = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-	var nonce = cfg.nonce || '';
-	var all = [];
-	var noticeTimer = null;
+	const A = NWScenarios.ajaxurl;
+	const N = NWScenarios.nonce;
+	let allRows = [];
 
-	var TYPES = ['main', 'personal', 'social', 'world'];
-	var CATEGORIES = ['combat', 'social', 'magic', 'investigation', 'worlds', 'sidequest', 'family'];
+	const JSON_FIELDS = [
+		'#nw-field-tags',
+		'#nw-field-required-tags',
+		'#nw-field-success-tags',
+		'#nw-field-failure-tags',
+		'#nw-field-reward-items',
+		'#nw-field-giver-npc-tag'
+	];
 
-	function esc(s) {
-		return $('<span>').text(s == null ? '' : String(s)).html();
+	function icons() {
+		if (window.lucide) lucide.createIcons();
 	}
 
-	function boolVal(v) {
-		return v === true || v === 1 || v === '1' || v === 'true';
-	}
-
-	function debounce(fn, delay) {
-		var timer = null;
-		return function () {
-			var ctx = this;
-			var args = arguments;
-			clearTimeout(timer);
-			timer = setTimeout(function () {
-				fn.apply(ctx, args);
-			}, delay || 150);
-		};
-	}
-
-	function clampInt(v, min, max, fallback) {
-		var n = parseInt(v, 10);
-		if (isNaN(n)) return fallback;
-		return Math.max(min, Math.min(max, n));
-	}
-
-	function nullableInt(v, min, max) {
-		if (v === null || typeof v === 'undefined') return '';
-		var s = String(v).trim();
-		if (!s) return '';
-		var n = parseInt(s, 10);
-		if (isNaN(n)) return '';
-		return Math.max(min, Math.min(max, n));
-	}
-
-	function clearNoticeTimer() {
-		if (noticeTimer) {
-			clearTimeout(noticeTimer);
-			noticeTimer = null;
-		}
-	}
-
-	function notice(msg, type) {
-		var $el = $('#nw-notice');
-		var isError = type === 'error';
-
-		clearNoticeTimer();
-
-		$el.stop(true, true)
-			.attr('class', '')
-			.css({
-				display: 'block',
-				background: isError ? '#5c0000' : '#1a3300',
-				color: isError ? '#ff8080' : '#adff00'
-			})
-			.text(msg || '');
-
-		noticeTimer = setTimeout(function () {
-			$el.fadeOut(250);
-			noticeTimer = null;
-		}, 3200);
-	}
-
-	function arrayToCommaString(v) {
-		if (!v) return '';
-		if (Array.isArray(v)) return v.join(', ');
-		if (typeof v === 'string') return v;
-		return '';
-	}
-
-	function jsonOrLinesToTextarea(v) {
-		if (!v) return '';
-		if (Array.isArray(v)) return JSON.stringify(v, null, 2);
-		if (typeof v === 'object') return JSON.stringify(v, null, 2);
-		if (typeof v === 'string') return v;
-		return '';
-	}
-
-	function rewardText(row) {
-		var credits = row.reward_credits != null && row.reward_credits !== '' ? row.reward_credits : '—';
-		var items = Array.isArray(row.reward_items) ? row.reward_items.length : 0;
-		return '₵ ' + esc(credits) + (items ? ' + ' + esc(items) + ' item(s)' : '');
+	function notice(msg, type = 'success') {
+		const n = $('#nw-notice');
+		n.removeClass('nw-notice-success nw-notice-error')
+			.addClass(type === 'error' ? 'nw-notice-error' : 'nw-notice-success')
+			.html(msg).show();
+		setTimeout(() => n.fadeOut(), 4000);
 	}
 
 	function updateStats(rows) {
-		var data = rows || [];
-		var active = data.filter(function (row) {
-			return boolVal(row.is_active);
-		}).length;
-
-		$('#nw-total').text(data.length);
-		$('#nw-active-count').text(active);
+		$('#nw-total').text(rows.length);
+		$('#nw-active').text(rows.filter(r => r.is_active).length);
+		$('#nw-inactive').text(rows.filter(r => !r.is_active).length);
+		$('#nw-boss').text(rows.filter(r => r.is_boss).length);
+		$('#nw-arc').text(rows.filter(r => r.is_key_arc).length);
 	}
 
-	function getFilteredRows() {
-		var term = ($('#nw-search').val() || '').toLowerCase().trim();
-		var type = ($('#nw-filter-type').val() || '').trim();
-		var category = ($('#nw-filter-category').val() || '').trim();
-		var difficulty = ($('#nw-filter-difficulty').val() || '').trim();
-
-		return all.filter(function (row) {
-			if (type && row.type !== type) return false;
-			if (category && row.category !== category) return false;
-			if (difficulty && String(row.difficulty) !== String(difficulty)) return false;
-
-			if (!term) return true;
-
-			var haystack = [
-				row.name || '',
-				row.type || '',
-				row.category || '',
-				row.goal || '',
-				row.gm_instruction || '',
-				row.victory_condition || '',
-				row.fail_conditions || '',
-				arrayToCommaString(row.tags),
-				arrayToCommaString(row.required_tags),
-				arrayToCommaString(row.success_tags),
-				arrayToCommaString(row.failure_tags),
-				row.area_id || ''
-			].join(' ').toLowerCase();
-
-			return haystack.indexOf(term) !== -1;
-		});
+	function typeBadge(v) {
+		return `<span class="nw-type-badge nw-type-${v || 'main'}">${v || 'main'}</span>`;
 	}
 
-	function rerenderCurrentView() {
-		var filtered = getFilteredRows();
-		renderTable(filtered);
-		updateStats(filtered);
+	function categoryBadge(v) {
+		return `<span class="nw-cat-badge nw-cat-${v || 'combat'}">${v || 'combat'}</span>`;
+	}
+
+	function difficultyDots(v) {
+		v = parseInt(v || 0, 10);
+		let out = '<span class="nw-diff-dots">';
+		for (let i = 1; i <= 5; i++) out += `<span class="nw-diff-dot ${i <= v ? 'is-on' : ''}"></span>`;
+		out += ` <strong>${v}/5</strong></span>`;
+		return out;
+	}
+
+	function entropyText(row) {
+		const min = row.min_entropy;
+		const max = row.max_entropy;
+		if (min === null && max === null) return '<span class="nw-muted">—</span>';
+		if (min !== null && max !== null) return `<span class="nw-entropy-pill">${min}–${max}</span>`;
+		return `<span class="nw-entropy-pill">${min !== null ? min : '…'}–${max !== null ? max : '…'}</span>`;
+	}
+
+	function flagsHtml(row) {
+		const flags = [];
+		if (row.is_boss) flags.push('<span class="nw-flag-chip nw-chip-boss">Boss</span>');
+		if (row.is_key_arc) flags.push('<span class="nw-flag-chip nw-chip-arc">Key Arc</span>');
+		if (row.is_repeatable) flags.push('<span class="nw-flag-chip nw-chip-repeat">Repeatable</span>');
+		return flags.length ? flags.join(' ') : '<span class="nw-muted">—</span>';
 	}
 
 	function renderTable(rows) {
-		var data = rows || [];
-		var $tbody = $('#nw-scenarios-tbody');
-
-		if (!data.length) {
-			$tbody.html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">No scenarios found.</td></tr>');
+		const tbody = $('#nw-scenarios-tbody');
+		if (!rows.length) {
+			tbody.html(`<tr><td colspan="9" class="nw-empty-row"><i data-lucide="inbox" style="width:18px;height:18px;vertical-align:middle;margin-right:6px"></i>No scenarios found. Create one!</td></tr>`);
+			icons();
 			return;
 		}
 
-		var html = data.map(function (row) {
-			var active = boolVal(row.is_active);
+		const html = rows.map(r => {
+			const img = r.img_url
+				? `<img src="${r.img_url}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px" loading="lazy">`
+				: `<span class="nw-no-img"><i data-lucide="image-off" style="width:14px;height:14px"></i></span>`;
+			const active = r.is_active ? '<span class="nw-status-dot nw-dot-on"></span>' : '<span class="nw-status-dot nw-dot-off"></span>';
 
-			return ''
-				+ '<tr data-id="' + esc(row.id) + '"' + (active ? '' : ' class="nw-row-inactive"') + '>'
-				+ '<td>'
-				+ '<div><strong>' + esc(row.name) + '</strong></div>'
-				+ '<div style="color:#888;font-size:12px;">ID: ' + esc(row.id) + '</div>'
-				+ '</td>'
-				+ '<td>' + esc(row.type || '—') + '</td>'
-				+ '<td>' + esc(row.category || '—') + '</td>'
-				+ '<td>' + esc(row.difficulty || '—') + '</td>'
-				+ '<td>' + rewardText(row) + '</td>'
-				+ '<td><label class="nw-toggle"><input type="checkbox" class="nw-active-toggle" data-id="' + esc(row.id) + '"' + (active ? ' checked' : '') + '><span class="nw-toggle-slider"></span></label></td>'
-				+ '<td><button type="button" class="button button-small nw-edit-btn" data-id="' + esc(row.id) + '">Edit</button></td>'
-				+ '</tr>';
+			return `<tr data-id="${r.id}">
+				<td>${img}</td>
+				<td>
+					<strong>${r.name}</strong>
+					${r.goal ? `<br><small class="nw-muted">${r.goal.substring(0,70)}${r.goal.length > 70 ? '…' : ''}</small>` : ''}
+				</td>
+				<td>${typeBadge(r.type)}</td>
+				<td>${categoryBadge(r.category)}</td>
+				<td>${difficultyDots(r.difficulty)}</td>
+				<td>${entropyText(r)}</td>
+				<td>${flagsHtml(r)}</td>
+				<td style="text-align:center">${active}</td>
+				<td class="nw-actions-cell">
+					<button class="nw-btn nw-btn-ghost nw-btn-sm nw-edit-btn" data-id="${r.id}" title="Edit"><i data-lucide="pencil" style="width:13px;height:13px"></i></button>
+					<button class="nw-btn nw-btn-ghost nw-btn-sm nw-dup-btn" data-id="${r.id}" title="Duplicate"><i data-lucide="copy" style="width:13px;height:13px"></i></button>
+				</td>
+			</tr>`;
 		}).join('');
+		tbody.html(html);
+		icons();
+	}
 
-		$tbody.html(html);
+	function applyFilters() {
+		const q    = $('#nw-search').val().toLowerCase();
+		const type = $('#nw-filter-type').val();
+		const cat  = $('#nw-filter-category').val();
+		const diff = $('#nw-filter-difficulty').val();
+		const act  = $('#nw-filter-active').val();
+		const hasFilter = q || type || cat || diff || act !== '';
+		$('#nw-clear-filters').toggle(!!hasFilter);
+
+		const filtered = allRows.filter(r => {
+			if (q && !r.name.toLowerCase().includes(q) && !(r.goal || '').toLowerCase().includes(q)) return false;
+			if (type && r.type !== type) return false;
+			if (cat && r.category !== cat) return false;
+			if (diff && String(r.difficulty) !== diff) return false;
+			if (act !== '') { if (r.is_active !== (act === '1')) return false; }
+			return true;
+		});
+		renderTable(filtered);
+	}
+
+	function loadScenarios() {
+		$('#nw-scenarios-tbody').html(`<tr class="nw-loading-row"><td colspan="9"><span class="nw-spinner"></span> Loading scenarios…</td></tr>`);
+		$.post(A, { action: 'nw_scenarios_load', nonce: N }, res => {
+			if (!res.success) { notice(res.data || 'Load failed.', 'error'); return; }
+			allRows = res.data;
+			updateStats(allRows);
+			applyFilters();
+		});
+	}
+
+	function renderDifficultyStars(v) {
+		v = parseInt(v || 0, 10);
+		let html = '';
+		for (let i = 1; i <= 5; i++) {
+			html += `<span class="nw-star ${i <= v ? 'is-on' : ''}">◆</span>`;
+		}
+		$('#nw-diff-stars').html(html);
 	}
 
 	function resetForm() {
-		if ($('#nw-scenario-form').length && $('#nw-scenario-form')[0]) {
-			$('#nw-scenario-form')[0].reset();
-		}
-
 		$('#nw-field-id').val('');
 		$('#nw-field-name').val('');
 		$('#nw-field-type').val('main');
 		$('#nw-field-category').val('combat');
-		$('#nw-field-difficulty').val(3);
+		$('#nw-field-area-id').val('');
+		$('#nw-field-img-url').val('');
 		$('#nw-field-goal').val('');
-		$('#nw-field-gm_instruction').val('');
-		$('#nw-field-victory_condition').val('');
-		$('#nw-field-fail_conditions').val('');
-		$('#nw-field-tags').val('');
-		$('#nw-field-required_tags').val('');
-		$('#nw-field-success_tags').val('');
-		$('#nw-field-failure_tags').val('');
-		$('#nw-field-reward_credits').val(100);
-		$('#nw-field-reward_items').val('');
-		$('#nw-field-min_entropy').val('');
-		$('#nw-field-max_entropy').val('');
-		$('#nw-field-kingdom_tech').val('');
-		$('#nw-field-kingdom_magic').val('');
-		$('#nw-field-kingdom_wealth').val('');
-		$('#nw-field-area_id').val('');
-		$('#nw-field-required_archetype_id').val('');
-		$('#nw-field-giver_npc_tag').val('');
-		$('#nw-field-img_url').val('');
-
-		$('#nw-field-is_boss').prop('checked', false);
-		$('#nw-field-is_key_arc').prop('checked', false);
-		$('#nw-field-is_repeatable').prop('checked', false);
-		$('#nw-field-is_active').prop('checked', true);
-
+		$('#nw-field-difficulty').val(3);
+		$('#nw-field-min-entropy').val('');
+		$('#nw-field-max-entropy').val('');
+		$('#nw-field-victory').val('');
+		$('#nw-field-fail').val('');
+		$('#nw-field-tags').val('[]');
+		$('#nw-field-required-tags').val('[]');
+		$('#nw-field-success-tags').val('[]');
+		$('#nw-field-failure-tags').val('[]');
+		$('#nw-field-credits').val(100);
+		$('#nw-field-kingdom-tech').val('');
+		$('#nw-field-kingdom-magic').val('');
+		$('#nw-field-kingdom-wealth').val('');
+		$('#nw-field-reward-items').val('');
+		$('#nw-field-archetype-id').val('');
+		$('#nw-field-giver-npc-tag').val('');
+		$('#nw-field-gm-instruction').val('');
+		$('#nw-field-is-active').prop('checked', true);
+		$('#nw-field-is-boss').prop('checked', false);
+		$('#nw-field-is-key-arc').prop('checked', false);
+		$('#nw-field-is-repeatable').prop('checked', false);
+		$('#nw-img-preview-wrap').hide();
 		$('#nw-delete-btn').hide();
-		$('#nw-modal-title').text('New Scenario');
-		$('#nw-save-btn').text('Save Scenario').prop('disabled', false);
+		renderDifficultyStars(3);
 	}
 
-	function populateForm(row) {
+	function openModal(row) {
+		const isNew = !row;
+		$('#nw-modal-title').text(isNew ? 'New Scenario' : 'Edit Scenario');
+		$('#nw-save-label').text(isNew ? 'Create Scenario' : 'Save Changes');
 		resetForm();
 
-		if (!row) return;
-
-		$('#nw-field-id').val(row.id || '');
-		$('#nw-field-name').val(row.name || '');
-		$('#nw-field-type').val(TYPES.indexOf(row.type) >= 0 ? row.type : 'main');
-		$('#nw-field-category').val(CATEGORIES.indexOf(row.category) >= 0 ? row.category : 'combat');
-		$('#nw-field-difficulty').val(clampInt(row.difficulty, 1, 5, 3));
-		$('#nw-field-goal').val(row.goal || '');
-		$('#nw-field-gm_instruction').val(row.gm_instruction || '');
-		$('#nw-field-victory_condition').val(row.victory_condition || '');
-		$('#nw-field-fail_conditions').val(row.fail_conditions || '');
-		$('#nw-field-tags').val(arrayToCommaString(row.tags));
-		$('#nw-field-required_tags').val(jsonOrLinesToTextarea(row.required_tags));
-		$('#nw-field-success_tags').val(jsonOrLinesToTextarea(row.success_tags));
-		$('#nw-field-failure_tags').val(jsonOrLinesToTextarea(row.failure_tags));
-		$('#nw-field-reward_credits').val(row.reward_credits != null ? row.reward_credits : 100);
-		$('#nw-field-reward_items').val(jsonOrLinesToTextarea(row.reward_items));
-		$('#nw-field-min_entropy').val(row.min_entropy != null ? row.min_entropy : '');
-		$('#nw-field-max_entropy').val(row.max_entropy != null ? row.max_entropy : '');
-		$('#nw-field-kingdom_tech').val(row.kingdom_tech != null ? row.kingdom_tech : '');
-		$('#nw-field-kingdom_magic').val(row.kingdom_magic != null ? row.kingdom_magic : '');
-		$('#nw-field-kingdom_wealth').val(row.kingdom_wealth != null ? row.kingdom_wealth : '');
-		$('#nw-field-area_id').val(row.area_id || '');
-		$('#nw-field-required_archetype_id').val(row.required_archetype_id != null ? row.required_archetype_id : '');
-		$('#nw-field-giver_npc_tag').val(jsonOrLinesToTextarea(row.giver_npc_tag));
-		$('#nw-field-img_url').val(row.img_url || '');
-
-		$('#nw-field-is_boss').prop('checked', boolVal(row.is_boss));
-		$('#nw-field-is_key_arc').prop('checked', boolVal(row.is_key_arc));
-		$('#nw-field-is_repeatable').prop('checked', boolVal(row.is_repeatable));
-		$('#nw-field-is_active').prop('checked', boolVal(row.is_active));
-
-		$('#nw-delete-btn').show();
-		$('#nw-modal-title').text('Edit Scenario');
-		$('#nw-save-btn').text('Save Changes').prop('disabled', false);
-	}
-
-	function openModal(id) {
-		resetForm();
-
-		if (!id) {
-			$('#nw-modal-overlay').fadeIn(150);
-			$('#nw-field-name').trigger('focus');
-			return;
+		if (!isNew) {
+			$('#nw-field-id').val(row.id);
+			$('#nw-field-name').val(row.name || '');
+			$('#nw-field-type').val(row.type || 'main');
+			$('#nw-field-category').val(row.category || 'combat');
+			$('#nw-field-area-id').val(row.area_id || '');
+			$('#nw-field-img-url').val(row.img_url || '');
+			$('#nw-field-goal').val(row.goal || '');
+			$('#nw-field-difficulty').val(row.difficulty || 3);
+			$('#nw-field-min-entropy').val(row.min_entropy ?? '');
+			$('#nw-field-max-entropy').val(row.max_entropy ?? '');
+			$('#nw-field-victory').val(row.victory_condition || '');
+			$('#nw-field-fail').val(row.fail_conditions || '');
+			$('#nw-field-tags').val(JSON.stringify(row.tags || []));
+			$('#nw-field-required-tags').val(JSON.stringify(row.required_tags || []));
+			$('#nw-field-success-tags').val(JSON.stringify(row.success_tags || []));
+			$('#nw-field-failure-tags').val(JSON.stringify(row.failure_tags || []));
+			$('#nw-field-credits').val(row.reward_credits ?? 100);
+			$('#nw-field-kingdom-tech').val(row.kingdom_tech ?? '');
+			$('#nw-field-kingdom-magic').val(row.kingdom_magic ?? '');
+			$('#nw-field-kingdom-wealth').val(row.kingdom_wealth ?? '');
+			$('#nw-field-reward-items').val(row.reward_items ? JSON.stringify(row.reward_items) : '');
+			$('#nw-field-archetype-id').val(row.required_archetype_id ?? '');
+			$('#nw-field-giver-npc-tag').val(row.giver_npc_tag ? JSON.stringify(row.giver_npc_tag) : '');
+			$('#nw-field-gm-instruction').val(row.gm_instruction || '');
+			$('#nw-field-is-active').prop('checked', !!row.is_active);
+			$('#nw-field-is-boss').prop('checked', !!row.is_boss);
+			$('#nw-field-is-key-arc').prop('checked', !!row.is_key_arc);
+			$('#nw-field-is-repeatable').prop('checked', !!row.is_repeatable);
+			if (row.img_url) {
+				$('#nw-img-preview').attr('src', row.img_url);
+				$('#nw-img-preview-wrap').show();
+			}
+			$('#nw-delete-btn').show().data('id', row.id);
+			renderDifficultyStars(row.difficulty || 3);
 		}
 
-		$.post(ajaxEndpoint, {
-			action: 'nw_scenarios_get_one',
-			nonce: nonce,
-			id: id
-		}, function (res) {
-			if (!res || !res.success) {
-				notice('Error: ' + ((res && res.data) || 'Could not load scenario.'), 'error');
-				return;
-			}
-
-			populateForm(res.data || {});
-			$('#nw-modal-overlay').fadeIn(150);
-			$('#nw-field-name').trigger('focus');
-		}).fail(function () {
-			notice('Request failed.', 'error');
-		});
+		$('#nw-modal-overlay').fadeIn(160);
+		icons();
 	}
 
 	function closeModal() {
-		$('#nw-modal-overlay').fadeOut(150);
+		$('#nw-modal-overlay').fadeOut(140);
 	}
 
-	function collectPayload() {
-		var data = {
-			action: 'nw_scenarios_save',
-			nonce: nonce
-		};
-
-		data.id = ($('#nw-field-id').val() || '').trim();
-		data.name = ($('#nw-field-name').val() || '').trim();
-		data.type = ($('#nw-field-type').val() || 'main').trim();
-		data.category = ($('#nw-field-category').val() || 'combat').trim();
-		data.difficulty = String(clampInt($('#nw-field-difficulty').val(), 1, 5, 3));
-		data.goal = ($('#nw-field-goal').val() || '').trim();
-		data.gm_instruction = ($('#nw-field-gm_instruction').val() || '').trim();
-		data.victory_condition = ($('#nw-field-victory_condition').val() || '').trim();
-		data.fail_conditions = ($('#nw-field-fail_conditions').val() || '').trim();
-		data.tags = ($('#nw-field-tags').val() || '').trim();
-		data.required_tags = ($('#nw-field-required_tags').val() || '').trim();
-		data.success_tags = ($('#nw-field-success_tags').val() || '').trim();
-		data.failure_tags = ($('#nw-field-failure_tags').val() || '').trim();
-		data.reward_credits = String(Math.max(0, parseInt($('#nw-field-reward_credits').val(), 10) || 0));
-		data.reward_items = ($('#nw-field-reward_items').val() || '').trim();
-		data.min_entropy = nullableInt($('#nw-field-min_entropy').val(), 0, 999);
-		data.max_entropy = nullableInt($('#nw-field-max_entropy').val(), 0, 999);
-		data.kingdom_tech = nullableInt($('#nw-field-kingdom_tech').val(), 0, 5);
-		data.kingdom_magic = nullableInt($('#nw-field-kingdom_magic').val(), 0, 5);
-		data.kingdom_wealth = nullableInt($('#nw-field-kingdom_wealth').val(), 0, 5);
-		data.area_id = ($('#nw-field-area_id').val() || '').trim();
-		data.required_archetype_id = ($('#nw-field-required_archetype_id').val() || '').trim();
-		data.giver_npc_tag = ($('#nw-field-giver_npc_tag').val() || '').trim();
-		data.img_url = ($('#nw-field-img_url').val() || '').trim();
-
-		data.is_boss = $('#nw-field-is_boss').is(':checked') ? '1' : '0';
-		data.is_key_arc = $('#nw-field-is_key_arc').is(':checked') ? '1' : '0';
-		data.is_repeatable = $('#nw-field-is_repeatable').is(':checked') ? '1' : '0';
-		data.is_active = $('#nw-field-is_active').is(':checked') ? '1' : '0';
-
-		return data;
+	function validateJsonField(selector, label) {
+		const raw = $(selector).val().trim();
+		if (!raw) return true;
+		try { JSON.parse(raw); return true; }
+		catch(e) { notice(label + ' must be valid JSON.', 'error'); return false; }
 	}
 
-	function loadAll() {
-		$('#nw-scenarios-tbody').html('<tr><td colspan="7" style="text-align:center;padding:32px;color:#777;">Loading…</td></tr>');
+	function saveScenario() {
+		const btn  = $('#nw-save-btn');
+		const id   = $('#nw-field-id').val().trim();
+		const name = $('#nw-field-name').val().trim();
+		if (!name) { notice('Name is required.', 'error'); return; }
 
-		$.post(ajaxEndpoint, {
-			action: 'nw_scenarios_get_all',
-			nonce: nonce,
-			filter_type: ($('#nw-filter-type').val() || '').trim(),
-			filter_category: ($('#nw-filter-category').val() || '').trim(),
-			filter_difficulty: ($('#nw-filter-difficulty').val() || '').trim()
-		}, function (res) {
-			if (!res || !res.success) {
-				notice('Error: ' + ((res && res.data) || 'Load failed.'), 'error');
-				return;
-			}
+		if (!validateJsonField('#nw-field-tags', 'Tags')) return;
+		if (!validateJsonField('#nw-field-required-tags', 'Required Tags')) return;
+		if (!validateJsonField('#nw-field-success-tags', 'Success Tags')) return;
+		if (!validateJsonField('#nw-field-failure-tags', 'Failure Tags')) return;
+		if (!validateJsonField('#nw-field-reward-items', 'Reward Items')) return;
+		if (!validateJsonField('#nw-field-giver-npc-tag', 'Giver NPC Tag')) return;
 
-			all = Array.isArray(res.data) ? res.data : [];
-			rerenderCurrentView();
-		}).fail(function () {
-			notice('Request failed.', 'error');
-		});
-	}
-
-	var debouncedSearchRender = debounce(function () {
-		rerenderCurrentView();
-	}, 150);
-
-	$(document).on('input', '#nw-search', debouncedSearchRender);
-
-	$(document).on('change', '#nw-filter-type, #nw-filter-category, #nw-filter-difficulty', function () {
-		loadAll();
-	});
-
-	$(document).on('click', '#nw-add-btn', function () {
-		openModal(null);
-	});
-
-	$(document).on('click', '#nw-refresh-btn', function () {
-		loadAll();
-	});
-
-	$(document).on('click', '.nw-edit-btn', function () {
-		openModal($(this).data('id'));
-	});
-
-	$(document).on('click', '#nw-modal-close, #nw-cancel-btn', function () {
-		closeModal();
-	});
-
-	$(document).on('click', '#nw-modal-overlay', function (e) {
-		if ($(e.target).is('#nw-modal-overlay')) {
-			closeModal();
-		}
-	});
-
-	$(document).on('change', '.nw-active-toggle', function () {
-		var $cb = $(this);
-		var id = $cb.data('id');
-		var val = $cb.is(':checked');
-
-		$.post(ajaxEndpoint, {
-			action: 'nw_scenarios_toggle',
-			nonce: nonce,
-			id: id,
-			is_active: val ? '1' : '0'
-		}, function (res) {
-			if (!res || !res.success) {
-				notice('Toggle failed: ' + ((res && res.data) || 'Unknown error'), 'error');
-				$cb.prop('checked', !val);
-				return;
-			}
-
-			all = all.map(function (scenario) {
-				if (String(scenario.id) === String(id)) {
-					return $.extend({}, scenario, {
-						is_active: val
-					});
-				}
-				return scenario;
-			});
-
-			rerenderCurrentView();
-			notice(val ? 'Activated.' : 'Deactivated.', 'success');
-		}).fail(function () {
-			$cb.prop('checked', !val);
-			notice('Request failed.', 'error');
-		});
-	});
-
-	$(document).on('click', '#nw-save-btn', function () {
-		var payload = collectPayload();
-		var $btn = $(this);
-
-		if (!payload.name) {
-			notice('Name is required.', 'error');
-			return;
-		}
-
-		if (TYPES.indexOf(payload.type) < 0) {
-			notice('Invalid type.', 'error');
-			return;
-		}
-
-		if (CATEGORIES.indexOf(payload.category) < 0) {
-			notice('Invalid category.', 'error');
-			return;
-		}
-
-		if (
-			payload.min_entropy !== '' &&
-			payload.max_entropy !== '' &&
-			parseInt(payload.min_entropy, 10) > parseInt(payload.max_entropy, 10)
-		) {
+		const minE = $('#nw-field-min-entropy').val();
+		const maxE = $('#nw-field-max-entropy').val();
+		if (minE !== '' && maxE !== '' && parseInt(minE, 10) > parseInt(maxE, 10)) {
 			notice('Min entropy cannot be greater than max entropy.', 'error');
 			return;
 		}
 
-		$btn.prop('disabled', true).text('Saving…');
+		btn.prop('disabled', true).html('<span class="nw-spinner" style="width:13px;height:13px"></span> Saving…');
 
-		$.post(ajaxEndpoint, payload, function (res) {
-			$btn.prop('disabled', false).text(payload.id ? 'Save Changes' : 'Save Scenario');
-
-			if (!res || !res.success) {
-				notice('Error: ' + ((res && res.data) || 'Unknown error'), 'error');
-				return;
-			}
-
-			notice('Scenario saved!', 'success');
+		$.post(A, {
+			action: 'nw_scenarios_save',
+			nonce: N,
+			id: id,
+			name: name,
+			type: $('#nw-field-type').val(),
+			category: $('#nw-field-category').val(),
+			goal: $('#nw-field-goal').val(),
+			gm_instruction: $('#nw-field-gm-instruction').val(),
+			victory_condition: $('#nw-field-victory').val(),
+			fail_conditions: $('#nw-field-fail').val(),
+			difficulty: $('#nw-field-difficulty').val(),
+			min_entropy: minE,
+			max_entropy: maxE,
+			area_id: $('#nw-field-area-id').val(),
+			img_url: $('#nw-field-img-url').val(),
+			reward_credits: $('#nw-field-credits').val(),
+			reward_items: $('#nw-field-reward-items').val(),
+			kingdom_tech: $('#nw-field-kingdom-tech').val(),
+			kingdom_magic: $('#nw-field-kingdom-magic').val(),
+			kingdom_wealth: $('#nw-field-kingdom-wealth').val(),
+			required_archetype_id: $('#nw-field-archetype-id').val(),
+			giver_npc_tag: $('#nw-field-giver-npc-tag').val(),
+			tags: $('#nw-field-tags').val(),
+			required_tags: $('#nw-field-required-tags').val(),
+			success_tags: $('#nw-field-success-tags').val(),
+			failure_tags: $('#nw-field-failure-tags').val(),
+			is_boss: $('#nw-field-is-boss').is(':checked') ? 1 : 0,
+			is_key_arc: $('#nw-field-is-key-arc').is(':checked') ? 1 : 0,
+			is_active: $('#nw-field-is-active').is(':checked') ? 1 : 0,
+			is_repeatable: $('#nw-field-is-repeatable').is(':checked') ? 1 : 0
+		}, res => {
+			btn.prop('disabled', false)
+				.html('<i data-lucide="save" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i><span id="nw-save-label">' + (id ? 'Save Changes' : 'Create Scenario') + '</span>');
+			icons();
+			if (!res.success) { notice(res.data || 'Save failed.', 'error'); return; }
+			notice(id ? 'Scenario updated.' : 'Scenario created!');
 			closeModal();
-			loadAll();
-		}).fail(function () {
-			$btn.prop('disabled', false).text(payload.id ? 'Save Changes' : 'Save Scenario');
-			notice('Request failed.', 'error');
+			loadScenarios();
 		});
-	});
-
-	$(document).on('click', '#nw-delete-btn', function () {
-		var id = ($('#nw-field-id').val() || '').trim();
-
-		if (!id) return;
-
-		if (!window.confirm('Delete this scenario? This cannot be undone.')) {
-			return;
-		}
-
-		$.post(ajaxEndpoint, {
-			action: 'nw_scenarios_delete',
-			nonce: nonce,
-			id: id
-		}, function (res) {
-			if (!res || !res.success) {
-				notice('Delete failed: ' + ((res && res.data) || 'Unknown error'), 'error');
-				return;
-			}
-
-			notice('Deleted.', 'success');
-			closeModal();
-			loadAll();
-		}).fail(function () {
-			notice('Request failed.', 'error');
-		});
-	});
-
-	if (!ajaxEndpoint || !nonce) {
-		notice('Missing AJAX config.', 'error');
-		return;
 	}
 
-	$('#nw-field-difficulty').attr({ min: 1, max: 5 });
+	function deleteScenario(id) {
+		if (!confirm('Delete this scenario? This cannot be undone.')) return;
+		$.post(A, { action: 'nw_scenarios_delete', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Delete failed.', 'error'); return; }
+			notice('Scenario deleted.');
+			closeModal();
+			loadScenarios();
+		});
+	}
 
-	loadAll();
+	function duplicateScenario(id) {
+		$.post(A, { action: 'nw_scenarios_duplicate', nonce: N, id }, res => {
+			if (!res.success) { notice(res.data || 'Duplicate failed.', 'error'); return; }
+			notice('Scenario duplicated.');
+			loadScenarios();
+		});
+	}
 
-})(jQuery);
+	icons();
+	loadScenarios();
+	$('#nw-refresh-btn').on('click', loadScenarios);
+	$('#nw-add-btn').on('click', () => openModal(null));
+	$('#nw-modal-close, #nw-cancel-btn').on('click', closeModal);
+	$('#nw-modal-overlay').on('click', e => { if (e.target.id === 'nw-modal-overlay') closeModal(); });
+	$('#nw-save-btn').on('click', saveScenario);
+	$('#nw-scenario-form').on('submit', e => { e.preventDefault(); saveScenario(); });
+	$('#nw-delete-btn').on('click', function () { deleteScenario($(this).data('id')); });
+
+	$('#nw-scenarios-tbody')
+		.on('click', '.nw-edit-btn', function () {
+			const id = $(this).data('id');
+			const row = allRows.find(r => String(r.id) === String(id));
+			if (row) openModal(row);
+		})
+		.on('click', '.nw-dup-btn', function () { duplicateScenario($(this).data('id')); });
+
+	$('#nw-search, #nw-filter-type, #nw-filter-category, #nw-filter-difficulty, #nw-filter-active').on('input change', applyFilters);
+	$('#nw-clear-filters').on('click', () => {
+		$('#nw-search').val('');
+		$('#nw-filter-type, #nw-filter-category, #nw-filter-difficulty, #nw-filter-active').val('');
+		applyFilters();
+	});
+
+	$('#nw-field-img-url').on('input', function () {
+		const url = $(this).val().trim();
+		if (url) {
+			$('#nw-img-preview').attr('src', url);
+			$('#nw-img-preview-wrap').show();
+		} else {
+			$('#nw-img-preview-wrap').hide();
+		}
+	});
+
+	$('#nw-field-difficulty').on('input change', function () {
+		let v = parseInt($(this).val(), 10) || 1;
+		v = Math.max(1, Math.min(5, v));
+		$(this).val(v);
+		renderDifficultyStars(v);
+	});
+
+}(jQuery));
