@@ -35,15 +35,21 @@ function nw_supabase_headers( bool $with_prefer = false ): array {
 /**
  * Service role key — use for all server-side WRITE operations (POST, PATCH, DELETE).
  * Bypasses RLS so mutations are never silently blocked.
+ *
+ * Uses NW_SUPABASE_SERVICE_KEY defined in wp-config.php.
+ * $with_prefer adds 'return=representation' (needed when you need the row back).
+ * Pass a custom $prefer string to override (e.g. 'resolution=merge-duplicates').
  */
-function nw_supabase_service_headers( bool $with_prefer = false ): array {
+function nw_supabase_service_headers( bool $with_prefer = false, string $prefer = '' ): array {
 	$key     = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : '';
 	$headers = [
 		'apikey'        => $key,
 		'Authorization' => 'Bearer ' . $key,
 		'Content-Type'  => 'application/json',
 	];
-	if ( $with_prefer ) {
+	if ( $prefer !== '' ) {
+		$headers['Prefer'] = $prefer;
+	} elseif ( $with_prefer ) {
 		$headers['Prefer'] = 'return=representation';
 	}
 	return $headers;
@@ -342,8 +348,17 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 	$node_id_raw = $request->get_param( 'node_id' );
 	$node_id     = $node_id_raw ? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $node_id_raw ) : null;
 
+	// Load the creator class if not already available.
 	if ( ! class_exists( 'Neoweaver_Agents_Creator' ) ) {
-		return new WP_Error( 'class_missing', 'Agents creator class not loaded.', [ 'status' => 500 ] );
+		$creator_file = plugin_dir_path( __FILE__ ) . 'agents/class-agents-creator.php';
+		if ( file_exists( $creator_file ) ) {
+			require_once $creator_file;
+		}
+	}
+
+	if ( ! class_exists( 'Neoweaver_Agents_Creator' ) ) {
+		error_log( 'TW_ENDPOINT_CHARACTER: Neoweaver_Agents_Creator class not found — check agents/class-agents-creator.php' );
+		return new WP_Error( 'class_missing', 'Character creator class not loaded. Check server logs.', [ 'status' => 500 ] );
 	}
 
 	$creator = new Neoweaver_Agents_Creator();
@@ -414,6 +429,8 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 /**
  * POST /wp-json/neoweaver/v1/character/change
  * Swap the active character on a campaign (replaces cyber_campaign_characters row).
+ * Uses PostgREST upsert (Prefer: resolution=merge-duplicates) to avoid the
+ * partial-failure state that would result from a DELETE+INSERT sequence.
  * Fires tw_character_changed after a successful swap.
  *
  * @return WP_REST_Response|WP_Error
@@ -477,16 +494,13 @@ function neoweaver_change_character( WP_REST_Request $request ) {
 			: null;
 	}
 
-	// Upsert: delete existing row then insert new one (cyber_campaign_characters has campaign_id as PK or unique)
-	$delete_url  = add_query_arg( [ 'campaign_id' => 'eq.' . $campaign_id ], $base . 'cyber_campaign_characters' );
-	wp_remote_request( $delete_url, [
-		'method'  => 'DELETE',
-		'headers' => nw_supabase_service_headers(),
-		'timeout' => 10,
-	] );
-
-	$insert_resp = wp_remote_post( $base . 'cyber_campaign_characters', [
-		'headers' => nw_supabase_service_headers( true ),
+	// Upsert via PostgREST merge-duplicates — atomic, no partial-failure risk.
+	// Requires a UNIQUE constraint on campaign_id in cyber_campaign_characters.
+	$upsert_resp = wp_remote_post( $base . 'cyber_campaign_characters', [
+		'headers' => nw_supabase_service_headers(
+			false,
+			'resolution=merge-duplicates,return=representation'
+		),
 		'body'    => wp_json_encode( [
 			'campaign_id'  => $campaign_id,
 			'character_id' => $new_character_id,
@@ -495,13 +509,13 @@ function neoweaver_change_character( WP_REST_Request $request ) {
 		'timeout' => 15,
 	] );
 
-	if ( is_wp_error( $insert_resp ) ) {
+	if ( is_wp_error( $upsert_resp ) ) {
 		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
 	}
 
-	$code = wp_remote_retrieve_response_code( $insert_resp );
+	$code = wp_remote_retrieve_response_code( $upsert_resp );
 	if ( $code < 200 || $code >= 300 ) {
-		error_log( 'TW_CHARACTER_CHANGE: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $insert_resp ) );
+		error_log( 'TW_CHARACTER_CHANGE: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $upsert_resp ) );
 		return new WP_Error( 'change_failed', 'Character change failed. HTTP ' . $code, [ 'status' => $code ] );
 	}
 
@@ -1107,6 +1121,7 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 	$safe_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $character_id );
 
 	// READ — start location — anon key is fine
+	// cyber_world_map.id is a UUID — keep it as a string, do NOT cast to int.
 	$start_location_id = null;
 	if ( $safe_world_id ) {
 		$loc_url  = add_query_arg( [
@@ -1118,8 +1133,11 @@ function neoweaver_start_game_session( WP_REST_Request $request ) {
 		], $base . 'cyber_world_map' );
 		$loc_resp = wp_remote_get( $loc_url, [ 'headers' => nw_supabase_headers(), 'timeout' => 10 ] );
 		if ( ! is_wp_error( $loc_resp ) && wp_remote_retrieve_response_code( $loc_resp ) < 300 ) {
-			$loc_data          = json_decode( wp_remote_retrieve_body( $loc_resp ), true ) ?: [];
-			$start_location_id = ! empty( $loc_data[0]['id'] ) ? (int) $loc_data[0]['id'] : null;
+			$loc_data = json_decode( wp_remote_retrieve_body( $loc_resp ), true ) ?: [];
+			// Preserve UUID string — casting to (int) would collapse any UUID to 0.
+			$start_location_id = ! empty( $loc_data[0]['id'] )
+				? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $loc_data[0]['id'] )
+				: null;
 		}
 	}
 
