@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// ─── Hooks ──────────────────────────────────────────────────────────────────
+// ─── Hooks ─────────────────────────────────────────────────────────────
 
 add_action( 'wp_login', 'tw_supabase_on_wp_login', 10, 2 );
 function tw_supabase_on_wp_login( string $user_login, WP_User $user ): void {
@@ -27,12 +27,24 @@ function tw_supabase_ensure_token_for_current_user(): void {
 		return;
 	}
 	$user = wp_get_current_user();
-	if ( ! tw_supabase_get_cached_token( $user->ID ) ) {
-		tw_supabase_provision_user( $user->ID, $user->user_email );
+
+	// Szybki short-circuit: jeśli token istnieje — nic nie rób.
+	if ( tw_supabase_get_cached_token( $user->ID ) ) {
+		return;
 	}
+
+	// Blokada przeciw równoległym requestóm: prowizjonuj najwyżej raz na 5 minut.
+	// Bez tego każdy request po wygaśnięciu transientu odpala 2-3 HTTP calls do Supabase.
+	$lock_key = 'tw_prov_lock_' . $user->ID;
+	if ( get_transient( $lock_key ) ) {
+		return;
+	}
+	set_transient( $lock_key, 1, 5 * MINUTE_IN_SECONDS );
+
+	tw_supabase_provision_user( $user->ID, $user->user_email );
 }
 
-// ─── Core ───────────────────────────────────────────────────────────────────
+// ─── Core ─────────────────────────────────────────────────────────────────
 
 function tw_supabase_provision_user( int $wp_user_id, string $email ): ?string {
 	$supabase_uid = tw_supabase_get_or_create_auth_user( $wp_user_id, $email );
@@ -45,6 +57,9 @@ function tw_supabase_provision_user( int $wp_user_id, string $email ): ?string {
 	if ( ! $token ) {
 		$token = tw_supabase_fetch_token_via_magiclink( $email, $wp_user_id );
 	}
+
+	// Po udanym prowizjonowaniu usuń blokadę — następny request użyje tokena z cache.
+	delete_transient( 'tw_prov_lock_' . $wp_user_id );
 
 	return $token;
 }
@@ -63,7 +78,7 @@ function tw_supabase_get_current_user_token(): ?string {
 	return tw_supabase_get_cached_token( get_current_user_id() );
 }
 
-// ─── Token via generate_link + verify ───────────────────────────────────────
+// ─── Token via generate_link + verify ──────────────────────────────────────────
 
 /**
  * Hostinger Supabase zwraca generate_link z hashed_token w ROOT body:
@@ -195,7 +210,7 @@ function tw_supabase_refresh_token_if_possible( int $wp_user_id ): ?string {
 	return $body['access_token'];
 }
 
-// ─── Supabase auth.users provisioning ────────────────────────────────────────
+// ─── Supabase auth.users provisioning ─────────────────────────────────────────────
 
 function tw_supabase_get_or_create_auth_user( int $wp_user_id, string $email ): ?string {
 	$existing = tw_supabase_find_supabase_uid_by_wp_id( $wp_user_id );
@@ -321,14 +336,16 @@ function tw_supabase_patch_app_metadata( string $supabase_uid, int $wp_user_id )
 }
 
 function tw_supabase_upsert_cyber_user( string $supabase_uid, int $wp_user_id ): void {
-	$url = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_users';
+	// ?on_conflict=id jest wymagany przez PostgREST gdy używamy resolution=merge-duplicates.
+	// Bez tego parametru Supabase ignoruje Prefer lub rzuca błąd constraint.
+	$url = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_users?on_conflict=id';
 
 	$response = wp_remote_post( $url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
 			'Authorization' => 'Bearer ' . tw_supabase_service_key(),
 			'Content-Type'  => 'application/json',
-			'Prefer'        => 'resolution=merge-duplicates',
+			'Prefer'        => 'resolution=merge-duplicates,return=minimal',
 		],
 		'body'    => wp_json_encode( [
 			'id'         => $supabase_uid,
