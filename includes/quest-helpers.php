@@ -14,6 +14,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Normalize quest_tags value to a plain PHP array.
+ *
+ * $quest_data['tags'] may arrive as:
+ *   - PHP array (from Supabase jsonb column decoded by wp_remote_get)
+ *   - comma-separated string (from legacy data or manual entry)
+ *   - JSON string ("[\"tag1\",\"tag2\"]" — sometimes from jsonb text casts)
+ *   - null / false / empty
+ *
+ * Returns a numerically-indexed array of non-empty strings.
+ *
+ * @param mixed $raw Raw tags value.
+ * @return array<int, string>
+ */
+function tw_normalize_quest_tags( $raw ): array {
+	if ( empty( $raw ) ) {
+		return array();
+	}
+
+	if ( is_array( $raw ) ) {
+		return array_values( array_filter( array_map( 'strval', $raw ) ) );
+	}
+
+	$raw = (string) $raw;
+
+	// Try JSON first (covers jsonb text-cast like ["a","b"]).
+	$decoded = json_decode( $raw, true );
+	if ( is_array( $decoded ) ) {
+		return array_values( array_filter( array_map( 'strval', $decoded ) ) );
+	}
+
+	// Fallback: comma-separated string.
+	return array_values( array_filter( array_map( 'trim', explode( ',', $raw ) ) ) );
+}
+
+/**
  * Assign a quest to a character and write it to cyber_active_quests.
  *
  * @param string $character_id  UUID of the character (from cyber_characters).
@@ -30,31 +65,47 @@ function tw_assign_quest_to_character( string $character_id, array $quest_data, 
 	$service_key  = tw_supabase_service_key();
 	$endpoint_url = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_active_quests';
 
-	$payload = [
+	/**
+	 * quest_tags: normalizujemy do tablicy PHP przed wstawieniem.
+	 *
+	 * Kolumna cyber_active_quests.quest_tags to TEXT[], a nie jsonb.
+	 * PostgREST akceptuje JSON array ("[\"a\",\"b\"]") przy Content-Type: application/json,
+	 * ale tylko gdy typ kolumny to text[] lub jsonb.
+	 * Przekazanie surowej tablicy PHP przez wp_json_encode działa poprawnie —
+	 * tw_normalize_quest_tags() gwarantuje że zawsze dostaniemy array, nie string.
+	 */
+	$quest_tags = tw_normalize_quest_tags( $quest_data['tags'] ?? null );
+
+	$payload = array(
 		'character_id'    => $character_id,
 		'quest_origin_id' => $quest_data['id'],
 		'quest_type'      => $type,
 		'quest_name'      => $quest_data['name'],
-		'quest_tags'      => $quest_data['tags'],
+		'quest_tags'      => $quest_tags,
 		'status'          => 'active',
-		'progress_data'   => wp_json_encode( [
-			'assigned_at'          => gmdate( 'Y-m-d H:i:s' ),
-			'current_step'         => 'Initial discovery',
-			'original_description' => $quest_data['description'],
-		] ),
-	];
+		'progress_data'   => wp_json_encode(
+			array(
+				'assigned_at'          => gmdate( 'Y-m-d H:i:s' ),
+				'current_step'         => 'Initial discovery',
+				'original_description' => $quest_data['description'] ?? '',
+			)
+		),
+	);
 
-	$response = wp_remote_post( $endpoint_url, [
-		'method'  => 'POST',
-		'headers' => [
-			'apikey'        => $service_key,
-			'Authorization' => 'Bearer ' . $service_key,
-			'Content-Type'  => 'application/json',
-			'Prefer'        => 'return=representation',
-		],
-		'body'    => wp_json_encode( $payload ),
-		'timeout' => 15,
-	] );
+	$response = wp_remote_post(
+		$endpoint_url,
+		array(
+			'method'  => 'POST',
+			'headers' => array(
+				'apikey'        => $service_key,
+				'Authorization' => 'Bearer ' . $service_key,
+				'Content-Type'  => 'application/json',
+				'Prefer'        => 'return=representation',
+			),
+			'body'    => wp_json_encode( $payload ),
+			'timeout' => 15,
+		)
+	);
 
 	if ( is_wp_error( $response ) ) {
 		error_log( '[NeoWeaver] tw_assign_quest_to_character error: ' . $response->get_error_message() );
@@ -94,15 +145,35 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 
 	$service_key = tw_supabase_service_key();
 	$base_url    = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-	$headers     = [
+	$headers     = array(
 		'apikey'        => $service_key,
 		'Authorization' => 'Bearer ' . $service_key,
-	];
+	);
 
-	// 1. Fetch active quest + linked scenario via PostgREST foreign-key join.
-	$q_url    = $base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id )
-		. '&select=*,cyber_scenarios:quest_origin_id(*)';
-	$response = wp_remote_get( $q_url, [ 'headers' => $headers, 'timeout' => 15 ] );
+	/**
+	 * 1. Fetch active quest + linked scenario via PostgREST FK join.
+	 *
+	 * Stara składnia:  cyber_scenarios:quest_origin_id(*)
+	 *   ':' to hint dla nazwy relacji/aliasu — jeśli PostgREST nie znajdzie
+	 *   pasującej nazwy, zwraca null dla cyber_scenarios.
+	 *
+	 * Poprawna składnia: cyber_scenarios!quest_origin_id(*)
+	 *   '!' jawnie wskazuje kolumnę FK na cyber_active_quests,
+	 *   która wskazuje na cyber_scenarios.id.
+	 *
+	 * add_query_arg() zamiast ręcznego sklejania stringów:
+	 *   - rawurlencode() na UUID jest bezpieczne, ale add_query_arg()
+	 *     jest standardem WordPress i obsługuje edge case'y.
+	 */
+	$q_url = add_query_arg(
+		array(
+			'id'     => 'eq.' . $active_quest_id,
+			'select' => '*,cyber_scenarios!quest_origin_id(*)',
+		),
+		$base_url . 'cyber_active_quests'
+	);
+
+	$response = wp_remote_get( $q_url, array( 'headers' => $headers, 'timeout' => 15 ) );
 
 	if ( is_wp_error( $response ) ) {
 		error_log( '[NeoWeaver] tw_resolve_quest_impact: fetch quest error – ' . $response->get_error_message() );
@@ -126,34 +197,40 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 
 	// 2. Pick success or failure tags from the scenario.
 	$raw_tags = $is_success ? ( $scenario['success_tags'] ?? '' ) : ( $scenario['failure_tags'] ?? '' );
+	$new_tags = tw_normalize_quest_tags( $raw_tags );
 
-	if ( is_string( $raw_tags ) ) {
-		$new_tags = array_filter( array_map( 'trim', explode( ',', $raw_tags ) ) );
-	} else {
-		$new_tags = is_array( $raw_tags ) ? array_filter( $raw_tags ) : [];
-	}
-	$new_tags = array_values( $new_tags );
-
-	$json_headers = array_merge( $headers, [ 'Content-Type' => 'application/json' ] );
+	$json_headers = array_merge( $headers, array( 'Content-Type' => 'application/json' ) );
 	$new_status   = $is_success ? 'completed' : 'failed';
 
-	// 3. Mark quest as completed / failed and store the pending tags in
-	//    progress_data so the tag-driven pipeline can read and apply them.
+	/**
+	 * 3. Mark quest as completed / failed.
+	 *
+	 * add_query_arg() buduje URL dla PATCH — ten sam pattern co GET wyżej.
+	 */
+	$patch_url = add_query_arg(
+		array( 'id' => 'eq.' . $active_quest_id ),
+		$base_url . 'cyber_active_quests'
+	);
+
 	$patch_response = wp_remote_request(
-		$base_url . 'cyber_active_quests?id=eq.' . rawurlencode( $active_quest_id ),
-		[
+		$patch_url,
+		array(
 			'method'  => 'PATCH',
 			'headers' => $json_headers,
 			'timeout' => 15,
-			'body'    => wp_json_encode( [
-				'status'        => $new_status,
-				'progress_data' => wp_json_encode( [
-					'resolved_at'  => gmdate( 'Y-m-d H:i:s' ),
-					'outcome'      => $new_status,
-					'pending_tags' => $new_tags,
-				] ),
-			] ),
-		]
+			'body'    => wp_json_encode(
+				array(
+					'status'        => $new_status,
+					'progress_data' => wp_json_encode(
+						array(
+							'resolved_at'  => gmdate( 'Y-m-d H:i:s' ),
+							'outcome'      => $new_status,
+							'pending_tags' => $new_tags,
+						)
+					),
+				)
+			),
+		)
 	);
 
 	if ( is_wp_error( $patch_response ) ) {
@@ -167,8 +244,8 @@ function tw_resolve_quest_impact( string $character_id, string $active_quest_id,
 		return false;
 	}
 
-	return [
+	return array(
 		'status'       => $new_status,
 		'pending_tags' => $new_tags,
-	];
+	);
 }
