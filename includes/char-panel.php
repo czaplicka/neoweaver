@@ -23,7 +23,7 @@ add_action(
 		wp_enqueue_script(
 			'tw-char-panel',
 			$file_url,
-			array(),
+			array( 'tw-gamedata' ),
 			$version,
 			true
 		);
