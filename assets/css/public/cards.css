@@ -2,135 +2,216 @@
  * cards.css — NeoWeaver unified card component
  * Used in: library, foundry, buffer (gameplay deck)
  *
- * COLOUR SYSTEM:
- *   Card border/glow  → rarity   (set via --nw-card-color on the element)
- *   Top stripe        → deck_category  (CSS class modifier)
- *   Type icon         → Lucide icon rendered in .nw-card__type-icon
+ * Inspired by Warframe mod card aesthetics:
+ *   - Dark base with transparent rarity-tinted background
+ *   - Double border frame (inner + outer) per rarity
+ *   - Ascension pips along the top border
+ *   - Type icon in the top-right corner (large, faded)
+ *   - Requirements row with icon + text
  *
  * Base class:   .nw-card
  *
- * Rarity modifiers (add to .nw-card):
- *   .nw-card--common     grey
- *   .nw-card--uncommon   green
- *   .nw-card--rare       blue
- *   .nw-card--epic       purple
- *   .nw-card--legendary  gold + glow
- *
- * Category stripe modifiers (add to .nw-card):
- *   .nw-card--magic      navy
- *   .nw-card--combat     red
- *   .nw-card--action     orange
- *   .nw-card--social     green
- *   .nw-card--equipment  brown
- *   .nw-card--tech       grey
- *
- * State modifiers:
- *   .nw-card--ready      playable / upgradable
- *   .nw-card--dim        owned but inactive
- *   .nw-card--ghost      locked / not owned
- *
- * Context modifiers:
- *   .nw-card--library    library view
- *   .nw-card--foundry    foundry / upgrade view
- *   .nw-card--hand       in-game hand (compact)
+ * Rarity modifiers:   .nw-card--common | uncommon | rare | epic | legendary
+ * Category modifiers: .nw-card--magic | combat | action | social | equipment | tech
+ * State modifiers:    .nw-card--ready | dim | ghost
+ * Context modifiers:  .nw-card--library | foundry | hand
  */
 
 /* ============================================================
    TOKENS
    ============================================================ */
 :root {
-  --nw-card-bg:         #0d0d0d;
-  --nw-card-border-dim: #2a2a2a;
-  --nw-card-radius:     6px;
-  --nw-card-font:       'Chakra Petch', monospace;
+  --nw-card-bg:          #0a0a0c;
+  --nw-card-border-dim:  rgba(255,255,255,0.08);
+  --nw-card-radius:      6px;
+  --nw-card-font:        'Chakra Petch', monospace;
 
-  /* --- rarity colours --- */
+  /* rarity palette */
   --nw-rarity-common:    #888888;
   --nw-rarity-uncommon:  #4caf50;
   --nw-rarity-rare:      #2196f3;
-  --nw-rarity-epic:      #9c27b0;
+  --nw-rarity-epic:      #a64dff;
   --nw-rarity-legendary: #ffc107;
 
-  /* --- category stripe colours --- */
-  --nw-cat-magic:     #1a237e;  /* navy      */
-  --nw-cat-combat:    #c62828;  /* red       */
-  --nw-cat-action:    #e65100;  /* orange    */
-  --nw-cat-social:    #2e7d32;  /* green     */
-  --nw-cat-equipment: #5d4037;  /* brown     */
-  --nw-cat-tech:      #546e7a;  /* slate     */
+  /* category colours */
+  --nw-cat-magic:     #5c6bc0;
+  --nw-cat-combat:    #e53935;
+  --nw-cat-action:    #fb8c00;
+  --nw-cat-social:    #43a047;
+  --nw-cat-equipment: #8d6e63;
+  --nw-cat-tech:      #546e7a;
 
-  /* fallback accent (when no rarity class) */
-  --nw-card-color:      var(--nw-rarity-common);
-  --nw-card-glow-alpha: rgba(136,136,136,0.2);
+  /* defaults */
+  --nw-card-color:       var(--nw-rarity-common);
+  --nw-card-rgb:         136,136,136;
+  --nw-card-glow-alpha:  rgba(136,136,136,0.18);
+
+  /* ascension pip size */
+  --nw-pip-size: 7px;
 }
 
 /* ============================================================
-   RARITY — set --nw-card-color per card
+   RARITY — sets color + tinted bg + glow
    ============================================================ */
 .nw-card--common {
   --nw-card-color:      var(--nw-rarity-common);
+  --nw-card-rgb:        136,136,136;
   --nw-card-glow-alpha: rgba(136,136,136,0.18);
+  --nw-card-bg-tint:    rgba(136,136,136,0.04);
 }
 .nw-card--uncommon {
   --nw-card-color:      var(--nw-rarity-uncommon);
+  --nw-card-rgb:        76,175,80;
   --nw-card-glow-alpha: rgba(76,175,80,0.22);
+  --nw-card-bg-tint:    rgba(76,175,80,0.07);
 }
 .nw-card--rare {
   --nw-card-color:      var(--nw-rarity-rare);
+  --nw-card-rgb:        33,150,243;
   --nw-card-glow-alpha: rgba(33,150,243,0.25);
+  --nw-card-bg-tint:    rgba(33,150,243,0.08);
 }
 .nw-card--epic {
   --nw-card-color:      var(--nw-rarity-epic);
-  --nw-card-glow-alpha: rgba(156,39,176,0.28);
+  --nw-card-rgb:        166,77,255;
+  --nw-card-glow-alpha: rgba(166,77,255,0.28);
+  --nw-card-bg-tint:    rgba(166,77,255,0.09);
 }
 .nw-card--legendary {
   --nw-card-color:      var(--nw-rarity-legendary);
+  --nw-card-rgb:        255,193,7;
   --nw-card-glow-alpha: rgba(255,193,7,0.35);
+  --nw-card-bg-tint:    rgba(255,193,7,0.10);
 }
 
 /* ============================================================
-   BASE CARD
+   BASE CARD — Warframe-style double frame
    ============================================================ */
 .nw-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--nw-card-bg);
+
+  /* Outer frame: rarity colour at low opacity by default, full on hover/ready */
+  background:
+    var(--nw-card-bg-tint, rgba(136,136,136,0.04)),
+    linear-gradient(160deg, rgba(255,255,255,0.03) 0%, transparent 60%),
+    var(--nw-card-bg);
+
+  /* Double-border effect via box-shadow inner ring */
   border: 1px solid var(--nw-card-border-dim);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--nw-card-rgb,136,136,136), 0.10),
+    0 2px 12px rgba(0,0,0,0.5);
+
   border-radius: var(--nw-card-radius);
   font-family: var(--nw-card-font);
   color: #c8c8c8;
-  overflow: hidden;
+  overflow: visible;   /* allow ascension pips to sit on the border */
   transition:
-    border-color 0.18s ease,
-    box-shadow   0.18s ease,
-    transform    0.18s ease;
+    border-color 0.2s ease,
+    box-shadow   0.2s ease,
+    transform    0.2s ease;
   cursor: default;
+  clip-path: none;
+}
+
+/* Clip inner content so images don't overflow radius */
+.nw-card > * { position: relative; z-index: 1; }
+.nw-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--nw-card-radius);
+  pointer-events: none;
+  /* subtle inner gradient overlay */
+  background: linear-gradient(
+    180deg,
+    rgba(var(--nw-card-rgb,136,136,136), 0.06) 0%,
+    transparent 35%
+  );
+  z-index: 0;
 }
 
 .nw-card:hover {
-  border-color: var(--nw-card-color);
-  box-shadow: 0 0 14px var(--nw-card-glow-alpha);
-  transform: translateY(-2px);
+  border-color: rgba(var(--nw-card-rgb,136,136,136), 0.6);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--nw-card-rgb,136,136,136), 0.30),
+    0 0 18px rgba(var(--nw-card-rgb,136,136,136), 0.18),
+    0 4px 20px rgba(0,0,0,0.6);
+  transform: translateY(-3px);
 }
 
 /* ============================================================
-   CATEGORY STRIPE (top bar)
+   ASCENSION PIPS — horizontal row ABOVE the card top border
    ============================================================ */
-.nw-card::before {
-  content: '';
-  display: block;
-  height: 4px;
+.nw-asc-pips {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.nw-asc-pip {
+  width:  var(--nw-pip-size);
+  height: var(--nw-pip-size);
+  border-radius: 50%;
+  background:    rgba(var(--nw-card-rgb,136,136,136), 0.15);
+  border:        1px solid rgba(var(--nw-card-rgb,136,136,136), 0.35);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nw-asc-pip--lit {
+  background:  var(--nw-card-color);
+  border-color: var(--nw-card-color);
+  box-shadow:  0 0 5px rgba(var(--nw-card-rgb,136,136,136), 0.7);
+}
+
+/* ============================================================
+   TYPE ICON — large watermark in top-right corner
+   ============================================================ */
+.nw-card__corner-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+  color: var(--nw-card-color);
+  opacity: 0.18;
+  transition: opacity 0.2s ease;
+}
+.nw-card__corner-icon svg,
+.nw-card__corner-icon i {
+  width:  100%;
+  height: 100%;
+  stroke-width: 1.5;
+}
+.nw-card:hover .nw-card__corner-icon {
+  opacity: 0.32;
+}
+
+/* ============================================================
+   CATEGORY STRIPE (top bar, inside card)
+   ============================================================ */
+.nw-card__stripe {
+  height: 3px;
   width: 100%;
   background: var(--nw-cat-stripe, var(--nw-card-border-dim));
-  transition: filter 0.18s ease;
+  flex-shrink: 0;
+  border-radius: var(--nw-card-radius) var(--nw-card-radius) 0 0;
+  transition: filter 0.2s ease;
 }
+.nw-card:hover .nw-card__stripe { filter: brightness(1.3); }
 
-.nw-card:hover::before {
-  filter: brightness(1.25);
-}
-
-/* category stripe colour via modifier */
 .nw-card--magic     { --nw-cat-stripe: var(--nw-cat-magic);     }
 .nw-card--combat    { --nw-cat-stripe: var(--nw-cat-combat);    }
 .nw-card--action    { --nw-cat-stripe: var(--nw-cat-action);    }
@@ -138,32 +219,43 @@
 .nw-card--equipment { --nw-cat-stripe: var(--nw-cat-equipment); }
 .nw-card--tech      { --nw-cat-stripe: var(--nw-cat-tech);      }
 
+/*
+  Legacy support: .nw-card::before was the old stripe.
+  Keep it transparent so it doesn't double-up.
+*/
+.nw-card::before {
+  content: none;
+}
+
 /* ============================================================
-   STATE: READY (playable / upgradable)
+   STATE: READY
    ============================================================ */
 .nw-card--ready {
-  border-color: var(--nw-card-color);
-  box-shadow: 0 0 10px var(--nw-card-glow-alpha);
+  border-color: rgba(var(--nw-card-rgb,136,136,136), 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--nw-card-rgb,136,136,136), 0.25),
+    0 0 14px rgba(var(--nw-card-rgb,136,136,136), 0.20),
+    0 4px 16px rgba(0,0,0,0.5);
 }
 
 /* ============================================================
-   STATE: DIM (owned, not usable now)
+   STATE: DIM
    ============================================================ */
 .nw-card--dim {
-  opacity: 0.45;
-  filter: grayscale(0.5);
+  opacity: 0.42;
+  filter: grayscale(0.4);
 }
 .nw-card--dim:hover {
-  opacity: 0.6;
+  opacity: 0.55;
   transform: none;
-  box-shadow: none;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
 }
 
 /* ============================================================
-   STATE: GHOST (locked / not owned)
+   STATE: GHOST
    ============================================================ */
 .nw-card--ghost {
-  opacity: 0.25;
+  opacity: 0.22;
   filter: grayscale(1);
   pointer-events: none;
 }
@@ -172,10 +264,13 @@
    LEGENDARY extras
    ============================================================ */
 .nw-card--legendary {
-  box-shadow: 0 0 6px rgba(255,193,7,0.2);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,193,7,0.25),
+    0 0 10px rgba(255,193,7,0.15),
+    0 4px 20px rgba(0,0,0,0.6);
 }
-.nw-card--legendary::before {
-  background: linear-gradient(90deg, #b8860b, #ffd700, #b8860b);
+.nw-card--legendary .nw-card__stripe {
+  background: linear-gradient(90deg, #b8860b 0%, #ffd700 50%, #b8860b 100%);
   background-size: 200% 100%;
   animation: nw-legend-shimmer 3s linear infinite;
 }
@@ -190,17 +285,18 @@
 .nw-card__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px 5px;
+  padding: 10px 12px 4px;
   gap: 6px;
+  /* leave right space for corner icon */
+  padding-right: 44px;
 }
 
 .nw-card__name {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #e8e8e8;
+  letter-spacing: 0.07em;
+  color: #ebebeb;
   line-height: 1.2;
   flex: 1;
   white-space: nowrap;
@@ -208,23 +304,9 @@
   text-overflow: ellipsis;
 }
 
-/* type icon (Lucide) */
-.nw-card__type-icon {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-  color: var(--nw-cat-stripe, #555);
-  opacity: 0.85;
-}
-.nw-card__type-icon svg {
-  width: 100%;
-  height: 100%;
-  stroke-width: 2;
-}
-
-/* level badge */
+/* small level badge */
 .nw-card__level {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 700;
   color: var(--nw-card-color);
   border: 1px solid var(--nw-card-color);
@@ -232,27 +314,45 @@
   padding: 1px 5px;
   white-space: nowrap;
   flex-shrink: 0;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 /* rarity dot */
 .nw-card__rarity-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--nw-card-color);
-  box-shadow: 0 0 4px var(--nw-card-glow-alpha);
+  box-shadow: 0 0 5px rgba(var(--nw-card-rgb,136,136,136), 0.7);
 }
-.nw-card--legendary .nw-card__rarity-dot {
-  box-shadow: 0 0 8px var(--nw-rarity-legendary);
+
+/* ============================================================
+   CARD IMAGE WRAPPER
+   ============================================================ */
+.nw-card__img-wrap {
+  overflow: hidden;
+  line-height: 0;
+  /* allow image to appear slightly behind border */
+}
+.nw-card__img-wrap img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+  opacity: 0.88;
+  transition: opacity 0.2s ease, transform 0.3s ease;
+}
+.nw-card:hover .nw-card__img-wrap img {
+  opacity: 1;
+  transform: scale(1.03);
 }
 
 /* ============================================================
    CARD BODY
    ============================================================ */
 .nw-card__body {
-  padding: 4px 12px 10px;
+  padding: 6px 12px 10px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -261,36 +361,78 @@
 
 .nw-card__desc {
   font-size: 0.7rem;
-  color: #777;
-  line-height: 1.45;
+  color: #6a6a6a;
+  line-height: 1.5;
 }
 
-/* tags row */
+.nw-card__effect {
+  font-size: 0.68rem;
+  font-style: italic;
+  color: #555;
+  line-height: 1.45;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* tags */
 .nw-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 2px;
 }
 
 .nw-card__tag {
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #888;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #666;
 }
 
-/* stats row */
+/* ============================================================
+   REQUIREMENTS ROW
+   Icon + text, no label, subtle
+   Usage: <div class="nw-card__req">
+            <i data-lucide="shield" ...></i> Level 5
+          </div>
+   ============================================================ */
+.nw-card__req {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.62rem;
+  color: #555;
+  letter-spacing: 0.04em;
+  padding: 4px 0 2px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.nw-card__req i,
+.nw-card__req svg {
+  width:  11px;
+  height: 11px;
+  flex-shrink: 0;
+  color: rgba(var(--nw-card-rgb,136,136,136), 0.55);
+  stroke-width: 2;
+}
+.nw-card__req span {
+  /* multiple requirements: separate with | */
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   STATS ROW
+   ============================================================ */
 .nw-card__stats {
   display: flex;
   gap: 10px;
   margin-top: auto;
   padding-top: 6px;
-  border-top: 1px solid #1c1c1c;
+  border-top: 1px solid rgba(255,255,255,0.04);
 }
 
 .nw-card__stat {
@@ -307,10 +449,10 @@
 }
 
 .nw-card__stat-lbl {
-  font-size: 0.55rem;
+  font-size: 0.53rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #444;
+  color: #383838;
 }
 
 /* ============================================================
@@ -318,11 +460,13 @@
    ============================================================ */
 .nw-card__footer {
   padding: 7px 12px;
-  border-top: 1px solid #1c1c1c;
+  border-top: 1px solid rgba(255,255,255,0.04);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 0 0 var(--nw-card-radius) var(--nw-card-radius);
 }
 
 .nw-card__costs {
@@ -335,19 +479,13 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.65rem;
-  color: #666;
+  font-size: 0.63rem;
+  color: #555;
 }
 
-.nw-card__cost svg {
-  width: 11px;
-  height: 11px;
-  flex-shrink: 0;
-  color: #adff00;
-}
-
-.nw-card__cost--ap svg  { color: #ffc107; }
-.nw-card__cost--mp svg  { color: #7b4fff; }
+.nw-card__cost svg { width: 11px; height: 11px; flex-shrink: 0; color: #adff00; }
+.nw-card__cost--ap svg   { color: #ffc107; }
+.nw-card__cost--mp svg   { color: #7b4fff; }
 .nw-card__cost--time svg { color: #2196f3; }
 
 /* ============================================================
@@ -355,15 +493,15 @@
    ============================================================ */
 .nw-card__btn {
   font-family: var(--nw-card-font);
-  font-size: 0.62rem;
+  font-size: 0.60rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   padding: 5px 10px;
   border-radius: 3px;
-  border: 1px solid var(--nw-card-border-dim);
+  border: 1px solid rgba(255,255,255,0.08);
   background: transparent;
-  color: #444;
+  color: #333;
   cursor: not-allowed;
   transition:
     background   0.15s ease,
@@ -374,23 +512,23 @@
 }
 
 .nw-card__btn:not(:disabled) {
-  border-color: var(--nw-card-color);
+  border-color: rgba(var(--nw-card-rgb,136,136,136), 0.55);
   color: var(--nw-card-color);
   cursor: pointer;
 }
 
 .nw-card__btn:not(:disabled):hover {
-  background: var(--nw-card-color);
-  color: #000;
-  box-shadow: 0 0 8px var(--nw-card-glow-alpha);
+  background: rgba(var(--nw-card-rgb,136,136,136), 0.18);
+  border-color: var(--nw-card-color);
+  box-shadow: 0 0 8px rgba(var(--nw-card-rgb,136,136,136), 0.3);
 }
 
 /* ============================================================
-   PROGRESS BAR (foundry XP)
+   PROGRESS BAR
    ============================================================ */
 .nw-card__progress {
   height: 3px;
-  background: #1a1a1a;
+  background: rgba(255,255,255,0.05);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -399,15 +537,69 @@
   height: 100%;
   background: var(--nw-card-color);
   border-radius: 2px;
+  box-shadow: 0 0 4px rgba(var(--nw-card-rgb,136,136,136), 0.6);
   transition: width 0.4s ease;
 }
 
 .nw-card__progress-label {
-  font-size: 0.57rem;
-  color: #444;
+  font-size: 0.55rem;
+  color: #383838;
   margin-top: 2px;
   display: flex;
   justify-content: space-between;
+}
+
+/* ============================================================
+   ASC BONUS PILLS (Ascension panel)
+   ============================================================ */
+.nw-asc-bonuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.nw-asc-bonus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--nw-card-font);
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(var(--nw-card-rgb,136,136,136), 0.12);
+  color: var(--nw-card-color);
+  border: 1px solid rgba(var(--nw-card-rgb,136,136,136), 0.25);
+}
+
+.nw-asc-bonus-pill--next {
+  background: rgba(var(--nw-card-rgb,136,136,136), 0.05);
+  color: rgba(var(--nw-card-rgb,136,136,136), 0.45);
+  border-color: rgba(var(--nw-card-rgb,136,136,136), 0.15);
+}
+
+.nw-asc-bonuses-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px dashed rgba(var(--nw-card-rgb,136,136,136), 0.20);
+  background: rgba(var(--nw-card-rgb,136,136,136), 0.04);
+}
+
+.nw-asc-preview-label {
+  width: 100%;
+  font-family: var(--nw-card-font);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(var(--nw-card-rgb,136,136,136), 0.45);
+  margin-bottom: 2px;
 }
 
 /* ============================================================
@@ -417,8 +609,8 @@
   min-width: 200px;
   max-width: 260px;
 }
-.nw-card--library .nw-card__name { font-size: 0.85rem; }
-.nw-card--library .nw-card__desc { font-size: 0.72rem; }
+.nw-card--library .nw-card__name { font-size: 0.82rem; }
+.nw-card--library .nw-card__desc { font-size: 0.70rem; }
 
 /* ============================================================
    CONTEXT: FOUNDRY
@@ -426,22 +618,25 @@
 .nw-card--foundry {
   min-width: 180px;
 }
-.nw-card--foundry .nw-card__body { gap: 8px; }
+.nw-card--foundry .nw-card__body { gap: 7px; }
 
 /* ============================================================
-   CONTEXT: HAND (in-game compact)
+   CONTEXT: HAND (compact in-game)
    ============================================================ */
 .nw-card--hand {
   width: 88px;
   min-height: 118px;
   flex-shrink: 0;
 }
-.nw-card--hand .nw-card__header { padding: 7px 8px 4px; }
-.nw-card--hand .nw-card__name   { font-size: 0.65rem; }
+.nw-card--hand .nw-card__header { padding: 7px 8px 4px; padding-right: 8px; }
+.nw-card--hand .nw-card__name   { font-size: 0.62rem; }
 .nw-card--hand .nw-card__body   { padding: 2px 8px 8px; }
 .nw-card--hand .nw-card__desc   { display: none; }
 .nw-card--hand .nw-card__stats  { display: none; }
 .nw-card--hand .nw-card__footer { padding: 5px 8px; }
+.nw-card--hand .nw-card__corner-icon { width: 20px; height: 20px; top: 6px; right: 6px; }
+.nw-card--hand .nw-asc-pips     { gap: 3px; top: -8px; }
+.nw-card--hand .nw-asc-pip      { width: 5px; height: 5px; }
 
 /* ============================================================
    GRID LAYOUTS
@@ -449,7 +644,9 @@
 .nw-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  gap: 20px;
+  /* extra top padding so ascension pips don't get clipped */
+  padding-top: 14px;
 }
 
 .nw-cards-hand {
@@ -457,7 +654,7 @@
   flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 14px 4px 4px;
   scrollbar-width: thin;
   scrollbar-color: #adff00 #111;
 }
@@ -485,7 +682,7 @@
 @media (max-width: 600px) {
   .nw-cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-    gap: 10px;
+    gap: 14px;
   }
   .nw-card--library {
     min-width: 0;
