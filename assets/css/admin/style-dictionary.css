@@ -1,85 +1,113 @@
-/* ============================================================
-   NeoWeaver Admin — STYLE DICTIONARY
-   Module-specific extensions (Style/Vibe categories)
-   ============================================================ */
+/* NeoWeaver — Style Dictionary admin (extends admin-core.css) */
 
-/* ---- Stats & Category Pills (Unique to Dictionary) ---- */
-.nw-pill-cat-behavior strong { color: #7dd3fc; }
-.nw-pill-cat-visuals  strong { color: #c4b5fd; }
-.nw-pill-cat-vibe     strong { color: #f9a8d4; }
-.nw-pill-cat-general  strong { color: #888; }
-
-/* ---- Table Extensions ---- */
-.nw-table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--nw-border, rgba(255,255,255,.08));
-    border-radius: 5px;
+.nw-styledic-panel {
+	font-family: 'Chakra Petch', monospace;
 }
 
-/* row inactive */
-.nw-table tbody tr.nw-row-inactive { 
-    opacity: .45; 
-    filter: grayscale(0.5);
+/* ── Tag pill ──────────────────────────────────────────────────────────── */
+.nw-tag-pill {
+	display: inline-block;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 12px;
+	font-weight: 600;
+	color: #adff00;
+	background: rgba(173, 255, 0, 0.08);
+	border: 1px solid rgba(173, 255, 0, 0.25);
+	border-radius: 6px;
+	padding: 3px 10px;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
 }
 
-/* ---- Category Badges (AI Instructions types) ---- */
+/* ── Category badges ───────────────────────────────────────────────────── */
 .nw-cat-badge {
-    display: inline-block;
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: #1c1c1c;
-    color: #888;
+	border-radius: 10px;
+	padding: 2px 9px;
+	font-size: 11px;
+	font-family: 'Chakra Petch', monospace;
+	font-weight: 600;
+	display: inline-block;
+	white-space: nowrap;
+}
+.nw-cat-behavior { background: rgba(251,146,60,0.12);  color: #fb923c; border: 1px solid rgba(251,146,60,0.28); }
+.nw-cat-visuals  { background: rgba(59,130,246,0.12);  color: #7ab4ff; border: 1px solid rgba(59,130,246,0.28); }
+.nw-cat-vibe     { background: rgba(168,85,247,0.12);  color: #c07aff; border: 1px solid rgba(168,85,247,0.28); }
+.nw-cat-general  { background: rgba(255,255,255,0.06); color: #aaa;    border: 1px solid rgba(255,255,255,0.1);  }
+
+/* ── Stats ─────────────────────────────────────────────────────────────── */
+.nw-stat-behavior { color: #fb923c !important; }
+.nw-stat-visuals  { color: #7ab4ff !important; }
+.nw-stat-vibe     { color: #c07aff !important; }
+.nw-stat-muted    { color: #888    !important; }
+
+/* ── Interpretation col ────────────────────────────────────────────────── */
+.nw-col-interp {
+	font-size: 12px;
+	color: #bbb;
+	max-width: 400px;
+	line-height: 1.5;
 }
 
-.nw-cat-badge.behavior { background: rgba(125,211,252,.12); color: #7dd3fc; }
-.nw-cat-badge.visuals  { background: rgba(196,181,253,.12); color: #c4b5fd; }
-.nw-cat-badge.vibe     { background: rgba(249,168,212,.12); color: #f9a8d4; }
-.nw-cat-badge.general  { background: #1c1c1c;              color: #888; }
-
-/* ---- Specialized Filters ---- */
-.nw-filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 16px;
+/* ── Modal textarea ────────────────────────────────────────────────────── */
+.nw-textarea {
+	width: 100%;
+	min-height: 120px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: 13px;
+	background: rgba(0,0,0,0.25);
+	border: 1px solid rgba(255,255,255,0.12);
+	border-radius: 6px;
+	color: #f0f0f0;
+	padding: 10px 12px;
+	line-height: 1.6;
+}
+.nw-textarea:focus {
+	outline: none;
+	border-color: rgba(173,255,0,0.45);
+	box-shadow: 0 0 0 2px rgba(173,255,0,0.08);
 }
 
-.nw-filter-input { 
-    flex: 1; 
-    min-width: 200px; 
+/* ── Mono tag name input ────────────────────────────────────────────────── */
+.nw-mono-input {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 13px;
+	color: #adff00;
 }
 
-/* ---- Form Field Adjustments ---- */
-.nw-field-center { 
-    justify-content: center; 
-    align-items: flex-start; 
+/* ── Checkbox row ──────────────────────────────────────────────────────── */
+.nw-checkbox-row {
+	margin-top: 4px;
+}
+.nw-checkbox-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	font-size: 13px;
+	color: #d4d4d4;
+}
+.nw-checkbox-label input[type="checkbox"] {
+	width: 16px;
+	height: 16px;
+	accent-color: #adff00;
+	cursor: pointer;
 }
 
-/* Custom alignment for toggle in table cells */
-.nw-toggle-cell { 
-    display: flex; 
-    align-items: center; 
-    gap: 8px; 
+/* ── Field hint ─────────────────────────────────────────────────────────── */
+.nw-field-hint {
+	font-size: 10px;
+	color: #888;
+	font-weight: 400;
+	margin-left: 6px;
+}
+.nw-required {
+	color: #f87171;
+	margin-left: 2px;
 }
 
-/* Action buttons within table rows */
-.nw-action-btn {
-    background: transparent;
-    border: 1px solid var(--nw-border, rgba(255,255,255,.08));
-    border-radius: 4px;
-    color: #888;
-    font-size: .75rem;
-    padding: 4px 10px;
-    cursor: pointer;
-    font-family: 'Chakra Petch', sans-serif;
-    transition: all 0.15s ease;
-}
+/* ── 2-col form grid ────────────────────────────────────────────────────── */
+.nw-form-cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 600px) { .nw-form-cols-2 { grid-template-columns: 1fr; } }
 
-.nw-action-btn:hover { 
-    color: var(--nw-accent, #adff00); 
-    border-color: var(--nw-accent, #adff00); 
-}
+.nw-text-muted { color: #777; font-size: 12px; }
