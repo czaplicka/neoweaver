@@ -22,6 +22,8 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+if ( class_exists( 'NW_Memory_Parser' ) ) return;
+
 class NW_Memory_Parser {
 
 	// Mapa ważności dla poszczególnych topiców
@@ -157,6 +159,15 @@ class NW_Memory_Parser {
 	private function save_memories( array $entries ): array {
 		if ( ! function_exists( 'tw_supabase_request' ) ) {
 			error_log( '[NW_Memory_Parser] tw_supabase_request() niedostępny.' );
+			return [];
+		}
+
+		// Walidacja: tylko czyste tablice asocjacyjne z wymaganymi polami
+		$entries = array_values( array_filter( $entries, fn( $e ) =>
+			is_array( $e ) && ! empty( $e['content'] ) && ! empty( $e['topic'] )
+		) );
+
+		if ( empty( $entries ) ) {
 			return [];
 		}
 
