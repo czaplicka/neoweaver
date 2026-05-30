@@ -146,31 +146,147 @@ class Neoweaver_Agents_List {
 		return (string) ob_get_clean();
 	}
 
+	/**
+	 * Return all agents for a WP user (living + dead), with tags and inventory.
+	 *
+	 * @param int $wp_user_id
+	 * @return array
+	 */
 	public function get_roster( int $wp_user_id ): array {
-		return [];
+		return $this->repo->get_for_wp_user( $wp_user_id );
 	}
 
+	/**
+	 * Return living (non-STATUS_DEAD) agents for a WP user.
+	 * Used by campaign step 7 agent selector and multiplayer join screens.
+	 *
+	 * @param int $wp_user_id
+	 * @return array
+	 */
 	public function get_selectable_agents( int $wp_user_id ): array {
-		return [];
+		return $this->repo->get_living_for_wp_user( $wp_user_id );
 	}
 
+	/**
+	 * Return all agents bound to a specific Node (world), regardless of owner.
+	 *
+	 * @param string|int $node_id  Supabase UUID of the cyber_worlds row.
+	 * @return array
+	 */
 	public function get_agents_in_node( $node_id ): array {
-		return [];
+		if ( empty( $node_id ) ) {
+			error_log( 'Neoweaver_Agents_List::get_agents_in_node — empty node_id' );
+			return [];
+		}
+		return $this->repo->get_by_node( $node_id );
 	}
 
+	/**
+	 * Return living agents belonging to a WP user that are bound to a specific Node.
+	 * These are the agents eligible for "Data Ghost" / observer mode.
+	 *
+	 * @param string|int $node_id
+	 * @param int        $wp_user_id
+	 * @return array
+	 */
 	public function get_data_ghosts_for_node( $node_id, int $wp_user_id ): array {
-		return [];
+		if ( empty( $node_id ) || empty( $wp_user_id ) ) {
+			error_log( 'Neoweaver_Agents_List::get_data_ghosts_for_node — empty node_id or wp_user_id' );
+			return [];
+		}
+
+		$in_node  = $this->repo->get_by_node( $node_id );
+		$living   = $this->repo->get_living_for_wp_user( $wp_user_id );
+
+		// Intersect: agents that are in the node AND owned by this user AND alive.
+		$living_ids = array_column( $living, 'id' );
+		$living_set = array_flip( array_map( 'strval', $living_ids ) );
+
+		return array_values( array_filter(
+			$in_node,
+			function ( $agent ) use ( $living_set ) {
+				return isset( $living_set[ (string) ( $agent['id'] ?? '' ) ] );
+			}
+		) );
 	}
 
+	/**
+	 * Render an HTML <select> of living agents for a WP user.
+	 * Used server-side where a plain dropdown is sufficient.
+	 *
+	 * @param int $wp_user_id
+	 * @return string  HTML <select> or an empty-state message.
+	 */
 	public function render_agent_select( int $wp_user_id ): string {
-		return '';
+		$agents = $this->repo->get_living_for_wp_user( $wp_user_id );
+
+		if ( empty( $agents ) ) {
+			return '<p class="tw-helper-text">No Field Agents available. <a href="' . esc_url( home_url( '/new-agent/' ) ) . '" class="tw-link">Create one first &rarr;</a></p>';
+		}
+
+		$html = '<select name="character_id" id="tw-agent-select" class="tw-select">';
+		$html .= '<option value="">— Select Field Agent —</option>';
+		foreach ( $agents as $agent ) {
+			$id    = esc_attr( (string) ( $agent['id'] ?? '' ) );
+			$label = esc_html( ( $agent['name'] ?? 'Unknown Agent' ) . ' (LVL ' . (int) ( $agent['lvl'] ?? 1 ) . ')' );
+			$html .= '<option value="' . $id . '">' . $label . '</option>';
+		}
+		$html .= '</select>';
+
+		return $html;
 	}
 
+	/**
+	 * Render a small badge showing the currently active agent for a WP user.
+	 * Returns an empty string when no active session / agent exists.
+	 *
+	 * @param int $wp_user_id
+	 * @return string  HTML badge or empty string.
+	 */
 	public function render_active_agent_badge( int $wp_user_id ): string {
-		return '';
+		$agent = $this->repo->get_active_for_wp_user( $wp_user_id );
+
+		if ( ! $agent ) {
+			return '';
+		}
+
+		$name  = esc_html( $agent['name'] ?? 'Unknown Agent' );
+		$lvl   = (int) ( $agent['lvl'] ?? 1 );
+		$race  = esc_html( $agent['cyber_races']['name'] ?? '' );
+		$class = esc_html( $agent['cyber_classes']['name'] ?? '' );
+		$id    = esc_attr( (string) ( $agent['id'] ?? '' ) );
+
+		return '<span class="tw-active-agent-badge" data-char-id="' . $id . '">' .
+				'<span class="tw-lvl-badge">LVL ' . $lvl . '</span> ' .
+				$name .
+				( $race || $class ? ' <small>' . implode( ' // ', array_filter( [ $race, $class ] ) ) . '</small>' : '' ) .
+				'</span>';
 	}
 
+	/**
+	 * Return a minimal array payload for each living agent, ready for JS / REST responses.
+	 * Keys: id, name, lvl, race, class, avatar, world_id.
+	 *
+	 * @param int $wp_user_id
+	 * @return array
+	 */
 	public function to_api_payload( int $wp_user_id ): array {
-		return [];
+		$agents  = $this->repo->get_living_for_wp_user( $wp_user_id );
+		$default = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'assets/images/Avatar.svg';
+		$out     = [];
+
+		foreach ( $agents as $agent ) {
+			$out[] = [
+				'id'       => $agent['id'] ?? '',
+				'name'     => $agent['name'] ?? 'Unknown Agent',
+				'lvl'      => (int) ( $agent['lvl'] ?? 1 ),
+				'race'     => $agent['cyber_races']['name'] ?? '',
+				'class'    => $agent['cyber_classes']['name'] ?? '',
+				'avatar'   => ! empty( $agent['avatar'] ) ? $agent['avatar'] : $default,
+				'world_id' => $agent['world_id'] ?? '',
+			];
+		}
+
+		return $out;
 	}
 }
