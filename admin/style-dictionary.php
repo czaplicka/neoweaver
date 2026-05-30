@@ -1,487 +1,343 @@
 <?php
 /**
- * NeoWeaver Admin Panel — Style Dictionary (cyber_style_dictionary)
- *
- * Columns: id, tag_name, category, interpretation_en, is_active, created_at
- * Categories: behavior | visuals | vibe | general
+ * NeoWeaver — Style Dictionary Admin
+ * Table: cyber_style_dictionary
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( class_exists( 'NeoWeaver_Style_Dictionary_Admin', false ) ) {
-	return;
-}
-
-class NeoWeaver_Style_Dictionary_Admin {
+class NWStyleDictionaryAdmin {
 
 	private string $page_slug    = 'nw-style-dictionary';
-	private string $parent_slug  = 'neoweaver';
-	private string $nonce_action = 'neoweaver_sd';
+	private string $nonce_action = 'nwstyledictionary nonce';
+	private string $table        = 'cyber_style_dictionary';
 
-	private array $categories = [ 'behavior', 'visuals', 'vibe', 'general' ];
+	private const CATEGORIES = [ 'behavior', 'visuals', 'vibe', 'general' ];
 
 	public function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_menu' ] );
+		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-		add_action( 'wp_ajax_nw_sd_get_all', [ $this, 'ajax_get_all' ] );
-		add_action( 'wp_ajax_nw_sd_save', [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_sd_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_sd_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nwstyledicload',      [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nwstyledicssave',     [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nwstyledicdelete',    [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nwstyledicduplicate', [ $this, 'ajax_duplicate' ] );
 	}
 
+	// ── Menu ─────────────────────────────────────────────────────────────────
 	public function register_menu(): void {
 		add_submenu_page(
-			$this->parent_slug,
-			'NeoWeaver — Style Dictionary',
-			'🔤 Style Dictionary',
+			'nw-dashboard',
+			__( 'Style Dictionary', 'neoweaver' ),
+			'<i data-lucide="book-marked" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"></i> Style Dictionary',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
 		);
 	}
 
+	// ── Assets ───────────────────────────────────────────────────────────────
 	public function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, $this->page_slug ) ) {
 			return;
 		}
-
-		$ver  = defined( 'NEOWEAVER_VERSION' ) ? NEOWEAVER_VERSION : '1.0.0';
-		$base = trailingslashit( NEOWEAVER_PLUGIN_URL );
-
-		if ( ! wp_style_is( 'nw-font-chakra-petch', 'registered' ) && ! wp_style_is( 'nw-font-chakra-petch', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'nw-font-chakra-petch',
-				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap',
-				[],
-				null
-			);
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style( 'chakra-petch', 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap', [], null );
 		}
-
-		wp_enqueue_style(
-			'nw-admin-core',
-			$base . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			$ver
-		);
-
-		wp_enqueue_style(
-			'nw-style-dictionary-style',
-			$base . 'assets/css/admin/style-dictionary.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			$ver
-		);
-
+		wp_enqueue_style( 'nw-admin-core',     NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',        [ 'chakra-petch' ], NW_VERSION );
+		wp_enqueue_style( 'nw-styledic-style', NW_PLUGIN_URL . 'assets/css/admin/style-dictionary.css',  [ 'chakra-petch', 'nw-admin-core' ], NW_VERSION );
+		wp_enqueue_script( 'lucide', 'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js', [], '0.468.0', true );
 		wp_enqueue_script(
-			'nw-style-dictionary-script',
-			$base . 'assets/js/admin/style-dictionary.js',
-			[ 'jquery', 'nw-lucide' ],
-			$ver,
+			'nw-styledic-script',
+			NW_PLUGIN_URL . 'assets/js/admin/style-dictionary.js',
+			[ 'jquery', 'lucide' ],
+			NW_VERSION,
 			true
 		);
-
-		wp_localize_script(
-			'nw-style-dictionary-script',
-			'NW_SD',
-			[
-				'ajax_url'   => admin_url( 'admin-ajax.php' ),
-				'nonce'      => wp_create_nonce( $this->nonce_action ),
-				'categories' => $this->categories,
-			]
-		);
+		wp_localize_script( 'nw-styledic-script', 'NWStyleDic', [
+			'ajaxurl'    => admin_url( 'admin-ajax.php' ),
+			'nonce'      => wp_create_nonce( $this->nonce_action ),
+			'categories' => self::CATEGORIES,
+		] );
 	}
 
-	public function render_page(): void {
-		?>
-		<div class="wrap nw-panel" id="nw-sd-panel">
-			<div class="nw-panel-header">
-				<h1 class="nw-panel-title"><span class="nw-accent">Neo</span>Weaver <span class="nw-panel-subtitle">/ Style Dictionary</span></h1>
-				<div class="nw-header-actions">
-					<button class="nw-btn nw-btn-ghost" id="nw-refresh-btn" type="button">↻ Refresh</button>
-					<button class="nw-btn nw-btn-primary" id="nw-add-btn" type="button">+ New Tag</button>
-				</div>
-			</div>
-
-			<div id="nw-notice" class="nw-notice" style="display:none;"></div>
-
-			<div class="nw-stats-bar">
-				<span class="nw-stat-pill">Total: <strong id="nw-total">—</strong></span>
-				<span class="nw-stat-pill nw-pill-active">Active: <strong id="nw-active">—</strong></span>
-				<span class="nw-stat-pill nw-pill-inactive">Inactive: <strong id="nw-inactive">—</strong></span>
-				<?php foreach ( $this->categories as $cat ) : ?>
-					<span class="nw-stat-pill nw-pill-cat-<?php echo esc_attr( $cat ); ?>">
-						<?php echo esc_html( ucfirst( $cat ) ); ?>:
-						<strong class="nw-cat-count" data-cat="<?php echo esc_attr( $cat ); ?>">—</strong>
-					</span>
-				<?php endforeach; ?>
-			</div>
-
-			<div class="nw-filter-bar">
-				<select id="nw-filter-category" class="nw-select nw-filter-select">
-					<option value="">All Categories</option>
-					<?php foreach ( $this->categories as $c ) : ?>
-						<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-filter-active" class="nw-select nw-filter-select">
-					<option value="">Active &amp; Inactive</option>
-					<option value="1">Active only</option>
-					<option value="0">Inactive only</option>
-				</select>
-
-				<input
-					type="text"
-					id="nw-filter-search"
-					class="nw-filter-input"
-					placeholder="Search tag name or interpretation…"
-				>
-			</div>
-
-			<div class="nw-table-wrap">
-				<table class="nw-table">
-					<thead>
-						<tr>
-							<th>Tag Name</th>
-							<th>Category</th>
-							<th>Interpretation (EN)</th>
-							<th>Active</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody id="nw-sd-tbody">
-						<tr class="nw-loading-row">
-							<td colspan="5"><div class="nw-spinner"></div> Loading tags…</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-
-			<div class="nw-modal-overlay" id="nw-modal-overlay" style="display:none;">
-				<div class="nw-modal">
-					<div class="nw-modal-header">
-						<h2 id="nw-modal-title">Edit Style Tag</h2>
-						<button class="nw-modal-close" id="nw-modal-close" type="button">✕</button>
-					</div>
-
-					<div class="nw-modal-body">
-						<form id="nw-sd-form">
-							<input type="hidden" id="nw-field-id" name="id">
-
-							<div class="nw-section-label">Identity</div>
-							<div class="nw-form-grid">
-								<div class="nw-field">
-									<label for="nw-field-tag_name">Tag Name <span class="nw-req">*</span></label>
-									<input
-										type="text"
-										id="nw-field-tag_name"
-										name="tag_name"
-										required
-										placeholder="e.g. neon-shadow"
-									>
-								</div>
-
-								<div class="nw-field">
-									<label for="nw-field-category">Category <span class="nw-req">*</span></label>
-									<select id="nw-field-category" name="category" class="nw-select">
-										<?php foreach ( $this->categories as $c ) : ?>
-											<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-										<?php endforeach; ?>
-									</select>
-								</div>
-
-								<div class="nw-field nw-field-full">
-									<label for="nw-field-interpretation_en">Interpretation (EN) <span class="nw-req">*</span></label>
-									<textarea
-										id="nw-field-interpretation_en"
-										name="interpretation_en"
-										rows="4"
-										required
-										placeholder="Describe what this style tag means in the game world…"
-									></textarea>
-								</div>
-							</div>
-
-							<div class="nw-section-label">Visibility</div>
-							<div class="nw-form-grid">
-								<div class="nw-field nw-field-center">
-									<label for="nw-field-is_active">Active</label>
-									<label class="nw-toggle">
-										<input type="checkbox" id="nw-field-is_active" name="is_active">
-										<span class="nw-toggle-slider"></span>
-									</label>
-								</div>
-							</div>
-						</form>
-					</div>
-
-					<div class="nw-modal-footer">
-						<button class="nw-btn nw-btn-danger" id="nw-delete-btn" type="button" style="display:none;margin-right:auto;">🗑 Delete</button>
-						<button class="nw-btn nw-btn-ghost" id="nw-cancel-btn" type="button">Cancel</button>
-						<button class="nw-btn nw-btn-primary" id="nw-save-btn" type="button">
-							<span id="nw-save-label">Save Tag</span>
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-		<?php
-	}
-
-	private function get_supabase_url(): string {
-		if ( function_exists( 'tw_supabase_url' ) ) {
-			return rtrim( (string) tw_supabase_url(), '/' );
-		}
-
-		return '';
-	}
-
-	private function get_supabase_key(): string {
-		if ( function_exists( 'tw_supabase_service_key' ) && tw_supabase_service_key() ) {
-			return (string) tw_supabase_service_key();
-		}
-
-		if ( function_exists( 'tw_supabase_anon_key' ) && tw_supabase_anon_key() ) {
-			return (string) tw_supabase_anon_key();
-		}
-
-		return '';
+	// ── Helpers ──────────────────────────────────────────────────────────────
+	private function sk(): array {
+		if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) { return []; }
+		return [
+			'apikey'        => TW_SUPABASE_SERVICE_KEY,
+			'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+		];
 	}
 
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
-		$supabase_url = $this->get_supabase_url();
-		$supabase_key = $this->get_supabase_key();
-
-		if ( '' === $supabase_url || '' === $supabase_key ) {
-			return [
-				'code'  => 0,
-				'data'  => null,
-				'error' => 'Supabase configuration not available.',
-			];
+		$method = strtoupper( $method );
+		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) { parse_str( $qs, $query ); }
+			$data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
+			if ( ! is_array( $data ) ) {
+				return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
+			}
+			if ( isset( $data['code'], $data['message'] ) ) {
+				return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+			}
+			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
 		}
-
-		$headers = array_merge(
-			[
-				'apikey'        => $supabase_key,
-				'Authorization' => 'Bearer ' . $supabase_key,
-				'Content-Type'  => 'application/json',
-				'Prefer'        => 'return=representation',
-			],
-			$extra_headers
-		);
-
-		if ( array_key_exists( 'Prefer', $headers ) && '' === $headers['Prefer'] ) {
-			unset( $headers['Prefer'] );
+		if ( function_exists( 'tw_supabase_request' ) ) {
+			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+			$query = [];
+			if ( $qs ) { parse_str( $qs, $query ); }
+			$extra_args = [];
+			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+				$extra_args['headers']['Prefer'] = 'return=representation';
+			}
+			if ( ! empty( $extra_headers ) ) {
+				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+			}
+			$res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+			$ok   = $res['ok']   ?? false;
+			$code = $res['code'] ?? 0;
+			$data = $res['data'] ?? null;
+			if ( ! $ok ) {
+				$msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+				return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+			}
+			return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
 		}
-
-		$args = [
-			'method'  => strtoupper( $method ),
-			'timeout' => 15,
-			'headers' => $headers,
-		];
-
-		if ( ! empty( $body ) && ! in_array( strtoupper( $method ), [ 'GET', 'DELETE' ], true ) ) {
-			$args['body'] = wp_json_encode( $body );
-		}
-
-		$res = wp_remote_request(
-			$supabase_url . '/rest/v1/' . ltrim( $endpoint, '/' ),
-			$args
-		);
-
-		if ( is_wp_error( $res ) ) {
-			return [
-				'code'  => 0,
-				'data'  => null,
-				'error' => $res->get_error_message(),
-			];
-		}
-
-		$body_raw = wp_remote_retrieve_body( $res );
-		$data     = '' !== $body_raw ? json_decode( $body_raw, true ) : null;
-
-		return [
-			'code'  => (int) wp_remote_retrieve_response_code( $res ),
-			'data'  => $data,
-			'error' => null,
-		];
+		return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
 	}
 
-	private function normalize_tag( array $tag ): array {
-		$tag['id']                = isset( $tag['id'] ) ? (string) $tag['id'] : '';
-		$tag['tag_name']          = isset( $tag['tag_name'] ) ? (string) $tag['tag_name'] : '';
-		$tag['category']          = isset( $tag['category'] ) ? (string) $tag['category'] : 'general';
-		$tag['interpretation_en'] = isset( $tag['interpretation_en'] ) ? (string) $tag['interpretation_en'] : '';
-		$tag['is_active']         = ! empty( $tag['is_active'] );
-		$tag['created_at']        = isset( $tag['created_at'] ) ? (string) $tag['created_at'] : '';
-
-		return $tag;
+	private function get_cache_key( string $suffix ): string {
+		return 'nw_' . md5( $suffix );
 	}
 
-	public function ajax_get_all(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
+	private function bust_cache(): void {
+		delete_transient( $this->get_cache_key( $this->table . '_all' ) );
+	}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
+	private function cached_get_all(): array {
+		$cache_key = $this->get_cache_key( $this->table . '_all' );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
 		}
-
-		$res = $this->supa(
-			'GET',
-			'cyber_style_dictionary?select=id,tag_name,category,interpretation_en,is_active,created_at&order=tag_name.asc'
-		);
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
+		$res = $this->supa( 'GET', $this->table . '?select=*&order=category.asc,tag_name.asc', [], $this->sk() );
+		if ( ! $res['ok'] ) {
+			return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
 		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
 		$rows = is_array( $res['data'] ) ? $res['data'] : [];
-		$rows = array_map( [ $this, 'normalize_tag' ], $rows );
+		set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+		return $rows;
+	}
 
+	private function is_uuid( string $value ): bool {
+		return (bool) preg_match( '/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/', $value );
+	}
+
+	private function bool_from_post( string $key, bool $default = false ): bool {
+		if ( ! isset( $_POST[ $key ] ) ) { return $default; }
+		return (bool) intval( wp_unslash( $_POST[ $key ] ) );
+	}
+
+	private function sanitize_category( string $v ): string {
+		return in_array( $v, self::CATEGORIES, true ) ? $v : 'general';
+	}
+
+	// ── AJAX ─────────────────────────────────────────────────────────────────
+	public function ajax_load(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+		$rows = $this->cached_get_all();
+		if ( isset( $rows['error'] ) ) { wp_send_json_error( $rows['error'] ); return; }
 		wp_send_json_success( $rows );
 	}
 
 	public function ajax_save(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
+		$id                = sanitize_text_field( wp_unslash( $_POST['id']                ?? '' ) );
+		$tag_name          = sanitize_text_field( wp_unslash( $_POST['tag_name']          ?? '' ) );
+		$category          = sanitize_text_field( wp_unslash( $_POST['category']          ?? 'general' ) );
+		$interpretation_en = sanitize_textarea_field( wp_unslash( $_POST['interpretation_en'] ?? '' ) );
+		$is_active         = $this->bool_from_post( 'is_active', true );
 
-		$raw = wp_unslash( $_POST['tag'] ?? [] );
-
-		if ( ! is_array( $raw ) ) {
-			wp_send_json_error( 'Invalid payload', 400 );
-		}
-
-		$id       = sanitize_text_field( $raw['id'] ?? '' );
-		$category = sanitize_text_field( $raw['category'] ?? 'general' );
+		if ( ! $tag_name )          { wp_send_json_error( 'Tag name is required.' );          return; }
+		if ( ! $interpretation_en ) { wp_send_json_error( 'Interpretation is required.' ); return; }
+		if ( $id && ! $this->is_uuid( $id ) ) { wp_send_json_error( 'Invalid ID.' ); return; }
 
 		$payload = [
-			'tag_name'          => sanitize_text_field( $raw['tag_name'] ?? '' ),
-			'category'          => in_array( $category, $this->categories, true ) ? $category : 'general',
-			'interpretation_en' => sanitize_textarea_field( $raw['interpretation_en'] ?? '' ),
-			'is_active'         => filter_var( $raw['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN ),
+			'tag_name'          => strtolower( trim( $tag_name ) ),
+			'category'          => $this->sanitize_category( $category ),
+			'interpretation_en' => $interpretation_en,
+			'is_active'         => $is_active,
 		];
 
-		if ( '' === $payload['tag_name'] ) {
-			wp_send_json_error( 'Tag name is required.', 400 );
+		if ( ! $id ) {
+			$res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		} else {
+			$res = $this->supa( 'PATCH', $this->table . '?id=eq.' . rawurlencode( $id ), $payload, $this->sk() );
 		}
 
-		if ( '' === $payload['interpretation_en'] ) {
-			wp_send_json_error( 'Interpretation is required.', 400 );
-		}
-
-		$res = '' !== $id
-			? $this->supa( 'PATCH', 'cyber_style_dictionary?id=eq.' . rawurlencode( $id ), $payload )
-			: $this->supa( 'POST', 'cyber_style_dictionary', $payload );
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
-		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
-		$item = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
-
-		if ( is_array( $item ) ) {
-			$item = $this->normalize_tag( $item );
-		}
-
-		wp_send_json_success( $item );
-	}
-
-	public function ajax_toggle(): void {
-		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
-
-		$id    = sanitize_text_field( wp_unslash( $_POST['tag_id'] ?? '' ) );
-		$state = filter_var( wp_unslash( $_POST['is_active'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-		}
-
-		$res = $this->supa(
-			'PATCH',
-			'cyber_style_dictionary?id=eq.' . rawurlencode( $id ),
-			[ 'is_active' => $state ]
-		);
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
-		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
-		wp_send_json_success(
-			[
-				'tag_id'    => $id,
-				'is_active' => $state,
-			]
-		);
+		if ( ! $res['ok'] ) { wp_send_json_error( $res['error'] ?? 'Save failed.' ); return; }
+		$this->bust_cache();
+		$row = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+		wp_send_json_success( $row );
 	}
 
 	public function ajax_delete(): void {
 		check_ajax_referer( $this->nonce_action, 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['tag_id'] ?? '' ) );
-
-		if ( '' === $id ) {
-			wp_send_json_error( 'Missing ID', 400 );
-		}
-
-		$res = $this->supa(
-			'DELETE',
-			'cyber_style_dictionary?id=eq.' . rawurlencode( $id ),
-			[],
-			[ 'Prefer' => '' ]
-		);
-
-		if ( $res['error'] ) {
-			wp_send_json_error( $res['error'], 500 );
-		}
-
-		$code = $res['code'] ?? 0;
-
-		if ( $code < 200 || $code >= 300 ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] )
-				? $res['data']['message']
-				: 'Supabase error ' . $code;
-			wp_send_json_error( $msg, 500 );
-		}
-
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		if ( ! $id || ! $this->is_uuid( $id ) ) { wp_send_json_error( 'Invalid ID.' ); return; }
+		$res = $this->supa( 'DELETE', $this->table . '?id=eq.' . rawurlencode( $id ), [], $this->sk() );
+		if ( ! $res['ok'] ) { wp_send_json_error( $res['error'] ?? 'Delete failed.' ); return; }
+		$this->bust_cache();
 		wp_send_json_success( 'deleted' );
+	}
+
+	public function ajax_duplicate(): void {
+		check_ajax_referer( $this->nonce_action, 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); return; }
+		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+		if ( ! $id || ! $this->is_uuid( $id ) ) { wp_send_json_error( 'Invalid ID.' ); return; }
+
+		$res = $this->supa( 'GET', $this->table . '?id=eq.' . rawurlencode( $id ) . '&select=*', [], $this->sk() );
+		if ( ! $res['ok'] || empty( $res['data'] ) ) { wp_send_json_error( 'Original not found.' ); return; }
+		$original = is_array( $res['data'] ) ? ( $res['data'][0] ?? [] ) : [];
+
+		$payload = $original;
+		unset( $payload['id'], $payload['created_at'] );
+		$payload['tag_name']  = $original['tag_name'] . '_copy';
+		$payload['is_active'] = false;
+
+		$dup_res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+		if ( ! $dup_res['ok'] ) { wp_send_json_error( $dup_res['error'] ?? 'Duplicate failed.' ); return; }
+		$this->bust_cache();
+		$row = is_array( $dup_res['data'] ) ? ( $dup_res['data'][0] ?? $dup_res['data'] ) : $dup_res['data'];
+		wp_send_json_success( $row );
+	}
+
+	// ── Render ───────────────────────────────────────────────────────────────
+	public function render_page(): void {
+		$categories = self::CATEGORIES;
+		?>
+<div class="wrap nw-styledic-panel">
+
+	<div class="nw-admin-header">
+		<div class="nw-admin-header-left">
+			<i data-lucide="book-marked" class="nw-header-icon"></i>
+			<div>
+				<h1 class="nw-admin-title">Style Dictionary</h1>
+				<p class="nw-admin-subtitle">Tags that define world aesthetics, vibes and visual interpretation for the AI GM</p>
+			</div>
+		</div>
+		<button id="nw-add-btn" class="nw-btn nw-btn-primary">
+			<i data-lucide="plus"></i> New Tag
+		</button>
+	</div>
+
+	<div id="nw-notice" class="nw-notice" style="display:none;"></div>
+
+	<div class="nw-stats-bar">
+		<div class="nw-stat-card"><span class="nw-stat-value" id="nw-total">—</span><span class="nw-stat-label">Total</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value nw-stat-behavior" id="nw-stat-behavior">—</span><span class="nw-stat-label">Behavior</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value nw-stat-visuals"  id="nw-stat-visuals">—</span><span class="nw-stat-label">Visuals</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value nw-stat-vibe"     id="nw-stat-vibe">—</span><span class="nw-stat-label">Vibe</span></div>
+		<div class="nw-stat-card"><span class="nw-stat-value nw-stat-muted"    id="nw-inactive">—</span><span class="nw-stat-label">Inactive</span></div>
+	</div>
+
+	<div class="nw-filters-bar">
+		<div class="nw-search-wrap">
+			<i data-lucide="search" class="nw-search-icon"></i>
+			<input type="text" id="nw-search" class="nw-input" placeholder="Search tag name or interpretation…">
+		</div>
+		<select id="nw-filter-category" class="nw-select">
+			<option value="">All categories</option>
+			<?php foreach ( $categories as $c ) : ?>
+			<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<select id="nw-filter-active" class="nw-select">
+			<option value="">All status</option>
+			<option value="1">Active</option>
+			<option value="0">Inactive</option>
+		</select>
+		<button id="nw-clear-filters" class="nw-btn nw-btn-ghost">
+			<i data-lucide="x"></i> Clear
+		</button>
+	</div>
+
+	<div class="nw-table-wrap">
+		<table class="nw-table">
+			<thead>
+				<tr>
+					<th>Tag Name</th>
+					<th>Category</th>
+					<th>Interpretation (EN)</th>
+					<th>Active</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody id="nw-styledic-tbody">
+				<tr><td colspan="5" class="nw-loading"><i data-lucide="loader-2" class="nw-spin"></i> Loading…</td></tr>
+			</tbody>
+		</table>
+	</div>
+
+</div>
+
+<!-- ── MODAL ──────────────────────────────────────────────────────────── -->
+<div id="nw-modal" class="nw-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title">
+	<div class="nw-modal">
+		<div class="nw-modal-header">
+			<h2 id="nw-modal-title">New Style Tag</h2>
+			<button id="nw-modal-close" class="nw-modal-close" aria-label="Close"><i data-lucide="x"></i></button>
+		</div>
+		<div class="nw-modal-body">
+			<input type="hidden" id="nw-field-id">
+
+			<div class="nw-form-row nw-form-cols-2">
+				<div class="nw-form-group">
+					<label for="nw-field-tag_name">Tag Name <span class="nw-required">*</span>
+						<span class="nw-field-hint">lowercase, no spaces</span>
+					</label>
+					<input type="text" id="nw-field-tag_name" class="nw-input nw-mono-input" placeholder="e.g. neo_punk">
+				</div>
+				<div class="nw-form-group">
+					<label for="nw-field-category">Category</label>
+					<select id="nw-field-category" class="nw-select">
+						<?php foreach ( $categories as $c ) : ?>
+						<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+			</div>
+
+			<div class="nw-form-group">
+				<label for="nw-field-interpretation_en">Interpretation (EN) <span class="nw-required">*</span></label>
+				<textarea id="nw-field-interpretation_en" class="nw-textarea" rows="4"
+					placeholder="Describe what this style tag means for the AI GM — appearance, atmosphere, behavioral cues…"></textarea>
+			</div>
+
+			<div class="nw-form-group nw-checkbox-row">
+				<label class="nw-checkbox-label">
+					<input type="checkbox" id="nw-field-is_active" checked>
+					<span>Active (visible to AI GM)</span>
+				</label>
+			</div>
+		</div>
+		<div class="nw-modal-footer">
+			<button id="nw-modal-cancel" class="nw-btn nw-btn-ghost">Cancel</button>
+			<button id="nw-modal-save"   class="nw-btn nw-btn-primary">
+				<i data-lucide="save"></i> Save Tag
+			</button>
+		</div>
+	</div>
+</div>
+		<?php
 	}
 }
