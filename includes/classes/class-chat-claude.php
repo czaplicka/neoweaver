@@ -136,11 +136,16 @@ PROMPT;
 		$block_b .= "WORLD: Entropy {$entropy}/100 | {$w_tags}";
 
 		// Block C: Memory
-		$memory_parser = new NW_Memory_Parser();
-		$block_c = $memory_parser->build_prompt_block(
-			$ctx['char_id']  ?? '',
-			$ctx['world_id'] ?? ''
-		);
+		$block_c = '';
+		if ( class_exists( 'NW_Memory_Parser' ) ) {
+			$memory_parser = new NW_Memory_Parser();
+			$block_c = $memory_parser->build_prompt_block(
+				$ctx['char_id']  ?? '',
+				$ctx['world_id'] ?? ''
+			);
+		} else {
+			error_log( '[NW_Chat_Claude] NW_Memory_Parser class not found — memory block skipped.' );
+		}
 
 		// Block D: Protocol
 		$block_d = "PROTOCOL: {$protocol}";
