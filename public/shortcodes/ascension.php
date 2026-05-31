@@ -4,9 +4,6 @@
  * Shows cards eligible for Ascension for a given character.
  * Usage: [nw_ascension character_id="{uuid}"]
  *        or just [nw_ascension] — auto-detects / shows selector
- *
- * Card layout mirrors library.php (tw_render_library_card):
- *   img → header (name + level) → body (desc, tags, stars, progress, bonuses) → footer (button)
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -36,10 +33,6 @@ function _nw_asc_rarity_class( string $rarity ): string {
 	return $map[ strtolower( $rarity ) ] ?? 'nw-card--common';
 }
 
-/**
- * Returns CSS color variable for a given category slug.
- * Colors should match what's defined in cyber_card_categories in Supabase.
- */
 function _nw_asc_category_color( string $cat ): string {
 	$map = [
 		'magic'     => '#a855f7',
@@ -54,9 +47,6 @@ function _nw_asc_category_color( string $cat ): string {
 	return $map[ strtolower( $cat ) ] ?? '#adff00';
 }
 
-/**
- * Renders the bonus pills for a given ascension level.
- */
 function _nw_asc_render_bonuses( array $all_bonuses, int $asc_level ): string {
 	$active_bonuses = [];
 	for ( $lvl = 1; $lvl <= $asc_level; $lvl++ ) {
@@ -158,12 +148,11 @@ function nw_shortcode_ascension( array $atts ): string {
 		return '<p class="nw-notice">Supabase not configured.</p>';
 	}
 
-	// ── Fetch character's cards — include icon from cyber_card_categories via join ──
-	// Join path: cyber_character_deck → cyber_deck → cyber_card_types → cyber_card_categories
+	// ── Query 1: character deck + card definition (no category join here) ──
 	$owned = tw_supabase_get_admin( 'cyber_character_deck', [
 		'character_id' => 'eq.' . $character_id,
 		'is_locked'    => 'eq.false',
-		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,rarity,description,effect,asc_bonuses,cyber_card_types!cyber_deck_type_fkey(id,category_id,cyber_card_categories!cyber_card_types_category_id_fkey(id,slug,icon)))',
+		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck(id,name,img_url,rarity,description,effect,asc_bonuses,type_id)',
 	] );
 
 	$no_cards = '
@@ -175,6 +164,41 @@ function nw_shortcode_ascension( array $atts ): string {
 	if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
 		$out = count( $characters ) > 1 ? _nw_asc_selector( $characters, $character_id ) : '';
 		return $out . $no_cards;
+	}
+
+	// ── Collect unique type_ids for Query 2 ──
+	$type_ids = [];
+	foreach ( $owned as $row ) {
+		$cdata   = is_array( $row['cyber_deck'] ?? null ) ? $row['cyber_deck'] : [];
+		$type_id = (string) ( $cdata['type_id'] ?? '' );
+		if ( $type_id !== '' ) {
+			$type_ids[ $type_id ] = true;
+		}
+	}
+
+	// ── Query 2: card types + categories (slug + icon) ──
+	$cat_map = []; // type_id => [ 'slug' => '', 'icon' => '', 'category_id' => '' ]
+	if ( ! empty( $type_ids ) ) {
+		$ids_csv = implode( ',', array_keys( $type_ids ) );
+		$types   = tw_supabase_get_admin( 'cyber_card_types', [
+			'id'     => 'in.(' . $ids_csv . ')',
+			'select' => 'id,category_id,cyber_card_categories(slug,icon)',
+		] );
+
+		if ( ! is_wp_error( $types ) && is_array( $types ) ) {
+			foreach ( $types as $t ) {
+				$tid      = (string) ( $t['id'] ?? '' );
+				$cat_row  = is_array( $t['cyber_card_categories'] ?? null ) ? $t['cyber_card_categories'] : [];
+				$slug     = (string) ( $cat_row['slug'] ?? $t['category_id'] ?? '' );
+				$icon     = (string) ( $cat_row['icon'] ?? '' );
+				if ( $icon === '' ) $icon = 'tag';
+
+				$cat_map[ $tid ] = [
+					'slug' => $slug,
+					'icon' => $icon,
+				];
+			}
+		}
 	}
 
 	// ── Group by deck_id ──
@@ -196,17 +220,8 @@ function nw_shortcode_ascension( array $atts ): string {
 				$raw_bonuses = json_decode( $raw_bonuses, true ) ?: [];
 			}
 
-			// ── Extract category data from nested join ──
-			$card_type = is_array( $cdata['cyber_card_types'] ?? null ) ? $cdata['cyber_card_types'] : [];
-			$category_row = is_array( $card_type['cyber_card_categories'] ?? null ) ? $card_type['cyber_card_categories'] : [];
-
-			// slug is used for color lookup (fallback to category_id)
-			$cat_slug = (string) ( $category_row['slug'] ?? $card_type['category_id'] ?? '' );
-			// icon comes directly from the DB column; fallback to 'tag'
-			$cat_icon = (string) ( $category_row['icon'] ?? '' );
-			if ( '' === $cat_icon ) {
-				$cat_icon = 'tag';
-			}
+			$type_id  = (string) ( $cdata['type_id'] ?? '' );
+			$cat_data = $cat_map[ $type_id ] ?? [ 'slug' => '', 'icon' => 'tag' ];
 
 			$defs_map[ $did ] = [
 				'id'          => $did,
@@ -216,8 +231,8 @@ function nw_shortcode_ascension( array $atts ): string {
 				'description' => (string) ( $cdata['description'] ?? '' ),
 				'effect'      => (string) ( $cdata['effect']      ?? '' ),
 				'asc_bonuses' => is_array( $raw_bonuses ) ? $raw_bonuses : [],
-				'category'    => $cat_slug,
-				'cat_icon'    => $cat_icon,
+				'category'    => $cat_data['slug'],
+				'cat_icon'    => $cat_data['icon'],
 			];
 		}
 
@@ -283,13 +298,11 @@ function nw_shortcode_ascension( array $atts ): string {
 			$rarity_cls = _nw_asc_rarity_class( $rarity );
 			$state_cls  = $can_ascend ? 'nw-card--ready' : ( $maxed ? '' : 'nw-card--dim' );
 
-			// Category badge data — icon from DB, color from local map (fallback: #adff00)
 			$cat_color = _nw_asc_category_color( $category );
-			$cat_icon  = $def['cat_icon']; // already sanitized; comes from cyber_card_categories.icon
+			$cat_icon  = $def['cat_icon'];
 
 			$progress_pct = $required > 0 ? min( 100, round( $base_count / $required * 100 ) ) : 100;
 
-			// Inline card style: HUD border color from rarity
 			$rarity_colors = [
 				'common'    => '#6b7280',
 				'uncommon'  => '#22c55e',
@@ -309,7 +322,7 @@ function nw_shortcode_ascension( array $atts ): string {
 				<span class="nw-asc-corner nw-asc-corner--bl"></span>
 				<span class="nw-asc-corner nw-asc-corner--br"></span>
 
-				<!-- Category badge — icon from cyber_card_categories.icon -->
+				<!-- Category badge -->
 				<?php if ( $category ) : ?>
 				<div class="nw-asc-cat-badge" style="background: <?php echo esc_attr( $cat_color ); ?>22; border-color: <?php echo esc_attr( $cat_color ); ?>66;" title="<?php echo esc_attr( ucfirst( $category ) ); ?>">
 					<i data-lucide="<?php echo esc_attr( $cat_icon ); ?>" style="color: <?php echo esc_attr( $cat_color ); ?>;"></i>
@@ -349,7 +362,7 @@ function nw_shortcode_ascension( array $atts ): string {
 						<p class="nw-asc-effect"><?php echo esc_html( $def['effect'] ); ?></p>
 					<?php endif; ?>
 
-					<!-- Ascension dots (5 max — replaces ASC 1 text) -->
+					<!-- Ascension dots -->
 					<div class="nw-asc-dots">
 						<?php for ( $i = 1; $i <= 5; $i++ ) : ?>
 							<span class="nw-asc-dot <?php echo $i <= $cur_asc ? 'nw-asc-dot--lit' : ''; ?>"></span>
@@ -357,12 +370,10 @@ function nw_shortcode_ascension( array $atts ): string {
 					</div>
 
 					<?php
-					// Active bonuses
 					if ( $cur_asc > 0 && ! empty( $all_bonuses ) ) {
 						echo _nw_asc_render_bonuses( $all_bonuses, $cur_asc );
 					}
 
-					// Next-level bonus preview
 					if ( ! $maxed && ! empty( $all_bonuses ) ) {
 						$next_key = (string) $next_asc;
 						if ( ! empty( $all_bonuses[ $next_key ] ) ) : ?>
@@ -450,7 +461,6 @@ function nw_shortcode_ascension( array $atts ): string {
 	@media (max-width: 900px) { .nw-ascension-grid { grid-template-columns: repeat(2, 1fr); } }
 	@media (max-width: 560px) { .nw-ascension-grid { grid-template-columns: 1fr; } }
 
-	/* ── Card shell ── */
 	.nw-asc-card {
 		position: relative;
 		background: #0d0d0d;
@@ -460,145 +470,69 @@ function nw_shortcode_ascension( array $atts ): string {
 		display: flex;
 		flex-direction: column;
 		transition: box-shadow 0.2s ease, transform 0.2s ease;
-		box-shadow:
-			0 0 0 1px rgba(0,0,0,0.8),
-			inset 0 0 20px rgba(0,0,0,0.4);
+		box-shadow: 0 0 0 1px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.4);
 	}
 	.nw-asc-card:hover {
 		transform: translateY(-2px);
-		box-shadow:
-			0 0 0 1px rgba(0,0,0,0.8),
-			0 0 12px var(--nw-rarity-color, #6b7280),
-			inset 0 0 20px rgba(0,0,0,0.4);
+		box-shadow: 0 0 0 1px rgba(0,0,0,0.8), 0 0 12px var(--nw-rarity-color, #6b7280), inset 0 0 20px rgba(0,0,0,0.4);
 	}
-	.nw-asc-card.nw-card--ready {
-		border-color: #adff00;
-		--nw-rarity-color: #adff00;
-	}
+	.nw-asc-card.nw-card--ready { border-color: #adff00; --nw-rarity-color: #adff00; }
 	.nw-asc-card.nw-card--dim { opacity: 0.7; }
 
-	/* ── HUD corner brackets ── */
 	.nw-asc-corner {
-		position: absolute;
-		width: 10px;
-		height: 10px;
-		border-color: var(--nw-rarity-color, #6b7280);
-		border-style: solid;
-		z-index: 10;
-		pointer-events: none;
+		position: absolute; width: 10px; height: 10px;
+		border-color: var(--nw-rarity-color, #6b7280); border-style: solid;
+		z-index: 10; pointer-events: none;
 	}
 	.nw-asc-corner--tl { top: 4px; left: 4px;  border-width: 2px 0 0 2px; }
 	.nw-asc-corner--tr { top: 4px; right: 4px; border-width: 2px 2px 0 0; }
 	.nw-asc-corner--bl { bottom: 4px; left: 4px;  border-width: 0 0 2px 2px; }
 	.nw-asc-corner--br { bottom: 4px; right: 4px; border-width: 0 2px 2px 0; }
 
-	/* ── Category badge — top-left icon ── */
 	.nw-asc-cat-badge {
-		position: absolute;
-		top: 14px;
-		left: 14px;
-		z-index: 20;
-		width: 26px;
-		height: 26px;
-		border-radius: 4px;
-		border: 1px solid;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		position: absolute; top: 14px; left: 14px; z-index: 20;
+		width: 26px; height: 26px; border-radius: 4px; border: 1px solid;
+		display: flex; align-items: center; justify-content: center;
 		backdrop-filter: blur(4px);
 	}
-	.nw-asc-cat-badge i {
-		width: 13px;
-		height: 13px;
-		display: block;
-	}
+	.nw-asc-cat-badge i { width: 13px; height: 13px; display: block; }
 
-	/* ── Image ── */
-	.nw-asc-img-wrap {
-		position: relative;
-		height: 110px;
-		overflow: hidden;
-	}
-	.nw-asc-img-wrap img {
-		width: 100%;
-		height: 110px;
-		object-fit: cover;
-		display: block;
-	}
+	.nw-asc-img-wrap { position: relative; height: 110px; overflow: hidden; }
+	.nw-asc-img-wrap img { width: 100%; height: 110px; object-fit: cover; display: block; }
 	.nw-asc-img-overlay {
-		position: absolute;
-		inset: 0;
+		position: absolute; inset: 0;
 		background: linear-gradient(to bottom, transparent 40%, #0d0d0d 100%);
 	}
 
-	/* ── Header ── */
 	.nw-asc-header {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 6px;
-		padding: 8px 12px 4px;
+		display: flex; align-items: baseline; justify-content: space-between;
+		gap: 6px; padding: 8px 12px 4px;
 	}
 	.nw-asc-name {
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.8rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #e5e5e5;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		font-family: 'Chakra Petch', monospace; font-size: 0.8rem; font-weight: 700;
+		text-transform: uppercase; letter-spacing: 0.06em; color: #e5e5e5;
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 	}
 	.nw-asc-level {
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.6rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--nw-rarity-color, #6b7280);
-		white-space: nowrap;
-		display: flex;
-		align-items: center;
-		gap: 2px;
+		font-family: 'Chakra Petch', monospace; font-size: 0.6rem; font-weight: 600;
+		text-transform: uppercase; letter-spacing: 0.08em;
+		color: var(--nw-rarity-color, #6b7280); white-space: nowrap;
+		display: flex; align-items: center; gap: 2px;
 	}
 
-	/* ── Body ── */
 	.nw-asc-body {
-		flex: 1;
-		padding: 0 12px 8px;
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
+		flex: 1; padding: 0 12px 8px; display: flex; flex-direction: column; gap: 4px;
 	}
-	.nw-asc-desc {
-		font-size: 0.7rem;
-		color: #888;
-		line-height: 1.4;
-		margin: 0;
-	}
+	.nw-asc-desc { font-size: 0.7rem; color: #888; line-height: 1.4; margin: 0; }
 	.nw-asc-effect {
-		font-size: 0.68rem;
-		font-style: italic;
-		color: #555;
-		margin: 0;
-		padding-top: 3px;
-		border-top: 1px solid rgba(255,255,255,0.06);
+		font-size: 0.68rem; font-style: italic; color: #555; margin: 0;
+		padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.06);
 	}
 
-	/* ── Ascension dots (replaces ASC 1 text) ── */
-	.nw-asc-dots {
-		display: flex;
-		gap: 5px;
-		align-items: center;
-		margin: 4px 0;
-	}
+	.nw-asc-dots { display: flex; gap: 5px; align-items: center; margin: 4px 0; }
 	.nw-asc-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: #2a2a2a;
-		border: 1px solid #3a3a3a;
+		width: 8px; height: 8px; border-radius: 50%;
+		background: #2a2a2a; border: 1px solid #3a3a3a;
 		transition: background 0.2s ease, box-shadow 0.2s ease;
 	}
 	.nw-asc-dot--lit {
@@ -607,123 +541,55 @@ function nw_shortcode_ascension( array $atts ): string {
 		box-shadow: 0 0 5px var(--nw-rarity-color, #adff00);
 	}
 
-	/* ── Active bonus pills ── */
-	.nw-asc-bonuses {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-		margin: 2px 0;
-	}
+	.nw-asc-bonuses { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0; }
 	.nw-asc-bonus-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.62rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		padding: 2px 6px;
-		border-radius: 3px;
-		background: rgba(173,255,0,0.1);
-		color: #adff00;
+		display: inline-flex; align-items: center; gap: 3px;
+		font-family: 'Chakra Petch', monospace; font-size: 0.62rem; font-weight: 600;
+		text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 6px;
+		border-radius: 3px; background: rgba(173,255,0,0.1); color: #adff00;
 		border: 1px solid rgba(173,255,0,0.25);
 	}
 	.nw-asc-bonus-pill--next {
-		background: rgba(173,255,0,0.04);
-		color: rgba(173,255,0,0.5);
+		background: rgba(173,255,0,0.04); color: rgba(173,255,0,0.5);
 		border-color: rgba(173,255,0,0.12);
 	}
 
-	/* ── Next-level preview ── */
 	.nw-asc-bonuses-preview {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 4px;
-		padding: 5px 6px;
-		border-radius: 4px;
-		border: 1px dashed rgba(173,255,0,0.15);
-		background: rgba(173,255,0,0.03);
+		display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+		padding: 5px 6px; border-radius: 4px;
+		border: 1px dashed rgba(173,255,0,0.15); background: rgba(173,255,0,0.03);
 	}
 	.nw-asc-preview-label {
-		width: 100%;
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.58rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: rgba(173,255,0,0.4);
+		width: 100%; font-family: 'Chakra Petch', monospace; font-size: 0.58rem;
+		text-transform: uppercase; letter-spacing: 0.08em; color: rgba(173,255,0,0.4);
 		margin-bottom: 2px;
 	}
 
-	/* ── Progress ── */
 	.nw-asc-progress-wrap { margin-top: 4px; }
 	.nw-asc-progress-bar {
-		height: 3px;
-		background: rgba(255,255,255,0.08);
-		border-radius: 2px;
-		overflow: hidden;
+		height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
 	}
 	.nw-asc-progress-fill {
-		height: 100%;
-		background: var(--nw-rarity-color, #adff00);
-		border-radius: 2px;
-		transition: width 0.4s ease;
+		height: 100%; background: var(--nw-rarity-color, #adff00);
+		border-radius: 2px; transition: width 0.4s ease;
 	}
 	.nw-asc-progress-label {
-		display: flex;
-		justify-content: space-between;
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.58rem;
-		color: #555;
-		margin-top: 3px;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+		display: flex; justify-content: space-between;
+		font-family: 'Chakra Petch', monospace; font-size: 0.58rem; color: #555;
+		margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em;
 	}
 
-	/* ── Footer ── */
-	.nw-asc-footer {
-		padding: 8px 12px 10px;
-		border-top: 1px solid rgba(255,255,255,0.06);
-	}
+	.nw-asc-footer { padding: 8px 12px 10px; border-top: 1px solid rgba(255,255,255,0.06); }
 	.nw-asc-btn {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		width: 100%;
-		justify-content: center;
-		font-family: 'Chakra Petch', monospace;
-		font-size: 0.65rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		padding: 6px 10px;
-		border-radius: 4px;
-		border: 1px solid;
-		cursor: pointer;
-		transition: all 0.2s ease;
+		display: flex; align-items: center; gap: 5px; width: 100%; justify-content: center;
+		font-family: 'Chakra Petch', monospace; font-size: 0.65rem; font-weight: 700;
+		text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 10px;
+		border-radius: 4px; border: 1px solid; cursor: pointer; transition: all 0.2s ease;
 	}
-	.nw-asc-btn--ready {
-		background: rgba(173,255,0,0.1);
-		color: #adff00;
-		border-color: rgba(173,255,0,0.4);
-	}
-	.nw-asc-btn--ready:hover {
-		background: rgba(173,255,0,0.2);
-		box-shadow: 0 0 8px rgba(173,255,0,0.3);
-	}
-	.nw-asc-btn--locked {
-		background: transparent;
-		color: #444;
-		border-color: #333;
-		cursor: not-allowed;
-	}
-	.nw-asc-btn--max {
-		background: transparent;
-		color: #adff00;
-		border-color: rgba(173,255,0,0.3);
-		cursor: default;
-	}
+	.nw-asc-btn--ready { background: rgba(173,255,0,0.1); color: #adff00; border-color: rgba(173,255,0,0.4); }
+	.nw-asc-btn--ready:hover { background: rgba(173,255,0,0.2); box-shadow: 0 0 8px rgba(173,255,0,0.3); }
+	.nw-asc-btn--locked { background: transparent; color: #444; border-color: #333; cursor: not-allowed; }
+	.nw-asc-btn--max { background: transparent; color: #adff00; border-color: rgba(173,255,0,0.3); cursor: default; }
 	</style>
 	<?php
 	return ob_get_clean();
