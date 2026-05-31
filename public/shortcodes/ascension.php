@@ -55,23 +55,6 @@ function _nw_asc_category_color( string $cat ): string {
 }
 
 /**
- * Returns Lucide icon name for a given category slug.
- */
-function _nw_asc_category_icon( string $cat ): string {
-	$map = [
-		'magic'     => 'sparkles',
-		'combat'    => 'sword',
-		'action'    => 'zap',
-		'social'    => 'users',
-		'equipment' => 'package',
-		'tech'      => 'cpu',
-		'stealth'   => 'eye-off',
-		'support'   => 'shield-plus',
-	];
-	return $map[ strtolower( $cat ) ] ?? 'tag';
-}
-
-/**
  * Renders the bonus pills for a given ascension level.
  */
 function _nw_asc_render_bonuses( array $all_bonuses, int $asc_level ): string {
@@ -175,11 +158,12 @@ function nw_shortcode_ascension( array $atts ): string {
 		return '<p class="nw-notice">Supabase not configured.</p>';
 	}
 
-	// ── Fetch character's cards — include asc_bonuses from cyber_deck ──
+	// ── Fetch character's cards — include icon from cyber_card_categories via join ──
+	// Join path: cyber_character_deck → cyber_deck → cyber_card_types → cyber_card_categories
 	$owned = tw_supabase_get_admin( 'cyber_character_deck', [
 		'character_id' => 'eq.' . $character_id,
 		'is_locked'    => 'eq.false',
-		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,rarity,description,effect,asc_bonuses,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,rarity,description,effect,asc_bonuses,cyber_card_types!cyber_deck_type_fkey(id,category_id,cyber_card_categories!cyber_card_types_category_id_fkey(id,slug,icon)))',
 	] );
 
 	$no_cards = '
@@ -212,6 +196,18 @@ function nw_shortcode_ascension( array $atts ): string {
 				$raw_bonuses = json_decode( $raw_bonuses, true ) ?: [];
 			}
 
+			// ── Extract category data from nested join ──
+			$card_type = is_array( $cdata['cyber_card_types'] ?? null ) ? $cdata['cyber_card_types'] : [];
+			$category_row = is_array( $card_type['cyber_card_categories'] ?? null ) ? $card_type['cyber_card_categories'] : [];
+
+			// slug is used for color lookup (fallback to category_id)
+			$cat_slug = (string) ( $category_row['slug'] ?? $card_type['category_id'] ?? '' );
+			// icon comes directly from the DB column; fallback to 'tag'
+			$cat_icon = (string) ( $category_row['icon'] ?? '' );
+			if ( '' === $cat_icon ) {
+				$cat_icon = 'tag';
+			}
+
 			$defs_map[ $did ] = [
 				'id'          => $did,
 				'name'        => (string) ( $cdata['name']        ?? '' ),
@@ -220,7 +216,8 @@ function nw_shortcode_ascension( array $atts ): string {
 				'description' => (string) ( $cdata['description'] ?? '' ),
 				'effect'      => (string) ( $cdata['effect']      ?? '' ),
 				'asc_bonuses' => is_array( $raw_bonuses ) ? $raw_bonuses : [],
-				'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
+				'category'    => $cat_slug,
+				'cat_icon'    => $cat_icon,
 			];
 		}
 
@@ -286,9 +283,9 @@ function nw_shortcode_ascension( array $atts ): string {
 			$rarity_cls = _nw_asc_rarity_class( $rarity );
 			$state_cls  = $can_ascend ? 'nw-card--ready' : ( $maxed ? '' : 'nw-card--dim' );
 
-			// Category badge data
+			// Category badge data — icon from DB, color from local map (fallback: #adff00)
 			$cat_color = _nw_asc_category_color( $category );
-			$cat_icon  = _nw_asc_category_icon( $category );
+			$cat_icon  = $def['cat_icon']; // already sanitized; comes from cyber_card_categories.icon
 
 			$progress_pct = $required > 0 ? min( 100, round( $base_count / $required * 100 ) ) : 100;
 
@@ -312,7 +309,7 @@ function nw_shortcode_ascension( array $atts ): string {
 				<span class="nw-asc-corner nw-asc-corner--bl"></span>
 				<span class="nw-asc-corner nw-asc-corner--br"></span>
 
-				<!-- Category badge — top-left icon with category color -->
+				<!-- Category badge — icon from cyber_card_categories.icon -->
 				<?php if ( $category ) : ?>
 				<div class="nw-asc-cat-badge" style="background: <?php echo esc_attr( $cat_color ); ?>22; border-color: <?php echo esc_attr( $cat_color ); ?>66;" title="<?php echo esc_attr( ucfirst( $category ) ); ?>">
 					<i data-lucide="<?php echo esc_attr( $cat_icon ); ?>" style="color: <?php echo esc_attr( $cat_color ); ?>;"></i>
