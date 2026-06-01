@@ -183,12 +183,15 @@ if ( ! function_exists( 'cyber_update_supabase_location' ) ) {
 
 /**
  * AJAX: save active deck via RPC.
+ *
+ * BUG-10 FIX: was 'cyber_deck_nonce' — unified to 'tw_deck_nonce'
+ * to match twGameConfig.nonce localized by tw_localize_deck_vars().
  */
 add_action( 'wp_ajax_save_cyber_deck_rpc', 'handle_save_cyber_deck_rpc' );
 
 if ( ! function_exists( 'handle_save_cyber_deck_rpc' ) ) {
 	function handle_save_cyber_deck_rpc(): void {
-		check_ajax_referer( 'cyber_deck_nonce', 'nonce' );
+		check_ajax_referer( 'tw_deck_nonce', 'nonce' );
 
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {

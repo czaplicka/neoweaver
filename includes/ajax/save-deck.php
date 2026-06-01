@@ -4,7 +4,7 @@
  * Saves the player's active deck selection via cyber_sync_deck RPC.
  *
  * POST params:
- *   nonce        — wp nonce 'cyber_deck_builder'
+ *   nonce        — wp nonce 'tw_deck_nonce' (BUG-10 FIX: was 'cyber_deck_builder')
  *   character_id — UUID of the character
  *   active       — comma-separated cyber_character_deck.id values (UUIDs)
  */
@@ -16,7 +16,8 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 	function tw_ajax_save_deck(): void {
 
 		// ── Auth & nonce ──────────────────────────────────────────────────
-		if ( ! check_ajax_referer( 'cyber_deck_builder', 'nonce', false ) ) {
+		// BUG-10 FIX: unified to 'tw_deck_nonce' (matches twGameConfig.nonce)
+		if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Invalid nonce', 403 );
 			return;
 		}
