@@ -491,7 +491,7 @@ jQuery(function($){
 <?php
     }
 
-    /* ── Security helper ──────────────────────────────────── */
+        /* ── Security helper ──────────────────────────────────── */
 
     private function verify_nonce() {
         if ( ! check_ajax_referer( $this->nonce_key, 'nonce', false ) ) {
@@ -502,23 +502,125 @@ jQuery(function($){
         }
     }
 
+    /* ── Supabase helper ──────────────────────────────────── */
+
+    private function get_supabase_url() {
+        if ( defined( 'NW_SUPABASE_URL' ) && NW_SUPABASE_URL ) {
+            return rtrim( NW_SUPABASE_URL, '/' );
+        }
+
+        if ( defined( 'NW_SUPABASE_REST_URL' ) && NW_SUPABASE_REST_URL ) {
+            return preg_replace( '#/rest/v1/?$#', '', rtrim( NW_SUPABASE_REST_URL, '/' ) );
+        }
+
+        wp_send_json_error( 'Missing NW_SUPABASE_URL / NW_SUPABASE_REST_URL', 500 );
+    }
+
+    private function get_supabase_key() {
+        if ( defined( 'NW_SUPABASE_SERVICE_KEY' ) && NW_SUPABASE_SERVICE_KEY ) {
+            return NW_SUPABASE_SERVICE_KEY;
+        }
+
+        if ( defined( 'NW_SUPABASE_ANON_KEY' ) && NW_SUPABASE_ANON_KEY ) {
+            return NW_SUPABASE_ANON_KEY;
+        }
+
+        wp_send_json_error( 'Missing Supabase API key', 500 );
+    }
+
+    private function supabase_request( $method, $path, $query = [], $body = null, $prefer = '' ) {
+        $base = $this->get_supabase_url();
+        $key  = $this->get_supabase_key();
+
+        $url = $base . '/rest/v1/' . ltrim( $path, '/' );
+        if ( ! empty( $query ) ) {
+            $url = add_query_arg( $query, $url );
+        }
+
+        $headers = [
+            'apikey'        => $key,
+            'Authorization' => 'Bearer ' . $key,
+            'Content-Type'  => 'application/json',
+            'Accept'        => 'application/json',
+        ];
+
+        if ( $prefer ) {
+            $headers['Prefer'] = $prefer;
+        }
+
+        $args = [
+            'method'  => strtoupper( $method ),
+            'headers' => $headers,
+            'timeout' => 20,
+        ];
+
+        if ( null !== $body ) {
+            $args['body'] = wp_json_encode( $body );
+        }
+
+        $response = wp_remote_request( $url, $args );
+
+        if ( is_wp_error( $response ) ) {
+            return [
+                'ok'     => false,
+                'status' => 500,
+                'error'  => $response->get_error_message(),
+                'data'   => null,
+            ];
+        }
+
+        $status = wp_remote_retrieve_response_code( $response );
+        $raw    = wp_remote_retrieve_body( $response );
+        $data   = json_decode( $raw, true );
+
+        if ( $status < 200 || $status >= 300 ) {
+            $message = 'Supabase request failed';
+
+            if ( is_array( $data ) ) {
+                $message = $data['message'] ?? $data['hint'] ?? $data['details'] ?? $message;
+            } elseif ( is_string( $raw ) && $raw ) {
+                $message = $raw;
+            }
+
+            return [
+                'ok'     => false,
+                'status' => $status,
+                'error'  => $message,
+                'data'   => $data,
+            ];
+        }
+
+        return [
+            'ok'     => true,
+            'status' => $status,
+            'error'  => null,
+            'data'   => $data,
+        ];
+    }
+
     /* ── HUD Groups ──────────────────────────────────────── */
 
     public function ajax_hud_groups_load() {
         $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, slug, display_label, base_color, icon, sort_order
-             FROM cyber_hud_groups ORDER BY sort_order ASC, id ASC",
-            ARRAY_A
+
+        $res = $this->supabase_request(
+            'GET',
+            'cyber_hud_groups',
+            [
+                'select' => 'id,slug,display_label,base_color,icon,sort_order',
+                'order'  => 'sort_order.asc,id.asc',
+            ]
         );
-        if ( $rows === null ) $rows = [];
-        wp_send_json_success( $rows );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
+        }
+
+        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
     }
 
     public function ajax_hud_save() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id         = absint( $_POST['id'] ?? 0 );
         $slug       = sanitize_key( $_POST['slug'] ?? '' );
@@ -527,94 +629,161 @@ jQuery(function($){
         $icon       = sanitize_text_field( $_POST['icon'] ?? '' );
         $sort_order = intval( $_POST['sort_order'] ?? 0 );
 
-        if ( ! $slug || ! $label ) wp_send_json_error( 'Slug and label are required.' );
+        if ( ! $slug || ! $label ) {
+            wp_send_json_error( 'Slug and label are required.' );
+        }
 
-        $data = [
+        $payload = [
             'slug'          => $slug,
             'display_label' => $label,
             'base_color'    => $base_color,
             'icon'          => $icon ?: null,
             'sort_order'    => $sort_order,
         ];
-        $fmt = [ '%s', '%s', '%s', '%s', '%d' ];
 
         if ( $id ) {
-            $ok = $wpdb->update( 'cyber_hud_groups', $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+            $res = $this->supabase_request(
+                'PATCH',
+                'cyber_hud_groups',
+                [ 'id' => 'eq.' . $id ],
+                $payload,
+                'return=representation'
+            );
         } else {
-            $ok = $wpdb->insert( 'cyber_hud_groups', $data, $fmt );
-            $id = $wpdb->insert_id;
+            $res = $this->supabase_request(
+                'POST',
+                'cyber_hud_groups',
+                [],
+                $payload,
+                'return=representation'
+            );
         }
 
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
-        wp_send_json_success( [ 'id' => $id ] );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
+        }
+
+        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
     public function ajax_hud_delete() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
+        }
 
-        $ok = $wpdb->delete( 'cyber_hud_groups', [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
+        $res = $this->supabase_request(
+            'DELETE',
+            'cyber_hud_groups',
+            [ 'id' => 'eq.' . $id ],
+            null,
+            'return=representation'
+        );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
+        }
+
         wp_send_json_success();
     }
 
     public function ajax_hud_duplicate() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
+        }
 
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM cyber_hud_groups WHERE id = %d", $id ),
-            ARRAY_A
+        $get = $this->supabase_request(
+            'GET',
+            'cyber_hud_groups',
+            [
+                'select' => 'id,slug,display_label,base_color,icon,sort_order',
+                'id'     => 'eq.' . $id,
+                'limit'  => 1,
+            ]
         );
-        if ( ! $row ) wp_send_json_error( 'HUD Group not found.' );
 
-        unset( $row['id'] );
-        $base  = rtrim( $row['slug'], '_' );
-        $taken = true; $i = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM cyber_hud_groups WHERE slug = %s", $try )
+        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+            wp_send_json_error( 'HUD Group not found.' );
+        }
+
+        $row  = $get['data'][0];
+        $base = rtrim( $row['slug'], '_' );
+        $try  = $base . '_copy';
+        $i    = 2;
+
+        while ( true ) {
+            $exists = $this->supabase_request(
+                'GET',
+                'cyber_hud_groups',
+                [
+                    'select' => 'id',
+                    'slug'   => 'eq.' . $try,
+                    'limit'  => 1,
+                ]
             );
-            if ( ! $taken ) $row['slug'] = $try;
+
+            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+                break;
+            }
+
+            $try = $base . '_copy' . $i;
             $i++;
         }
-        $row['display_label'] = $row['display_label'] . ' (copy)';
-        $row['sort_order']    = intval( $row['sort_order'] ) + 1;
 
-        $ok = $wpdb->insert( 'cyber_hud_groups', $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+        $new_row = [
+            'slug'          => $try,
+            'display_label' => $row['display_label'] . ' (copy)',
+            'base_color'    => $row['base_color'],
+            'icon'          => $row['icon'],
+            'sort_order'    => intval( $row['sort_order'] ) + 1,
+        ];
+
+        $insert = $this->supabase_request(
+            'POST',
+            'cyber_hud_groups',
+            [],
+            $new_row,
+            'return=representation'
+        );
+
+        if ( ! $insert['ok'] ) {
+            wp_send_json_error( $insert['error'], $insert['status'] );
+        }
+
+        wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
     }
 
     /* ================================================================ */
-    /* CATEGORIES AJAX                                                    */
+    /* CATEGORIES AJAX                                                  */
     /* ================================================================ */
 
     public function ajax_cats_load() {
         $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, internal_name, display_name, description, ui_color, sort_order, hud_group_id
-             FROM {$this->table_cats}
-             ORDER BY sort_order ASC, id ASC",
-            ARRAY_A
+
+        $res = $this->supabase_request(
+            'GET',
+            'cyber_action_tag_categories',
+            [
+                'select' => 'id,internal_name,display_name,description,ui_color,sort_order,hud_group_id',
+                'order'  => 'sort_order.asc,id.asc',
+            ]
         );
-        if ( $rows === null ) {
-            wp_send_json_error( $wpdb->last_error );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
         }
-        wp_send_json_success( $rows );
+
+        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
     }
 
     public function ajax_cats_save() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id            = absint( $_POST['id'] ?? 0 );
         $internal_name = sanitize_key( $_POST['internal_name'] ?? '' );
@@ -628,7 +797,7 @@ jQuery(function($){
             wp_send_json_error( 'Required fields missing.' );
         }
 
-        $data = [
+        $payload = [
             'internal_name' => $internal_name,
             'display_name'  => $display_name,
             'description'   => $description ?: null,
@@ -636,91 +805,151 @@ jQuery(function($){
             'sort_order'    => $sort_order,
             'hud_group_id'  => $hud_group_id,
         ];
-        $fmt = [ '%s', '%s', '%s', '%s', '%d', '%d' ];
 
         if ( $id ) {
-            $ok = $wpdb->update( $this->table_cats, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+            $res = $this->supabase_request(
+                'PATCH',
+                'cyber_action_tag_categories',
+                [ 'id' => 'eq.' . $id ],
+                $payload,
+                'return=representation'
+            );
         } else {
-            $ok = $wpdb->insert( $this->table_cats, $data, $fmt );
-            $id = $wpdb->insert_id;
+            $res = $this->supabase_request(
+                'POST',
+                'cyber_action_tag_categories',
+                [],
+                $payload,
+                'return=representation'
+            );
         }
 
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
         }
-        wp_send_json_success( [ 'id' => $id ] );
+
+        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
     public function ajax_cats_delete() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $ok = $wpdb->delete( $this->table_cats, [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
         }
+
+        $res = $this->supabase_request(
+            'DELETE',
+            'cyber_action_tag_categories',
+            [ 'id' => 'eq.' . $id ],
+            null,
+            'return=representation'
+        );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
+        }
+
         wp_send_json_success();
     }
 
     public function ajax_cats_duplicate() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
+        }
 
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM {$this->table_cats} WHERE id = %d", $id ),
-            ARRAY_A
+        $get = $this->supabase_request(
+            'GET',
+            'cyber_action_tag_categories',
+            [
+                'select'        => 'id,internal_name,display_name,description,ui_color,sort_order,hud_group_id',
+                'id'            => 'eq.' . $id,
+                'limit'         => 1,
+            ]
         );
-        if ( ! $row ) wp_send_json_error( 'Category not found.' );
 
-        unset( $row['id'] );
-        // Make internal_name unique
-        $base  = rtrim( $row['internal_name'], '_' );
-        $taken = true;
-        $i     = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM {$this->table_cats} WHERE internal_name = %s", $try )
+        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+            wp_send_json_error( 'Category not found.' );
+        }
+
+        $row  = $get['data'][0];
+        $base = rtrim( $row['internal_name'], '_' );
+        $try  = $base . '_copy';
+        $i    = 2;
+
+        while ( true ) {
+            $exists = $this->supabase_request(
+                'GET',
+                'cyber_action_tag_categories',
+                [
+                    'select'        => 'id',
+                    'internal_name' => 'eq.' . $try,
+                    'limit'         => 1,
+                ]
             );
-            if ( ! $taken ) $row['internal_name'] = $try;
+
+            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+                break;
+            }
+
+            $try = $base . '_copy' . $i;
             $i++;
         }
-        $row['display_name'] = $row['display_name'] . ' (copy)';
-        $row['sort_order']   = intval( $row['sort_order'] ) + 1;
 
-        $ok = $wpdb->insert( $this->table_cats, $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+        $new_row = [
+            'internal_name' => $try,
+            'display_name'  => $row['display_name'] . ' (copy)',
+            'description'   => $row['description'],
+            'ui_color'      => $row['ui_color'],
+            'sort_order'    => intval( $row['sort_order'] ) + 1,
+            'hud_group_id'  => intval( $row['hud_group_id'] ),
+        ];
+
+        $insert = $this->supabase_request(
+            'POST',
+            'cyber_action_tag_categories',
+            [],
+            $new_row,
+            'return=representation'
+        );
+
+        if ( ! $insert['ok'] ) {
+            wp_send_json_error( $insert['error'], $insert['status'] );
+        }
+
+        wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
     }
 
     /* ================================================================ */
-    /* TAGS AJAX                                                          */
+    /* TAGS AJAX                                                        */
     /* ================================================================ */
 
     public function ajax_tags_load() {
         $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, name, color, sentiment, impact, description, category_id, is_active
-             FROM {$this->table_tags}
-             ORDER BY name ASC",
-            ARRAY_A
+
+        $res = $this->supabase_request(
+            'GET',
+            'cyber_action_tags',
+            [
+                'select' => 'id,name,color,sentiment,impact,description,category_id,is_active',
+                'order'  => 'name.asc',
+            ]
         );
-        if ( $rows === null ) {
-            wp_send_json_error( $wpdb->last_error );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
         }
-        wp_send_json_success( $rows );
+
+        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
     }
 
     public function ajax_tags_save() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id          = absint( $_POST['id'] ?? 0 );
         $name        = sanitize_text_field( $_POST['name'] ?? '' );
@@ -729,7 +958,9 @@ jQuery(function($){
         $impact      = round( floatval( $_POST['impact'] ?? 0 ), 2 );
         $description = sanitize_textarea_field( $_POST['description'] ?? '' );
         $category_id = absint( $_POST['category_id'] ?? 0 );
-        $is_active   = isset( $_POST['is_active'] ) ? (int) boolval( $_POST['is_active'] ) : 1;
+        $is_active   = isset( $_POST['is_active'] )
+            ? ( filter_var( $_POST['is_active'], FILTER_VALIDATE_BOOLEAN ) || intval( $_POST['is_active'] ) === 1 )
+            : true;
 
         if ( ! $name || ! $category_id ) {
             wp_send_json_error( 'Name and category are required.' );
@@ -740,71 +971,132 @@ jQuery(function($){
             $sentiment = 'neutral';
         }
 
-        $data = [
+        $payload = [
             'name'        => $name,
             'color'       => $color,
             'sentiment'   => $sentiment,
             'impact'      => $impact,
             'description' => $description ?: null,
             'category_id' => $category_id,
-            'is_active'   => $is_active,
+            'is_active'   => (bool) $is_active,
         ];
-        $fmt = [ '%s', '%s', '%s', '%f', '%s', '%d', '%d' ];
 
         if ( $id ) {
-            $ok = $wpdb->update( $this->table_tags, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
+            $res = $this->supabase_request(
+                'PATCH',
+                'cyber_action_tags',
+                [ 'id' => 'eq.' . $id ],
+                $payload,
+                'return=representation'
+            );
         } else {
-            $ok = $wpdb->insert( $this->table_tags, $data, $fmt );
-            $id = $wpdb->insert_id;
+            $res = $this->supabase_request(
+                'POST',
+                'cyber_action_tags',
+                [],
+                $payload,
+                'return=representation'
+            );
         }
 
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
         }
-        wp_send_json_success( [ 'id' => $id ] );
+
+        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
     public function ajax_tags_delete() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
+        }
 
-        $ok = $wpdb->delete( $this->table_tags, [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
+        $res = $this->supabase_request(
+            'DELETE',
+            'cyber_action_tags',
+            [ 'id' => 'eq.' . $id ],
+            null,
+            'return=representation'
+        );
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'], $res['status'] );
+        }
+
         wp_send_json_success();
     }
 
     public function ajax_tags_duplicate() {
         $this->verify_nonce();
-        global $wpdb;
 
         $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid ID.' );
+        }
 
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM {$this->table_tags} WHERE id = %d", $id ),
-            ARRAY_A
+        $get = $this->supabase_request(
+            'GET',
+            'cyber_action_tags',
+            [
+                'select' => 'id,name,color,sentiment,impact,description,category_id,is_active',
+                'id'     => 'eq.' . $id,
+                'limit'  => 1,
+            ]
         );
-        if ( ! $row ) wp_send_json_error( 'Tag not found.' );
 
-        unset( $row['id'] );
-        $base  = rtrim( $row['name'], '_' );
-        $taken = true;
-        $i     = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM {$this->table_tags} WHERE name = %s", $try )
+        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+            wp_send_json_error( 'Tag not found.' );
+        }
+
+        $row  = $get['data'][0];
+        $base = rtrim( $row['name'], '_' );
+        $try  = $base . '_copy';
+        $i    = 2;
+
+        while ( true ) {
+            $exists = $this->supabase_request(
+                'GET',
+                'cyber_action_tags',
+                [
+                    'select' => 'id',
+                    'name'   => 'eq.' . $try,
+                    'limit'  => 1,
+                ]
             );
-            if ( ! $taken ) $row['name'] = $try;
+
+            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+                break;
+            }
+
+            $try = $base . '_copy' . $i;
             $i++;
         }
-        $row['is_active'] = 0; // duplicate starts inactive
 
-        $ok = $wpdb->insert( $this->table_tags, $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
+        $new_row = [
+            'name'        => $try,
+            'color'       => $row['color'],
+            'sentiment'   => $row['sentiment'],
+            'impact'      => $row['impact'],
+            'description' => $row['description'],
+            'category_id' => intval( $row['category_id'] ),
+            'is_active'   => false,
+        ];
+
+        $insert = $this->supabase_request(
+            'POST',
+            'cyber_action_tags',
+            [],
+            $new_row,
+            'return=representation'
+        );
+
+        if ( ! $insert['ok'] ) {
+            wp_send_json_error( $insert['error'], $insert['status'] );
+        }
+
+        wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
     }
-}
