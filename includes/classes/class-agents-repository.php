@@ -14,11 +14,8 @@
  *
  * ARCHITECTURAL RULES (do not violate):
  *  - This class NEVER mutates game state. Pure read queries only.
- *    Entropy, Echo, HP, STATUS flags etc. must be changed via the
- *     tag-driven pipeline, never by direct REST writes here.
  *  - Never resurrect an Agent whose status is STATUS_DEAD.
- *  - Never allow an Agent to be bound to a Node it was not created in
- *    (1 Agent = 1 Node invariant).
+ *  - Never allow an Agent to be bound to a Node it was not created in.
  *  - All table names use the cyber_ prefix (e.g. cyber_characters).
  *
  * @package Neoweaver
@@ -36,10 +33,6 @@ class Neoweaver_Agents_Repository {
 
 	/**
 	 * Build the standard Supabase REST request headers using SERVICE KEY.
-	 *
-	 * All queries in this class are server-side reads that must bypass RLS
-	 * (policies require `authenticated` role — anon key without JWT is blocked).
-	 * Falls back to anon key with a warning if service key is not configured.
 	 *
 	 * @return array<string,string>
 	 */
@@ -64,8 +57,8 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Build a full Supabase REST endpoint URL for a given table + query args.
 	 *
-	 * @param string               $table  Full table name (e.g. 'cyber_characters').
-	 * @param array<string,string> $args   Query-string parameters.
+	 * @param string               $table
+	 * @param array<string,string> $args
 	 * @return string
 	 */
 	private function table_url( string $table, array $args = [] ): string {
@@ -76,7 +69,11 @@ class Neoweaver_Agents_Repository {
 
 	/**
 	 * Execute a GET request and return the decoded JSON body as an array.
-	 * Returns an empty array and logs on any error or non-200 response.
+	 *
+	 * BUG 21 FIX: The original check used strict !== 200, which treated any
+	 * other 2xx code (e.g. 201 Created from a PostgREST upsert read-back)
+	 * as an error and returned []. Supabase/PostgREST can return 201 on
+	 * certain read patterns. Accept any 2xx (200–299) as success.
 	 *
 	 * @param string $url
 	 * @return array
@@ -89,8 +86,10 @@ class Neoweaver_Agents_Repository {
 			return [];
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		if ( $code !== 200 ) {
+		$code = (int) wp_remote_retrieve_response_code( $response );
+
+		// Accept any 2xx status code (200 OK, 201 Created, 206 Partial, etc.).
+		if ( $code < 200 || $code >= 300 ) {
 			error_log( 'TW Supabase HTTP ' . $code . ' [' . $url . ']: ' . wp_remote_retrieve_body( $response ) );
 			return [];
 		}
@@ -100,22 +99,14 @@ class Neoweaver_Agents_Repository {
 	}
 
 	/**
-	 * Build a Supabase `in.(...)` filter value that is safe for both integer
-	 * and UUID primary keys.
+	 * Build a Supabase `in.(...)` filter value safe for both integer and UUID keys.
 	 *
-	 * BUG-FIX 10: The original code ran every ID through intval(), which
-	 * converts UUID strings (e.g. "3f2504e0-4f89-...") to 0, collapsing the
-	 * entire filter to in.(0,0,0,...) and returning wrong results.
-	 * We now keep IDs as strings and only sanitize them — no intval().
-	 *
-	 * @param  array $ids  Raw ID values from Supabase rows (int or UUID string).
-	 * @return string      e.g. "in.(1,2,3)" or "in.(uuid1,uuid2)"
+	 * @param  array $ids
+	 * @return string  e.g. "in.(1,2,3)" or "in.(uuid1,uuid2)"
 	 */
 	private function in_filter( array $ids ): string {
 		$safe = array_map(
 			function ( $id ) {
-				// Strip everything except alphanumeric characters and hyphens
-				// (hyphens are part of UUID v4 format).
 				return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $id );
 			},
 			$ids
@@ -125,7 +116,6 @@ class Neoweaver_Agents_Repository {
 
 	/**
 	 * Sanitize a single ID (UUID or integer) for safe use in a Supabase filter.
-	 * Strips everything except alphanumerics and hyphens.
 	 *
 	 * @param  mixed $id
 	 * @return string
@@ -135,36 +125,21 @@ class Neoweaver_Agents_Repository {
 	}
 
 	// -------------------------------------------------------------------------
-	// Primary roster query (used by the characters list shortcode)
+	// Primary roster query
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Fetch all Field Agents for a WordPress user, with tags and inventory
-	 * already attached to each character row.
+	 * Fetch all Field Agents for a WordPress user, with tags and inventory.
 	 *
-	 * This is the single method the character-list shortcode needs. It fires
-	 * three Supabase queries:
-	 *   1. cyber_characters (with class, race and campaign joins)
-	 *   2. cyber_character_complete_tags  (all tags for the returned agent IDs)
-	 *   3. v_cyber_character_items        (inventory view for those agent IDs)
-	 *
-	 * Tags and inventory are keyed by character_id and merged into each
-	 * character array under the keys 'tags' and 'inventory' respectively.
-	 *
-	 * Returns an empty array when the user has no agents or any query fails.
-	 *
-	 * @param int $wp_user_id  WordPress user ID (get_current_user_id()).
-	 * @return array           Enriched character rows; each has 'tags' and 'inventory'.
+	 * @param int $wp_user_id
+	 * @return array  Enriched character rows; each has 'tags' and 'inventory'.
 	 */
 	public function get_for_wp_user( int $wp_user_id ): array {
 
-		// ------------------------------------------------------------------
-		// 1. Fetch characters
-		// ------------------------------------------------------------------
 		$chars_url = $this->table_url( 'cyber_characters', [
 			'wp_user_id' => 'eq.' . $wp_user_id,
 			'select'     => '*,cyber_classes(name),cyber_races(name),cyber_campaign_characters(cyber_campaign(name,cyber_campaign_worlds(cyber_worlds(name))))',
-			'order' => 'created_at.desc',
+			'order'      => 'created_at.desc',
 		] );
 
 		$characters = $this->get_json( $chars_url );
@@ -173,11 +148,6 @@ class Neoweaver_Agents_Repository {
 			return [];
 		}
 
-		// ------------------------------------------------------------------
-		// 2. Batch-fetch tags for all returned character IDs
-		//    BUG-FIX 10: use in_filter() instead of array_map('intval', ...)
-		//    so UUID primary keys are not coerced to 0.
-		// ------------------------------------------------------------------
 		$char_ids  = wp_list_pluck( $characters, 'id' );
 		$ids_query = $this->in_filter( $char_ids );
 
@@ -186,18 +156,11 @@ class Neoweaver_Agents_Repository {
 		] );
 		$all_tags = $this->get_json( $tags_url );
 
-		// ------------------------------------------------------------------
-		// 3. Batch-fetch inventory for all returned character IDs
-		// ------------------------------------------------------------------
 		$inv_url   = $this->table_url( 'v_cyber_character_items', [
 			'character_id' => $ids_query,
 		] );
 		$all_items = $this->get_json( $inv_url );
 
-		// ------------------------------------------------------------------
-		// 4. Attach tags and inventory to each character row
-		//    Compare as strings so both int and UUID keys match correctly.
-		// ------------------------------------------------------------------
 		foreach ( $characters as &$c ) {
 			$cid = (string) $c['id'];
 
@@ -225,14 +188,9 @@ class Neoweaver_Agents_Repository {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Fetch a single Field Agent record from cyber_characters by its primary key.
+	 * Fetch a single Field Agent by primary key.
 	 *
-	 * Accepts both integer and UUID string IDs; passes the value through
-	 * in_filter()-style sanitization (strip non-alphanumeric/hyphen chars).
-	 *
-	 * Returns the full row as an associative array, or null when not found.
-	 *
-	 * @param string|int $character_id  Supabase primary key of the cyber_characters row.
+	 * @param string|int $character_id
 	 * @return array|null
 	 */
 	public function get_by_id( $character_id ): ?array {
@@ -248,23 +206,10 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Fetch the Field Agent currently active for a given WordPress user.
 	 *
-	 * "Active" = the character linked to the user's most recent open session
-	 * in cyber_game_sessions (status = 'active', ordered by created_at desc).
-	 *
-	 * Returns null when:
-	 *  - No active session exists for the user.
-	 *  - The linked agent is STATUS_DEAD.
-	 *  - Any Supabase query fails.
-	 *
-	 * BUG-FIX 8: was a stub that always returned null. Now queries
-	 * cyber_game_sessions to find the active session and then fetches
-	 * the linked character, refusing to return STATUS_DEAD agents.
-	 *
 	 * @param int $wp_user_id
 	 * @return array|null
 	 */
 	public function get_active_for_wp_user( int $wp_user_id ): ?array {
-		// Step 1: find the most recent active session for this WP user.
 		$session_url = $this->table_url( 'cyber_game_sessions', [
 			'wp_user_id' => 'eq.' . $wp_user_id,
 			'status'     => 'eq.active',
@@ -277,21 +222,16 @@ class Neoweaver_Agents_Repository {
 			return null;
 		}
 
-		$session      = $sessions[0];
-		$character_id = $session['character_id'] ?? null;
-
+		$character_id = $sessions[0]['character_id'] ?? null;
 		if ( empty( $character_id ) ) {
 			return null;
 		}
 
-		// Step 2: fetch the character row, guarding against STATUS_DEAD.
 		$character = $this->get_by_id( $character_id );
-
 		if ( ! $character ) {
 			return null;
 		}
 
-		// Never surface a dead agent as "active" — protocol rule.
 		if ( ( $character['status'] ?? '' ) === 'STATUS_DEAD' ) {
 			error_log( 'TW Repository: get_active_for_wp_user — session references a STATUS_DEAD agent. wp_user_id=' . $wp_user_id . ' character_id=' . $character_id );
 			return null;
@@ -301,10 +241,7 @@ class Neoweaver_Agents_Repository {
 	}
 
 	/**
-	 * Fetch all Field Agents owned by a WordPress user, across all Nodes.
-	 *
-	 * Includes both living and dead agents. Dead agents are marked STATUS_DEAD.
-	 * Does NOT attach tags or inventory — use get_for_wp_user() for that.
+	 * Fetch all Field Agents owned by a WordPress user (living + dead).
 	 *
 	 * @param int $wp_user_id
 	 * @return array
@@ -339,13 +276,7 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Fetch all Field Agents currently bound to a specific Node (world).
 	 *
-	 * BUG-FIX: The previous signature typed $node_id as int and passed it
-	 * directly into the Supabase filter. cyber_worlds.id is a UUID string —
-	 * any integer cast collapses it to 0, so the query always returned empty.
-	 * The parameter is now string|int and is run through sanitize_id() so
-	 * UUID values are preserved intact.
-	 *
-	 * @param string|int $node_id  Supabase primary key (UUID) of the cyber_worlds row.
+	 * @param string|int $node_id  UUID of the cyber_worlds row.
 	 * @return array
 	 */
 	public function get_by_node( $node_id ): array {
@@ -369,15 +300,8 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Fetch the current Echo tag collection for a Field Agent.
 	 *
-	 * Tags are stored in cyber_character_complete_tags WITHOUT the leading '#'.
-	 *
-	 * BUG-FIX 9: The original code called get_character_tags(), a global
-	 * helper that does not exist in this plugin. The fallback Supabase query
-	 * was never reached. The guard is removed; we always go directly to
-	 * Supabase, which is the single source of truth for Echo tags.
-	 *
 	 * @param string|int $character_id
-	 * @return array  Array of tag row arrays (may be empty).
+	 * @return array
 	 */
 	public function get_echo_tags( $character_id ): array {
 		$safe_id = $this->sanitize_id( $character_id );
@@ -397,7 +321,6 @@ class Neoweaver_Agents_Repository {
 	public function has_echo_tag( $character_id, string $tag ): bool {
 		$tags = $this->get_echo_tags( $character_id );
 		foreach ( $tags as $row ) {
-			// Tags may be stored in a 'tag' or 'tag_name' column — check both.
 			$value = $row['tag'] ?? $row['tag_name'] ?? '';
 			if ( $value === $tag ) {
 				return true;
@@ -414,17 +337,31 @@ class Neoweaver_Agents_Repository {
 	 * Fetch the live HUD/biometric state for a Field Agent from
 	 * cyber_state_of_the_campaign.
 	 *
-	 * Returns the full row: HP, MP, XP, Satiety, Hydration, Rest,
-	 * Sync_rate (Entropy), time_of_day, current_location_id, etc.
-	 * Returns null when no active campaign row exists.
+	 * BUG 22 FIX: The previous query filtered only by character_id with limit=1,
+	 * returning the most-recently-inserted row regardless of which campaign is
+	 * active. A character can participate in multiple campaigns (multiple
+	 * Deployments in the same Node), so the wrong campaign's state could be
+	 * returned silently. $campaign_id is now a required parameter; callers
+	 * must pass the active campaign UUID from the current session context.
+	 *
+	 * Returns null when no matching row exists for the character+campaign pair.
 	 *
 	 * @param string|int $character_id
+	 * @param string|int $campaign_id   UUID of the active cyber_campaigns row.
 	 * @return array|null
 	 */
-	public function get_hud_state( $character_id ): ?array {
-		$safe_id = $this->sanitize_id( $character_id );
-		$url     = $this->table_url( 'cyber_state_of_the_campaign', [
-			'character_id' => 'eq.' . $safe_id,
+	public function get_hud_state( $character_id, $campaign_id ): ?array {
+		$safe_char     = $this->sanitize_id( $character_id );
+		$safe_campaign = $this->sanitize_id( $campaign_id );
+
+		if ( '' === $safe_char || '' === $safe_campaign ) {
+			error_log( 'TW Repository: get_hud_state — missing character_id or campaign_id.' );
+			return null;
+		}
+
+		$url  = $this->table_url( 'cyber_state_of_the_campaign', [
+			'character_id' => 'eq.' . $safe_char,
+			'campaign_id'  => 'eq.' . $safe_campaign,
 			'limit'        => '1',
 		] );
 		$rows = $this->get_json( $url );
@@ -437,14 +374,6 @@ class Neoweaver_Agents_Repository {
 
 	/**
 	 * Verify that a given WordPress user owns a specific Field Agent.
-	 *
-	 * Must be called before any AJAX action that mutates agent data, to prevent
-	 * one Operator from modifying another's character.
-	 *
-	 * Uses service key so the ownership check is never blocked by RLS
-	 * (all policies on cyber_characters require `authenticated` role —
-	 * a PHP server-side call without a JWT would always return false with
-	 * the anon key, making this guard silently ineffective).
 	 *
 	 * @param int        $wp_user_id
 	 * @param string|int $character_id
