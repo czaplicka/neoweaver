@@ -373,7 +373,7 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 
 				<label class="tw-field-label" for="tw-char-bio">
 					<span>Short bio</span>
-					<textarea id="tw-char-bio" name="bio" placeholder="Write a short bio, personality trace, or external-facing profile." maxlength="1000"></textarea>
+					<textarea id="tw-char-bio" name="bio" placeholder="Write a short bio, personality trace, or external-facing profile."></textarea>
 				</label>
 
 				<div class="tw-nav-row">
