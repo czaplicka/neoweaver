@@ -336,6 +336,70 @@ if ( ! function_exists( 'nw_store_character_backstory_tags' ) ) {
         return true;
     }
 }
+
+if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
+    /**
+     * Handles optional avatar file upload from $_FILES['avatar'].
+     * Returns the uploaded file URL (string) on success,
+     * empty string if no file was uploaded,
+     * or WP_Error on failure.
+     *
+     * @return string|WP_Error
+     */
+    function nw_handle_avatar_upload_strict() {
+        if ( empty( $_FILES['avatar']['tmp_name'] ) ) {
+            return '';
+        }
+
+        if ( ! function_exists( 'wp_handle_upload' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+
+        $file          = $_FILES['avatar'];
+        $allowed_types = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' );
+        $mime          = isset( $file['type'] ) ? strtolower( trim( $file['type'] ) ) : '';
+
+        if ( ! in_array( $mime, $allowed_types, true ) ) {
+            return new WP_Error(
+                'avatar_invalid_type',
+                'Avatar must be a JPEG, PNG, GIF, or WebP image.',
+                array( 'status' => 400 )
+            );
+        }
+
+        $max_size = 2 * 1024 * 1024; // 2 MB
+        if ( isset( $file['size'] ) && (int) $file['size'] > $max_size ) {
+            return new WP_Error(
+                'avatar_too_large',
+                'Avatar file must be smaller than 2 MB.',
+                array( 'status' => 400 )
+            );
+        }
+
+        $overrides = array(
+            'test_form' => false,
+            'mimes'     => array(
+                'jpg|jpeg|jpe' => 'image/jpeg',
+                'png'          => 'image/png',
+                'gif'          => 'image/gif',
+                'webp'         => 'image/webp',
+            ),
+        );
+
+        $uploaded = wp_handle_upload( $file, $overrides );
+
+        if ( isset( $uploaded['error'] ) ) {
+            return new WP_Error(
+                'avatar_upload_failed',
+                $uploaded['error'],
+                array( 'status' => 500 )
+            );
+        }
+
+        return isset( $uploaded['url'] ) ? (string) $uploaded['url'] : '';
+    }
+}
+
 if ( ! function_exists( 'nw_create_character_from_request' ) ) {
     function nw_create_character_from_request(): void {
         if ( ! is_user_logged_in() ) {
