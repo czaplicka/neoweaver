@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Two actions:
  *
  * 1. tw_get_char_state_active
- *    For the GAME HUD — fetches hp/mp from cyber_state_of_the_campaign
+ *    For the GAME HUD — fetches full state from cyber_state_of_the_campaign
  *    for the character that is currently in an ACTIVE (not paused) session.
  *    Fails fast if there is no active session.
  *
@@ -19,18 +19,21 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 1. ACTIVE GAME HUD — hp/mp from cyber_state_of_the_campaign
+// 1. ACTIVE GAME HUD — full state from cyber_state_of_the_campaign
 // ──────────────────────────────────────────────────────────────────────────────
 add_action( 'wp_ajax_tw_get_char_state_active', 'tw_get_char_state_active_handler' );
 
 if ( ! function_exists( 'tw_get_char_state_active_handler' ) ) {
 	function tw_get_char_state_active_handler(): void {
+		// BUG 6 FIX: nonce check MUST come before any configuration guard.
+		// The previous order let unauthenticated requests probe for tw_supabase_get
+		// by comparing 500 vs 403 response codes, fingerprinting plugin state.
+		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
+
 		if ( ! function_exists( 'tw_supabase_get' ) ) {
 			wp_send_json_error( 'Core functions missing', 500 );
 			return;
 		}
-
-		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
 
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
@@ -63,12 +66,15 @@ if ( ! function_exists( 'tw_get_char_state_active_handler' ) ) {
 			return;
 		}
 
+		// BUG 7 FIX: fetch all HUD fields, not just hp,mp.
+		// Added: satiety, hydration, sync_rate, xp, current_location_id
+		// per the cyber_state_of_the_campaign protocol spec.
 		$data = tw_supabase_get(
 			'cyber_state_of_the_campaign',
 			[
 				'character_id' => 'eq.' . $character_id,
 				'campaign_id'  => 'eq.' . $campaign_id,
-				'select'       => 'hp,mp',
+				'select'       => 'hp,mp,satiety,hydration,sync_rate,xp,current_location_id',
 				'order'        => 'created_at.desc',
 				'limit'        => 1,
 			]
@@ -90,12 +96,12 @@ add_action( 'wp_ajax_tw_get_char_state_profile', 'tw_get_char_state_profile_hand
 
 if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 	function tw_get_char_state_profile_handler(): void {
+		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
+
 		if ( ! function_exists( 'tw_supabase_get' ) ) {
 			wp_send_json_error( 'Core functions missing', 500 );
 			return;
 		}
-
-		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
 
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
