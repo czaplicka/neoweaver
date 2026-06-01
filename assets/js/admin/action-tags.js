@@ -1,813 +1,961 @@
-<?php
-/**
- * NeoWeaver Admin — Action Tags & Tag Categories
- * Dwie tabele na jednym ekranie (taby).
- */
+jQuery(function ($) {
+    'use strict';
 
-if ( ! defined( 'ABSPATH' ) ) exit;
-
-class NW_Action_Tags_Admin {
-
-    private $table_tags = 'cyber_action_tags';
-    private $table_cats = 'cyber_action_tag_categories';
-    private $nonce_key  = 'nw_action_tags_nonce';
-
-    public function __construct() {
-        add_action( 'admin_menu',           [ $this, 'register_menu' ], 12 );
-        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-        // AJAX — categories
-        add_action( 'wp_ajax_nw_acats_load',      [ $this, 'ajax_cats_load' ] );
-        add_action( 'wp_ajax_nw_acats_save',      [ $this, 'ajax_cats_save' ] );
-        add_action( 'wp_ajax_nw_acats_delete',    [ $this, 'ajax_cats_delete' ] );
-        add_action( 'wp_ajax_nw_acats_duplicate', [ $this, 'ajax_cats_duplicate' ] );
-
-        // AJAX — tags
-        add_action( 'wp_ajax_nw_atags_load',      [ $this, 'ajax_tags_load' ] );
-        add_action( 'wp_ajax_nw_atags_save',      [ $this, 'ajax_tags_save' ] );
-        add_action( 'wp_ajax_nw_atags_delete',    [ $this, 'ajax_tags_delete' ] );
-        add_action( 'wp_ajax_nw_atags_duplicate', [ $this, 'ajax_tags_duplicate' ] );
-
-        // HUD groups helper
-        add_action( 'wp_ajax_nw_hud_groups_load', [ $this, 'ajax_hud_groups_load' ] );
-        add_action( 'wp_ajax_nw_hud_save',        [ $this, 'ajax_hud_save' ] );
-        add_action( 'wp_ajax_nw_hud_delete',      [ $this, 'ajax_hud_delete' ] );
-        add_action( 'wp_ajax_nw_hud_duplicate',   [ $this, 'ajax_hud_duplicate' ] );
+    if (typeof NWActionTags === 'undefined') {
+        return;
     }
 
-    /* ── Menu ─────────────────────────────────────────────── */
+    const state = {
+        activeTab: 'tags',
+        tags: [],
+        cats: [],
+        hud: [],
+        filters: {
+            tagsSearch: '',
+            tagsCat: '',
+            tagsSentiment: '',
+            catsSearch: '',
+            hudSearch: ''
+        }
+    };
 
-    public function register_menu() {
-        add_submenu_page(
-            'neoweaver',
-            __( 'Action Tags', 'neoweaver' ),
-            __( 'Action Tags', 'neoweaver' ),
-            'manage_options',
-            'nw-action-tags',
-            [ $this, 'render_page' ]
-        );
+    const els = {
+        notice: $('#nw-at-notice'),
+
+        tabButtons: $('.nw-tab-btn'),
+        tabPanels: $('.nw-tab-panel'),
+
+        tagsTbody: $('#nw-tags-tbody'),
+        catsTbody: $('#nw-cats-tbody'),
+        hudTbody: $('#nw-hud-tbody'),
+
+        tagsSearch: $('#nw-tags-search'),
+        tagsFilterCat: $('#nw-tags-filter-cat'),
+        tagsFilterSentiment: $('#nw-tags-filter-sentiment'),
+        catsSearch: $('#nw-cats-search'),
+        hudSearch: $('#nw-hud-search'),
+
+        tagsRefresh: $('#nw-tags-refresh-btn'),
+        catsRefresh: $('#nw-cats-refresh-btn'),
+        hudRefresh: $('#nw-hud-refresh-btn'),
+
+        tagModal: $('#nw-tag-modal-overlay'),
+        catModal: $('#nw-cat-modal-overlay'),
+        hudModal: $('#nw-hud-modal-overlay')
+    };
+
+    function createIconsSafe() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
     }
 
-    /* ── Assets ───────────────────────────────────────────── */
-
-    public function enqueue_assets( $hook ) {
-        if ( strpos( $hook, 'nw-action-tags' ) === false ) return;
-
-        $base = plugin_dir_url( __FILE__ );
-
-        wp_enqueue_style(
-            'nw-admin-core',
-            plugin_dir_url( dirname( __FILE__ ) ) . '../assets/css/admin/admin-core.css',
-            [],
-            NW_VERSION
-        );
-        wp_enqueue_style(
-            'nw-action-tags',
-            $base . '../../assets/css/admin/action-tags.css',
-            [ 'nw-admin-core' ],
-            NW_VERSION
-        );
-
-        wp_enqueue_script( 'jquery' );
-        wp_enqueue_script(
-            'lucide',
-            'https://unpkg.com/lucide@latest/dist/umd/lucide.min.js',
-            [],
-            null,
-            true
-        );
-        wp_enqueue_script(
-            'nw-action-tags',
-            $base . '../../assets/js/admin/action-tags.js',
-            [ 'jquery', 'lucide' ],
-            NW_VERSION,
-            true
-        );
-        wp_localize_script( 'nw-action-tags', 'NWActionTags', [
-            'ajaxurl' => admin_url( 'admin-ajax.php' ),
-            'nonce'   => wp_create_nonce( $this->nonce_key ),
-        ] );
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
-    /* ── Page HTML ────────────────────────────────────────── */
+    function debounce(fn, delay) {
+        let timer = null;
+        return function () {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                fn.apply(context, args);
+            }, delay);
+        };
+    }
 
-    public function render_page() { ?>
-<div class="nw-admin-wrap">
+    function normalizeHex(value, fallback) {
+        let v = String(value || '').trim();
+        if (!v) return fallback || '#adff00';
+        if (v.charAt(0) !== '#') v = '#' + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+        return fallback || '#adff00';
+    }
 
-    <div class="nw-admin-header">
-        <div class="nw-admin-header-left">
-            <i data-lucide="tags" style="width:20px;height:20px;color:#adff00;flex-shrink:0;"></i>
-            <h1 class="nw-admin-title">Action Tags</h1>
-        </div>
-        <div class="nw-admin-header-actions">
-            <button id="nw-tags-add-btn"  class="nw-btn nw-btn-primary" data-tab-add="tags">
-                <i data-lucide="plus" style="width:14px;height:14px;"></i> New Tag
-            </button>
-            <button id="nw-cats-add-btn"  class="nw-btn nw-btn-secondary" data-tab-add="cats">
-                <i data-lucide="folder-plus" style="width:14px;height:14px;"></i> New Category
-            </button>
-            <button id="nw-hud-add-btn" class="nw-btn nw-btn-ghost" data-tab-add="hud">
-                <i data-lucide="layout-dashboard" style="width:14px;height:14px;"></i> New HUD Group
-            </button>
-        </div>
-    </div>
+    function normalizeSlug(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/[\s\-]+/g, '_')
+            .replace(/[^a-z0-9_]/g, '')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+    }
 
-    <div id="nw-at-notice" class="nw-notice" style="display:none;"></div>
+    function showNotice(message, type) {
+        const cls = type === 'error' ? 'nw-notice-error' : 'nw-notice-success';
+        els.notice
+            .stop(true, true)
+            .removeClass('nw-notice-error nw-notice-success')
+            .addClass(cls)
+            .html(escapeHtml(message))
+            .fadeIn(150);
 
-    <!-- Stats bar — Tags -->
-    <div class="nw-stats-bar" id="nw-tags-stats-bar">
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Total Tags</span>
-            <span class="nw-stat-value" id="nw-tags-total">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Active</span>
-            <span class="nw-stat-value nw-stat-green" id="nw-tags-active">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Positive</span>
-            <span class="nw-stat-value" style="color:#adff00;" id="nw-tags-pos">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Negative</span>
-            <span class="nw-stat-value" style="color:#ff5050;" id="nw-tags-neg">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Neutral</span>
-            <span class="nw-stat-value" style="color:#888;" id="nw-tags-neu">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">Categories</span>
-            <span class="nw-stat-value" id="nw-cats-total">—</span>
-        </div>
-        <div class="nw-stat-divider"></div>
-        <div class="nw-stat-item">
-            <span class="nw-stat-label">HUD Groups</span>
-            <span class="nw-stat-value" style="color:#44aaff;" id="nw-hud-total">—</span>
-        </div>
-    </div>
+        setTimeout(function () {
+            els.notice.fadeOut(250);
+        }, 2800);
+    }
 
-    <!-- Tabs -->
-    <div class="nw-admin-card" style="padding:0;">
-        <div class="nw-tab-nav">
-            <button class="nw-tab-btn nw-tab-active" data-tab="tags">
-                <i data-lucide="tag" style="width:13px;height:13px;"></i>
-                Tags <span class="nw-tab-count" id="nw-tab-count-tags">—</span>
-            </button>
-            <button class="nw-tab-btn" data-tab="cats">
-                <i data-lucide="folder" style="width:13px;height:13px;"></i>
-                Categories <span class="nw-tab-count" id="nw-tab-count-cats">—</span>
-            </button>
-            <button class="nw-tab-btn" data-tab="hud">
-                <i data-lucide="layout-dashboard" style="width:13px;height:13px;"></i>
-                HUD Groups <span class="nw-tab-count" id="nw-tab-count-hud">—</span>
-            </button>
-        </div>
+    function ajax(action, data) {
+        return $.ajax({
+            url: NWActionTags.ajaxurl,
+            type: 'POST',
+            dataType: 'json',
+            data: $.extend({}, data || {}, {
+                action: action,
+                nonce: NWActionTags.nonce
+            })
+        });
+    }
 
-        <!-- ======= TAB: TAGS ======= -->
-        <div id="nw-tab-tags" class="nw-tab-panel" style="padding:20px;">
-            <div class="nw-table-controls">
-                <div class="nw-search-wrap">
-                    <i data-lucide="search" class="nw-search-icon"></i>
-                    <input type="text" id="nw-tags-search" class="nw-search-input" placeholder="Search tags…">
-                </div>
-                <div class="nw-filter-group">
-                    <select id="nw-tags-filter-cat" class="nw-select">
-                        <option value="">All categories</option>
-                    </select>
-                    <select id="nw-tags-filter-sentiment" class="nw-select">
-                        <option value="">All sentiments</option>
-                        <option value="positive">Positive</option>
-                        <option value="negative">Negative</option>
-                        <option value="neutral">Neutral</option>
-                    </select>
-                    <button id="nw-tags-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
-                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
-                    </button>
-                </div>
-            </div>
+    function openModal($modal) {
+        $modal.fadeIn(120);
+        $('body').addClass('nw-modal-open');
+        createIconsSafe();
+    }
 
-            <div class="nw-table-wrap">
-                <table class="nw-table">
-                    <thead>
-                        <tr>
-                            <th style="width:36px;">Color</th>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th style="width:90px;">Sentiment</th>
-                            <th style="width:80px;">Impact</th>
-                            <th style="width:60px;">Active</th>
-                            <th style="width:100px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="nw-tags-tbody">
-                        <tr class="nw-loading-row"><td colspan="7"><span class="nw-spinner"></span> Loading…</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div><!-- /tab-tags -->
+    function closeModal($modal) {
+        $modal.fadeOut(120);
+        $('body').removeClass('nw-modal-open');
+    }
 
-        <!-- ======= TAB: CATEGORIES ======= -->
-        <div id="nw-tab-cats" class="nw-tab-panel nw-hidden" style="padding:20px;">
-            <div class="nw-table-controls">
-                <div class="nw-search-wrap">
-                    <i data-lucide="search" class="nw-search-icon"></i>
-                    <input type="text" id="nw-cats-search" class="nw-search-input" placeholder="Search categories…">
-                </div>
-                <div class="nw-filter-group">
-                    <button id="nw-cats-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
-                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
-                    </button>
-                </div>
-            </div>
+    function closeAllModals() {
+        $('.nw-modal-overlay').fadeOut(120);
+        $('body').removeClass('nw-modal-open');
+    }
 
-            <div class="nw-table-wrap">
-                <table class="nw-table">
-                    <thead>
-                        <tr>
-                            <th style="width:36px;">Color</th>
-                            <th>Internal Name</th>
-                            <th>Display Name</th>
-                            <th style="width:60px;">Sort</th>
-                            <th>HUD Group</th>
-                            <th style="width:100px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="nw-cats-tbody">
-                        <tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div><!-- /tab-cats -->
-        <!-- ======= TAB: HUD GROUPS ======= -->
-        <div id="nw-tab-hud" class="nw-tab-panel nw-hidden" style="padding:20px;">
-            <div class="nw-table-controls">
-                <div class="nw-search-wrap">
-                    <i data-lucide="search" class="nw-search-icon"></i>
-                    <input type="text" id="nw-hud-search" class="nw-search-input" placeholder="Search HUD groups…">
-                </div>
-                <div class="nw-filter-group">
-                    <button id="nw-hud-refresh-btn" class="nw-btn nw-btn-ghost nw-btn-sm">
-                        <i data-lucide="refresh-cw" style="width:12px;height:12px;"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="nw-table-wrap">
-                <table class="nw-table">
-                    <thead>
-                        <tr>
-                            <th style="width:36px;">Color</th>
-                            <th style="width:36px;">Icon</th>
-                            <th>Slug</th>
-                            <th>Label</th>
-                            <th style="width:60px;">Sort</th>
-                            <th style="width:100px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="nw-hud-tbody">
-                        <tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div><!-- /tab-hud -->
+    function setActiveTab(tab) {
+        state.activeTab = tab;
+        els.tabButtons.removeClass('nw-tab-active');
+        $('.nw-tab-btn[data-tab="' + tab + '"]').addClass('nw-tab-active');
 
-    </div><!-- /.nw-admin-card -->
+        els.tabPanels.addClass('nw-hidden');
+        $('#nw-tab-' + tab).removeClass('nw-hidden');
+        createIconsSafe();
+    }
 
-</div><!-- /.nw-admin-wrap -->
+    function getCatById(id) {
+        id = parseInt(id, 10);
+        return state.cats.find(function (item) {
+            return parseInt(item.id, 10) === id;
+        }) || null;
+    }
 
-<!-- ============================================================ -->
-<!-- MODAL: TAG                                                    -->
-<!-- ============================================================ -->
-<div id="nw-tag-modal-overlay" class="nw-modal-overlay" style="display:none;">
-    <div class="nw-modal">
-        <div class="nw-modal-header">
-            <h2 class="nw-modal-title" id="nw-tag-modal-title">New Tag</h2>
-            <button class="nw-modal-close" data-modal="nw-tag-modal-overlay">
-                <i data-lucide="x" style="width:16px;height:16px;"></i>
-            </button>
-        </div>
-        <div class="nw-modal-body">
-            <form id="nw-tag-form" autocomplete="off">
-                <input type="hidden" id="nw-tag-field-id">
+    function getHudById(id) {
+        id = parseInt(id, 10);
+        return state.hud.find(function (item) {
+            return parseInt(item.id, 10) === id;
+        }) || null;
+    }
 
-                <div class="nw-field-grid nw-field-grid-2">
-                    <div class="nw-field">
-                        <label class="nw-label">Name <span class="nw-required">*</span></label>
-                        <input type="text" id="nw-tag-field-name" class="nw-input" placeholder="e.g. aggressive_action">
-                        <p class="nw-field-hint">Will be auto-normalised (lowercase, underscores) by the DB trigger.</p>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Category <span class="nw-required">*</span></label>
-                        <select id="nw-tag-field-category" class="nw-select">
-                            <option value="">— select —</option>
-                        </select>
-                    </div>
-                </div>
+    function getTagById(id) {
+        id = parseInt(id, 10);
+        return state.tags.find(function (item) {
+            return parseInt(item.id, 10) === id;
+        }) || null;
+    }
 
-                <div class="nw-field-grid nw-field-grid-3">
-                    <div class="nw-field">
-                        <label class="nw-label">Sentiment</label>
-                        <select id="nw-tag-field-sentiment" class="nw-select">
-                            <option value="neutral">Neutral</option>
-                            <option value="positive">Positive</option>
-                            <option value="negative">Negative</option>
-                        </select>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Impact</label>
-                        <input type="number" id="nw-tag-field-impact" class="nw-input" step="0.01" placeholder="0.00">
-                        <p class="nw-field-hint">Negative values allowed.</p>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Color</label>
-                        <div class="nw-color-input-wrap">
-                            <input type="color" id="nw-tag-field-color-picker" value="#adff00">
-                            <input type="text" id="nw-tag-field-color" class="nw-input" maxlength="7" placeholder="#adff00">
-                        </div>
-                    </div>
-                </div>
+    function sentimentClass(sentiment) {
+        if (sentiment === 'positive') return 'style="color:#adff00;"';
+        if (sentiment === 'negative') return 'style="color:#ff5050;"';
+        return 'style="color:#888;"';
+    }
 
-                <div class="nw-field">
-                    <label class="nw-label">Description</label>
-                    <textarea id="nw-tag-field-description" class="nw-input nw-textarea" rows="3" placeholder="Optional description…"></textarea>
-                </div>
+    function renderStats() {
+        const totalTags = state.tags.length;
+        const activeTags = state.tags.filter(function (t) { return parseInt(t.is_active, 10) === 1; }).length;
+        const positiveTags = state.tags.filter(function (t) { return t.sentiment === 'positive'; }).length;
+        const negativeTags = state.tags.filter(function (t) { return t.sentiment === 'negative'; }).length;
+        const neutralTags = state.tags.filter(function (t) { return t.sentiment === 'neutral'; }).length;
 
-                <div class="nw-field nw-field-toggle">
-                    <label class="nw-label">Active</label>
-                    <label class="nw-toggle-wrap">
-                        <input type="checkbox" id="nw-tag-field-is-active" checked>
-                        <span class="nw-toggle-slider"></span>
-                    </label>
-                </div>
-            </form>
-        </div>
-        <div class="nw-modal-footer">
-            <button id="nw-tag-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
-            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-tag-modal-overlay">Cancel</button>
-            <button id="nw-tag-save-btn" class="nw-btn nw-btn-primary">
-                <span id="nw-tag-save-label">Create Tag</span>
-            </button>
-        </div>
-    </div>
-</div>
+        $('#nw-tags-total').text(totalTags);
+        $('#nw-tags-active').text(activeTags);
+        $('#nw-tags-pos').text(positiveTags);
+        $('#nw-tags-neg').text(negativeTags);
+        $('#nw-tags-neu').text(neutralTags);
+        $('#nw-cats-total').text(state.cats.length);
+        $('#nw-hud-total').text(state.hud.length);
 
-<!-- ============================================================ -->
-<!-- MODAL: CATEGORY                                               -->
-<!-- ============================================================ -->
-<div id="nw-cat-modal-overlay" class="nw-modal-overlay" style="display:none;">
-    <div class="nw-modal">
-        <div class="nw-modal-header">
-            <h2 class="nw-modal-title" id="nw-cat-modal-title">New Category</h2>
-            <button class="nw-modal-close" data-modal="nw-cat-modal-overlay">
-                <i data-lucide="x" style="width:16px;height:16px;"></i>
-            </button>
-        </div>
-        <div class="nw-modal-body">
-            <form id="nw-cat-form" autocomplete="off">
-                <input type="hidden" id="nw-cat-field-id">
+        $('#nw-tab-count-tags').text(totalTags);
+        $('#nw-tab-count-cats').text(state.cats.length);
+        $('#nw-tab-count-hud').text(state.hud.length);
+    }
 
-                <div class="nw-field-grid nw-field-grid-2">
-                    <div class="nw-field">
-                        <label class="nw-label">Internal Name <span class="nw-required">*</span></label>
-                        <input type="text" id="nw-cat-field-internal" class="nw-input" placeholder="e.g. combat">
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Display Name <span class="nw-required">*</span></label>
-                        <input type="text" id="nw-cat-field-display" class="nw-input" placeholder="e.g. Combat Actions">
-                    </div>
-                </div>
+    function populateCategoryFilters() {
+        const current = els.tagsFilterCat.val() || '';
+        const opts = ['<option value="">All categories</option>'];
 
-                <div class="nw-field-grid nw-field-grid-3">
-                    <div class="nw-field">
-                        <label class="nw-label">UI Color</label>
-                        <div class="nw-color-input-wrap">
-                            <input type="color" id="nw-cat-field-color-picker" value="#adff00">
-                            <input type="text" id="nw-cat-field-ui-color" class="nw-input" maxlength="7" placeholder="#adff00">
-                        </div>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Sort Order</label>
-                        <input type="number" id="nw-cat-field-sort" class="nw-input" value="0" min="0">
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">HUD Group <span class="nw-required">*</span></label>
-                        <select id="nw-cat-field-hud" class="nw-select">
-                            <option value="">— select —</option>
-                        </select>
-                    </div>
-                </div>
+        state.cats.forEach(function (cat) {
+            opts.push(
+                '<option value="' + parseInt(cat.id, 10) + '">' +
+                escapeHtml(cat.display_name || cat.internal_name || '—') +
+                '</option>'
+            );
+        });
 
-                <div class="nw-field">
-                    <label class="nw-label">Description</label>
-                    <textarea id="nw-cat-field-description" class="nw-input nw-textarea" rows="3" placeholder="Optional…"></textarea>
-                </div>
-            </form>
-        </div>
-        <div class="nw-modal-footer">
-            <button id="nw-cat-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
-            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-cat-modal-overlay">Cancel</button>
-            <button id="nw-cat-save-btn" class="nw-btn nw-btn-primary">
-                <span id="nw-cat-save-label">Create Category</span>
-            </button>
-        </div>
-    </div>
-</div>
+        els.tagsFilterCat.html(opts.join(''));
+        els.tagsFilterCat.val(current);
+    }
 
+    function populateTagCategorySelect(selectedId) {
+        const $select = $('#nw-tag-field-category');
+        const opts = ['<option value="">— select —</option>'];
 
-<!-- ============================================================ -->
-<!-- MODAL: HUD GROUP                                              -->
-<!-- ============================================================ -->
-<div id="nw-hud-modal-overlay" class="nw-modal-overlay" style="display:none;">
-    <div class="nw-modal">
-        <div class="nw-modal-header">
-            <h2 class="nw-modal-title" id="nw-hud-modal-title">New HUD Group</h2>
-            <button class="nw-modal-close" data-modal="nw-hud-modal-overlay">
-                <i data-lucide="x" style="width:16px;height:16px;"></i>
-            </button>
-        </div>
-        <div class="nw-modal-body">
-            <form id="nw-hud-form" autocomplete="off">
-                <input type="hidden" id="nw-hud-field-id">
-                <div class="nw-field-grid nw-field-grid-2">
-                    <div class="nw-field">
-                        <label class="nw-label">Slug <span class="nw-required">*</span></label>
-                        <input type="text" id="nw-hud-field-slug" class="nw-input" placeholder="e.g. combat">
-                        <p class="nw-field-hint">Lowercase, underscores only.</p>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Display Label <span class="nw-required">*</span></label>
-                        <input type="text" id="nw-hud-field-label" class="nw-input" placeholder="e.g. Combat">
-                    </div>
-                </div>
-                <div class="nw-field-grid nw-field-grid-3">
-                    <div class="nw-field">
-                        <label class="nw-label">Base Color</label>
-                        <div class="nw-color-input-wrap">
-                            <input type="color" id="nw-hud-field-color-picker" value="#adff00">
-                            <input type="text" id="nw-hud-field-color" class="nw-input" maxlength="7" placeholder="#adff00">
-                        </div>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Icon <span class="nw-field-hint-inline">(Lucide slug)</span></label>
-                        <div class="nw-icon-input-wrap">
-                            <input type="text" id="nw-hud-field-icon" class="nw-input" placeholder="e.g. sword">
-                            <span id="nw-hud-icon-preview" class="nw-icon-preview"></span>
-                        </div>
-                    </div>
-                    <div class="nw-field">
-                        <label class="nw-label">Sort Order</label>
-                        <input type="number" id="nw-hud-field-sort" class="nw-input" value="0" min="0">
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="nw-modal-footer">
-            <button id="nw-hud-delete-btn" class="nw-btn nw-btn-danger" style="display:none;">Delete</button>
-            <button class="nw-btn nw-btn-ghost" data-modal-close="nw-hud-modal-overlay">Cancel</button>
-            <button id="nw-hud-save-btn" class="nw-btn nw-btn-primary">
-                <span id="nw-hud-save-label">Create HUD Group</span>
-            </button>
-        </div>
-    </div>
-</div>
+        state.cats.forEach(function (cat) {
+            opts.push(
+                '<option value="' + parseInt(cat.id, 10) + '">' +
+                escapeHtml(cat.display_name || cat.internal_name || '—') +
+                '</option>'
+            );
+        });
 
-<script>
-// Init Lucide icons in admin
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.lucide) lucide.createIcons();
+        $select.html(opts.join(''));
+        if (selectedId) $select.val(String(selectedId));
+    }
+
+    function populateCatHudSelect(selectedId) {
+        const $select = $('#nw-cat-field-hud');
+        const opts = ['<option value="">— select —</option>'];
+
+        state.hud.forEach(function (group) {
+            opts.push(
+                '<option value="' + parseInt(group.id, 10) + '">' +
+                escapeHtml(group.display_label || group.slug || '—') +
+                '</option>'
+            );
+        });
+
+        $select.html(opts.join(''));
+        if (selectedId) $select.val(String(selectedId));
+    }
+
+    function renderTags() {
+        const q = state.filters.tagsSearch.trim().toLowerCase();
+        const catFilter = state.filters.tagsCat;
+        const sentimentFilter = state.filters.tagsSentiment;
+
+        const filtered = state.tags.filter(function (tag) {
+            const cat = getCatById(tag.category_id);
+            const catName = cat ? (cat.display_name || cat.internal_name || '') : '';
+            const haystack = [
+                tag.name,
+                tag.description,
+                tag.sentiment,
+                catName
+            ].join(' ').toLowerCase();
+
+            const matchSearch = !q || haystack.indexOf(q) !== -1;
+            const matchCat = !catFilter || String(tag.category_id) === String(catFilter);
+            const matchSentiment = !sentimentFilter || String(tag.sentiment) === String(sentimentFilter);
+
+            return matchSearch && matchCat && matchSentiment;
+        });
+
+        if (!filtered.length) {
+            els.tagsTbody.html('<tr><td colspan="7">No tags found.</td></tr>');
+            createIconsSafe();
+            return;
+        }
+
+        const rows = filtered.map(function (tag) {
+            const color = normalizeHex(tag.color, '#adff00');
+            const impact = parseFloat(tag.impact || 0);
+            const impactClass = impact > 0 ? 'nw-at-impact nw-at-impact-pos' : (impact < 0 ? 'nw-at-impact nw-at-impact-neg' : 'nw-at-impact');
+            const cat = getCatById(tag.category_id);
+            const active = parseInt(tag.is_active, 10) === 1;
+            const desc = tag.description ? '<div class="nw-at-tag-desc">' + escapeHtml(tag.description) + '</div>' : '';
+
+            return '' +
+                '<tr>' +
+                    '<td><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + escapeHtml(color) + ';border:1px solid rgba(255,255,255,.12);"></span></td>' +
+                    '<td>' +
+                        '<div class="nw-at-tag-name">' + escapeHtml(tag.name) + '</div>' +
+                        desc +
+                    '</td>' +
+                    '<td>' + escapeHtml(cat ? (cat.display_name || cat.internal_name) : '—') + '</td>' +
+                    '<td><span class="nw-at-sentiment" ' + sentimentClass(tag.sentiment) + '>' + escapeHtml(tag.sentiment || 'neutral') + '</span></td>' +
+                    '<td><span class="' + impactClass + '">' + (impact > 0 ? '+' : '') + impact.toFixed(2) + '</span></td>' +
+                    '<td>' + (active ? '<span style="color:#adff00;">Yes</span>' : '<span style="color:#777;">No</span>') + '</td>' +
+                    '<td>' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-tags-edit-btn" data-id="' + parseInt(tag.id, 10) + '"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button> ' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-tags-dup-btn" data-id="' + parseInt(tag.id, 10) + '"><i data-lucide="copy" style="width:12px;height:12px;"></i></button>' +
+                    '</td>' +
+                '</tr>';
+        });
+
+        els.tagsTbody.html(rows.join(''));
+        createIconsSafe();
+    }
+
+    function renderCats() {
+        const q = state.filters.catsSearch.trim().toLowerCase();
+
+        const filtered = state.cats.filter(function (cat) {
+            const hud = getHudById(cat.hud_group_id);
+            const hudName = hud ? (hud.display_label || hud.slug || '') : '';
+            const haystack = [
+                cat.internal_name,
+                cat.display_name,
+                cat.description,
+                hudName
+            ].join(' ').toLowerCase();
+
+            return !q || haystack.indexOf(q) !== -1;
+        });
+
+        if (!filtered.length) {
+            els.catsTbody.html('<tr><td colspan="6">No categories found.</td></tr>');
+            createIconsSafe();
+            return;
+        }
+
+        const rows = filtered.map(function (cat) {
+            const color = normalizeHex(cat.ui_color, '#adff00');
+            const hud = getHudById(cat.hud_group_id);
+            return '' +
+                '<tr>' +
+                    '<td><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + escapeHtml(color) + ';border:1px solid rgba(255,255,255,.12);"></span></td>' +
+                    '<td><span class="nw-at-code">' + escapeHtml(cat.internal_name) + '</span></td>' +
+                    '<td>' +
+                        '<div class="nw-at-tag-name">' + escapeHtml(cat.display_name) + '</div>' +
+                        (cat.description ? '<div class="nw-at-tag-desc">' + escapeHtml(cat.description) + '</div>' : '') +
+                    '</td>' +
+                    '<td>' + parseInt(cat.sort_order || 0, 10) + '</td>' +
+                    '<td>' + (hud ? '<span class="nw-at-hud-badge">' + escapeHtml(hud.display_label || hud.slug) + '</span>' : '—') + '</td>' +
+                    '<td>' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-cats-edit-btn" data-id="' + parseInt(cat.id, 10) + '"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button> ' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-cats-dup-btn" data-id="' + parseInt(cat.id, 10) + '"><i data-lucide="copy" style="width:12px;height:12px;"></i></button>' +
+                    '</td>' +
+                '</tr>';
+        });
+
+        els.catsTbody.html(rows.join(''));
+        createIconsSafe();
+    }
+
+    function renderHud() {
+        const q = state.filters.hudSearch.trim().toLowerCase();
+
+        const filtered = state.hud.filter(function (group) {
+            const haystack = [
+                group.slug,
+                group.display_label,
+                group.icon
+            ].join(' ').toLowerCase();
+
+            return !q || haystack.indexOf(q) !== -1;
+        });
+
+        if (!filtered.length) {
+            els.hudTbody.html('<tr><td colspan="6">No HUD groups found.</td></tr>');
+            createIconsSafe();
+            return;
+        }
+
+        const rows = filtered.map(function (group) {
+            const color = normalizeHex(group.base_color, '#adff00');
+            const icon = group.icon
+                ? '<i data-lucide="' + escapeHtml(group.icon) + '" style="width:14px;height:14px;color:' + escapeHtml(color) + ';"></i>'
+                : '—';
+
+            return '' +
+                '<tr>' +
+                    '<td><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + escapeHtml(color) + ';border:1px solid rgba(255,255,255,.12);"></span></td>' +
+                    '<td>' + icon + '</td>' +
+                    '<td><span class="nw-at-code">' + escapeHtml(group.slug) + '</span></td>' +
+                    '<td><div class="nw-at-tag-name">' + escapeHtml(group.display_label) + '</div></td>' +
+                    '<td>' + parseInt(group.sort_order || 0, 10) + '</td>' +
+                    '<td>' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-hud-edit-btn" data-id="' + parseInt(group.id, 10) + '"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button> ' +
+                        '<button class="nw-btn nw-btn-ghost nw-btn-sm nw-hud-dup-btn" data-id="' + parseInt(group.id, 10) + '"><i data-lucide="copy" style="width:12px;height:12px;"></i></button>' +
+                    '</td>' +
+                '</tr>';
+        });
+
+        els.hudTbody.html(rows.join(''));
+        createIconsSafe();
+    }
+
+    function renderAll() {
+        populateCategoryFilters();
+        renderStats();
+        renderTags();
+        renderCats();
+        renderHud();
+    }
+
+    function loadCats() {
+        return ajax('nw_acats_load').done(function (res) {
+            if (res && res.success) {
+                state.cats = Array.isArray(res.data) ? res.data : [];
+                populateCategoryFilters();
+                populateTagCategorySelect();
+                populateCatHudSelect();
+                renderCats();
+                renderTags();
+                renderStats();
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not load categories.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not load categories.', 'error');
+        });
+    }
+
+    function loadHud() {
+        return ajax('nw_hud_groups_load').done(function (res) {
+            if (res && res.success) {
+                state.hud = Array.isArray(res.data) ? res.data : [];
+                populateCatHudSelect();
+                renderHud();
+                renderCats();
+                renderStats();
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not load HUD groups.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not load HUD groups.', 'error');
+        });
+    }
+
+    function loadTags() {
+        return ajax('nw_atags_load').done(function (res) {
+            if (res && res.success) {
+                state.tags = Array.isArray(res.data) ? res.data : [];
+                renderTags();
+                renderStats();
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not load tags.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not load tags.', 'error');
+        });
+    }
+
+    function loadAll() {
+        els.tagsTbody.html('<tr class="nw-loading-row"><td colspan="7"><span class="nw-spinner"></span> Loading…</td></tr>');
+        els.catsTbody.html('<tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>');
+        els.hudTbody.html('<tr class="nw-loading-row"><td colspan="6"><span class="nw-spinner"></span> Loading…</td></tr>');
+
+        $.when(loadHud(), loadCats(), loadTags()).done(function () {
+            renderAll();
+        });
+    }
+
+    function resetTagForm() {
+        $('#nw-tag-modal-title').text('New Tag');
+        $('#nw-tag-save-label').text('Create Tag');
+        $('#nw-tag-delete-btn').hide();
+
+        $('#nw-tag-field-id').val('');
+        $('#nw-tag-field-name').val('');
+        $('#nw-tag-field-category').val('');
+        $('#nw-tag-field-sentiment').val('neutral');
+        $('#nw-tag-field-impact').val('0.00');
+        $('#nw-tag-field-description').val('');
+        $('#nw-tag-field-color').val('#adff00');
+        $('#nw-tag-field-color-picker').val('#adff00');
+        $('#nw-tag-field-is-active').prop('checked', true);
+
+        populateTagCategorySelect();
+    }
+
+    function resetCatForm() {
+        $('#nw-cat-modal-title').text('New Category');
+        $('#nw-cat-save-label').text('Create Category');
+        $('#nw-cat-delete-btn').hide();
+
+        $('#nw-cat-field-id').val('');
+        $('#nw-cat-field-internal').val('');
+        $('#nw-cat-field-display').val('');
+        $('#nw-cat-field-description').val('');
+        $('#nw-cat-field-ui-color').val('#adff00');
+        $('#nw-cat-field-color-picker').val('#adff00');
+        $('#nw-cat-field-sort').val('0');
+        $('#nw-cat-field-hud').val('');
+
+        populateCatHudSelect();
+    }
+
+    function resetHudForm() {
+        $('#nw-hud-modal-title').text('New HUD Group');
+        $('#nw-hud-save-label').text('Create HUD Group');
+        $('#nw-hud-delete-btn').hide();
+
+        $('#nw-hud-field-id').val('');
+        $('#nw-hud-field-slug').val('');
+        $('#nw-hud-field-label').val('');
+        $('#nw-hud-field-color').val('#adff00');
+        $('#nw-hud-field-color-picker').val('#adff00');
+        $('#nw-hud-field-icon').val('');
+        $('#nw-hud-field-sort').val('0');
+        renderHudIconPreview('');
+    }
+
+    function openTagCreate() {
+        resetTagForm();
+        openModal(els.tagModal);
+    }
+
+    function openCatCreate() {
+        resetCatForm();
+        openModal(els.catModal);
+    }
+
+    function openHudCreate() {
+        resetHudForm();
+        openModal(els.hudModal);
+    }
+
+    function openTagEdit(id) {
+        const row = getTagById(id);
+        if (!row) return;
+
+        resetTagForm();
+        $('#nw-tag-modal-title').text('Edit Tag');
+        $('#nw-tag-save-label').text('Save Tag');
+        $('#nw-tag-delete-btn').show();
+
+        $('#nw-tag-field-id').val(row.id);
+        $('#nw-tag-field-name').val(row.name || '');
+        populateTagCategorySelect(row.category_id);
+        $('#nw-tag-field-sentiment').val(row.sentiment || 'neutral');
+        $('#nw-tag-field-impact').val(parseFloat(row.impact || 0).toFixed(2));
+        $('#nw-tag-field-description').val(row.description || '');
+
+        const color = normalizeHex(row.color, '#adff00');
+        $('#nw-tag-field-color').val(color);
+        $('#nw-tag-field-color-picker').val(color);
+        $('#nw-tag-field-is-active').prop('checked', parseInt(row.is_active, 10) === 1);
+
+        openModal(els.tagModal);
+    }
+
+    function openCatEdit(id) {
+        const row = getCatById(id);
+        if (!row) return;
+
+        resetCatForm();
+        $('#nw-cat-modal-title').text('Edit Category');
+        $('#nw-cat-save-label').text('Save Category');
+        $('#nw-cat-delete-btn').show();
+
+        $('#nw-cat-field-id').val(row.id);
+        $('#nw-cat-field-internal').val(row.internal_name || '');
+        $('#nw-cat-field-display').val(row.display_name || '');
+        $('#nw-cat-field-description').val(row.description || '');
+
+        const color = normalizeHex(row.ui_color, '#adff00');
+        $('#nw-cat-field-ui-color').val(color);
+        $('#nw-cat-field-color-picker').val(color);
+        $('#nw-cat-field-sort').val(parseInt(row.sort_order || 0, 10));
+
+        populateCatHudSelect(row.hud_group_id);
+
+        openModal(els.catModal);
+    }
+
+    function openHudEdit(id) {
+        const row = getHudById(id);
+        if (!row) return;
+
+        resetHudForm();
+        $('#nw-hud-modal-title').text('Edit HUD Group');
+        $('#nw-hud-save-label').text('Save HUD Group');
+        $('#nw-hud-delete-btn').show();
+
+        $('#nw-hud-field-id').val(row.id);
+        $('#nw-hud-field-slug').val(row.slug || '');
+        $('#nw-hud-field-label').val(row.display_label || '');
+
+        const color = normalizeHex(row.base_color, '#adff00');
+        $('#nw-hud-field-color').val(color);
+        $('#nw-hud-field-color-picker').val(color);
+        $('#nw-hud-field-icon').val(row.icon || '');
+        $('#nw-hud-field-sort').val(parseInt(row.sort_order || 0, 10));
+        renderHudIconPreview(row.icon || '');
+
+        openModal(els.hudModal);
+    }
+
+    function renderHudIconPreview(iconName) {
+        const $preview = $('#nw-hud-icon-preview');
+        const icon = normalizeSlug(iconName);
+
+        if (!icon) {
+            $preview.html('<i data-lucide="sparkles" style="width:14px;height:14px;"></i>');
+            createIconsSafe();
+            return;
+        }
+
+        $preview.html('<i data-lucide="' + escapeHtml(icon) + '" style="width:14px;height:14px;"></i>');
+        createIconsSafe();
+    }
+
+    function saveTag() {
+        const payload = {
+            id: $('#nw-tag-field-id').val(),
+            name: $('#nw-tag-field-name').val().trim(),
+            category_id: $('#nw-tag-field-category').val(),
+            sentiment: $('#nw-tag-field-sentiment').val(),
+            impact: $('#nw-tag-field-impact').val(),
+            color: normalizeHex($('#nw-tag-field-color').val(), '#adff00'),
+            description: $('#nw-tag-field-description').val().trim(),
+            is_active: $('#nw-tag-field-is-active').is(':checked') ? 1 : 0
+        };
+
+        if (!payload.name) {
+            showNotice('Tag name is required.', 'error');
+            return;
+        }
+        if (!payload.category_id) {
+            showNotice('Category is required.', 'error');
+            return;
+        }
+
+        ajax('nw_atags_save', payload).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.tagModal);
+                loadTags();
+                showNotice('Tag saved.', 'success');
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not save tag.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not save tag.', 'error');
+        });
+    }
+
+    function saveCat() {
+        const payload = {
+            id: $('#nw-cat-field-id').val(),
+            internal_name: normalizeSlug($('#nw-cat-field-internal').val()),
+            display_name: $('#nw-cat-field-display').val().trim(),
+            description: $('#nw-cat-field-description').val().trim(),
+            ui_color: normalizeHex($('#nw-cat-field-ui-color').val(), '#adff00'),
+            sort_order: $('#nw-cat-field-sort').val() || 0,
+            hud_group_id: $('#nw-cat-field-hud').val()
+        };
+
+        $('#nw-cat-field-internal').val(payload.internal_name);
+
+        if (!payload.internal_name || !payload.display_name || !payload.hud_group_id) {
+            showNotice('Internal name, display name and HUD group are required.', 'error');
+            return;
+        }
+
+        ajax('nw_acats_save', payload).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.catModal);
+                $.when(loadCats(), loadTags()).done(function () {
+                    showNotice('Category saved.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not save category.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not save category.', 'error');
+        });
+    }
+
+    function saveHud() {
+        const payload = {
+            id: $('#nw-hud-field-id').val(),
+            slug: normalizeSlug($('#nw-hud-field-slug').val()),
+            display_label: $('#nw-hud-field-label').val().trim(),
+            base_color: normalizeHex($('#nw-hud-field-color').val(), '#adff00'),
+            icon: normalizeSlug($('#nw-hud-field-icon').val()),
+            sort_order: $('#nw-hud-field-sort').val() || 0
+        };
+
+        $('#nw-hud-field-slug').val(payload.slug);
+        $('#nw-hud-field-icon').val(payload.icon);
+
+        if (!payload.slug || !payload.display_label) {
+            showNotice('Slug and label are required.', 'error');
+            return;
+        }
+
+        ajax('nw_hud_save', payload).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.hudModal);
+                $.when(loadHud(), loadCats()).done(function () {
+                    showNotice('HUD group saved.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not save HUD group.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not save HUD group.', 'error');
+        });
+    }
+
+    function deleteTag() {
+        const id = $('#nw-tag-field-id').val();
+        if (!id) return;
+        if (!window.confirm('Delete this tag?')) return;
+
+        ajax('nw_atags_delete', { id: id }).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.tagModal);
+                loadTags();
+                showNotice('Tag deleted.', 'success');
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not delete tag.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not delete tag.', 'error');
+        });
+    }
+
+    function deleteCat() {
+        const id = $('#nw-cat-field-id').val();
+        if (!id) return;
+        if (!window.confirm('Delete this category?')) return;
+
+        ajax('nw_acats_delete', { id: id }).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.catModal);
+                $.when(loadCats(), loadTags()).done(function () {
+                    showNotice('Category deleted.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not delete category.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not delete category.', 'error');
+        });
+    }
+
+    function deleteHud() {
+        const id = $('#nw-hud-field-id').val();
+        if (!id) return;
+        if (!window.confirm('Delete this HUD group?')) return;
+
+        ajax('nw_hud_delete', { id: id }).done(function (res) {
+            if (res && res.success) {
+                closeModal(els.hudModal);
+                $.when(loadHud(), loadCats()).done(function () {
+                    showNotice('HUD group deleted.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not delete HUD group.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not delete HUD group.', 'error');
+        });
+    }
+
+    function duplicateTag(id) {
+        ajax('nw_atags_duplicate', { id: id }).done(function (res) {
+            if (res && res.success) {
+                loadTags();
+                showNotice('Tag duplicated.', 'success');
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not duplicate tag.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not duplicate tag.', 'error');
+        });
+    }
+
+    function duplicateCat(id) {
+        ajax('nw_acats_duplicate', { id: id }).done(function (res) {
+            if (res && res.success) {
+                $.when(loadCats(), loadTags()).done(function () {
+                    showNotice('Category duplicated.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not duplicate category.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not duplicate category.', 'error');
+        });
+    }
+
+    function duplicateHud(id) {
+        ajax('nw_hud_duplicate', { id: id }).done(function (res) {
+            if (res && res.success) {
+                $.when(loadHud(), loadCats()).done(function () {
+                    showNotice('HUD group duplicated.', 'success');
+                });
+            } else {
+                showNotice((res && res.data) ? res.data : 'Could not duplicate HUD group.', 'error');
+            }
+        }).fail(function () {
+            showNotice('Could not duplicate HUD group.', 'error');
+        });
+    }
+
+    function bindColorPair(textSelector, pickerSelector) {
+        const $text = $(textSelector);
+        const $picker = $(pickerSelector);
+
+        $picker.on('input change', function () {
+            $text.val(normalizeHex($(this).val(), '#adff00'));
+        });
+
+        $text.on('input blur', function () {
+            const val = normalizeHex($(this).val(), '#adff00');
+            $(this).val(val);
+            $picker.val(val);
+        });
+    }
+
+    function bindEvents() {
+        els.tabButtons.on('click', function () {
+            setActiveTab($(this).data('tab'));
+        });
+
+        $('#nw-tags-add-btn').on('click', function () {
+            setActiveTab('tags');
+            openTagCreate();
+        });
+
+        $('#nw-cats-add-btn').on('click', function () {
+            setActiveTab('cats');
+            openCatCreate();
+        });
+
+        $('#nw-hud-add-btn').on('click', function () {
+            setActiveTab('hud');
+            openHudCreate();
+        });
+
+        $(document).on('click', '[data-modal-close], .nw-modal-close', function () {
+            const target = $(this).data('modal-close') || $(this).data('modal');
+            if (target) closeModal($('#' + target));
+        });
+
+        $(document).on('click', '.nw-modal-overlay', function (e) {
+            if ($(e.target).is('.nw-modal-overlay')) {
+                closeModal($(this));
+            }
+        });
+
+        $(document).on('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeAllModals();
+            }
+        });
+
+        bindColorPair('#nw-tag-field-color', '#nw-tag-field-color-picker');
+        bindColorPair('#nw-cat-field-ui-color', '#nw-cat-field-color-picker');
+        bindColorPair('#nw-hud-field-color', '#nw-hud-field-color-picker');
+
+        $('#nw-cat-field-internal').on('blur', function () {
+            $(this).val(normalizeSlug($(this).val()));
+        });
+
+        $('#nw-hud-field-slug').on('blur', function () {
+            $(this).val(normalizeSlug($(this).val()));
+        });
+
+        $('#nw-hud-field-icon').on('input blur', function () {
+            const icon = normalizeSlug($(this).val());
+            $(this).val(icon);
+            renderHudIconPreview(icon);
+        });
+
+        $('#nw-tag-save-btn').on('click', function (e) {
+            e.preventDefault();
+            saveTag();
+        });
+
+        $('#nw-cat-save-btn').on('click', function (e) {
+            e.preventDefault();
+            saveCat();
+        });
+
+        $('#nw-hud-save-btn').on('click', function (e) {
+            e.preventDefault();
+            saveHud();
+        });
+
+        $('#nw-tag-delete-btn').on('click', function (e) {
+            e.preventDefault();
+            deleteTag();
+        });
+
+        $('#nw-cat-delete-btn').on('click', function (e) {
+            e.preventDefault();
+            deleteCat();
+        });
+
+        $('#nw-hud-delete-btn').on('click', function (e) {
+            e.preventDefault();
+            deleteHud();
+        });
+
+        $(document).on('click', '.nw-tags-edit-btn', function () {
+            openTagEdit($(this).data('id'));
+        });
+
+        $(document).on('click', '.nw-cats-edit-btn', function () {
+            openCatEdit($(this).data('id'));
+        });
+
+        $(document).on('click', '.nw-hud-edit-btn', function () {
+            openHudEdit($(this).data('id'));
+        });
+
+        $(document).on('click', '.nw-tags-dup-btn', function () {
+            duplicateTag($(this).data('id'));
+        });
+
+        $(document).on('click', '.nw-cats-dup-btn', function () {
+            duplicateCat($(this).data('id'));
+        });
+
+        $(document).on('click', '.nw-hud-dup-btn', function () {
+            duplicateHud($(this).data('id'));
+        });
+
+        els.tagsRefresh.on('click', function () {
+            loadTags();
+        });
+
+        els.catsRefresh.on('click', function () {
+            loadCats();
+        });
+
+        els.hudRefresh.on('click', function () {
+            loadHud();
+        });
+
+        els.tagsSearch.on('input', debounce(function () {
+            state.filters.tagsSearch = $(this).val();
+            renderTags();
+        }, 180));
+
+        els.tagsFilterCat.on('change', function () {
+            state.filters.tagsCat = $(this).val();
+            renderTags();
+        });
+
+        els.tagsFilterSentiment.on('change', function () {
+            state.filters.tagsSentiment = $(this).val();
+            renderTags();
+        });
+
+        els.catsSearch.on('input', debounce(function () {
+            state.filters.catsSearch = $(this).val();
+            renderCats();
+        }, 180));
+
+        els.hudSearch.on('input', debounce(function () {
+            state.filters.hudSearch = $(this).val();
+            renderHud();
+        }, 180));
+    }
+
+    bindEvents();
+    setActiveTab('tags');
+    loadAll();
 });
-// Tab: header buttons jump to correct tab
-jQuery(function($){
-    $('[data-tab-add]').on('click', function(){
-        var tab = $(this).data('tab-add');
-        $('.nw-tab-btn[data-tab="' + tab + '"]').trigger('click');
-    });
-});
-</script>
-<?php
-    }
-
-    /* ── Security helper ──────────────────────────────────── */
-
-    private function verify_nonce() {
-        if ( ! check_ajax_referer( $this->nonce_key, 'nonce', false ) ) {
-            wp_send_json_error( 'Invalid nonce', 403 );
-        }
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( 'Insufficient permissions', 403 );
-        }
-    }
-
-    /* ── HUD Groups ──────────────────────────────────────── */
-
-    public function ajax_hud_groups_load() {
-        $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, slug, display_label, base_color, icon, sort_order
-             FROM cyber_hud_groups ORDER BY sort_order ASC, id ASC",
-            ARRAY_A
-        );
-        if ( $rows === null ) $rows = [];
-        wp_send_json_success( $rows );
-    }
-
-    public function ajax_hud_save() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id         = absint( $_POST['id'] ?? 0 );
-        $slug       = sanitize_key( $_POST['slug'] ?? '' );
-        $label      = sanitize_text_field( $_POST['display_label'] ?? '' );
-        $base_color = sanitize_hex_color( $_POST['base_color'] ?? '#adff00' ) ?: '#adff00';
-        $icon       = sanitize_text_field( $_POST['icon'] ?? '' );
-        $sort_order = intval( $_POST['sort_order'] ?? 0 );
-
-        if ( ! $slug || ! $label ) wp_send_json_error( 'Slug and label are required.' );
-
-        $data = [
-            'slug'          => $slug,
-            'display_label' => $label,
-            'base_color'    => $base_color,
-            'icon'          => $icon ?: null,
-            'sort_order'    => $sort_order,
-        ];
-        $fmt = [ '%s', '%s', '%s', '%s', '%d' ];
-
-        if ( $id ) {
-            $ok = $wpdb->update( 'cyber_hud_groups', $data, [ 'id' => $id ], $fmt, [ '%d' ] );
-        } else {
-            $ok = $wpdb->insert( 'cyber_hud_groups', $data, $fmt );
-            $id = $wpdb->insert_id;
-        }
-
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
-        wp_send_json_success( [ 'id' => $id ] );
-    }
-
-    public function ajax_hud_delete() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $ok = $wpdb->delete( 'cyber_hud_groups', [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
-        wp_send_json_success();
-    }
-
-    public function ajax_hud_duplicate() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM cyber_hud_groups WHERE id = %d", $id ),
-            ARRAY_A
-        );
-        if ( ! $row ) wp_send_json_error( 'HUD Group not found.' );
-
-        unset( $row['id'] );
-        $base  = rtrim( $row['slug'], '_' );
-        $taken = true; $i = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM cyber_hud_groups WHERE slug = %s", $try )
-            );
-            if ( ! $taken ) $row['slug'] = $try;
-            $i++;
-        }
-        $row['display_label'] = $row['display_label'] . ' (copy)';
-        $row['sort_order']    = intval( $row['sort_order'] ) + 1;
-
-        $ok = $wpdb->insert( 'cyber_hud_groups', $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
-    }
-
-    /* ================================================================ */
-    /* CATEGORIES AJAX                                                    */
-    /* ================================================================ */
-
-    public function ajax_cats_load() {
-        $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, internal_name, display_name, description, ui_color, sort_order, hud_group_id
-             FROM {$this->table_cats}
-             ORDER BY sort_order ASC, id ASC",
-            ARRAY_A
-        );
-        if ( $rows === null ) {
-            wp_send_json_error( $wpdb->last_error );
-        }
-        wp_send_json_success( $rows );
-    }
-
-    public function ajax_cats_save() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id            = absint( $_POST['id'] ?? 0 );
-        $internal_name = sanitize_key( $_POST['internal_name'] ?? '' );
-        $display_name  = sanitize_text_field( $_POST['display_name'] ?? '' );
-        $description   = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $ui_color      = sanitize_hex_color( $_POST['ui_color'] ?? '#adff00' ) ?: '#adff00';
-        $sort_order    = intval( $_POST['sort_order'] ?? 0 );
-        $hud_group_id  = absint( $_POST['hud_group_id'] ?? 0 );
-
-        if ( ! $internal_name || ! $display_name || ! $hud_group_id ) {
-            wp_send_json_error( 'Required fields missing.' );
-        }
-
-        $data = [
-            'internal_name' => $internal_name,
-            'display_name'  => $display_name,
-            'description'   => $description ?: null,
-            'ui_color'      => $ui_color,
-            'sort_order'    => $sort_order,
-            'hud_group_id'  => $hud_group_id,
-        ];
-        $fmt = [ '%s', '%s', '%s', '%s', '%d', '%d' ];
-
-        if ( $id ) {
-            $ok = $wpdb->update( $this->table_cats, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
-        } else {
-            $ok = $wpdb->insert( $this->table_cats, $data, $fmt );
-            $id = $wpdb->insert_id;
-        }
-
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
-        }
-        wp_send_json_success( [ 'id' => $id ] );
-    }
-
-    public function ajax_cats_delete() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $ok = $wpdb->delete( $this->table_cats, [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error (FK restrict?)' );
-        }
-        wp_send_json_success();
-    }
-
-    public function ajax_cats_duplicate() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM {$this->table_cats} WHERE id = %d", $id ),
-            ARRAY_A
-        );
-        if ( ! $row ) wp_send_json_error( 'Category not found.' );
-
-        unset( $row['id'] );
-        // Make internal_name unique
-        $base  = rtrim( $row['internal_name'], '_' );
-        $taken = true;
-        $i     = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM {$this->table_cats} WHERE internal_name = %s", $try )
-            );
-            if ( ! $taken ) $row['internal_name'] = $try;
-            $i++;
-        }
-        $row['display_name'] = $row['display_name'] . ' (copy)';
-        $row['sort_order']   = intval( $row['sort_order'] ) + 1;
-
-        $ok = $wpdb->insert( $this->table_cats, $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
-    }
-
-    /* ================================================================ */
-    /* TAGS AJAX                                                          */
-    /* ================================================================ */
-
-    public function ajax_tags_load() {
-        $this->verify_nonce();
-        global $wpdb;
-        $rows = $wpdb->get_results(
-            "SELECT id, name, color, sentiment, impact, description, category_id, is_active
-             FROM {$this->table_tags}
-             ORDER BY name ASC",
-            ARRAY_A
-        );
-        if ( $rows === null ) {
-            wp_send_json_error( $wpdb->last_error );
-        }
-        wp_send_json_success( $rows );
-    }
-
-    public function ajax_tags_save() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id          = absint( $_POST['id'] ?? 0 );
-        $name        = sanitize_text_field( $_POST['name'] ?? '' );
-        $color       = sanitize_hex_color( $_POST['color'] ?? '#adff00' ) ?: '#adff00';
-        $sentiment   = sanitize_text_field( $_POST['sentiment'] ?? 'neutral' );
-        $impact      = round( floatval( $_POST['impact'] ?? 0 ), 2 );
-        $description = sanitize_textarea_field( $_POST['description'] ?? '' );
-        $category_id = absint( $_POST['category_id'] ?? 0 );
-        $is_active   = isset( $_POST['is_active'] ) ? (int) boolval( $_POST['is_active'] ) : 1;
-
-        if ( ! $name || ! $category_id ) {
-            wp_send_json_error( 'Name and category are required.' );
-        }
-
-        $valid_sentiments = [ 'positive', 'negative', 'neutral' ];
-        if ( ! in_array( $sentiment, $valid_sentiments, true ) ) {
-            $sentiment = 'neutral';
-        }
-
-        $data = [
-            'name'        => $name,
-            'color'       => $color,
-            'sentiment'   => $sentiment,
-            'impact'      => $impact,
-            'description' => $description ?: null,
-            'category_id' => $category_id,
-            'is_active'   => $is_active,
-        ];
-        $fmt = [ '%s', '%s', '%s', '%f', '%s', '%d', '%d' ];
-
-        if ( $id ) {
-            $ok = $wpdb->update( $this->table_tags, $data, [ 'id' => $id ], $fmt, [ '%d' ] );
-        } else {
-            $ok = $wpdb->insert( $this->table_tags, $data, $fmt );
-            $id = $wpdb->insert_id;
-        }
-
-        if ( $ok === false ) {
-            wp_send_json_error( $wpdb->last_error ?: 'DB error' );
-        }
-        wp_send_json_success( [ 'id' => $id ] );
-    }
-
-    public function ajax_tags_delete() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $ok = $wpdb->delete( $this->table_tags, [ 'id' => $id ], [ '%d' ] );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error ?: 'DB error' );
-        wp_send_json_success();
-    }
-
-    public function ajax_tags_duplicate() {
-        $this->verify_nonce();
-        global $wpdb;
-
-        $id = absint( $_POST['id'] ?? 0 );
-        if ( ! $id ) wp_send_json_error( 'Invalid ID.' );
-
-        $row = $wpdb->get_row(
-            $wpdb->prepare( "SELECT * FROM {$this->table_tags} WHERE id = %d", $id ),
-            ARRAY_A
-        );
-        if ( ! $row ) wp_send_json_error( 'Tag not found.' );
-
-        unset( $row['id'] );
-        $base  = rtrim( $row['name'], '_' );
-        $taken = true;
-        $i     = 2;
-        while ( $taken ) {
-            $try   = $base . '_copy' . ( $i > 2 ? $i : '' );
-            $taken = (bool) $wpdb->get_var(
-                $wpdb->prepare( "SELECT id FROM {$this->table_tags} WHERE name = %s", $try )
-            );
-            if ( ! $taken ) $row['name'] = $try;
-            $i++;
-        }
-        $row['is_active'] = 0; // duplicate starts inactive
-
-        $ok = $wpdb->insert( $this->table_tags, $row );
-        if ( $ok === false ) wp_send_json_error( $wpdb->last_error );
-        wp_send_json_success( [ 'id' => $wpdb->insert_id ] );
-    }
-}
-
-new NW_Action_Tags_Admin();
