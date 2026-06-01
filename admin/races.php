@@ -38,10 +38,10 @@ add_submenu_page(
 		wp_enqueue_style( 'nw-admin-races', NW_PLUGIN_URL . 'assets/css/admin/races.css', [], NW_VERSION );
 		wp_enqueue_script( 'nw-lucide' );
 		wp_enqueue_script( 'nw-admin-races', NW_PLUGIN_URL . 'assets/js/admin/races.js', [ 'nw-lucide' ], NW_VERSION, true );
-		wp_localize_script( 'nw-admin-races', 'NW_RACES', [
-			'ajax_url' => admin_url( 'admin-ajax.php' ),
-			'nonce'    => wp_create_nonce( 'nw_races_nonce' ),
-		] );
+		wp_localize_script( 'nw-admin-races', 'NWRaces', [
+    'ajaxurl' => admin_url( 'admin-ajax.php' ),
+    'nonce'   => wp_create_nonce( 'nw_races_nonce' ),
+] );
 	}
 
 	public function render_page(): void {
