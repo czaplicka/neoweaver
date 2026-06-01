@@ -9,7 +9,9 @@ if ( ! function_exists( 'cyber_buffer_hand_shortcode' ) ) {
 			return '<div class="terminal-error">UPLINK LOST: User not authenticated.</div>';
 		}
 
-		if ( ! function_exists( 'get_cyber_character_id_by_wp_id' ) ) {
+		// BUG 21 fix — use session-active character, not "first character" for this WP user.
+		// get_cyber_character_id_by_wp_id() is for character lists/selection only.
+		if ( ! function_exists( 'get_cyber_active_session_character_id' ) ) {
 			return '<div class="terminal-error">UPLINK LOST: Character resolver unavailable.</div>';
 		}
 
@@ -17,10 +19,10 @@ if ( ! function_exists( 'cyber_buffer_hand_shortcode' ) ) {
 			return '<div class="terminal-error">UPLINK LOST: Hand datastore unavailable.</div>';
 		}
 
-		$character_id = get_cyber_character_id_by_wp_id( $user_id );
+		$character_id = get_cyber_active_session_character_id( $user_id );
 
 		if ( empty( $character_id ) || ! is_scalar( $character_id ) ) {
-			return '<div class="terminal-error">UPLINK LOST: Character not identified.</div>';
+			return '<div class="terminal-error">UPLINK LOST: No active game session found.</div>';
 		}
 
 		$hand_cards = fetch_cyber_hand_with_details( $character_id );
@@ -40,7 +42,8 @@ if ( ! function_exists( 'cyber_buffer_hand_shortcode' ) ) {
 				array(
 					'characterId' => (string) $character_id,
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
-					'nonce'       => wp_create_nonce( 'cyber_buffer_hand' ),
+					// BUG 22 fix — must match check_ajax_referer( 'use_card_nonce' ) in buffer.php.
+					'nonce'       => wp_create_nonce( 'use_card_nonce' ),
 					'selectors'   => array(
 						'overlay' => '#card-zoom-overlay-' . $uid,
 						'content' => '#zoom-content-' . $uid,
@@ -142,6 +145,13 @@ if ( ! function_exists( 'cyber_buffer_hand_shortcode' ) ) {
 
 		return ob_get_clean();
 	}
-
-	add_shortcode( 'cyber_buffer_hand', 'cyber_buffer_hand_shortcode' );
 }
+
+if ( ! function_exists( 'tw_register_cyber_buffer_hand_shortcode' ) ) {
+	function tw_register_cyber_buffer_hand_shortcode(): void {
+		add_shortcode( 'cyber_buffer_hand', 'cyber_buffer_hand_shortcode' );
+	}
+}
+
+// Register on init so WP shortcode infrastructure is ready.
+add_action( 'init', 'tw_register_cyber_buffer_hand_shortcode' );
