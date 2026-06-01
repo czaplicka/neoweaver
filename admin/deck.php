@@ -38,7 +38,7 @@ class NW_Admin_Deck {
         add_submenu_page(
             $menu_parent ?: 'neoweaver',
             __( 'Deck / Cards', 'neoweaver' ),
-            ' Deck',
+            '<span data-lucide-menu="id-card-lanyard"></span> Deck',
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
