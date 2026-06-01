@@ -1,0 +1,50 @@
+/**
+ * NeoWeaver — Cyber HUD error / offline states
+ * BUG 19 fix
+ *
+ * Dołącz ten plik przez tw_enqueue_cyber_hud_assets() lub wp_enqueue_style().
+ */
+
+/* ─── OFFLINE (brak sesji/postaci – renderuje PHP) ──────────────────────── */
+.cyber-hud-wrapper--offline {
+	display: flex;
+	align-items: center;
+	padding: 6px 12px;
+	background: transparent;
+}
+
+.cyber-hud-wrapper--offline .hud-status-label {
+	font-family: 'Chakra Petch', monospace;
+	font-size: 0.65rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: #ff0033;
+	opacity: 0.75;
+}
+
+/* ─── JS FAILURE FALLBACK (JS bundle nie odpalił) ────────────────────────── */
+
+/* Domyślnie error widoczny, grid ukryty */
+.hud-error-state {
+	display: block;
+	font-family: 'Chakra Petch', monospace;
+	font-size: 0.65rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: #ff0033;
+	opacity: 0.75;
+	padding: 6px 12px;
+}
+
+#hud-wrapper .cyber-hud-grid {
+	display: none;
+}
+
+/* Gdy JS odpali i doda klasę → error znika, grid pojawia się */
+#hud-wrapper.hud-js-ready .hud-error-state {
+	display: none;
+}
+
+#hud-wrapper.hud-js-ready .cyber-hud-grid {
+	display: grid;
+}
