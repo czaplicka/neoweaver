@@ -4,9 +4,13 @@
  * Saves the player's active deck selection via cyber_sync_deck RPC.
  *
  * POST params:
- *   nonce        — wp nonce 'tw_deck_nonce' (BUG-10 FIX: was 'cyber_deck_builder')
+ *   nonce        — wp nonce 'tw_deck_nonce'
  *   character_id — UUID of the character
  *   active       — comma-separated cyber_character_deck.id values (UUIDs)
+ *
+ * Deck size limits are configurable via filters:
+ *   nw_deck_min_size  (default: 20)
+ *   nw_deck_max_size  (default: 50)
  */
 
 if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
@@ -15,8 +19,7 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 
 	function tw_ajax_save_deck(): void {
 
-		// ── Auth & nonce ──────────────────────────────────────────────────
-		// BUG-10 FIX: unified to 'tw_deck_nonce' (matches twGameConfig.nonce)
+		// ── Auth & nonce ────────────────────────────────────────────
 		if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Invalid nonce', 403 );
 			return;
@@ -28,15 +31,13 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			return;
 		}
 
-		// ── Character ownership check ──────────────────────────────────
+		// ── Character ownership check ─────────────────────────────
 		$char_id = sanitize_text_field( wp_unslash( $_POST['character_id'] ?? '' ) );
 		if ( empty( $char_id ) ) {
 			wp_send_json_error( 'Missing character_id', 400 );
 			return;
 		}
 
-		// Verify character belongs to current user via direct Supabase query.
-		// tw_get_user_characters() does not exist in this codebase.
 		$base     = function_exists( 'tw_supabase_url' ) ? trailingslashit( tw_supabase_url() ) . 'rest/v1/' : '';
 		$anon_key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
 
@@ -72,9 +73,7 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			return;
 		}
 
-		// ── Parse active ids ───────────────────────────────────────────────
-		// cyber_character_deck.id is UUID — sanitize each value with nw_sanitize_uuid(),
-		// then discard any empty strings (= invalid UUIDs rejected by sanitizer).
+		// ── Parse active ids ──────────────────────────────────────────
 		$raw_active = (string) ( $_POST['active'] ?? '' );
 		$active_ids = array_values(
 			array_filter(
@@ -87,23 +86,44 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			)
 		);
 
-		// ── Validate limit 20–50 ─────────────────────────────────────────────
+		// ── BUG 16 FIX: configurable deck size limits ──────────────────
+		// Hardcoded 20/50 silently rejects valid decks when game design changes.
+		// Use apply_filters() so any plugin/theme can override without touching core.
+		$deck_min = (int) apply_filters( 'nw_deck_min_size', 20 );
+		$deck_max = (int) apply_filters( 'nw_deck_max_size', 50 );
+
 		$total = count( $active_ids );
-		if ( $total < 20 || $total > 50 ) {
+		if ( $total < $deck_min || $total > $deck_max ) {
 			wp_send_json_error(
-				sprintf( 'Active deck must have 20–50 cards. You sent %d.', $total ),
+				sprintf(
+					'Active deck must have %d–%d cards. You sent %d.',
+					$deck_min,
+					$deck_max,
+					$total
+				),
 				400
 			);
 			return;
 		}
 
-		// ── Verify cards belong to this character ─────────────────────────
+		// ── BUG 15 FIX: verify cards belong to this character AND are in slot=active ─
+		// The previous query fetched ALL deck rows for the character including
+		// discard, sideboard, and locked slots. A player could submit a locked
+		// or discarded card UUID and it would pass the intersection check.
+		// Adding slot=eq.active restricts the ownership pool to only cards
+		// that are legally playable in an active deck configuration.
 		$all_assigned = function_exists( 'tw_supabase_get' )
 			? tw_supabase_get( 'cyber_character_deck', [
 				'character_id' => 'eq.' . $char_id,
+				'slot'         => 'eq.active',
 				'select'       => 'id',
 			] )
 			: [];
+
+		if ( is_wp_error( $all_assigned ) ) {
+			wp_send_json_error( 'Could not load character deck: ' . $all_assigned->get_error_message(), 500 );
+			return;
+		}
 
 		if ( ! is_array( $all_assigned ) ) {
 			wp_send_json_error( 'Could not load character deck', 500 );
@@ -113,15 +133,15 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 		$all_deck_ids = array_map( static fn( $r ) => (string) $r['id'], $all_assigned );
 		$valid_active = array_values( array_intersect( $active_ids, $all_deck_ids ) );
 
-		if ( count( $valid_active ) < 20 ) {
+		if ( count( $valid_active ) < $deck_min ) {
 			wp_send_json_error(
-				sprintf( 'Not enough valid cards after ownership check (%d).', count( $valid_active ) ),
+				sprintf( 'Not enough valid active-slot cards after ownership check (%d).', count( $valid_active ) ),
 				400
 			);
 			return;
 		}
 
-		// ── Call RPC cyber_sync_deck ───────────────────────────────────────
+		// ── Call RPC cyber_sync_deck ───────────────────────────────────
 		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 			wp_send_json_error( 'tw_supabase_rpc() not available', 500 );
 			return;
@@ -132,7 +152,6 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			'p_active_ids'   => $valid_active,
 		] );
 
-		// tw_supabase_rpc() returns WP_Error on failure, never boolean false.
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
 				'Sync failed — ' . $result->get_error_message(),
