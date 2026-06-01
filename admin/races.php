@@ -21,7 +21,7 @@ class NWRacesAdmin {
 		add_action( 'wp_ajax_nw_races_save', [ $this, 'ajax_save' ] );
 		add_action( 'wp_ajax_nw_races_delete', [ $this, 'ajax_delete' ] );
 	}
-
+public function register_menu(): void {
 add_submenu_page(
     $this->menu_parent,
     'Races',                                                    // page_title
