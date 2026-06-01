@@ -22,15 +22,14 @@ class NWRacesAdmin {
 		add_action( 'wp_ajax_nw_races_delete', [ $this, 'ajax_delete' ] );
 	}
 
-	public function register_menu(): void {
-		add_submenu_page(
-			$this->menu_parent,
-			'Races',
-			'<span data-lucide="users-round"></span> Races',
-			'manage_options',
-			$this->page_slug,
-			[ $this, 'render_page' ]
-		);
+add_submenu_page(
+    $this->menu_parent,
+    'Races',                                                    // page_title
+    '<span data-lucide="users-round"></span> Races',            // menu_title
+    'manage_options',                                           // capability
+    $this->page_slug,                                           // menu_slug
+    [ $this, 'render_page' ]                                    // callback
+);
 	}
 
 	public function enqueue_assets( string $hook ): void {
