@@ -89,7 +89,7 @@ if ( ! class_exists( 'NeoWeaver_Settings', false ) ) {
 			add_submenu_page(
 				$this->parent_slug,
 				__( 'NeoWeaver Settings', 'neoweaver' ),
-				__( 'Settings', 'neoweaver' ),
+				__( '<span data-lucide-menu="settings"></span> Settings', 'neoweaver' ),
 				'manage_options',
 				$this->slug,
 				[ $this, 'render_page' ]
