@@ -384,23 +384,17 @@ if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
 	}
 }
 
-if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
-	function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
-		$class_name = strtolower( trim( (string) $class_name ) );
-		return array_values(
-			array_filter(
-				$rows,
-				static function ( $row ) use ( $class_name ) {
-					$tags = nw_decode_jsonb_array( $row['compatibility_tags'] ?? array() );
-					$tags = array_map(
-						static function ( $tag ) { return strtolower( trim( (string) $tag ) ); },
-						$tags
-					);
-					return in_array( $class_name, $tags, true );
-				}
-			)
-		);
-	}
+function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
+    $class_name = strtolower( trim( $class_name ) );
+    return array_values(
+        array_filter(
+            $rows,
+            static function ( $row ) use ( $class_name ) {
+                $name = strtolower( trim( (string) ( $row['package_name'] ?? '' ) ) );
+                return str_contains( $name, $class_name );
+            }
+        )
+    );
 }
 
 // ─── Lookup finders ──────────────────────────────────────────────────────────
