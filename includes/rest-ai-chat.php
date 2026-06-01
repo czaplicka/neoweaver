@@ -126,6 +126,13 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id, [ 'status' => 404 ] );
 		}
 
+		// BUG 8 FIX — weryfikacja właściciela postaci.
+		// permission_callback sprawdza tylko is_user_logged_in(); musimy tu
+		// upewnić się, że zalogowany użytkownik faktycznie posiada tę postać.
+		if ( (int) ( $char['wp_user_id'] ?? 0 ) !== get_current_user_id() ) {
+			return new WP_Error( 'tw_ai_forbidden', 'Brak dostępu do tej postaci.', [ 'status' => 403 ] );
+		}
+
 		$location = [];
 		if ( ! empty( $char['location_id'] ) ) {
 			$safe_loc = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['location_id'] ) );
@@ -296,12 +303,18 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					}
 					break;
 				case 'ENTROPY_UP':
-					// Zmiany entropii muszą przechodzić przez pipeline tagów (Make.com),
-					// nie bezpośrednio przez RPC. Emitujemy action hook — dedykowany
-					// handler (np. Make.com webhook lub osobny moduł) odbierze zdarzenie.
+					// BUG 7 FIX — ENTROPY_UP musi faktycznie zapisać zmianę w Supabase.
+					// Poprzednia implementacja tylko emitowała do_action() bez żadnego
+					// nasłuchującego handlera — zdarzenie było cicho gubione.
+					// Teraz: (1) bezpośredni zapis przez RPC fn_apply_entropy_change,
+					// (2) do_action() zachowany dla zewnętrznych listenerów (Make.com itp.).
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
 					if ( $delta !== 0 && $world_id ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_entropy_change', [
+							'p_world_id' => $world_id,
+							'p_delta'    => $delta,
+						] );
 						do_action( 'tw_entropy_change', $world_id, $delta, $context );
 					}
 					break;
@@ -383,6 +396,10 @@ if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
  * zakodowane przez http_build_query(), co eliminuje problemy
  * ze spacjami i nawiasami w wartościach filtrów PostgREST.
  *
+ * BUG 9 FIX — sprawdzamy HTTP status przed dekodowaniem.
+ * Supabase przy błędzie 4xx/5xx zwraca JSON {"code":"...","message":"..."},
+ * który bez tej kontroli był po cichu traktowany jako prawidłowe dane wierszy.
+ *
  * @param string $table
  * @param array  $params  np. [ 'id' => 'eq.abc', 'select' => 'id,name', 'limit' => '1' ]
  * @return array
@@ -400,6 +417,16 @@ function tw_rest_ai_supa_get( string $table, array $params ): array {
 	] );
 	if ( is_wp_error( $response ) ) {
 		error_log( '[NeoWeaver rest-ai-chat] GET error: ' . $response->get_error_message() );
+		return [];
+	}
+	$http_code = (int) wp_remote_retrieve_response_code( $response );
+	if ( $http_code >= 300 ) {
+		error_log( sprintf(
+			'[NeoWeaver rest-ai-chat] GET %s returned HTTP %d: %s',
+			$table,
+			$http_code,
+			wp_remote_retrieve_body( $response )
+		) );
 		return [];
 	}
 	return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
