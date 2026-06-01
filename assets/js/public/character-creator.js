@@ -1040,26 +1040,23 @@ window.requestAnimationFrame(function () {
     });
   }
 
-  function loadPackages(classId) {
-    if (!classId) { state.packages = []; renderPackages([]); return Promise.resolve([]); }
+function loadPackages(classId) {
+  if (!classId) { state.packages = []; renderPackages([]); return Promise.resolve([]); }
 
-    return fetchPost('neoweaver_get_starting_packages', { class_name: classId })
-      .then(function (res) {
-        var rows = [];
-        if      (res && res.success && Array.isArray(res.data))                    rows = res.data;
-        else if (res && Array.isArray(res.data))                                   rows = res.data;
-        else if (res && res.success && res.data && Array.isArray(res.data.rows))   rows = res.data.rows;
-        state.packages = rows;
-        renderPackages(state.packages);
-        return rows;
-      })
-      .catch(function (err) {
-        state.packages = [];
-        renderPackages([]);
-        setStatus(err && err.message ? err.message : 'Could not load starting packages.', 'error');
-        return [];
-      });
-  }
+  return fetchPost('neoweaver_get_starting_packages', {})
+    .then(function (res) {
+      var rows = res && res.success && Array.isArray(res.data) ? res.data : [];
+      state.packages = rows;
+      renderPackages(state.packages);
+      return rows;
+    })
+    .catch(function () {
+      state.packages = [];
+      renderPackages([]);
+      setStatus('Could not load starting packages.', 'error');
+      return [];
+    });
+}
 
   // ─── Lore section init ────────────────────────────────────────────────────────
   function initLoreSections() {
