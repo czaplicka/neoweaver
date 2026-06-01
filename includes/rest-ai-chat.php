@@ -189,15 +189,18 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 		// do wycięcia osieroconych wpisów. Zwracamy max 14 do Claude.
 		$rows = array_reverse( $rows );
 
-		// Strategia deduplicacji:
-		// Zamiast zastępować poprzedni wpis (co osierdzi wcześniejsze pary),
-		// pomijamy nowe wejście gdy bieżąca rola == poprzednia.
-		// Dzięki temu zachowujemy PIERWSZE wystąpienie w grupie (kompletną parę)
-		// zamiast ostatniego (które może być sierotą po retry).
-		$history   = [];
-		$prev_role = null;
+		// BUG 31 FIX — strategia deduplicacji: zachowujemy OSTATNIE wystąpienie
+		// w grupie wiadomości tej samej roli (nie pierwsze).
+		// Scenariusz retry: gracz wysyła wiadomość, nie dostaje odpowiedzi, wysyła
+		// ponownie — w bazie są dwie wiadomości `player` z rzędu. Stara logika
+		// zachowywała PIERWSZĄ (starszą), więc GM odpowiadał na przestarzały tekst.
+		// Nowa logika: iterujemy od końca (najnowsze najpierw), zatem przy kolizji
+		// ról zachowujemy nowszą wiadomość i pomijamy wcześniejszą.
+		$rows_reversed = array_reverse( $rows ); // teraz: najnowsze na początku
+		$deduped       = [];
+		$prev_role     = null;
 
-		foreach ( $rows as $row ) {
+		foreach ( $rows_reversed as $row ) {
 			$content = trim( $row['content'] ?? '' );
 			if ( $content === '' ) {
 				continue;
@@ -205,17 +208,20 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			$role = ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant';
 
 			if ( $role === $prev_role ) {
-				// Duplikat roli — pomiń; zachowaj pierwszą (kompletną) parę.
+				// Duplikat roli — pomiń; zachowamy już dodaną (nowszą) wiadomość.
 				continue;
 			}
 
-			$history[] = [ 'role' => $role, 'content' => $content ];
+			$deduped[] = [ 'role' => $role, 'content' => $content ];
 			$prev_role  = $role;
 
-			if ( count( $history ) >= 14 ) {
+			if ( count( $deduped ) >= 14 ) {
 				break;
 			}
 		}
+
+		// Przywróć porządek chronologiczny (najstarsza → najnowsza).
+		$history = array_reverse( $deduped );
 
 		// Claude musi zaczynać od 'user'
 		while ( ! empty( $history ) && $history[0]['role'] === 'assistant' ) {
@@ -432,6 +438,17 @@ function tw_rest_ai_supa_get( string $table, array $params ): array {
 	return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
 }
 
+/**
+ * POST do Supabase.
+ *
+ * BUG 30 FIX — logujemy odpowiedzi non-2xx (np. odrzucenie przez RLS).
+ * Poprzednio funkcja sprawdzała tylko is_wp_error() (błąd sieciowy),
+ * ale cicho ignorowała HTTP 4xx/5xx z Supabase. Teraz każda nieudana
+ * próba zapisu trafia do error_log z kodem HTTP i treścią odpowiedzi.
+ *
+ * @param string $table
+ * @param array  $body
+ */
 function tw_rest_ai_supa_post( string $table, array $body ): void {
 	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table;
 	$response = wp_remote_post( $url, [
@@ -445,7 +462,17 @@ function tw_rest_ai_supa_post( string $table, array $body ): void {
 		'timeout' => 8,
 	] );
 	if ( is_wp_error( $response ) ) {
-		error_log( '[NeoWeaver rest-ai-chat] POST error: ' . $response->get_error_message() );
+		error_log( '[NeoWeaver rest-ai-chat] POST network error: ' . $response->get_error_message() );
+		return;
+	}
+	$http_code = (int) wp_remote_retrieve_response_code( $response );
+	if ( $http_code < 200 || $http_code >= 300 ) {
+		error_log( sprintf(
+			'[NeoWeaver rest-ai-chat] POST %s returned HTTP %d: %s',
+			$table,
+			$http_code,
+			wp_remote_retrieve_body( $response )
+		) );
 	}
 }
 
