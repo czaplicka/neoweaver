@@ -62,7 +62,7 @@ class NW_Action_Tags_Admin {
         );
         wp_enqueue_style(
             'nw-action-tags',
-           NW_PLUGIN_URL . 'assets/css/admin/action-tags.css'
+           NW_PLUGIN_URL . 'assets/css/admin/action-tags.css',
             [ 'nw-admin-core' ],
             NW_VERSION
         );
@@ -77,7 +77,7 @@ class NW_Action_Tags_Admin {
         );
         wp_enqueue_script(
             'nw-action-tags',
-            NW_PLUGIN_URL . 'assets/js/admin/action-tags.js'
+            NW_PLUGIN_URL . 'assets/js/admin/action-tags.js',
             [ 'jquery', 'lucide' ],
             NW_VERSION,
             true
