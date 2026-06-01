@@ -491,7 +491,7 @@ jQuery(function($){
 <?php
     }
 
-        /* ── Security helper ──────────────────────────────────── */
+    /* ── Security helper ──────────────────────────────────── */
 
     private function verify_nonce() {
         if ( ! check_ajax_referer( $this->nonce_key, 'nonce', false ) ) {
@@ -502,100 +502,11 @@ jQuery(function($){
         }
     }
 
-    /* ── Supabase helper ──────────────────────────────────── */
-
-    private function get_supabase_url() {
-        if ( defined( 'NW_SUPABASE_URL' ) && NW_SUPABASE_URL ) {
-            return rtrim( NW_SUPABASE_URL, '/' );
+    private function error_message( $result, string $fallback = 'Supabase error' ): string {
+        if ( is_wp_error( $result ) ) {
+            return $result->get_error_message();
         }
-
-        if ( defined( 'NW_SUPABASE_REST_URL' ) && NW_SUPABASE_REST_URL ) {
-            return preg_replace( '#/rest/v1/?$#', '', rtrim( NW_SUPABASE_REST_URL, '/' ) );
-        }
-
-        wp_send_json_error( 'Missing NW_SUPABASE_URL / NW_SUPABASE_REST_URL', 500 );
-    }
-
-    private function get_supabase_key() {
-        if ( defined( 'NW_SUPABASE_SERVICE_KEY' ) && NW_SUPABASE_SERVICE_KEY ) {
-            return NW_SUPABASE_SERVICE_KEY;
-        }
-
-        if ( defined( 'NW_SUPABASE_ANON_KEY' ) && NW_SUPABASE_ANON_KEY ) {
-            return NW_SUPABASE_ANON_KEY;
-        }
-
-        wp_send_json_error( 'Missing Supabase API key', 500 );
-    }
-
-    private function supabase_request( $method, $path, $query = [], $body = null, $prefer = '' ) {
-        $base = $this->get_supabase_url();
-        $key  = $this->get_supabase_key();
-
-        $url = $base . '/rest/v1/' . ltrim( $path, '/' );
-        if ( ! empty( $query ) ) {
-            $url = add_query_arg( $query, $url );
-        }
-
-        $headers = [
-            'apikey'        => $key,
-            'Authorization' => 'Bearer ' . $key,
-            'Content-Type'  => 'application/json',
-            'Accept'        => 'application/json',
-        ];
-
-        if ( $prefer ) {
-            $headers['Prefer'] = $prefer;
-        }
-
-        $args = [
-            'method'  => strtoupper( $method ),
-            'headers' => $headers,
-            'timeout' => 20,
-        ];
-
-        if ( null !== $body ) {
-            $args['body'] = wp_json_encode( $body );
-        }
-
-        $response = wp_remote_request( $url, $args );
-
-        if ( is_wp_error( $response ) ) {
-            return [
-                'ok'     => false,
-                'status' => 500,
-                'error'  => $response->get_error_message(),
-                'data'   => null,
-            ];
-        }
-
-        $status = wp_remote_retrieve_response_code( $response );
-        $raw    = wp_remote_retrieve_body( $response );
-        $data   = json_decode( $raw, true );
-
-        if ( $status < 200 || $status >= 300 ) {
-            $message = 'Supabase request failed';
-
-            if ( is_array( $data ) ) {
-                $message = $data['message'] ?? $data['hint'] ?? $data['details'] ?? $message;
-            } elseif ( is_string( $raw ) && $raw ) {
-                $message = $raw;
-            }
-
-            return [
-                'ok'     => false,
-                'status' => $status,
-                'error'  => $message,
-                'data'   => $data,
-            ];
-        }
-
-        return [
-            'ok'     => true,
-            'status' => $status,
-            'error'  => null,
-            'data'   => $data,
-        ];
+        return $fallback;
     }
 
     /* ── HUD Groups ──────────────────────────────────────── */
@@ -603,8 +514,7 @@ jQuery(function($){
     public function ajax_hud_groups_load() {
         $this->verify_nonce();
 
-        $res = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_hud_groups',
             [
                 'select' => 'id,slug,display_label,base_color,icon,sort_order',
@@ -612,11 +522,11 @@ jQuery(function($){
             ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $rows ) ) {
+            wp_send_json_error( $this->error_message( $rows ), 500 );
         }
 
-        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
+        wp_send_json_success( is_array( $rows ) ? $rows : [] );
     }
 
     public function ajax_hud_save() {
@@ -642,28 +552,36 @@ jQuery(function($){
         ];
 
         if ( $id ) {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'PATCH',
                 'cyber_hud_groups',
                 [ 'id' => 'eq.' . $id ],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         } else {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'POST',
                 'cyber_hud_groups',
                 [],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         }
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
-        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        $row = $res['data'][0] ?? [];
         wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
@@ -675,16 +593,20 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $res = $this->supabase_request(
+        $res = tw_supabase_request(
             'DELETE',
             'cyber_hud_groups',
             [ 'id' => 'eq.' . $id ],
             null,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
         wp_send_json_success();
@@ -698,8 +620,7 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $get = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_hud_groups',
             [
                 'select' => 'id,slug,display_label,base_color,icon,sort_order',
@@ -708,18 +629,17 @@ jQuery(function($){
             ]
         );
 
-        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+        if ( is_wp_error( $rows ) || empty( $rows[0] ) ) {
             wp_send_json_error( 'HUD Group not found.' );
         }
 
-        $row  = $get['data'][0];
+        $row  = $rows[0];
         $base = rtrim( $row['slug'], '_' );
         $try  = $base . '_copy';
         $i    = 2;
 
         while ( true ) {
-            $exists = $this->supabase_request(
-                'GET',
+            $exists = tw_supabase_get_admin(
                 'cyber_hud_groups',
                 [
                     'select' => 'id',
@@ -728,7 +648,7 @@ jQuery(function($){
                 ]
             );
 
-            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+            if ( ! is_wp_error( $exists ) && empty( $exists ) ) {
                 break;
             }
 
@@ -744,16 +664,20 @@ jQuery(function($){
             'sort_order'    => intval( $row['sort_order'] ) + 1,
         ];
 
-        $insert = $this->supabase_request(
+        $insert = tw_supabase_request(
             'POST',
             'cyber_hud_groups',
             [],
             $new_row,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $insert['ok'] ) {
-            wp_send_json_error( $insert['error'], $insert['status'] );
+        if ( is_wp_error( $insert ) ) {
+            wp_send_json_error( $this->error_message( $insert ), 500 );
         }
 
         wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
@@ -766,8 +690,7 @@ jQuery(function($){
     public function ajax_cats_load() {
         $this->verify_nonce();
 
-        $res = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_action_tag_categories',
             [
                 'select' => 'id,internal_name,display_name,description,ui_color,sort_order,hud_group_id',
@@ -775,11 +698,11 @@ jQuery(function($){
             ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $rows ) ) {
+            wp_send_json_error( $this->error_message( $rows ), 500 );
         }
 
-        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
+        wp_send_json_success( is_array( $rows ) ? $rows : [] );
     }
 
     public function ajax_cats_save() {
@@ -807,28 +730,36 @@ jQuery(function($){
         ];
 
         if ( $id ) {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'PATCH',
                 'cyber_action_tag_categories',
                 [ 'id' => 'eq.' . $id ],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         } else {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'POST',
                 'cyber_action_tag_categories',
                 [],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         }
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
-        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        $row = $res['data'][0] ?? [];
         wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
@@ -840,16 +771,20 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $res = $this->supabase_request(
+        $res = tw_supabase_request(
             'DELETE',
             'cyber_action_tag_categories',
             [ 'id' => 'eq.' . $id ],
             null,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
         wp_send_json_success();
@@ -863,28 +798,26 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $get = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_action_tag_categories',
             [
-                'select'        => 'id,internal_name,display_name,description,ui_color,sort_order,hud_group_id',
-                'id'            => 'eq.' . $id,
-                'limit'         => 1,
+                'select' => 'id,internal_name,display_name,description,ui_color,sort_order,hud_group_id',
+                'id'     => 'eq.' . $id,
+                'limit'  => 1,
             ]
         );
 
-        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+        if ( is_wp_error( $rows ) || empty( $rows[0] ) ) {
             wp_send_json_error( 'Category not found.' );
         }
 
-        $row  = $get['data'][0];
+        $row  = $rows[0];
         $base = rtrim( $row['internal_name'], '_' );
         $try  = $base . '_copy';
         $i    = 2;
 
         while ( true ) {
-            $exists = $this->supabase_request(
-                'GET',
+            $exists = tw_supabase_get_admin(
                 'cyber_action_tag_categories',
                 [
                     'select'        => 'id',
@@ -893,7 +826,7 @@ jQuery(function($){
                 ]
             );
 
-            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+            if ( ! is_wp_error( $exists ) && empty( $exists ) ) {
                 break;
             }
 
@@ -910,16 +843,20 @@ jQuery(function($){
             'hud_group_id'  => intval( $row['hud_group_id'] ),
         ];
 
-        $insert = $this->supabase_request(
+        $insert = tw_supabase_request(
             'POST',
             'cyber_action_tag_categories',
             [],
             $new_row,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $insert['ok'] ) {
-            wp_send_json_error( $insert['error'], $insert['status'] );
+        if ( is_wp_error( $insert ) ) {
+            wp_send_json_error( $this->error_message( $insert ), 500 );
         }
 
         wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
@@ -932,8 +869,7 @@ jQuery(function($){
     public function ajax_tags_load() {
         $this->verify_nonce();
 
-        $res = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_action_tags',
             [
                 'select' => 'id,name,color,sentiment,impact,description,category_id,is_active',
@@ -941,11 +877,11 @@ jQuery(function($){
             ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $rows ) ) {
+            wp_send_json_error( $this->error_message( $rows ), 500 );
         }
 
-        wp_send_json_success( is_array( $res['data'] ) ? $res['data'] : [] );
+        wp_send_json_success( is_array( $rows ) ? $rows : [] );
     }
 
     public function ajax_tags_save() {
@@ -982,28 +918,36 @@ jQuery(function($){
         ];
 
         if ( $id ) {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'PATCH',
                 'cyber_action_tags',
                 [ 'id' => 'eq.' . $id ],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         } else {
-            $res = $this->supabase_request(
+            $res = tw_supabase_request(
                 'POST',
                 'cyber_action_tags',
                 [],
                 $payload,
-                'return=representation'
+                [
+                    'headers' => [
+                        'Prefer' => 'return=representation',
+                    ],
+                ]
             );
         }
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
-        $row = is_array( $res['data'] ) && ! empty( $res['data'][0] ) ? $res['data'][0] : [];
+        $row = $res['data'][0] ?? [];
         wp_send_json_success( [ 'id' => $row['id'] ?? $id ] );
     }
 
@@ -1015,16 +959,20 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $res = $this->supabase_request(
+        $res = tw_supabase_request(
             'DELETE',
             'cyber_action_tags',
             [ 'id' => 'eq.' . $id ],
             null,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $res['ok'] ) {
-            wp_send_json_error( $res['error'], $res['status'] );
+        if ( is_wp_error( $res ) ) {
+            wp_send_json_error( $this->error_message( $res ), 500 );
         }
 
         wp_send_json_success();
@@ -1038,8 +986,7 @@ jQuery(function($){
             wp_send_json_error( 'Invalid ID.' );
         }
 
-        $get = $this->supabase_request(
-            'GET',
+        $rows = tw_supabase_get_admin(
             'cyber_action_tags',
             [
                 'select' => 'id,name,color,sentiment,impact,description,category_id,is_active',
@@ -1048,18 +995,17 @@ jQuery(function($){
             ]
         );
 
-        if ( ! $get['ok'] || empty( $get['data'][0] ) ) {
+        if ( is_wp_error( $rows ) || empty( $rows[0] ) ) {
             wp_send_json_error( 'Tag not found.' );
         }
 
-        $row  = $get['data'][0];
+        $row  = $rows[0];
         $base = rtrim( $row['name'], '_' );
         $try  = $base . '_copy';
         $i    = 2;
 
         while ( true ) {
-            $exists = $this->supabase_request(
-                'GET',
+            $exists = tw_supabase_get_admin(
                 'cyber_action_tags',
                 [
                     'select' => 'id',
@@ -1068,7 +1014,7 @@ jQuery(function($){
                 ]
             );
 
-            if ( $exists['ok'] && empty( $exists['data'] ) ) {
+            if ( ! is_wp_error( $exists ) && empty( $exists ) ) {
                 break;
             }
 
@@ -1086,16 +1032,20 @@ jQuery(function($){
             'is_active'   => false,
         ];
 
-        $insert = $this->supabase_request(
+        $insert = tw_supabase_request(
             'POST',
             'cyber_action_tags',
             [],
             $new_row,
-            'return=representation'
+            [
+                'headers' => [
+                    'Prefer' => 'return=representation',
+                ],
+            ]
         );
 
-        if ( ! $insert['ok'] ) {
-            wp_send_json_error( $insert['error'], $insert['status'] );
+        if ( is_wp_error( $insert ) ) {
+            wp_send_json_error( $this->error_message( $insert ), 500 );
         }
 
         wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
