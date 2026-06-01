@@ -1,5 +1,16 @@
 /* NeoWeaver — Deck admin (extends admin-core.css) */
 
+/* ── Table images — never overflow ─────────────────────────────────────── */
+.nw-deck-panel .nw-table td img {
+    max-width: 40px;
+    max-height: 40px;
+    width: auto;
+    height: auto;
+    border-radius: 4px;
+    object-fit: cover;
+    display: block;
+}
+
 /* ── Rarity pills ───────────────────────────────────────────────────────── */
 .nw-deck-panel .nw-pill-common    { background: #3d3d3d; color: #ccc; }
 .nw-deck-panel .nw-pill-uncommon  { background: #1a3a1a; color: #6fcf6f; }
