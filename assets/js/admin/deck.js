@@ -1,463 +1,425 @@
-/* global ajaxurl, NWDeck */
+/* NeoWeaver — Deck Admin JS */
+/* globals NWDeck, lucide, jQuery */
+
 (function ($) {
     'use strict';
 
-    var cfg = window.NWDeck || {};
-    var ajax = cfg.ajaxurl || (typeof ajaxurl !== 'undefined' ? ajaxurl : '');
-    var nonce = cfg.nonce || '';
+    const A = NWDeck.ajaxurl;
+    const N = NWDeck.nonce;
 
-    // Lista typów załadowana z Supabase przy starcie
-    var allTypes = [];
+    let allRows    = [];
+    let allTypes   = [];
+    let allClasses = [];
 
-    var cards = [];
-    var currentId = '';
-    var activeXhr = null;
-    var noticeTimer = null;
-
-    function hasAjaxConfig() {
-        return !!(ajax && nonce);
+    // ── Lucide ──────────────────────────────────────────────────────────────
+    function icons() {
+        if (window.lucide) lucide.createIcons();
     }
 
-    function clearNoticeTimer() {
-        if (noticeTimer) {
-            clearTimeout(noticeTimer);
-            noticeTimer = null;
+    // ── Notice ──────────────────────────────────────────────────────────────
+    function notice(msg, type = 'success') {
+        const $n = $('#nw-notice');
+        $n.removeClass('nw-notice-success nw-notice-error')
+            .addClass(type === 'error' ? 'nw-notice-error' : 'nw-notice-success')
+            .html(msg).show();
+        setTimeout(() => $n.fadeOut(), 4000);
+    }
+
+    // ── Stats ────────────────────────────────────────────────────────────────
+    function updateStats(rows) {
+        $('#nw-total').text(rows.length);
+        $('#nw-active').text(rows.filter(r => r.is_active).length);
+        $('#nw-inactive').text(rows.filter(r => !r.is_active).length);
+        $('#nw-rareplus').text(rows.filter(r => ['rare', 'epic', 'legendary'].includes(r.rarity)).length);
+    }
+
+    // ── Rarity badge ─────────────────────────────────────────────────────────
+    const RARITY_CLASS = {
+        common: 'nw-pill-common', uncommon: 'nw-pill-uncommon',
+        rare: 'nw-pill-rare', epic: 'nw-pill-epic', legendary: 'nw-pill-legendary'
+    };
+
+    function rarityBadge(r) {
+        return `<span class="nw-pill ${RARITY_CLASS[r] || 'nw-pill-common'}">${r || 'common'}</span>`;
+    }
+
+    // ── Category badge ────────────────────────────────────────────────────────
+    const CAT_ICONS = {
+        action: 'zap', combat: 'sword', magic: 'sparkles',
+        social: 'users', equipment: 'package', tech: 'cpu'
+    };
+
+    function catBadge(cat) {
+        const icon = CAT_ICONS[cat] || 'layers';
+        return `<span class="nw-cat-badge nw-cat-${cat}"><i data-lucide="${icon}"></i>${cat}</span>`;
+    }
+
+    // ── Type label lookup ─────────────────────────────────────────────────────
+    function typeName(typeId) {
+        if (!typeId) return '—';
+        const t = allTypes.find(x => x.id === typeId);
+        return t ? `<span style="color:${t.color}">${t.label}</span>` : typeId;
+    }
+
+    // ── Render table ──────────────────────────────────────────────────────────
+    function renderTable(rows) {
+        const $tbody = $('#nw-deck-tbody');
+        if (!rows.length) {
+            $tbody.html('<tr><td colspan="11" class="nw-table-empty">No cards found.</td></tr>');
+            icons();
+            return;
         }
+        const html = rows.map(r => {
+            const img = r.img_url
+                ? `<img src="${r.img_url}" alt="${r.name}" class="nw-thumb" loading="lazy">`
+                : `<span class="nw-thumb-placeholder"><i data-lucide="image-off"></i></span>`;
+            const active = r.is_active
+                ? '<span class="nw-status nw-status-on"><i data-lucide="check-circle-2"></i></span>'
+                : '<span class="nw-status nw-status-off"><i data-lucide="circle-dashed"></i></span>';
+            return `<tr data-id="${r.id}">
+                <td class="nw-col-img">${img}</td>
+                <td class="nw-col-name">
+                    <strong>${r.name}</strong>
+                    ${r.is_disposable ? '<span class="nw-badge-disp" title="Disposable">1×</span>' : ''}
+                </td>
+                <td>${catBadge(r.deck_category)}</td>
+                <td>${typeName(r.type)}</td>
+                <td>${rarityBadge(r.rarity)}</td>
+                <td class="nw-col-num">${r.level ?? 1}</td>
+                <td class="nw-col-num nw-col-ap">${r.ap_cost ?? 1}</td>
+                <td class="nw-col-num nw-col-mp">${r.mp_cost ?? 0}</td>
+                <td class="nw-col-num nw-col-dmg">${r.base_damage ?? 0}</td>
+                <td>${active}</td>
+                <td class="nw-col-actions">
+                    <button class="nw-icon-btn nw-btn-edit" data-id="${r.id}" title="Edit"><i data-lucide="pencil"></i></button>
+                    <button class="nw-icon-btn nw-btn-dup"  data-id="${r.id}" title="Duplicate"><i data-lucide="copy"></i></button>
+                    <button class="nw-icon-btn nw-btn-del"  data-id="${r.id}" data-name="${r.name}" title="Delete"><i data-lucide="trash-2"></i></button>
+                </td>
+            </tr>`;
+        }).join('');
+        $tbody.html(html);
+        icons();
     }
 
-    function notice(msg, type) {
-        var $msg = $('#nw-deck-msg');
-        var color = (type === 'error') ? '#ff6b6b' : '#adff00';
-        clearNoticeTimer();
-        $msg.stop(true, true).css('color', color).text(msg).show();
-        noticeTimer = setTimeout(function () {
-            $msg.fadeOut(250);
-            noticeTimer = null;
-        }, type === 'error' ? 5000 : 2200);
+    // ── Filter ────────────────────────────────────────────────────────────────
+    function applyFilters() {
+        const search = $('#nw-search').val().toLowerCase();
+        const cat    = $('#nw-filter-cat').val();
+        const rarity = $('#nw-filter-rarity').val();
+        const active = $('#nw-filter-active').val();
+
+        const filtered = allRows.filter(r => {
+            if (search && !r.name.toLowerCase().includes(search)) return false;
+            if (cat    && r.deck_category !== cat)                  return false;
+            if (rarity && r.rarity        !== rarity)               return false;
+            if (active === '1' && !r.is_active)                     return false;
+            if (active === '0' && r.is_active)                      return false;
+            return true;
+        });
+        renderTable(filtered);
+        updateStats(filtered);
     }
 
-    function esc(str) {
-        return $('<div>').text(str == null ? '' : String(str)).html();
-    }
-
-    function boolVal(v) {
-        return v === true || v === 1 || v === '1' || v === 'true';
-    }
-
-    function tagsToString(val) {
-        if (!val) return '';
-        if (Array.isArray(val)) return val.join(', ');
-        if (typeof val === 'string') return val;
-        return '';
-    }
-
-    function normalizeId(id) {
-        return $.trim(String(id == null ? '' : id));
-    }
-
-    function rarityBadge(rarity) {
-        var r = rarity || 'common';
-        return '<span class="nw-rarity nw-rarity-' + esc(r) + '">' + esc(r) + '</span>';
-    }
-
-    function imageThumb(url) {
-        if (!url) return '<div class="nw-deck-thumb nw-deck-thumb-placeholder">—</div>';
-        return '<img src="' + esc(url) + '" alt="" class="nw-deck-thumb" loading="lazy">';
-    }
-
-    // Zwraca category_id z obiektu cyber_card_types (nested join)
-    function getCategoryFromCard(card) {
-        var t = card.cyber_card_types;
-        if (!t) return '';
-        if (Array.isArray(t)) return (t[0] && t[0].category_id) || '';
-        return t.category_id || '';
-    }
-
-    function getTypeLabelFromCard(card) {
-        var t = card.cyber_card_types;
-        if (!t) return card.type || '';
-        if (Array.isArray(t)) return (t[0] && t[0].label) || card.type || '';
-        return t.label || card.type || '';
-    }
-
-    // Załaduj typy z Supabase przez WP AJAX i wypełnij <select id="nw-deck-type">
-    function loadTypes(selectedTypeId) {
-        if (!hasAjaxConfig()) return;
-        $.post(ajax, {
-            action: 'nw_deck_types_list',
-            nonce: nonce
-        }, function (res) {
-            if (!res || !res.success) return;
-            allTypes = Array.isArray(res.data) ? res.data : [];
-            buildTypeSelect(selectedTypeId || '');
+    // ── Load data ─────────────────────────────────────────────────────────────
+    function loadAll() {
+        $('#nw-deck-tbody').html('<tr><td colspan="11" class="nw-table-loading">Loading…</td></tr>');
+        $.post(A, { action: 'nw_deck_load', nonce: N }, res => {
+            if (!res.success) { notice(res.data || 'Load failed.', 'error'); return; }
+            allRows = res.data || [];
+            applyFilters();
         });
     }
 
-    function buildTypeSelect(selectedId) {
-        var $sel = $('#nw-deck-type');
-        $sel.empty().append('<option value="">— select —</option>');
-
-        // Grupuj po category_id
-        var groups = {};
-        allTypes.forEach(function (t) {
-            var cat = t.category_id || 'other';
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(t);
-        });
-
-        Object.keys(groups).sort().forEach(function (cat) {
-            var $og = $('<optgroup>').attr('label', cat.charAt(0).toUpperCase() + cat.slice(1));
-            groups[cat].forEach(function (t) {
-                var $opt = $('<option>').val(t.id).text(t.label);
-                if (t.id === selectedId) $opt.prop('selected', true);
-                $og.append($opt);
+    function loadTypes() {
+        $.post(A, { action: 'nw_deck_load_types', nonce: N }, res => {
+            if (!res.success) return;
+            allTypes = res.data || [];
+            const $sel = $('#nw-field-type');
+            $sel.empty().append('<option value="">— select type —</option>');
+            allTypes.forEach(t => {
+                $sel.append(`<option value="${t.id}">${t.label}</option>`);
             });
-            $sel.append($og);
         });
-
-        updateTypeCategoryHint();
     }
 
-    function updateTypeCategoryHint() {
-        var typeId = $('#nw-deck-type').val();
-        var found = allTypes.filter(function (t) { return t.id === typeId; })[0];
-        var hint = found ? 'Category: ' + (found.category_id || '—') : '';
-        $('#nw-deck-type-category-hint').text(hint);
+    function loadClasses() {
+        $.post(A, { action: 'nw_deck_load_classes', nonce: N }, res => {
+            if (!res.success) return;
+            allClasses = res.data || [];
+            const $sel = $('#nw-field-class-id');
+            $sel.find('option:not(:first)').remove();
+            allClasses.forEach(c => {
+                $sel.append(`<option value="${c.id}">${c.name}</option>`);
+            });
+        });
     }
 
-    function openModal() {
-        $('#nw-deck-modal').show();
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+    function initTabs() {
+        $(document).on('click', '.nw-tab', function () {
+            const tab = $(this).data('tab');
+            $('.nw-tab').removeClass('nw-tab-active');
+            $(this).addClass('nw-tab-active');
+            $('.nw-tab-panel').hide();
+            $(`#nw-tab-${tab}`).show();
+            icons();
+        });
+    }
+
+    // ── Tag input ─────────────────────────────────────────────────────────────
+    const TAG_FIELDS = ['tags', 'requirement_tags', 'denied_tags', 'required_item_tags', 'required_location_tags', 'denied_location_tags'];
+
+    function getTagsForField(field) {
+        const tags = [];
+        $(`[data-field="${field}"] .nw-tag-chip`).each(function () {
+            tags.push($(this).data('value'));
+        });
+        return tags;
+    }
+
+    function syncHiddenTagField(field) {
+        $(`#nw-hidden-${field}`).val(JSON.stringify(getTagsForField(field)));
+    }
+
+    function addTag(field, value) {
+        value = value.trim().replace(/,/g, '');
+        if (!value) return;
+        const $container = $(`[data-field="${field}"] .nw-tag-input-inner`);
+        if ($container.find(`.nw-tag-chip[data-value="${value}"]`).length) return;
+        const chip = `<span class="nw-tag-chip" data-value="${value}">${value}<button type="button" class="nw-tag-remove" aria-label="Remove ${value}">×</button></span>`;
+        $container.find('input').before(chip);
+        syncHiddenTagField(field);
+    }
+
+    function loadTagsIntoField(field, values) {
+        const $container = $(`[data-field="${field}"] .nw-tag-input-inner`);
+        $container.find('.nw-tag-chip').remove();
+        (values || []).forEach(v => addTag(field, v));
+    }
+
+    function clearAllTagFields() {
+        TAG_FIELDS.forEach(field => {
+            $(`[data-field="${field}"] .nw-tag-input-inner .nw-tag-chip`).remove();
+            syncHiddenTagField(field);
+        });
+    }
+
+    function initTagInputs() {
+        $(document).on('keydown', '.nw-tag-input input', function (e) {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                const field = $(this).closest('.nw-tag-input').data('field');
+                addTag(field, $(this).val());
+                $(this).val('');
+            }
+        });
+        $(document).on('blur', '.nw-tag-input input', function () {
+            const val = $(this).val().trim();
+            if (val) {
+                const field = $(this).closest('.nw-tag-input').data('field');
+                addTag(field, val);
+                $(this).val('');
+            }
+        });
+        $(document).on('click', '.nw-tag-remove', function () {
+            const $chip = $(this).parent();
+            const field = $chip.closest('.nw-tag-input').data('field');
+            $chip.remove();
+            syncHiddenTagField(field);
+        });
+    }
+
+    // ── Modal ─────────────────────────────────────────────────────────────────
+    function openModal(card) {
+        const isEdit = !!card;
+        $('#nw-modal-title').text(isEdit ? 'Edit Card' : 'Add Card');
+        $('#nw-btn-save').html('<i data-lucide="save"></i> ' + (isEdit ? 'Update Card' : 'Save Card'));
+
+        // reset tabs
+        $('.nw-tab').removeClass('nw-tab-active').first().addClass('nw-tab-active');
+        $('.nw-tab-panel').hide();
+        $('#nw-tab-basic').show();
+
+        // clear form
+        $('#nw-form')[0].reset();
+        clearAllTagFields();
+
+        if (isEdit) {
+            $('#nw-field-id').val(card.id);
+            $('#nw-field-name').val(card.name || '');
+            $('#nw-field-deck-category').val(card.deck_category || 'action');
+            $('#nw-field-type').val(card.type || '');
+            $('#nw-field-rarity').val(card.rarity || 'common');
+            $('#nw-field-class-id').val(card.class_id || '');
+            $('#nw-field-cost-number').val(card.cost_number ?? 0);
+            $('#nw-field-description').val(card.description || '');
+            $('#nw-field-effect').val(card.effect || '');
+            $('#nw-field-mechanic').val(card.mechanic || '');
+            $('#nw-field-mechanic-goal').val(card.mechanic_goal || '');
+            $('#nw-field-img-url').val(card.img_url || '');
+            $('#nw-field-sound-effect').val(card.sound_effect || '');
+            $('#nw-field-is-active').prop('checked', !!card.is_active);
+            $('#nw-field-is-leveling').prop('checked', !!card.is_leveling);
+            $('#nw-field-is-disposable').prop('checked', !!card.is_disposable);
+            $('#nw-field-counts-hand').prop('checked', card.counts_toward_hand_limit !== false);
+
+            // combat
+            $('#nw-field-base-damage').val(card.base_damage ?? 0);
+            $('#nw-field-ap-cost').val(card.ap_cost ?? 1);
+            $('#nw-field-mp-cost').val(card.mp_cost ?? 0);
+            $('#nw-field-time-cost').val(card.time_cost_minutes ?? 0);
+            $('#nw-field-cooldown').val(card.cooldown_messages ?? 0);
+            $('#nw-field-entropy').val(card.entropy_on_fail ?? 0);
+            $('#nw-field-level').val(card.level ?? 1);
+            $('#nw-field-xp-current').val(card.xp_current ?? 0);
+            $('#nw-field-xp-to-next').val(card.xp_to_next ?? 10);
+            $('#nw-field-xp-per-level').val(card.xp_per_level ?? 10);
+
+            // JSON fields
+            $('#nw-field-bonus').val(card.bonus ? JSON.stringify(card.bonus, null, 2) : '{}');
+            $('#nw-field-level-scaling').val(card.level_scaling ? JSON.stringify(card.level_scaling, null, 2) : '{}');
+            $('#nw-field-asc-bonuses').val(card.asc_bonuses ? JSON.stringify(card.asc_bonuses, null, 2) : '{}');
+
+            // tags
+            TAG_FIELDS.forEach(field => loadTagsIntoField(field, card[field] || []));
+
+            // advanced
+            $('#nw-field-req-description').val(card.requirement_description || '');
+            $('#nw-field-ai-instruction').val(card.ai_instruction || '');
+            $('#nw-field-gm').val(card.gm || '');
+        } else {
+            $('#nw-field-id').val('');
+            // defaults
+            $('#nw-field-is-active').prop('checked', true);
+            $('#nw-field-is-leveling').prop('checked', true);
+            $('#nw-field-counts-hand').prop('checked', true);
+            $('#nw-field-ap-cost').val(1);
+            $('#nw-field-xp-to-next').val(10);
+            $('#nw-field-xp-per-level').val(10);
+            $('#nw-field-bonus').val('{}');
+            $('#nw-field-level-scaling').val('{}');
+            $('#nw-field-asc-bonuses').val('{}');
+        }
+
+        $('#nw-modal').show();
+        icons();
     }
 
     function closeModal() {
-        $('#nw-deck-modal').hide();
-        $('#nw-deck-msg').hide().text('');
-        clearNoticeTimer();
-        currentId = '';
+        $('#nw-modal').hide();
     }
 
-    function updateImagePreview() {
-        var url = ($('#nw-deck-img-url').val() || '').trim();
-        var $wrap = $('#nw-deck-image-preview-wrap');
-        var $img = $('#nw-deck-image-preview');
-        if (!url) { $img.attr('src', ''); $wrap.hide(); return; }
-        $img.attr('src', url);
-        $wrap.show();
-    }
-
-    function resetForm() {
-        currentId = '';
-        $('#nw-deck-id').val('');
-        $('#nw-deck-name').val('');
-        buildTypeSelect('');
-        $('#nw-deck-rarity').val('common');
-        $('#nw-deck-description').val('');
-        $('#nw-deck-effect').val('');
-        $('#nw-deck-mechanic').val('');
-        $('#nw-deck-mechanic-goal').val('');
-        $('#nw-deck-cost-label').val('');
-        $('#nw-deck-cost-number').val(0);
-        $('#nw-deck-time-cost-minutes').val(0);
-        $('#nw-deck-cooldown-messages').val(0);
-        $('#nw-deck-entropy-on-fail').val(0);
-        $('#nw-deck-bonus').val('');
-        $('#nw-deck-tags').val('');
-        $('#nw-deck-requirement-tags').val('');
-        $('#nw-deck-denied-tags').val('');
-        $('#nw-deck-required-item-tags').val('');
-        $('#nw-deck-required-location-tags').val('');
-        $('#nw-deck-denied-location-tags').val('');
-        $('#nw-deck-requirement-description').val('');
-        $('#nw-deck-ai-instruction').val('');
-        $('#nw-deck-gm').val('');
-        $('#nw-deck-sound-effect').val('');
-        $('#nw-deck-img-url').val('');
-        $('#nw-deck-class-id').val('');
-        $('#nw-deck-is-leveling').prop('checked', true);
-        $('#nw-deck-is-disposable').prop('checked', false);
-        $('#nw-deck-is-active').prop('checked', true);
-        $('#nw-deck-image-preview').attr('src', '');
-        $('#nw-deck-image-preview-wrap').hide();
-        $('#nw-deck-modal-title').text('Add Card');
-        $('#nw-deck-delete-btn').hide();
-        $('#nw-deck-msg').hide().text('');
-        clearNoticeTimer();
-    }
-
-    function fillForm(card) {
-        currentId = normalizeId(card.id);
-        $('#nw-deck-id').val(currentId);
-        $('#nw-deck-name').val(card.name || '');
-        buildTypeSelect(card.type || '');
-        $('#nw-deck-rarity').val(card.rarity || 'common');
-        $('#nw-deck-description').val(card.description || '');
-        $('#nw-deck-effect').val(card.effect || '');
-        $('#nw-deck-mechanic').val(card.mechanic || '');
-        $('#nw-deck-mechanic-goal').val(card.mechanic_goal || '');
-        $('#nw-deck-cost-label').val(card.cost_label || '');
-        $('#nw-deck-cost-number').val(card.cost_number || 0);
-        $('#nw-deck-time-cost-minutes').val(card.time_cost_minutes || 0);
-        $('#nw-deck-cooldown-messages').val(card.cooldown_messages || 0);
-        $('#nw-deck-entropy-on-fail').val(card.entropy_on_fail || 0);
-        $('#nw-deck-bonus').val(card.bonus && Object.keys(card.bonus).length ? JSON.stringify(card.bonus) : '');
-        $('#nw-deck-tags').val(tagsToString(card.tags));
-        $('#nw-deck-requirement-tags').val(tagsToString(card.requirement_tags));
-        $('#nw-deck-denied-tags').val(tagsToString(card.denied_tags));
-        $('#nw-deck-required-item-tags').val(tagsToString(card.required_item_tags));
-        $('#nw-deck-required-location-tags').val(tagsToString(card.required_location_tags));
-        $('#nw-deck-denied-location-tags').val(tagsToString(card.denied_location_tags));
-        $('#nw-deck-requirement-description').val(card.requirement_description || '');
-        $('#nw-deck-ai-instruction').val(card.ai_instruction || '');
-        $('#nw-deck-gm').val(card.gm || '');
-        $('#nw-deck-sound-effect').val(card.sound_effect || '');
-        $('#nw-deck-img-url').val(card.img_url || '');
-        $('#nw-deck-class-id').val(card.class_id || '');
-        $('#nw-deck-is-leveling').prop('checked', boolVal(card.is_leveling));
-        $('#nw-deck-is-disposable').prop('checked', boolVal(card.is_disposable));
-        $('#nw-deck-is-active').prop('checked', boolVal(card.is_active));
-        updateImagePreview();
-        $('#nw-deck-modal-title').text('Edit Card');
-        $('#nw-deck-delete-btn').show();
-        $('#nw-deck-msg').hide().text('');
-        clearNoticeTimer();
-    }
-
-    function renderTable(rows) {
-        var $tbody = $('#nw-deck-tbody');
-        if (!rows || !rows.length) {
-            $tbody.html('<tr><td colspan="7">No cards found.</td></tr>');
-            return;
+    // ── Expand textarea ───────────────────────────────────────────────────────
+    $(document).on('click', '.nw-expand-btn', function () {
+        const target = $(this).data('target');
+        const $ta    = $(`#${target}`);
+        if ($ta.hasClass('nw-textarea-expanded')) {
+            $ta.removeClass('nw-textarea-expanded').attr('rows', 5);
+        } else {
+            $ta.addClass('nw-textarea-expanded').attr('rows', 18);
         }
-        var html = rows.map(function (card) {
-            var active = boolVal(card.is_active);
-            var id = normalizeId(card.id);
-            var category = esc(getCategoryFromCard(card));
-            var typeLabel = esc(getTypeLabelFromCard(card));
-            return ''
-                + '<tr data-id="' + esc(id) + '">'
-                + '<td>' + imageThumb(card.img_url) + '</td>'
-                + '<td>' + esc(card.name || '') + '</td>'
-                + '<td>' + category + '</td>'
-                + '<td>' + typeLabel + '</td>'
-                + '<td>' + rarityBadge(card.rarity) + '</td>'
-                + '<td><input type="checkbox" class="nw-deck-toggle" data-id="' + esc(id) + '"' + (active ? ' checked' : '') + '></td>'
-                + '<td>'
-                + '<button type="button" class="button button-small nw-deck-edit" data-id="' + esc(id) + '">Edit</button> '
-                + '<button type="button" class="button button-small nw-deck-delete-row" data-id="' + esc(id) + '">Delete</button>'
-                + '</td>'
-                + '</tr>';
-        }).join('');
-        $tbody.html(html);
-    }
+    });
 
-    function loadCards() {
-        if (!hasAjaxConfig()) {
-            $('#nw-deck-tbody').html('<tr><td colspan="7">Missing AJAX config.</td></tr>');
-            notice('Missing AJAX config.', 'error');
-            return;
-        }
-        var data = {
-            action: 'nw_deck_list',
-            nonce: nonce,
-            category: $('#nw-deck-filter-category').val() || '',
-            rarity: $('#nw-deck-filter-rarity').val() || '',
-            active: $('#nw-deck-filter-active').val() || '',
-            search: ($('#nw-deck-search').val() || '').trim()
+    // ── Save ──────────────────────────────────────────────────────────────────
+    $('#nw-form').on('submit', function (e) {
+        e.preventDefault();
+
+        // Sync checkbox booleans manually (unchecked checkboxes don't submit)
+        const checkboxMap = {
+            'is_active': 'nw-field-is-active',
+            'is_leveling': 'nw-field-is-leveling',
+            'is_disposable': 'nw-field-is-disposable',
+            'counts_toward_hand_limit': 'nw-field-counts-hand'
         };
-        if (activeXhr && activeXhr.readyState !== 4) activeXhr.abort();
-        $('#nw-deck-tbody').html('<tr><td colspan="7">Loading…</td></tr>');
-        activeXhr = $.post(ajax, data, function (res) {
-            if (!res || !res.success) {
-                $('#nw-deck-tbody').html('<tr><td colspan="7">Error loading cards.</td></tr>');
-                notice((res && res.data) || 'Load error', 'error');
-                return;
+        Object.entries(checkboxMap).forEach(([name, id]) => {
+            if (!$('#nw-form input[name="' + name + '"]').length) {
+                $('<input>').attr({ type: 'hidden', name, value: 0 }).appendTo('#nw-form');
             }
-            cards = Array.isArray(res.data) ? res.data : [];
-            renderTable(cards);
-        }).fail(function (xhr, status) {
-            if (status !== 'abort') {
-                $('#nw-deck-tbody').html('<tr><td colspan="7">Request failed.</td></tr>');
-                notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-            }
-        }).always(function () { activeXhr = null; });
-    }
-
-    function loadSingle(id) {
-        var normalizedId = normalizeId(id);
-        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
-        if (!normalizedId) { notice('Invalid card ID.', 'error'); return; }
-        $.post(ajax, {
-            action: 'nw_deck_get',
-            nonce: nonce,
-            id: normalizedId
-        }, function (res) {
-            if (!res || !res.success || !res.data) {
-                notice((res && res.data) || 'Cannot load card.', 'error');
-                return;
-            }
-            fillForm(res.data);
-            openModal();
-        }).fail(function (xhr) {
-            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+            $(`#${id}`).prop('checked')
+                ? $(`input[name="${name}"]`).val(1)
+                : $(`input[name="${name}"]`).val(0);
         });
-    }
 
-    function collectPayload() {
-        var id = normalizeId($('#nw-deck-id').val());
-        return {
-            action: 'nw_deck_save',
-            nonce: nonce,
-            id: id,
-            name: ($('#nw-deck-name').val() || '').trim(),
-            type: ($('#nw-deck-type').val() || '').trim(),
-            rarity: $('#nw-deck-rarity').val(),
-            description: ($('#nw-deck-description').val() || '').trim(),
-            effect: ($('#nw-deck-effect').val() || '').trim(),
-            mechanic: ($('#nw-deck-mechanic').val() || '').trim(),
-            mechanic_goal: ($('#nw-deck-mechanic-goal').val() || '').trim(),
-            cost_label: ($('#nw-deck-cost-label').val() || '').trim(),
-            cost_number: $('#nw-deck-cost-number').val(),
-            time_cost_minutes: $('#nw-deck-time-cost-minutes').val(),
-            cooldown_messages: $('#nw-deck-cooldown-messages').val(),
-            entropy_on_fail: $('#nw-deck-entropy-on-fail').val(),
-            bonus: ($('#nw-deck-bonus').val() || '').trim(),
-            tags: ($('#nw-deck-tags').val() || '').trim(),
-            requirement_tags: ($('#nw-deck-requirement-tags').val() || '').trim(),
-            denied_tags: ($('#nw-deck-denied-tags').val() || '').trim(),
-            required_item_tags: ($('#nw-deck-required-item-tags').val() || '').trim(),
-            required_location_tags: ($('#nw-deck-required-location-tags').val() || '').trim(),
-            denied_location_tags: ($('#nw-deck-denied-location-tags').val() || '').trim(),
-            requirement_description: ($('#nw-deck-requirement-description').val() || '').trim(),
-            ai_instruction: ($('#nw-deck-ai-instruction').val() || '').trim(),
-            gm: ($('#nw-deck-gm').val() || '').trim(),
-            sound_effect: ($('#nw-deck-sound-effect').val() || '').trim(),
-            img_url: ($('#nw-deck-img-url').val() || '').trim(),
-            class_id: ($('#nw-deck-class-id').val() || '').trim(),
-            is_leveling: $('#nw-deck-is-leveling').is(':checked') ? 1 : 0,
-            is_disposable: $('#nw-deck-is-disposable').is(':checked') ? 1 : 0,
-            is_active: $('#nw-deck-is-active').is(':checked') ? 1 : 0
-        };
-    }
+        const data = $(this).serializeArray().reduce((acc, { name, value }) => {
+            acc[name] = value;
+            return acc;
+        }, {});
+        data.action = 'nw_deck_save';
+        data.nonce  = N;
 
-    // Zmiana typu → aktualizuj hint kategorii
-    $(document).on('change', '#nw-deck-type', updateTypeCategoryHint);
+        const $btn = $('#nw-btn-save').prop('disabled', true).html('<i data-lucide="loader-2"></i> Saving…');
+        icons();
 
-    $('#nw-deck-add-btn').on('click', function (e) {
-        e.preventDefault();
-        resetForm();
-        openModal();
-    });
-
-    $('#nw-deck-filter-btn').on('click', function (e) {
-        e.preventDefault();
-        loadCards();
-    });
-
-    $('#nw-deck-search').on('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); loadCards(); }
-    });
-
-    $('#nw-deck-cancel-btn, #nw-deck-modal-close').on('click', function (e) {
-        e.preventDefault();
-        closeModal();
-    });
-
-    $('#nw-deck-modal').on('click', function (e) {
-        if (e.target === this) closeModal();
-    });
-
-    $('#nw-deck-img-url').on('input change blur', updateImagePreview);
-
-    $(document).on('click', '.nw-deck-edit', function () {
-        var id = normalizeId($(this).attr('data-id'));
-        if (!id) { notice('Invalid card ID.', 'error'); return; }
-        loadSingle(id);
-    });
-
-    $(document).on('change', '.nw-deck-toggle', function () {
-        var id = normalizeId($(this).attr('data-id'));
-        var state = $(this).is(':checked') ? 1 : 0;
-        var $checkbox = $(this);
-        if (!hasAjaxConfig()) { $checkbox.prop('checked', !$checkbox.is(':checked')); notice('Missing AJAX config.', 'error'); return; }
-        if (!id) { $checkbox.prop('checked', !$checkbox.is(':checked')); notice('Invalid card ID.', 'error'); return; }
-        $.post(ajax, {
-            action: 'nw_deck_toggle',
-            nonce: nonce,
-            id: id,
-            state: state
-        }, function (res) {
-            if (!res || !res.success) {
-                $checkbox.prop('checked', !$checkbox.is(':checked'));
-                notice((res && res.data) || 'Toggle failed.', 'error');
+        $.post(A, data, res => {
+            $btn.prop('disabled', false).html('<i data-lucide="save"></i> Save Card');
+            icons();
+            if (!res.success) {
+                notice(res.data || 'Save failed.', 'error');
                 return;
             }
-            notice('Card updated.', 'success');
-        }).fail(function (xhr) {
-            $checkbox.prop('checked', !$checkbox.is(':checked'));
-            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
-        });
-    });
-
-    $('#nw-deck-save-btn').on('click', function (e) {
-        e.preventDefault();
-        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
-        var payload = collectPayload();
-        var $btn = $(this);
-        var originalText = $btn.text();
-        if (!payload.name) { notice('Name is required.', 'error'); return; }
-        $btn.prop('disabled', true).text('Saving…');
-        $.post(ajax, payload, function (res) {
-            $btn.prop('disabled', false).text(originalText);
-            if (!res || !res.success) { notice((res && res.data) || 'Save failed.', 'error'); return; }
-            notice('Card saved.', 'success');
             closeModal();
-            loadCards();
-        }).fail(function (xhr) {
-            $btn.prop('disabled', false).text(originalText);
-            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+            loadAll();
+            notice(data.id ? 'Card updated.' : 'Card created.');
         });
     });
 
-    $('#nw-deck-delete-btn').on('click', function (e) {
-        e.preventDefault();
-        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
-        var id = normalizeId($('#nw-deck-id').val());
-        if (!id) return;
-        if (!window.confirm('Delete this card? This cannot be undone.')) return;
-        $.post(ajax, {
-            action: 'nw_deck_delete',
-            nonce: nonce,
-            id: id
-        }, function (res) {
-            if (!res || !res.success) { notice((res && res.data) || 'Delete failed.', 'error'); return; }
-            notice('Card deleted.', 'success');
-            closeModal();
-            loadCards();
-        }).fail(function (xhr) {
-            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+    // ── Delete ────────────────────────────────────────────────────────────────
+    let pendingDeleteId = null;
+
+    $(document).on('click', '.nw-btn-del', function () {
+        pendingDeleteId = $(this).data('id');
+        $('#nw-confirm-name').text($(this).data('name'));
+        $('#nw-confirm-modal').show();
+        icons();
+    });
+
+    $('#nw-btn-confirm-delete').on('click', function () {
+        if (!pendingDeleteId) return;
+        $.post(A, { action: 'nw_deck_delete', nonce: N, id: pendingDeleteId }, res => {
+            $('#nw-confirm-modal').hide();
+            if (!res.success) { notice(res.data || 'Delete failed.', 'error'); return; }
+            notice('Card deleted.');
+            loadAll();
+            pendingDeleteId = null;
         });
     });
 
-    $(document).on('click', '.nw-deck-delete-row', function () {
-        var id = normalizeId($(this).attr('data-id'));
-        if (!hasAjaxConfig()) { notice('Missing AJAX config.', 'error'); return; }
-        if (!id) return;
-        if (!window.confirm('Delete this card? This cannot be undone.')) return;
-        $.post(ajax, {
-            action: 'nw_deck_delete',
-            nonce: nonce,
-            id: id
-        }, function (res) {
-            if (!res || !res.success) { notice((res && res.data) || 'Delete failed.', 'error'); return; }
-            notice('Card deleted.', 'success');
-            loadCards();
-        }).fail(function (xhr) {
-            notice('Request failed (' + (xhr.status || 'network') + ').', 'error');
+    // ── Duplicate ──────────────────────────────────────────────────────────────
+    $(document).on('click', '.nw-btn-dup', function () {
+        const id = $(this).data('id');
+        $.post(A, { action: 'nw_deck_duplicate', nonce: N, id }, res => {
+            if (!res.success) { notice(res.data || 'Duplicate failed.', 'error'); return; }
+            loadAll();
+            notice('Card duplicated (inactive).');
         });
     });
 
-    // Init: najpierw typy, potem karty
+    // ── Edit ──────────────────────────────────────────────────────────────────
+    $(document).on('click', '.nw-btn-edit', function () {
+        const id   = $(this).data('id');
+        const card = allRows.find(r => r.id == id);
+        if (card) openModal(card);
+    });
+
+    // ── Add button ────────────────────────────────────────────────────────────
+    $('#nw-btn-add').on('click', () => openModal(null));
+
+    // ── Close modal ───────────────────────────────────────────────────────────
+    $(document).on('click', '.nw-modal-close, .nw-modal-backdrop', function () {
+        const modal = $(this).data('modal') || 'nw-modal';
+        $(`#${modal}`).hide();
+    });
+
+    // ── Filters ───────────────────────────────────────────────────────────────
+    $('#nw-search').on('input', applyFilters);
+    $('#nw-filter-cat, #nw-filter-rarity, #nw-filter-active').on('change', applyFilters);
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    initTabs();
+    initTagInputs();
     loadTypes();
-    loadCards();
+    loadClasses();
+    loadAll();
+    icons();
 
-})(jQuery);
+}(jQuery));
