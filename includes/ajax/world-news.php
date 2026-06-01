@@ -21,7 +21,6 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 		$character_id = nw_sanitize_uuid( (string) ( $_POST['character_id'] ?? '' ) );
 
 		// Clamp to realistic in-game ranges to prevent timeline-bypass attacks.
-		// current_day: 1–9999 (game days); current_hour: 0–23 (hours in a day).
 		$current_day  = max( 1,  min( 9999, intval( $_POST['current_day']  ?? 1 ) ) );
 		$current_hour = max( 0,  min( 23,   intval( $_POST['current_hour'] ?? 0 ) ) );
 		$clearance    = max( 0,  min( 10,   intval( $_POST['clearance']    ?? 0 ) ) );
@@ -31,9 +30,36 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 			return;
 		}
 
+		// ── BUG 17 FIX: verify character belongs to the calling user ──────────
+		// $character_id was taken from $_POST without confirming ownership.
+		// Any logged-in user could pass any UUID and read news gated by that
+		// character's clearance_level. Verify via Supabase before proceeding.
+		$current_user_id = get_current_user_id();
+
+		$char_row = tw_supabase_get_admin(
+			'cyber_characters',
+			[
+				'id'         => 'eq.' . $character_id,
+				'wp_user_id' => 'eq.' . $current_user_id,
+				'select'     => 'id,clearance_level',
+				'limit'      => 1,
+			]
+		);
+
+		if ( is_wp_error( $char_row ) ) {
+			wp_send_json_error( [ 'message' => 'Character lookup failed.' ], 500 );
+			return;
+		}
+
+		if ( ! is_array( $char_row ) || empty( $char_row[0]['id'] ) ) {
+			wp_send_json_error( [ 'message' => 'Access denied.' ], 403 );
+			return;
+		}
+
+		// Use the clearance_level stored server-side — never trust the client value.
+		$clearance = max( 0, min( 10, intval( $char_row[0]['clearance_level'] ?? 0 ) ) );
+
 		// tw_supabase_get_admin() uses service key — server-side read bypassing RLS.
-		// tw_supabase_get() (anon key) would silently return empty results if RLS
-		// requires authenticated access and no JWT is forwarded.
 		$news = tw_supabase_get_admin(
 			'cyber_world_news',
 			[
@@ -70,6 +96,12 @@ if ( ! function_exists( 'tw_get_cyber_world_news_ajax' ) ) {
 			if ( $item['is_new'] ) {
 				$unread_count++;
 			}
+
+			// ── BUG 18 FIX: strip read_by before sending to client ───────────
+			// The full read_by array contains character UUIDs of every player
+			// who read this item — leaking other players' character IDs.
+			// The client only needs is_new (bool); raw UUIDs must stay server-side.
+			unset( $item['read_by'] );
 		}
 		unset( $item );
 
