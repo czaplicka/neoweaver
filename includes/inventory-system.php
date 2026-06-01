@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * define() zamiast const:
  * - PHP const na poziomie pliku (poza klasą) jest legalne, ale staje się
  *   fatal error gdy plik zostanie dołączony wewnątrz funkcji lub warunku.
- * - define() działa bezpiecznie w każdym kontekstu include/require.
+ * - define() działa bezpiecznie w każdym kontekście include/require.
  * - Wartości zamrożone — stałe globalne dla całego request.
  */
 if ( ! defined( 'NW_VALID_SLOTS' ) ) {
@@ -60,6 +60,21 @@ if ( ! defined( 'NW_SLOT_ALLOWED_TYPES' ) ) {
 	);
 }
 
+/**
+ * PRIORYTETY wp_enqueue_scripts w projekcie:
+ *   neoweaver-wp-core.php  — nw-game-data  → priorytet domyślny (10)
+ *   deck-core.php          — nw-deck-core  → 20
+ *   char-panel.php         — tw-char-panel → 25
+ *   inventory-system.php   — tw-inventory  → 40  (ten plik)
+ *
+ * Priorytet >= 11 gwarantuje, że is_page_template() jest wiarygodne
+ * (main query WordPress ustawiony). Inventory ładuje się po char-panel,
+ * bo może chcieć odczytać dane aktywnej postaci z window.nwGameData.
+ *
+ * BUG 5 FIX: dodano jquery i nw-game-data jako dependencies + config JS.
+ * BUG 6 FIX: ownership query przeniesiona przed rozgałęzienie equip/unequip,
+ *            więc unequip RÓWNIEŻ weryfikuje własność wiersza.
+ */
 add_action(
 	'wp_enqueue_scripts',
 	function () {
@@ -72,18 +87,47 @@ add_action(
 		$file_url  = trailingslashit( NEOWEAVER_PLUGIN_URL ) . $file_rel;
 		$version   = file_exists( $file_path ) ? (string) filemtime( $file_path ) : NEOWEAVER_VERSION;
 
+		// BUG 5 FIX — oryginał miał array() — brak jQuery i nw-game-data.
+		// inventory-system.js używa $ i window.nwGameData (dane postaci),
+		// więc oba muszą być załadowane jako pierwsze.
 		wp_enqueue_script(
 			'tw-inventory-system',
 			$file_url,
-			array(),
+			array( 'jquery', 'nw-game-data' ),
 			$version,
 			true
+		);
+
+		// BUG 5 FIX — config JS: ajaxUrl + nonce + activeCharacterId.
+		// Bez tego inventory-system.js nie miał jak wysłać poprawnego AJAX requestu.
+		//
+		// UWAGA NA KLUCZE:
+		//   supabaseUrl  — OK do JS (publiczny endpoint)
+		//   anon key     — tylko jeśli potrzebny Realtime po stronie klienta (patrz cyber-hud.php)
+		//   service key  — NIGDY do JS
+		$user_id   = get_current_user_id();
+		$game_data = function_exists( 'get_user_game_data_from_supabase' )
+			? get_user_game_data_from_supabase( $user_id )
+			: array();
+
+		wp_add_inline_script(
+			'tw-inventory-system',
+			'window.nwInventoryConfig = ' . wp_json_encode(
+				array(
+					'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
+					'nonce'             => wp_create_nonce( 'tw_adventure_nonce' ),
+					'activeCharacterId' => (string) ( $game_data['active_character_id'] ?? '' ),
+					'supabaseUrl'       => function_exists( 'tw_supabase_url' ) ? (string) tw_supabase_url() : '',
+					'validSlots'        => NW_VALID_SLOTS,
+				)
+			) . ';',
+			'before'
 		);
 	},
 	40
 );
 
-// ─── AJAX handler: tw_update_inventory_slot ─────────────────────────────────────────────────
+// ─── AJAX handler: tw_update_inventory_slot ─────────────────────────────────
 add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot' );
 
 if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
@@ -117,7 +161,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			$slot_name = null;
 		}
 
-		// Validate slot_name against the canonical allowlist.
+		// Validate slot_name against the canonical allowlist (tylko przy equipowaniu).
 		if ( $is_equipped && ( null === $slot_name || ! in_array( $slot_name, NW_VALID_SLOTS, true ) ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid equipment slot' ) );
 			return;
@@ -136,7 +180,13 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			return;
 		}
 
-		// Verify ownership and fetch item slot_type in one query.
+		// BUG 6 FIX — ownership check ZAWSZE przed PATCH, niezależnie od equip/unequip.
+		//
+		// Oryginał: przy $is_equipped=false ownership w ogóle nie był sprawdzany.
+		// Gracz mógł wysłać inventory_id dowolnej postaci i wyzerować jej equipped_slot.
+		//
+		// Fix: ownership query (character_id = aktywna postać gracza) odpala ZAWSZE.
+		// Jeśli wiersz nie należy do tej postaci, Supabase zwraca pusty array → 403.
 		$ownership_rows = tw_supabase_get(
 			'cyber_character_inventory',
 			array(
@@ -153,10 +203,10 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 		 * 1. is_wp_error() MUSI być PRZED empty().
 		 *
 		 *    empty() na obiekcie WP_Error zwraca FALSE (obiekt nie jest pusty),
-		 *    więc stary kod przechodził dalej z błędnym $ownership_rows[0]
-		 *    przy każdym błędzie sieciowym — PHP Warning + PATCH bez sprawdzenia właśności.
+		 *    więc bez tej kolejności błąd sieciowy byłby traktowany jako sukces.
 		 *
-		 * 2. empty() sprawdza czy Supabase zwróciło puste array (brak wiersza = brak właśności).
+		 * 2. empty() sprawdza czy Supabase zwróciło puste array
+		 *    (brak wiersza = brak własności lub nieistniejące ID).
 		 */
 		if ( is_wp_error( $ownership_rows ) ) {
 			error_log( '[NeoWeaver] tw_handle_update_inventory_slot: Supabase ownership check failed – ' . $ownership_rows->get_error_message() );
@@ -169,7 +219,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			return;
 		}
 
-		// Enforce item slot_type restriction when equipping.
+		// Enforce item slot_type restriction (tylko przy equipowaniu).
 		if ( $is_equipped && null !== $slot_name ) {
 			$allowed_types  = NW_SLOT_ALLOWED_TYPES[ $slot_name ] ?? array();
 			$item_slot_type = $ownership_rows[0]['cyber_items']['slot_type'] ?? null;
@@ -192,7 +242,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			$patch_body
 		);
 
-		// tw_supabase_request() zwraca WP_Error przy KAŻDYM błędzie HTTP (w tym 4xx/5xx).
+		// tw_supabase_request() zwraca WP_Error przy każdym błędzie HTTP (w tym 4xx/5xx).
 		// Sprawdzanie $result['code'] po tym bloku byłoby dead code — jeśli dotarliśmy
 		// tutaj, 'code' jest zawsze w [200, 299]. Patrz: supabase-helpers.php kontrakt.
 		if ( is_wp_error( $result ) ) {
