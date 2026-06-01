@@ -13,8 +13,6 @@
  * The front-end JS continues to submit directly to the REST endpoint;
  * this class provides a PHP-side API for server-driven creation and future tests.
  *
- * No namespaces. No Supabase direct calls — the endpoint owns that contract.
- *
  * BUG-FIX (loopback auth): create_via_rest_api() previously used wp_remote_post()
  * to call its own REST endpoint, which arrived unauthenticated (no session cookies
  * on loopback) and always triggered a 401 from neoweaver_user_can_play().
@@ -25,6 +23,16 @@
  * type `true|WP_Error`. This causes a fatal parse error on PHP 7.x (Hostinger
  * may run 7.4). Fixed by removing the union type and using a plain PHPDoc
  * @return annotation instead, which is compatible with all PHP versions.
+ *
+ * BUG-FIX (BUG-27 – nonce single-use on retries): build_payload() previously
+ * embedded wp_create_nonce() in the payload array. When create_via_rest_api()
+ * calls neoweaver_create_world() directly (in-process), there is no HTTP
+ * round-trip, so the nonce is consumed by wp_verify_nonce() on the first call.
+ * In object-cache setups the nonce tick may not have advanced, so a second
+ * call within the same tick returns 2 (stale) or false, causing a 403.
+ * Fix: build_payload() no longer generates a nonce. create_via_rest_api()
+ * mints a fresh nonce immediately before each direct invocation, guaranteeing
+ * a unique token per call regardless of how many retries occur.
  *
  * @package Neoweaver
  */
@@ -93,6 +101,10 @@ class Neoweaver_Nodes_Creator {
 	 * Field names are kept exactly as the current form posts them.
 	 * wp_user_id is injected from the current session.
 	 *
+	 * NOTE: No nonce is included here. create_via_rest_api() mints a fresh
+	 * nonce immediately before each direct call so that retries never reuse
+	 * a token that wp_verify_nonce() has already consumed (BUG-27).
+	 *
 	 * @param  array $data  Validated form fields.
 	 * @return array
 	 */
@@ -110,7 +122,6 @@ class Neoweaver_Nodes_Creator {
 			'moral'       => intval( $data['moral'] ),
 			'customize'   => sanitize_textarea_field( $data['customize'] ?? '' ),
 			'wp_user_id'  => get_current_user_id(),
-			'nonce'       => wp_create_nonce( 'tw_world_nonce' ),
 		];
 	}
 
@@ -122,9 +133,9 @@ class Neoweaver_Nodes_Creator {
 	 * is_user_logged_in() returned false and every call got a 401.
 	 *
 	 * The fix bypasses HTTP entirely: we build a WP_REST_Request from the
-	 * payload and invoke neoweaver_create_world() in-process. The current user
-	 * session is already available, nonce verification passes because
-	 * build_payload() mints a fresh nonce, and no network round-trip occurs.
+	 * payload and invoke neoweaver_create_world() in-process. A fresh nonce is
+	 * minted here — not in build_payload() — so each call (including retries)
+	 * always carries a token that has never been seen by wp_verify_nonce().
 	 *
 	 * @param  array $payload  Output of build_payload().
 	 * @return array  ['success' => bool, 'data' => mixed]
@@ -137,6 +148,10 @@ class Neoweaver_Nodes_Creator {
 				'data'    => [ 'message' => 'World creation handler not available.' ],
 			];
 		}
+
+		// Mint a fresh nonce immediately before the call so every invocation
+		// (including retries) gets a token wp_verify_nonce() has not yet seen.
+		$payload['nonce'] = wp_create_nonce( 'tw_world_nonce' );
 
 		// Build a synthetic REST request so neoweaver_create_world() can use
 		// its normal get_param() interface without any HTTP involvement.
