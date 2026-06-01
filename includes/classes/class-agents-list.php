@@ -22,13 +22,15 @@ class Neoweaver_Agents_List {
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
 		if ( empty( $characters ) ) {
+			// BUG-11 FIX: use home_url() instead of hardcoded /new-agent/
+			$new_agent_url = esc_url( apply_filters( 'neoweaver_new_agent_url', home_url( '/new-agent/' ) ) );
 			return '
 			<div class="tw-agents-empty">
 				<div class="tw-agents-empty-icon">⚠️</div>
 				<p class="tw-agents-empty-main">NO OPERATIVES DETECTED IN YOUR GRID.</p>
 				<small class="tw-agents-empty-sub">Initialize a new Field Agent to start the weaving process.</small>
 				<div class="tw-agents-empty-actions">
-					<a href="/new-agent/" class="tw-btn-sync">NEW FIELD AGENT</a>
+					<a href="' . $new_agent_url . '" class="tw-btn-sync">NEW FIELD AGENT</a>
 				</div>
 			</div>';
 		}
@@ -221,7 +223,7 @@ class Neoweaver_Agents_List {
 		$agents = $this->repo->get_living_for_wp_user( $wp_user_id );
 
 		if ( empty( $agents ) ) {
-			return '<p class="tw-helper-text">No Field Agents available. <a href="' . esc_url( home_url( '/new-agent/' ) ) . '" class="tw-link">Create one first &rarr;</a></p>';
+			return '<p class="tw-helper-text">No Field Agents available. <a href="' . esc_url( apply_filters( 'neoweaver_new_agent_url', home_url( '/new-agent/' ) ) ) . '" class="tw-link">Create one first &rarr;</a></p>';
 		}
 
 		$html = '<select name="character_id" id="tw-agent-select" class="tw-select">';
