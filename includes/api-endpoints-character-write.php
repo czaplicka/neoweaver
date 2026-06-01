@@ -155,6 +155,39 @@ $missing = array_values( array_diff( $requested_str, $found ) );
 		return true;
 	}
 }
+if ( ! function_exists( 'nw_parse_attr_post' ) ) {
+	/**
+	 * Reads an attribute value from $_POST, accepting two possible key names.
+	 * Returns an integer 1-5, or WP_Error on invalid input.
+	 *
+	 * @param string $key_primary   Primary POST key (e.g. 'attrbody').
+	 * @param string $key_secondary Fallback POST key (e.g. 'attr_body').
+	 * @return int|WP_Error
+	 */
+	function nw_parse_attr_post( string $key_primary, string $key_secondary ) {
+		$raw = $_POST[ $key_primary ] ?? $_POST[ $key_secondary ] ?? null;
+
+		if ( null === $raw || '' === (string) $raw ) {
+			return new WP_Error(
+				'attr_required',
+				sprintf( 'Attribute "%s" is required.', $key_primary ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$value = (int) $raw;
+
+		if ( $value < 1 || $value > 5 ) {
+			return new WP_Error(
+				'attr_out_of_range',
+				sprintf( 'Attribute "%s" must be between 1 and 5.', $key_primary ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return $value;
+	}
+}
 function nw_validate_race_selection( string $race_id_input, string $subrace_id_input ) {
     $race_id_input    = sanitize_text_field( $race_id_input );
     $subrace_id_input = sanitize_text_field( $subrace_id_input );
