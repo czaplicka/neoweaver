@@ -60,7 +60,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'deck.php',
-			'class' => 'NW_Deck_Admin',
+			'class' => 'NW_Admin_Deck',
 			'slug'  => 'nw-deck',
 			'root'  => false,
 		],
@@ -84,7 +84,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'seasons.php',
-			'class' => 'NeoWeaver_Seasons_Admin',
+			'class' => 'NWSeasonsAdmin',
 			'slug'  => 'nw-seasons',
 			'root'  => false,
 		],
@@ -96,19 +96,19 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'starting-packages.php',
-			'class' => 'NeoWeaver_Starting_Packages_Admin',
+			'class' => 'NWStartingPackagesAdmin',
 			'slug'  => 'nw-starting-packages',
 			'root'  => false,
 		],
 		[
 			'file'  => 'status-tags.php',
-			'class' => 'NW_Status_Tags_Admin',
+			'class' => 'NWStatusTagsAdmin',
 			'slug'  => 'nw-status-tags',
 			'root'  => false,
 		],
 		[
 			'file'  => 'style-dictionary.php',
-			'class' => 'NeoWeaver_Style_Dictionary_Admin',
+			'class' => 'NWStyleDictionaryAdmin',
 			'slug'  => 'nw-style-dictionary',
 			'root'  => false,
 		],
@@ -120,7 +120,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 		[
 			'file'  => 'world-tag-defs.php',
-			'class' => 'NeoWeaver_World_Tag_Defs_Admin',
+			'class' => 'NWWorldTagDefsAdmin',
 			'slug'  => 'nw-world-tag-defs',
 			'root'  => false,
 		],
