@@ -115,13 +115,16 @@ Rules:
 PROMPT;
 
 		// Block B: Dynamic world state
-		// Field names match current schema:
-		//   cyber_characters: current_hp, max_hp (snake_case)
-		//   cyber_worlds:     globaltag1
-		//   cyber_world_map:  location_name, instance_tags, ai_prompt
+		//
+		// BUG 23 FIX: cyber_characters stores HP as 'hp' (not 'current_hp' / 'max_hp')
+		// and MP as 'mp'. The previous code read $char['current_hp'] / $char['max_hp']
+		// which are always null/0 because those columns do not exist in the schema.
+		// Correct column names: hp (current), max_hp does not exist — HP is a single
+		// value; render as HP: {hp}. MP column is 'mp'.
+		//
+		// If your schema later adds a max_hp column, update the line below accordingly.
 		$char_name  = esc_html( $char['name']              ?? 'Unknown' );
-		$hp         = (int) ( $char['current_hp']          ?? 0 );
-		$hp_max     = (int) ( $char['max_hp']              ?? 0 );
+		$hp         = (int) ( $char['hp']                  ?? 0 );
 		$mp         = (int) ( $char['mp']                  ?? 0 );
 		$gold       = (int) ( $char['gold']                ?? 0 );
 		$loc_name   = esc_html( $location['location_name'] ?? 'Unknown location' );
@@ -130,7 +133,7 @@ PROMPT;
 		$entropy    = (int) ( $world['entropy']            ?? 0 );
 		$w_tags     = esc_html( $world['globaltag1']       ?? '' );
 
-		$block_b  = "AGENT: {$char_name} | HP: {$hp}/{$hp_max} | MP: {$mp} | Gold: {$gold}g\n";
+		$block_b  = "AGENT: {$char_name} | HP: {$hp} | MP: {$mp} | Gold: {$gold}g\n";
 		$block_b .= "LOCATION: {$loc_name} | TAGS: {$loc_tags}\n";
 		if ( $loc_prompt ) $block_b .= "LOCATION CONTEXT: {$loc_prompt}\n";
 		$block_b .= "WORLD: Entropy {$entropy}/100 | {$w_tags}";
@@ -158,22 +161,64 @@ PROMPT;
 	// HISTORY
 	// =========================================================
 
+	/**
+	 * Load recent conversation history for a channel.
+	 *
+	 * BUG 24 FIX: The previous implementation used tw_supabase_get() which
+	 * sends only the anon key. cyber_chat_messages is protected by RLS policies
+	 * that require auth.uid() — the anon key with no JWT is blocked, so history
+	 * always returned []. We now use a direct wp_remote_get() with the service
+	 * key (same pattern as log_tokens), which bypasses RLS on the server side.
+	 * The service key is never sent to the browser.
+	 *
+	 * @param string $channel_id
+	 * @return array  Ordered oldest-first, roles mapped to Claude format.
+	 */
 	private function get_history( string $channel_id ): array {
-		if ( ! $channel_id || ! function_exists( 'tw_supabase_get' ) ) {
+		if ( ! $channel_id ) {
 			return [];
 		}
 
-		// message_type stores 'player' and 'gm' — map to Claude roles after fetch.
-		// The column is message_type, not role.
-		$rows = tw_supabase_get( 'cyber_chat_messages', [
-			'channel_id'   => 'eq.' . $channel_id,
-			'message_type' => 'in.(player,gm)',
-			'order'        => 'created_at.desc',
-			'limit'        => $this->history_len,
-			'select'       => 'message_type,content',
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
+			error_log( '[NW_Chat_Claude] get_history: tw_supabase_url or tw_supabase_service_key not available.' );
+			return [];
+		}
+
+		$service_key = tw_supabase_service_key();
+
+		$url = add_query_arg(
+			[
+				'channel_id'   => 'eq.' . $channel_id,
+				'message_type' => 'in.(player,gm)',
+				'order'        => 'created_at.desc',
+				'limit'        => (string) $this->history_len,
+				'select'       => 'message_type,content',
+			],
+			trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_chat_messages'
+		);
+
+		$response = wp_remote_get( $url, [
+			'headers' => [
+				'apikey'        => $service_key,
+				'Authorization' => 'Bearer ' . $service_key,
+				'Content-Type'  => 'application/json',
+			],
+			'timeout' => 10,
 		] );
 
-		if ( is_wp_error( $rows ) || ! is_array( $rows ) ) {
+		if ( is_wp_error( $response ) ) {
+			error_log( '[NW_Chat_Claude] get_history wp_remote_get error: ' . $response->get_error_message() );
+			return [];
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( $code < 200 || $code >= 300 ) {
+			error_log( '[NW_Chat_Claude] get_history HTTP ' . $code . ': ' . wp_remote_retrieve_body( $response ) );
+			return [];
+		}
+
+		$rows = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $rows ) ) {
 			return [];
 		}
 
@@ -229,10 +274,24 @@ PROMPT;
 	// tw_supabase_request() (anon key) — cyber_token_ledger wymaga
 	// uprawnień serwera, nie gracza.
 	// =========================================================
+
+	/**
+	 * Write token usage to cyber_token_ledger.
+	 *
+	 * BUG 25 FIX: tw_supabase_service_key() was called twice inline —
+	 * once for 'apikey' and once for 'Authorization'. Assigned to a
+	 * local variable first to avoid the double function call.
+	 *
+	 * @param array  $usage
+	 * @param array  $ctx
+	 * @param string $protocol
+	 */
 	private function log_tokens( array $usage, array $ctx, string $protocol ): void {
 		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			return;
 		}
+
+		$service_key = tw_supabase_service_key();
 
 		$url  = trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_token_ledger';
 		$body = [
@@ -249,8 +308,8 @@ PROMPT;
 
 		$response = wp_remote_post( $url, [
 			'headers' => [
-				'apikey'        => tw_supabase_service_key(),
-				'Authorization' => 'Bearer ' . tw_supabase_service_key(),
+				'apikey'        => $service_key,
+				'Authorization' => 'Bearer ' . $service_key,
 				'Content-Type'  => 'application/json',
 				'Prefer'        => 'return=minimal',
 			],
