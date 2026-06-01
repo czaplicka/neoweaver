@@ -23,7 +23,7 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			return '<div class="echo-stream-container">// ERROR: CHARACTER RESOLVER OFFLINE</div>';
 		}
 
-		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_service_key' ) ) {
 			return '<div class="echo-stream-container">// ERROR: SUPABASE CONFIG OFFLINE</div>';
 		}
 
@@ -43,8 +43,11 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 			return '<div class="echo-stream-container">// ERROR: INVALID CHARACTER IDENTIFIER</div>';
 		}
 
-		$cache_key = 'tw_echo_tags_' . md5( $safe_id );
-		$rows      = get_transient( $cache_key );
+		// BUG 17 fix — cache key scoped to wp_user_id so two users never share a cache entry.
+		// TTL set to 0 (no cache) so GM tag changes via Make.com are reflected immediately.
+		$wp_user_id = get_current_user_id();
+		$cache_key  = 'tw_echo_tags_' . md5( $safe_id . '_u' . $wp_user_id );
+		$rows       = get_transient( $cache_key );
 
 		if ( false === $rows ) {
 			$endpoint = add_query_arg(
@@ -55,18 +58,21 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 				trailingslashit( tw_supabase_url() ) . 'rest/v1/cyber_character_complete_tags'
 			);
 
-			$anon_key = tw_supabase_anon_key();
+			// BUG 16 fix — use service-role key so RLS (auth.uid() checks) is bypassed
+			// for this server-side read. The anon key was causing empty results when the
+			// view policy requires an authenticated user JWT.
+			$service_key = tw_supabase_service_key();
 
-			if ( empty( $anon_key ) ) {
-				return '<div class="echo-stream-container">// ERROR: SUPABASE KEY MISSING</div>';
+			if ( empty( $service_key ) ) {
+				return '<div class="echo-stream-container">// ERROR: SUPABASE SERVICE KEY MISSING</div>';
 			}
 
 			$response = wp_remote_get(
 				$endpoint,
 				[
 					'headers' => [
-						'apikey'        => $anon_key,
-						'Authorization' => 'Bearer ' . $anon_key,
+						'apikey'        => $service_key,
+						'Authorization' => 'Bearer ' . $service_key,
 						'Content-Type'  => 'application/json',
 					],
 					'timeout' => 10,
@@ -90,7 +96,8 @@ if ( ! function_exists( 'tw_character_echo_shortcode' ) ) {
 				$rows = [];
 			}
 
-			set_transient( $cache_key, $rows, 30 );
+			// TTL = 0 → no caching; tags must always reflect the live GM state.
+			set_transient( $cache_key, $rows, 0 );
 		}
 
 		$groups = [
