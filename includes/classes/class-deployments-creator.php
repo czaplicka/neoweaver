@@ -10,7 +10,9 @@
  * never outputs HTML, and knows nothing about the multi-step wizard UI.
  * Rendering lives in Neoweaver_Public::shortcode_campaign_creator().
  *
- * ARCHITECTURAL RULES (do not violate):\n *  - Never modify Node Entropy or any Agent Echo tag from here.\n *    All world-state changes must go through the tag pipeline.
+ * ARCHITECTURAL RULES (do not violate):
+ *  - Never modify Node Entropy or any Agent Echo tag from here.
+ *    All world-state changes must go through the tag pipeline.
  *  - Table names are fixed: cyber_campaign, cyber_campaign_worlds,
  *    cyber_campaign_characters. Do not alias or rename them.
  *  - Column names sent to Supabase must exactly match the existing schema
@@ -35,14 +37,22 @@ class Neoweaver_Deployments_Creator {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Supabase REST headers using SERVICE KEY for server-side writes.
+	 * Supabase REST headers using SERVICE KEY.
 	 *
-	 * All methods in this class perform server-side INSERTs that must bypass
-	 * RLS. The service key is used exclusively here on the PHP/server side and
-	 * is never exposed to the browser.
+	 * BUG 26 FIX: The previous implementation had two header methods:
+	 *   headers()       — service key, used for POSTs
+	 *   read_headers()  — anon key, used for GETs
 	 *
-	 * Falls back to anon key with an error_log warning if the service key
-	 * constant is not defined (misconfigured wp-config.php).
+	 * read_headers() (anon key, no user JWT) was used for all ownership/existence
+	 * GET checks. If RLS on cyber_campaign or cyber_campaign_worlds requires the
+	 * `authenticated` role, the anon key request is blocked and returns [] —
+	 * meaning every ownership check silently passes as "not found" without ever
+	 * blocking anything. This is a security hole: a user could link any world or
+	 * character regardless of ownership.
+	 *
+	 * Fix: all server-side reads (existence/ownership checks) now use the service
+	 * key, which bypasses RLS on the server side. The service key is never sent
+	 * to the browser. read_headers() is removed — there is only one header method.
 	 *
 	 * @return array<string,string>
 	 */
@@ -65,23 +75,6 @@ class Neoweaver_Deployments_Creator {
 	}
 
 	/**
-	 * Read-only headers using ANON KEY for GET requests.
-	 *
-	 * GET requests (existence checks, fetches) should use the anon key so
-	 * that RLS read policies apply normally.
-	 *
-	 * @return array<string,string>
-	 */
-	private function read_headers(): array {
-		$key = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
-		return [
-			'apikey'        => $key,
-			'Authorization' => 'Bearer ' . $key,
-			'Content-Type'  => 'application/json',
-		];
-	}
-
-	/**
 	 * Build a full Supabase REST table URL with optional query-string args.
 	 *
 	 * @param string               $table  Full table name, e.g. 'cyber_campaign'.
@@ -96,20 +89,26 @@ class Neoweaver_Deployments_Creator {
 
 	/**
 	 * Execute a GET and return the decoded JSON body as an array.
-	 * Uses anon key — reads respect RLS policies.
-	 * Returns [] and logs on any error.
+	 *
+	 * BUG 26 FIX: Uses service key (via headers()) instead of the removed
+	 * read_headers() anon-key method. Server-side ownership/existence checks
+	 * must use the service key to bypass RLS; anon key without a user JWT is
+	 * blocked by any policy that requires auth.uid().
+	 *
+	 * Also accepts any 2xx status code (not just 200) to match PostgREST
+	 * behaviour on some Supabase configurations.
 	 *
 	 * @param string $url
 	 * @return array
 	 */
 	private function get_json( string $url ): array {
-		$res = wp_remote_get( $url, [ 'headers' => $this->read_headers(), 'timeout' => 15 ] );
+		$res = wp_remote_get( $url, [ 'headers' => $this->headers(), 'timeout' => 15 ] );
 		if ( is_wp_error( $res ) ) {
 			error_log( 'TW Deployments GET error [' . $url . ']: ' . $res->get_error_message() );
 			return [];
 		}
-		$code = wp_remote_retrieve_response_code( $res );
-		if ( $code !== 200 ) {
+		$code = (int) wp_remote_retrieve_response_code( $res );
+		if ( $code < 200 || $code >= 300 ) {
 			error_log( 'TW Deployments GET HTTP ' . $code . ' [' . $url . ']: ' . wp_remote_retrieve_body( $res ) );
 			return [];
 		}
@@ -142,9 +141,9 @@ class Neoweaver_Deployments_Creator {
 			return null;
 		}
 
-		$code = wp_remote_retrieve_response_code( $res );
+		$code = (int) wp_remote_retrieve_response_code( $res );
 		// Supabase returns 201 for a successful INSERT with return=representation.
-		if ( ! in_array( (int) $code, array( 200, 201 ), true ) ) {
+		if ( $code < 200 || $code >= 300 ) {
 			error_log( 'TW Deployments POST HTTP ' . $code . ' [' . $url . ']: ' . wp_remote_retrieve_body( $res ) );
 			return null;
 		}
@@ -158,11 +157,6 @@ class Neoweaver_Deployments_Creator {
 
 	/**
 	 * Sanitize a UUID or integer ID for safe use in a Supabase REST payload.
-	 *
-	 * cyber_worlds.id and cyber_characters.id are UUID strings. Passing them
-	 * as PHP int (or casting with intval()) collapses every UUID to 0, breaking
-	 * FK constraints on insert. Strip everything except alphanumerics and
-	 * hyphens — safe for both UUID v4 and legacy integer IDs.
 	 *
 	 * @param  mixed $raw_id
 	 * @return string  Sanitized ID, or '' if nothing valid remains.
@@ -181,18 +175,13 @@ class Neoweaver_Deployments_Creator {
 	 * Checks:
 	 *  1. Required fields are present and non-empty:
 	 *     wp_user_id, name, game_mode, gm_style, game_length, priority.
-	 *     (world_type is intentionally excluded — it is set during world linkage,
-	 *     not at campaign creation time, and is nullable in cyber_campaign.)
 	 *  2. Deployment name is a non-empty string.
 	 *  3. Numeric fields (game_mode, game_length, priority) are > 0.
 	 *
-	 * Returns true on success, WP_Error with a descriptive code on failure.
-	 *
-	 * @param array $data  Sanitised deployment data, keyed as per cyber_campaign columns.
+	 * @param array $data
 	 * @return true|WP_Error
 	 */
 	public function validate( array $data ) {
-		// Required field keys (world_type excluded — nullable, set during linkage).
 		$required = [ 'wp_user_id', 'name', 'game_mode', 'gm_style', 'game_length', 'priority' ];
 		foreach ( $required as $field ) {
 			if ( ! isset( $data[ $field ] ) || $data[ $field ] === '' ) {
@@ -203,12 +192,10 @@ class Neoweaver_Deployments_Creator {
 			}
 		}
 
-		// Name must not be blank after trimming.
 		if ( ! is_string( $data['name'] ) || trim( $data['name'] ) === '' ) {
 			return new WP_Error( 'invalid_name', 'Deployment name cannot be empty.' );
 		}
 
-		// Numeric range guards for selectable fields (1–5 per UI).
 		$numeric_fields = [ 'game_mode', 'game_length', 'priority' ];
 		foreach ( $numeric_fields as $field ) {
 			if ( (int) $data[ $field ] < 1 ) {
@@ -229,14 +216,7 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Insert the base cyber_campaign row.
 	 *
-	 * Column names and values exactly mirror the JS payload from the original
-	 * shortcode — do not change them without updating the DB schema first:
-	 *   wp_user_id, name, game_mode, world_type, gm_style, customize,
-	 *   is_active, game_length, priority.
-	 *
-	 * Returns the newly created campaign UUID string on success, or null.
-	 *
-	 * @param array $data  Sanitised deployment data.
+	 * @param array $data
 	 * @return string|null  New campaign ID (UUID), or null on failure.
 	 */
 	public function insert_campaign_row( array $data ): ?string {
@@ -266,19 +246,10 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Link a world (Node) to the deployment in cyber_campaign_worlds.
 	 *
-	 * BUG-FIX: $world_id was typed as int and passed directly to Supabase.
-	 * cyber_worlds.id is a UUID string — intval() on a UUID collapses it to 0,
-	 * causing the FK constraint to reject the insert or store a corrupt value.
-	 * The parameter is now typed as string|int and run through sanitize_id()
-	 * before use. Callers in create() are updated accordingly.
-	 *
-	 * BUG-FIX 2: payload key was 'creator_wp_id' but the table column is
-	 * 'wp_user_id'. Changed to match the actual schema.
-	 *
-	 * @param string      $campaign_id    UUID of the newly created campaign.
-	 * @param string|int  $world_id       Supabase primary key (UUID) of cyber_worlds.
-	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
-	 * @return bool  true on success, false on failure.
+	 * @param string      $campaign_id
+	 * @param string|int  $world_id
+	 * @param int         $creator_wp_id
+	 * @return bool
 	 */
 	public function link_world( string $campaign_id, $world_id, int $creator_wp_id ): bool {
 		$safe_world_id = $this->sanitize_id( $world_id );
@@ -308,19 +279,10 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Link a Field Agent to the deployment in cyber_campaign_characters.
 	 *
-	 * BUG-FIX: $character_id was typed as int and passed directly to Supabase.
-	 * cyber_characters.id is a UUID string — intval() on a UUID collapses it
-	 * to 0, causing the FK constraint to reject the insert or store a corrupt
-	 * value. The parameter is now typed as string|int and run through
-	 * sanitize_id() before use. Callers in create() are updated accordingly.
-	 *
-	 * BUG-FIX 2: payload key was 'creator_wp_id' but the table column is
-	 * 'wp_user_id'. Changed to match the actual schema.
-	 *
-	 * @param string      $campaign_id    UUID of the newly created campaign.
-	 * @param string|int  $character_id   Supabase primary key (UUID) of cyber_characters.
-	 * @param int         $creator_wp_id  WordPress user ID of the campaign creator.
-	 * @return bool  true on success, false on failure.
+	 * @param string      $campaign_id
+	 * @param string|int  $character_id
+	 * @param int         $creator_wp_id
+	 * @return bool
 	 */
 	public function link_character( string $campaign_id, $character_id, int $creator_wp_id ): bool {
 		$safe_character_id = $this->sanitize_id( $character_id );
@@ -354,36 +316,26 @@ class Neoweaver_Deployments_Creator {
 	/**
 	 * Run the full deployment creation pipeline.
 	 *
-	 * Steps (in order):
-	 *  1. validate() — returns WP_Error on failure (bubbled up as null here).
-	 *  2. insert_campaign_row() — abort on null.
-	 *  3. link_world()     — only when $world_id is not null; non-fatal.
-	 *  4. link_character() — only when $character_id is not null; non-fatal.
-	 *  5. Fire 'neoweaver_campaign_created' action hook.
-	 *  6. Return $campaign_id.
+	 * Steps:
+	 *  1. validate()
+	 *  2. insert_campaign_row()
+	 *  3. link_world()     — optional, non-fatal on failure
+	 *  4. link_character() — optional, non-fatal on failure
+	 *  5. Fire 'neoweaver_campaign_created' action hook
+	 *  6. Return $campaign_id
 	 *
-	 * link_world and link_character failures are logged but do not abort
-	 * the pipeline — the deployment row itself already exists by that point
-	 * and unlinking is recoverable from the admin side.
-	 *
-	 * BUG-FIX: $world_id and $character_id are now string|null (UUID) instead
-	 * of int|null, matching the actual Supabase column types. Callers that
-	 * previously cast these to int before passing them here must stop doing so.
-	 *
-	 * @param array            $data          Sanitised deployment data (all required fields).
-	 * @param string|int|null  $world_id      Optional: link this Node to the deployment.
-	 * @param string|int|null  $character_id  Optional: link this Field Agent to the deployment.
-	 * @return string|null  New campaign UUID, or null on hard failure.
+	 * @param array            $data
+	 * @param string|int|null  $world_id
+	 * @param string|int|null  $character_id
+	 * @return string|null
 	 */
 	public function create( array $data, $world_id = null, $character_id = null ): ?string {
-		// 1. Validate.
 		$valid = $this->validate( $data );
 		if ( is_wp_error( $valid ) ) {
 			error_log( 'TW Deployments: validate() failed — ' . $valid->get_error_message() );
 			return null;
 		}
 
-		// 2. Insert campaign row.
 		$campaign_id = $this->insert_campaign_row( $data );
 		if ( ! $campaign_id ) {
 			return null;
@@ -391,17 +343,14 @@ class Neoweaver_Deployments_Creator {
 
 		$creator_wp_id = intval( $data['wp_user_id'] );
 
-		// 3. Optionally link a world / Node.
 		if ( $world_id !== null ) {
 			$this->link_world( $campaign_id, $world_id, $creator_wp_id );
 		}
 
-		// 4. Optionally link a Field Agent.
 		if ( $character_id !== null ) {
 			$this->link_character( $campaign_id, $character_id, $creator_wp_id );
 		}
 
-		// 5. Fire action hook for dispatcher and other listeners.
 		do_action( 'neoweaver_campaign_created', $campaign_id, $data );
 
 		return $campaign_id;
