@@ -1,921 +1,701 @@
 <?php
 /**
- * NeoWeaver — Deck Admin
+ * NeoWeaver — Deck (Cards) Admin Page
  *
- * Manages cyber_deck table.
- * Instantiated exclusively by NW_Admin_Bootstrap.
+ * Zarządza tabelą cyber_deck. Wzorowane na admin/containers.
  *
  * @package NeoWeaver
  */
 
+declare( strict_types=1 );
+
 if ( ! defined( 'ABSPATH' ) ) {
-	exit;
+    exit;
 }
 
-if ( class_exists( 'NW_Deck_Admin', false ) ) {
-	return;
-}
-
-class NW_Deck_Admin {
-
-	private string $page_slug = 'neoweaver-deck';
-
-	private const CATEGORIES = [ 'magic', 'combat', 'action', 'social', 'equipment', 'tech' ];
-	private const RARITIES   = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
-
-	/** Typy bonusów dostępne w edytorze asc_bonuses */
-	private const BONUS_TYPES = [
-		'damage'        => 'Damage',
-		'defense'       => 'Defense',
-		'xp_gain'       => 'XP Gain',
-		'hp_max'        => 'Max HP',
-		'hp_regen'      => 'HP Regen',
-		'mana_max'      => 'Max Mana',
-		'mana_regen'    => 'Mana Regen',
-		'speed'         => 'Speed',
-		'crit_chance'   => 'Crit Chance %',
-		'unlock_effect' => 'Unlock Effect (special)',
-	];
-
-	public function __construct() {
-		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-
-		add_action( 'wp_ajax_nw_deck_list',   [ $this, 'ajax_list' ] );
-		add_action( 'wp_ajax_nw_deck_get',    [ $this, 'ajax_get' ] );
-		add_action( 'wp_ajax_nw_deck_save',   [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_deck_toggle', [ $this, 'ajax_toggle' ] );
-		add_action( 'wp_ajax_nw_deck_delete', [ $this, 'ajax_delete' ] );
-	}
-
-	public function register_menu(): void {
-		add_submenu_page(
-			'neoweaver',
-			__( 'NeoWeaver — Deck', 'neoweaver' ),
-			__( '🃏 Deck', 'neoweaver' ),
-			'manage_options',
-			$this->page_slug,
-			[ $this, 'render_page' ]
-		);
-	}
-
-	public function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
-			return;
-		}
-
-		wp_enqueue_style(
-			'nw-admin-core',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/admin-core.css',
-			[ 'nw-font-chakra-petch' ],
-			NEOWEAVER_VERSION
-		);
-
-		wp_enqueue_style(
-			'nw-deck-style',
-			NEOWEAVER_PLUGIN_URL . 'assets/css/admin/deck.css',
-			[ 'nw-font-chakra-petch', 'nw-admin-core' ],
-			NEOWEAVER_VERSION
-		);
-
-		wp_enqueue_script(
-			'nw-deck-script',
-			NEOWEAVER_PLUGIN_URL . 'assets/js/admin/deck.js',
-			[ 'jquery', 'nw-lucide' ],
-			NEOWEAVER_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			'nw-deck-script',
-			'NWDeck',
-			[
-				'ajaxurl'    => admin_url( 'admin-ajax.php' ),
-				'nonce'      => wp_create_nonce( 'neoweaver_deck' ),
-				'categories' => self::CATEGORIES,
-				'bonusTypes' => self::BONUS_TYPES,
-			]
-		);
-	}
-
-	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
-		$method = strtoupper( $method );
-
-		if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
-			[ $table, $qs ] = array_pad( explode( '?', ltrim( $endpoint, '/' ), 2 ), 2, '' );
-			$query = [];
-
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-
-			$data = tw_supabase_get( $table, $query );
-
-			if ( ! is_array( $data ) ) {
-				return [
-					'ok'    => false,
-					'code'  => 0,
-					'data'  => null,
-					'error' => 'tw_supabase_get returned non-array',
-				];
-			}
-
-			if ( isset( $data['code'], $data['message'] ) ) {
-				return [
-					'ok'    => false,
-					'code'  => (int) $data['code'],
-					'data'  => null,
-					'error' => $data['message'],
-				];
-			}
-
-			return [
-				'ok'    => true,
-				'code'  => 200,
-				'data'  => $data,
-				'error' => null,
-			];
-		}
-
-		if ( function_exists( 'tw_supabase_request' ) ) {
-			[ $table, $qs ] = array_pad( explode( '?', ltrim( $endpoint, '/' ), 2 ), 2, '' );
-			$query = [];
-
-			if ( $qs ) {
-				parse_str( $qs, $query );
-			}
-
-			$extra_args = [];
-
-			if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
-				$extra_args['headers']['Prefer'] = 'return=representation';
-			}
-
-			if ( ! empty( $extra_headers ) ) {
-				$extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
-			}
-
-			$res = tw_supabase_request(
-				$method,
-				$table,
-				$query,
-				empty( $body ) ? null : $body,
-				$extra_args
-			);
-
-			$ok   = $res['ok']   ?? false;
-			$code = $res['code'] ?? 0;
-			$data = $res['data'] ?? null;
-
-			if ( ! $ok ) {
-				$msg = is_array( $data )
-					? ( $data['message'] ?? 'Supabase error ' . $code )
-					: 'Supabase error ' . $code;
-
-				return [
-					'ok'    => false,
-					'code'  => $code,
-					'data'  => $data,
-					'error' => $msg,
-				];
-			}
-
-			return [
-				'ok'    => true,
-				'code'  => $code,
-				'data'  => $data,
-				'error' => null,
-			];
-		}
-
-		return [
-			'ok'    => false,
-			'code'  => 0,
-			'data'  => null,
-			'error' => 'Supabase helper functions not available.',
-		];
-	}
-
-	private function is_uuid( string $value ): bool {
-		return (bool) preg_match(
-			'/^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[1-5][0-9a-fA-F]{3}\-[89abAB][0-9a-fA-F]{3}\-[0-9a-fA-F]{12}$/',
-			$value
-		);
-	}
-
-	private function get_uuid_from_post( string $key = 'id' ): string {
-		$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ?? '' ) );
-
-		if ( ! $value || ! $this->is_uuid( $value ) ) {
-			return '';
-		}
-
-		return $value;
-	}
-
-	private function parse_json_array_field( $value ): array {
-		if ( is_array( $value ) ) {
-			$items = $value;
-		} else {
-			$value = trim( (string) $value );
-
-			if ( '' === $value ) {
-				return [];
-			}
-
-			$decoded = json_decode( $value, true );
-
-			if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
-				$items = $decoded;
-			} else {
-				$items = array_map( 'trim', explode( ',', $value ) );
-			}
-		}
-
-		$items = array_map( 'sanitize_text_field', $items );
-		$items = array_values( array_filter( array_unique( $items ), static fn( $v ) => '' !== $v ) );
-
-		return $items;
-	}
-
-	private function parse_json_object_field( $value ): array {
-		if ( is_array( $value ) ) {
-			return $value;
-		}
-
-		$value = trim( (string) $value );
-
-		if ( '' === $value ) {
-			return [];
-		}
-
-		$decoded = json_decode( $value, true );
-
-		return ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) ? $decoded : [];
-	}
-
-	private function maybe_null_text( $value ): ?string {
-		$value = trim( sanitize_text_field( (string) $value ) );
-		return '' === $value ? null : $value;
-	}
-
-	private function maybe_null_textarea( $value ): ?string {
-		$value = trim( sanitize_textarea_field( (string) $value ) );
-		return '' === $value ? null : $value;
-	}
-
-	private function maybe_uuid( $value ): ?string {
-		$value = trim( sanitize_text_field( (string) $value ) );
-
-		if ( '' === $value ) {
-			return null;
-		}
-
-		return $this->is_uuid( $value ) ? $value : null;
-	}
-
-	/**
-	 * Parsuje asc_bonuses z POST.
-	 * Oczekuje JSON obiektu: {"1":[{"type":"damage","value":10}], "3":[...]}.
-	 * Zwraca null jeśli puste, tablicę po walidacji jeśli wypełnione.
-	 */
-	private function parse_asc_bonuses( $raw ): ?array {
-		$raw = trim( (string) $raw );
-
-		if ( '' === $raw ) {
-			return null;
-		}
-
-		$decoded = json_decode( $raw, true );
-
-		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
-			return null;
-		}
-
-		$allowed_types = array_keys( self::BONUS_TYPES );
-		$clean = [];
-
-		foreach ( $decoded as $level => $bonuses ) {
-			$level_int = (int) $level;
-
-			if ( $level_int < 1 || $level_int > 20 ) {
-				continue;
-			}
-
-			if ( ! is_array( $bonuses ) ) {
-				continue;
-			}
-
-			$level_bonuses = [];
-
-			foreach ( $bonuses as $bonus ) {
-				if ( ! is_array( $bonus ) ) {
-					continue;
-				}
-
-				$type = sanitize_text_field( $bonus['type'] ?? '' );
-
-				if ( ! in_array( $type, $allowed_types, true ) ) {
-					continue;
-				}
-
-				$entry = [ 'type' => $type ];
-
-				if ( 'unlock_effect' !== $type ) {
-					$entry['value'] = (int) ( $bonus['value'] ?? 0 );
-				}
-
-				if ( isset( $bonus['special'] ) ) {
-					$entry['special'] = sanitize_text_field( $bonus['special'] );
-				}
-
-				$level_bonuses[] = $entry;
-			}
-
-			if ( ! empty( $level_bonuses ) ) {
-				$clean[ (string) $level_int ] = $level_bonuses;
-			}
-		}
-
-		return empty( $clean ) ? null : $clean;
-	}
-
-	public function render_page(): void {
-		$bonus_types_options = '';
-		foreach ( self::BONUS_TYPES as $val => $label ) {
-			$bonus_types_options .= sprintf(
-				'<option value="%s">%s</option>',
-				esc_attr( $val ),
-				esc_html( $label )
-			);
-		}
-		?>
-		<div class="wrap nw-deck-admin">
-			<h1><?php esc_html_e( 'NeoWeaver — Deck', 'neoweaver' ); ?></h1>
-
-			<div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
-				<select id="nw-deck-filter-category">
-					<option value=""><?php esc_html_e( 'All categories', 'neoweaver' ); ?></option>
-					<?php foreach ( self::CATEGORIES as $c ) : ?>
-						<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( ucfirst( $c ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-deck-filter-rarity">
-					<option value=""><?php esc_html_e( 'All rarities', 'neoweaver' ); ?></option>
-					<?php foreach ( self::RARITIES as $r ) : ?>
-						<option value="<?php echo esc_attr( $r ); ?>"><?php echo esc_html( ucfirst( $r ) ); ?></option>
-					<?php endforeach; ?>
-				</select>
-
-				<select id="nw-deck-filter-active">
-					<option value=""><?php esc_html_e( 'All statuses', 'neoweaver' ); ?></option>
-					<option value="1"><?php esc_html_e( 'Active', 'neoweaver' ); ?></option>
-					<option value="0"><?php esc_html_e( 'Inactive', 'neoweaver' ); ?></option>
-				</select>
-
-				<input type="text" id="nw-deck-search" placeholder="<?php esc_attr_e( 'Search name…', 'neoweaver' ); ?>" style="width:200px;" class="regular-text">
-				<button class="button" id="nw-deck-filter-btn"><?php esc_html_e( 'Filter', 'neoweaver' ); ?></button>
-				<button class="button button-primary" id="nw-deck-add-btn"><?php esc_html_e( '+ Add Card', 'neoweaver' ); ?></button>
-			</div>
-
-			<table class="wp-list-table widefat fixed striped" id="nw-deck-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Image', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Name', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Category', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Type', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Active', 'neoweaver' ); ?></th>
-						<th><?php esc_html_e( 'Actions', 'neoweaver' ); ?></th>
-					</tr>
-				</thead>
-				<tbody id="nw-deck-tbody">
-					<tr><td colspan="7"><?php esc_html_e( 'Loading…', 'neoweaver' ); ?></td></tr>
-				</tbody>
-			</table>
-
-			<div id="nw-deck-modal" class="nw-deck-modal-overlay" style="display:none;">
-				<div class="nw-deck-modal-panel">
-					<button id="nw-deck-modal-close" style="position:absolute; top:12px; right:12px; font-size:20px;">✕</button>
-					<h2 id="nw-deck-modal-title"><?php esc_html_e( 'Card', 'neoweaver' ); ?></h2>
-
-					<input type="hidden" id="nw-deck-id">
-
-					<table class="form-table">
-						<tr>
-							<th><label for="nw-deck-name"><?php esc_html_e( 'Name *', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-name" class="regular-text" required></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-type"><?php esc_html_e( 'Type', 'neoweaver' ); ?></label></th>
-							<td>
-								<select id="nw-deck-type">
-									<option value=""><?php esc_html_e( '— select —', 'neoweaver' ); ?></option>
-								</select>
-								<p class="description" id="nw-deck-type-category-hint"></p>
-							</td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-rarity"><?php esc_html_e( 'Rarity', 'neoweaver' ); ?></label></th>
-							<td>
-								<select id="nw-deck-rarity">
-									<?php foreach ( self::RARITIES as $r ) : ?>
-										<option value="<?php echo esc_attr( $r ); ?>"><?php echo esc_html( ucfirst( $r ) ); ?></option>
-									<?php endforeach; ?>
-								</select>
-							</td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-description"><?php esc_html_e( 'Description', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-description" rows="3" class="large-text"></textarea></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-effect"><?php esc_html_e( 'Effect', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-effect" rows="3" class="large-text"></textarea></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-mechanic"><?php esc_html_e( 'Mechanic', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-mechanic" class="regular-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-mechanic-goal"><?php esc_html_e( 'Mechanic Goal', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-mechanic-goal" class="regular-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-cost-label"><?php esc_html_e( 'Cost Label', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-cost-label" class="regular-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-cost-number"><?php esc_html_e( 'Cost Number', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-cost-number" min="0" value="0" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-time-cost-minutes"><?php esc_html_e( 'Time Cost Minutes', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-time-cost-minutes" min="0" value="0" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-cooldown-messages"><?php esc_html_e( 'Cooldown Messages', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-cooldown-messages" min="0" value="0" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-entropy-on-fail"><?php esc_html_e( 'Entropy on Fail', 'neoweaver' ); ?></label></th>
-							<td><input type="number" id="nw-deck-entropy-on-fail" min="0" value="0" style="width:80px;"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-bonus"><?php esc_html_e( 'Bonus JSON', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-bonus" rows="3" class="large-text" placeholder='{"damage":2}'></textarea></td>
-						</tr>
-
-						<!-- ═══════════════════════════════════════════════
-						     ASCENSION BONUSES — visual per-level editor
-						     ═══════════════════════════════════════════════ -->
-						<tr>
-							<th style="vertical-align:top; padding-top:14px;">
-								<?php esc_html_e( 'Ascension Bonuses', 'neoweaver' ); ?>
-								<p class="description" style="font-weight:normal;"><?php esc_html_e( 'Bonuses per ascension level (1–20).', 'neoweaver' ); ?></p>
-							</th>
-							<td>
-								<div id="nw-asc-levels-wrap" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;">
-									<!-- JS wstrzyknie wiersze poziomów tutaj -->
-								</div>
-								<button type="button" class="button" id="nw-asc-add-level">
-									+ <?php esc_html_e( 'Add level', 'neoweaver' ); ?>
-								</button>
-								<!-- hidden field przechowuje skompilowany JSON -->
-								<input type="hidden" id="nw-deck-asc-bonuses">
-								<details style="margin-top:8px;">
-									<summary style="cursor:pointer; color:#888; font-size:12px;"><?php esc_html_e( 'Raw JSON (read-only preview)', 'neoweaver' ); ?></summary>
-									<pre id="nw-asc-json-preview" style="background:#f0f0f0; padding:8px; font-size:11px; overflow:auto; max-height:120px;"></pre>
-								</details>
-							</td>
-						</tr>
-						<!-- ═══════════════════════════════════════════════ -->
-
-						<tr>
-							<th><label for="nw-deck-tags"><?php esc_html_e( 'Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-tags" class="large-text" placeholder="comma,separated,tags"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-requirement-tags"><?php esc_html_e( 'Requirement Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-requirement-tags" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-denied-tags"><?php esc_html_e( 'Denied Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-denied-tags" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-required-item-tags"><?php esc_html_e( 'Required Item Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-required-item-tags" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-required-location-tags"><?php esc_html_e( 'Required Location Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-required-location-tags" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-denied-location-tags"><?php esc_html_e( 'Denied Location Tags', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-denied-location-tags" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-requirement-description"><?php esc_html_e( 'Requirement Description', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-requirement-description" rows="3" class="large-text"></textarea></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-ai-instruction"><?php esc_html_e( 'AI Instruction', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-ai-instruction" rows="3" class="large-text"></textarea></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-gm"><?php esc_html_e( 'GM Notes', 'neoweaver' ); ?></label></th>
-							<td><textarea id="nw-deck-gm" rows="3" class="large-text"></textarea></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-sound-effect"><?php esc_html_e( 'Sound Effect URL', 'neoweaver' ); ?></label></th>
-							<td><input type="url" id="nw-deck-sound-effect" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-img-url"><?php esc_html_e( 'Image URL', 'neoweaver' ); ?></label></th>
-							<td><input type="url" id="nw-deck-img-url" class="large-text"></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Preview', 'neoweaver' ); ?></th>
-							<td>
-								<div id="nw-deck-image-preview-wrap" style="display:none;">
-									<img id="nw-deck-image-preview" src="" alt="">
-								</div>
-							</td>
-						</tr>
-						<tr>
-							<th><label for="nw-deck-class-id"><?php esc_html_e( 'Class ID', 'neoweaver' ); ?></label></th>
-							<td><input type="text" id="nw-deck-class-id" class="regular-text"></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Flags', 'neoweaver' ); ?></th>
-							<td>
-								<label><input type="checkbox" id="nw-deck-is-leveling" checked> <?php esc_html_e( 'Is leveling', 'neoweaver' ); ?></label><br>
-								<label><input type="checkbox" id="nw-deck-is-disposable"> <?php esc_html_e( 'Is disposable', 'neoweaver' ); ?></label><br>
-								<label><input type="checkbox" id="nw-deck-is-active" checked> <?php esc_html_e( 'Is active', 'neoweaver' ); ?></label>
-							</td>
-						</tr>
-					</table>
-
-					<p>
-						<button class="button button-primary" id="nw-deck-save-btn"><?php esc_html_e( 'Save', 'neoweaver' ); ?></button>
-						<button class="button" id="nw-deck-cancel-btn"><?php esc_html_e( 'Cancel', 'neoweaver' ); ?></button>
-						<button class="button button-link-delete" id="nw-deck-delete-btn" style="display:none;"><?php esc_html_e( 'Delete', 'neoweaver' ); ?></button>
-						<span id="nw-deck-msg" style="margin-left:12px;"></span>
-					</p>
-				</div>
-			</div>
-
-			<?php
-			// Template dla wiersza poziomu — używany przez deck.js via innerHTML
-			// data-bonus-types jest tylko do renderowania, JS czyta NWDeck.bonusTypes
-			?>
-			<template id="nw-asc-level-tpl">
-				<div class="nw-asc-level-row" style="border:1px solid #ddd; border-radius:4px; padding:8px; background:#fafafa;">
-					<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-						<strong style="min-width:60px;"><?php esc_html_e( 'Level', 'neoweaver' ); ?></strong>
-						<input type="number" class="nw-asc-level-num" min="1" max="20" value="1" style="width:60px;">
-						<button type="button" class="button nw-asc-add-bonus" style="margin-left:auto;">+ <?php esc_html_e( 'Add bonus', 'neoweaver' ); ?></button>
-						<button type="button" class="button nw-asc-remove-level" style="color:#a00;">✕ <?php esc_html_e( 'Remove level', 'neoweaver' ); ?></button>
-					</div>
-					<div class="nw-asc-bonuses-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-				</div>
-			</template>
-
-			<template id="nw-asc-bonus-tpl">
-				<div class="nw-asc-bonus-row" style="display:flex; align-items:center; gap:6px;">
-					<select class="nw-asc-bonus-type">
-						<?php echo $bonus_types_options; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-					</select>
-					<input type="number" class="nw-asc-bonus-value" placeholder="value" style="width:70px;">
-					<input type="text" class="nw-asc-bonus-special" placeholder="special key (optional)" style="width:140px;">
-					<button type="button" class="button nw-asc-remove-bonus" style="color:#a00;">✕</button>
-				</div>
-			</template>
-		</div>
-
-		<script>
-		(function($){
-			'use strict';
-
-			// ─── ASC BONUSES EDITOR ───────────────────────────────────────
-
-			const wrap    = document.getElementById('nw-asc-levels-wrap');
-			const hidden  = document.getElementById('nw-deck-asc-bonuses');
-			const preview = document.getElementById('nw-asc-json-preview');
-			const lvlTpl  = document.getElementById('nw-asc-level-tpl');
-			const bonTpl  = document.getElementById('nw-asc-bonus-tpl');
-
-			function syncJson() {
-				const result = {};
-				wrap.querySelectorAll('.nw-asc-level-row').forEach(function(row) {
-					const lvl     = parseInt(row.querySelector('.nw-asc-level-num').value, 10);
-					const bonuses = [];
-					row.querySelectorAll('.nw-asc-bonus-row').forEach(function(bRow) {
-						const type    = bRow.querySelector('.nw-asc-bonus-type').value;
-						const valEl   = bRow.querySelector('.nw-asc-bonus-value');
-						const special = bRow.querySelector('.nw-asc-bonus-special').value.trim();
-						const entry   = { type: type };
-						if ( type !== 'unlock_effect' ) {
-							entry.value = parseInt(valEl.value, 10) || 0;
-						}
-						if ( special ) { entry.special = special; }
-						bonuses.push(entry);
-					});
-					if ( lvl >= 1 && lvl <= 20 && bonuses.length ) {
-						result[String(lvl)] = bonuses;
-					}
-				});
-				const json = Object.keys(result).length ? JSON.stringify(result) : '';
-				hidden.value    = json;
-				preview.textContent = json ? JSON.stringify(result, null, 2) : '(empty)';
-			}
-
-			function addBonusRow(listEl, data) {
-				const node = bonTpl.content.cloneNode(true);
-				const row  = node.querySelector('.nw-asc-bonus-row');
-				if ( data ) {
-					row.querySelector('.nw-asc-bonus-type').value = data.type || 'damage';
-					if ( data.value !== undefined ) {
-						row.querySelector('.nw-asc-bonus-value').value = data.value;
-					}
-					if ( data.special ) {
-						row.querySelector('.nw-asc-bonus-special').value = data.special;
-					}
-				}
-				row.querySelector('.nw-asc-remove-bonus').addEventListener('click', function(){
-					row.remove(); syncJson();
-				});
-				row.querySelectorAll('input, select').forEach(function(el){
-					el.addEventListener('input', syncJson);
-					el.addEventListener('change', syncJson);
-				});
-				listEl.appendChild(node);
-				syncJson();
-			}
-
-			function addLevelRow(level, bonuses) {
-				const node = lvlTpl.content.cloneNode(true);
-				const row  = node.querySelector('.nw-asc-level-row');
-				const numEl = row.querySelector('.nw-asc-level-num');
-				if ( level ) { numEl.value = level; }
-				numEl.addEventListener('input', syncJson);
-				row.querySelector('.nw-asc-remove-level').addEventListener('click', function(){
-					row.remove(); syncJson();
-				});
-				const listEl = row.querySelector('.nw-asc-bonuses-list');
-				row.querySelector('.nw-asc-add-bonus').addEventListener('click', function(){
-					addBonusRow(listEl, null);
-				});
-				if ( bonuses && bonuses.length ) {
-					bonuses.forEach(function(b){ addBonusRow(listEl, b); });
-				}
-				wrap.appendChild(node);
-				syncJson();
-			}
-
-			document.getElementById('nw-asc-add-level').addEventListener('click', function(){
-				addLevelRow(null, null);
-			});
-
-			// Eksponujemy funkcję do ładowania danych z zewnątrz (deck.js)
-			window.NWAscEditor = {
-				load: function(jsonData) {
-					wrap.innerHTML = '';
-					hidden.value  = '';
-					preview.textContent = '(empty)';
-					if ( ! jsonData || typeof jsonData !== 'object' ) { return; }
-					Object.keys(jsonData).sort(function(a,b){ return parseInt(a)-parseInt(b); }).forEach(function(lvl){
-						addLevelRow(parseInt(lvl, 10), jsonData[lvl]);
-					});
-				},
-				get: function() { return hidden.value; }
-			};
-
-		})(jQuery);
-		</script>
-		<?php
-	}
-
-	public function ajax_list(): void {
-		check_ajax_referer( 'neoweaver_deck', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$category = sanitize_text_field( wp_unslash( $_POST['category'] ?? '' ) );
-		$rarity   = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? '' ) );
-		$search   = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
-		$active   = sanitize_text_field( wp_unslash( $_POST['active'] ?? '' ) );
-
-		$select = 'id,name,type,rarity,img_url,is_active,cyber_card_types!cyber_deck_type_fkey(id,label,icon,color,category_id)';
-		$endpoint = 'cyber_deck?select=' . rawurlencode( $select ) . '&order=name.asc';
-
-		if ( $category && in_array( $category, self::CATEGORIES, true ) ) {
-			$endpoint .= '&cyber_card_types.category_id=eq.' . rawurlencode( $category );
-		}
-
-		if ( $rarity && in_array( $rarity, self::RARITIES, true ) ) {
-			$endpoint .= '&rarity=eq.' . rawurlencode( $rarity );
-		}
-
-		if ( '' !== $active ) {
-			$endpoint .= '&is_active=eq.' . ( '1' === $active ? 'true' : 'false' );
-		}
-
-		if ( $search ) {
-			$endpoint .= '&name=ilike.*' . rawurlencode( $search ) . '*';
-		}
-
-		$result = $this->supa( 'GET', $endpoint );
-
-		if ( ! $result['ok'] ) {
-			wp_send_json_error( $result['error'] ?? 'Failed to load deck.' );
-			return;
-		}
-
-		wp_send_json_success( $result['data'] ?? [] );
-	}
-
-	public function ajax_get(): void {
-		check_ajax_referer( 'neoweaver_deck', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID.' );
-			return;
-		}
-
-		$select = rawurlencode( '*,cyber_card_types!cyber_deck_type_fkey(id,label,icon,color,category_id)' );
-		$result = $this->supa(
-			'GET',
-			'cyber_deck?id=eq.' . rawurlencode( $id ) . '&select=' . $select
-		);
-
-		if ( ! $result['ok'] ) {
-			wp_send_json_error( $result['error'] ?? 'Failed to fetch card.' );
-			return;
-		}
-
-		$data = $result['data'] ?? [];
-		wp_send_json_success( is_array( $data ) ? ( $data[0] ?? null ) : null );
-	}
-
-	public function ajax_save(): void {
-		check_ajax_referer( 'neoweaver_deck', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id   = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-
-		if ( ! $name ) {
-			wp_send_json_error( 'Name is required.' );
-			return;
-		}
-
-		if ( $id && ! $this->is_uuid( $id ) ) {
-			wp_send_json_error( 'Invalid ID.' );
-			return;
-		}
-
-		$rarity = sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) );
-
-		if ( ! in_array( $rarity, self::RARITIES, true ) ) {
-			wp_send_json_error( 'Invalid rarity.' );
-			return;
-		}
-
-		$asc_bonuses = $this->parse_asc_bonuses( wp_unslash( $_POST['asc_bonuses'] ?? '' ) );
-
-		$payload = [
-			'name'                    => $name,
-			'description'             => $this->maybe_null_textarea( wp_unslash( $_POST['description'] ?? '' ) ),
-			'type'                    => $this->maybe_null_text( wp_unslash( $_POST['type'] ?? '' ) ) ?: 'action',
-			'mechanic'                => $this->maybe_null_text( wp_unslash( $_POST['mechanic'] ?? '' ) ),
-			'mechanic_goal'           => $this->maybe_null_text( wp_unslash( $_POST['mechanic_goal'] ?? '' ) ),
-			'cost_label'              => $this->maybe_null_text( wp_unslash( $_POST['cost_label'] ?? '' ) ),
-			'cost_number'             => max( 0, intval( wp_unslash( $_POST['cost_number'] ?? 0 ) ) ),
-			'effect'                  => $this->maybe_null_textarea( wp_unslash( $_POST['effect'] ?? '' ) ),
-			'bonus'                   => $this->parse_json_object_field( wp_unslash( $_POST['bonus'] ?? '' ) ),
-			'asc_bonuses'             => $asc_bonuses,
-			'ai_instruction'          => $this->maybe_null_textarea( wp_unslash( $_POST['ai_instruction'] ?? '' ) ),
-			'gm'                      => $this->maybe_null_textarea( wp_unslash( $_POST['gm'] ?? '' ) ),
-			'tags'                    => $this->parse_json_array_field( wp_unslash( $_POST['tags'] ?? '' ) ),
-			'requirement_tags'        => $this->parse_json_array_field( wp_unslash( $_POST['requirement_tags'] ?? '' ) ),
-			'denied_tags'             => $this->parse_json_array_field( wp_unslash( $_POST['denied_tags'] ?? '' ) ),
-			'required_item_tags'      => $this->parse_json_array_field( wp_unslash( $_POST['required_item_tags'] ?? '' ) ),
-			'required_location_tags'  => $this->parse_json_array_field( wp_unslash( $_POST['required_location_tags'] ?? '' ) ),
-			'denied_location_tags'    => $this->parse_json_array_field( wp_unslash( $_POST['denied_location_tags'] ?? '' ) ),
-			'requirement_description' => $this->maybe_null_textarea( wp_unslash( $_POST['requirement_description'] ?? '' ) ),
-			'time_cost_minutes'       => max( 0, intval( wp_unslash( $_POST['time_cost_minutes'] ?? 0 ) ) ),
-			'cooldown_messages'       => max( 0, intval( wp_unslash( $_POST['cooldown_messages'] ?? 0 ) ) ),
-			'entropy_on_fail'         => max( 0, intval( wp_unslash( $_POST['entropy_on_fail'] ?? 0 ) ) ),
-			'rarity'                  => $rarity,
-			'is_leveling'             => filter_var( wp_unslash( $_POST['is_leveling'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
-			'is_disposable'           => filter_var( wp_unslash( $_POST['is_disposable'] ?? false ), FILTER_VALIDATE_BOOLEAN ),
-			'is_active'               => filter_var( wp_unslash( $_POST['is_active'] ?? true ), FILTER_VALIDATE_BOOLEAN ),
-			'sound_effect'            => esc_url_raw( wp_unslash( $_POST['sound_effect'] ?? '' ) ) ?: null,
-			'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
-			'class_id'                => $this->maybe_uuid( wp_unslash( $_POST['class_id'] ?? '' ) ),
-		];
-
-		if ( ! $id ) {
-			$payload['xp_current'] = 0;
-			$payload['xp_to_next'] = 10;
-		}
-
-		if ( $id ) {
-			$result = $this->supa(
-				'PATCH',
-				'cyber_deck?id=eq.' . rawurlencode( $id ),
-				$payload
-			);
-		} else {
-			$result = $this->supa(
-				'POST',
-				'cyber_deck',
-				$payload
-			);
-		}
-
-		if ( ! $result['ok'] ) {
-			wp_send_json_error( $result['error'] ?? 'Save failed.' );
-			return;
-		}
-
-		$data = $result['data'] ?? [];
-		wp_send_json_success( is_array( $data ) ? ( $data[0] ?? $data ) : $data );
-	}
-
-	public function ajax_toggle(): void {
-		check_ajax_referer( 'neoweaver_deck', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id    = $this->get_uuid_from_post( 'id' );
-		$state = filter_var( wp_unslash( $_POST['state'] ?? false ), FILTER_VALIDATE_BOOLEAN );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID.' );
-			return;
-		}
-
-		$result = $this->supa(
-			'PATCH',
-			'cyber_deck?id=eq.' . rawurlencode( $id ),
-			[ 'is_active' => $state ]
-		);
-
-		if ( ! $result['ok'] ) {
-			wp_send_json_error( $result['error'] ?? 'Toggle failed.' );
-			return;
-		}
-
-		wp_send_json_success( [ 'toggled' => true, 'state' => $state ] );
-	}
-
-	public function ajax_delete(): void {
-		check_ajax_referer( 'neoweaver_deck', 'nonce' );
-
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Forbidden', 403 );
-			return;
-		}
-
-		$id = $this->get_uuid_from_post( 'id' );
-
-		if ( ! $id ) {
-			wp_send_json_error( 'Invalid ID.' );
-			return;
-		}
-
-		$result = $this->supa(
-			'DELETE',
-			'cyber_deck?id=eq.' . rawurlencode( $id )
-		);
-
-		if ( ! $result['ok'] ) {
-			wp_send_json_error( $result['error'] ?? 'Delete failed.' );
-			return;
-		}
-
-		wp_send_json_success( [ 'deleted' => true ] );
-	}
+class NW_Admin_Deck {
+
+    private string $page_slug    = 'nw-deck';
+    private string $nonce_action = 'nw_deck_nonce';
+    private string $table        = 'cyber_deck';
+
+    private const RARITIES  = [ 'common', 'uncommon', 'rare', 'epic', 'legendary' ];
+    private const CATEGORIES = [ 'magic', 'combat', 'action', 'social', 'equipment', 'tech' ];
+
+    public function __construct() {
+        add_action( 'admin_menu', [ $this, 'register_menu' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+        add_action( 'wp_ajax_nw_deck_load',           [ $this, 'ajax_load' ] );
+        add_action( 'wp_ajax_nw_deck_save',           [ $this, 'ajax_save' ] );
+        add_action( 'wp_ajax_nw_deck_delete',         [ $this, 'ajax_delete' ] );
+        add_action( 'wp_ajax_nw_deck_duplicate',      [ $this, 'ajax_duplicate' ] );
+        add_action( 'wp_ajax_nw_deck_load_types',     [ $this, 'ajax_load_types' ] );
+        add_action( 'wp_ajax_nw_deck_load_classes',   [ $this, 'ajax_load_classes' ] );
+    }
+
+    public function register_menu( string $menu_parent = '' ): void {
+        add_submenu_page(
+            $menu_parent ?: 'neoweaver',
+            __( 'Deck / Cards', 'neoweaver' ),
+            ' Deck',
+            'manage_options',
+            $this->page_slug,
+            [ $this, 'render_page' ]
+        );
+    }
+
+    public function enqueue_assets( string $hook ): void {
+        if ( ! str_contains( $hook, $this->page_slug ) ) {
+            return;
+        }
+        if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+            wp_enqueue_style(
+                'chakra-petch',
+                'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+                [],
+                null
+            );
+        }
+        wp_enqueue_style( 'nw-admin-core', NW_PLUGIN_URL . 'assets/css/admin/admin-core.css', [ 'chakra-petch' ], NW_VERSION );
+        wp_enqueue_style( 'nw-deck-style',  NW_PLUGIN_URL . 'assets/css/admin/deck.css',       [ 'chakra-petch', 'nw-admin-core' ], NW_VERSION );
+
+        wp_enqueue_script( 'lucide',      'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js', [], '0.468.0', true );
+        wp_enqueue_script( 'nw-deck-script', NW_PLUGIN_URL . 'assets/js/admin/deck.js', [ 'jquery', 'lucide' ], NW_VERSION, true );
+
+        wp_localize_script( 'nw-deck-script', 'NWDeck', [
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( $this->nonce_action ),
+        ] );
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function sk(): array {
+        if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
+            return [];
+        }
+        return [
+            'apikey'        => TW_SUPABASE_SERVICE_KEY,
+            'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
+        ];
+    }
+
+    private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
+        $method = strtoupper( $method );
+
+        if ( 'GET' === $method && function_exists( 'tw_supabase_get' ) ) {
+            [ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+            $query = [];
+            if ( $qs ) {
+                parse_str( $qs, $query );
+            }
+            $data = tw_supabase_get( $table, $query, [ 'headers' => $extra_headers ] );
+            if ( ! is_array( $data ) ) {
+                return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'tw_supabase_get returned non-array' ];
+            }
+            if ( isset( $data['code'], $data['message'] ) ) {
+                return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
+            }
+            return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
+        }
+
+        if ( function_exists( 'tw_supabase_request' ) ) {
+            [ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
+            $query = [];
+            if ( $qs ) {
+                parse_str( $qs, $query );
+            }
+            $extra_args = [];
+            if ( in_array( $method, [ 'POST', 'PATCH' ], true ) ) {
+                $extra_args['headers']['Prefer'] = 'return=representation';
+            }
+            if ( ! empty( $extra_headers ) ) {
+                $extra_args['headers'] = array_merge( $extra_args['headers'] ?? [], $extra_headers );
+            }
+            $res  = tw_supabase_request( $method, $table, $query, empty( $body ) ? null : $body, $extra_args );
+            $ok   = $res['ok']   ?? false;
+            $code = $res['code'] ?? 0;
+            $data = $res['data'] ?? null;
+            if ( ! $ok ) {
+                $msg = is_array( $data ) ? ( $data['message'] ?? 'Supabase error ' . $code ) : 'Supabase error ' . $code;
+                return [ 'ok' => false, 'code' => $code, 'data' => $data, 'error' => $msg ];
+            }
+            return [ 'ok' => true, 'code' => $code, 'data' => $data, 'error' => null ];
+        }
+
+        return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Supabase helper functions not available.' ];
+    }
+
+    private function get_cache_key( string $suffix ): string {
+        return 'nw_' . md5( $suffix );
+    }
+
+    private function bust_cache(): void {
+        delete_transient( $this->get_cache_key( $this->table . '_all' ) );
+        delete_transient( $this->get_cache_key( 'cyber_card_types_all' ) );
+        delete_transient( $this->get_cache_key( 'cyber_classes_all' ) );
+    }
+
+    private function cached_get_all(): array {
+        $cache_key = $this->get_cache_key( $this->table . '_all' );
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached && is_array( $cached ) ) {
+            return $cached;
+        }
+        $res = $this->supa( 'GET', $this->table . '?select=*&order=created_at.desc', [], $this->sk() );
+        if ( ! $res['ok'] ) {
+            return [ 'error' => $res['error'] ?? 'Failed to fetch records.' ];
+        }
+        $rows = is_array( $res['data'] ) ? $res['data'] : [];
+        set_transient( $cache_key, $rows, MINUTE_IN_SECONDS * 5 );
+        return $rows;
+    }
+
+    private function bool_from_post( string $key, bool $default = false ): bool {
+        if ( ! isset( $_POST[ $key ] ) ) {
+            return $default;
+        }
+        return (bool) intval( wp_unslash( $_POST[ $key ] ) );
+    }
+
+    private function sanitize_rarity( string $r ): string {
+        $r = strtolower( trim( $r ) );
+        return in_array( $r, self::RARITIES, true ) ? $r : 'common';
+    }
+
+    private function sanitize_category( string $c ): string {
+        $c = strtolower( trim( $c ) );
+        return in_array( $c, self::CATEGORIES, true ) ? $c : 'action';
+    }
+
+    private function json_from_post( string $key, mixed $default = [] ): mixed {
+        $raw = wp_unslash( $_POST[ $key ] ?? '' );
+        if ( '' === $raw ) {
+            return $default;
+        }
+        $decoded = json_decode( $raw, true );
+        return ( JSON_ERROR_NONE === json_last_error() ) ? $decoded : $default;
+    }
+
+    // ── AJAX ──────────────────────────────────────────────────────────────────
+
+    public function ajax_load(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+        $rows = $this->cached_get_all();
+        if ( isset( $rows['error'] ) ) {
+            wp_send_json_error( $rows['error'] );
+            return;
+        }
+        wp_send_json_success( $rows );
+    }
+
+    public function ajax_load_types(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+        $cache_key = $this->get_cache_key( 'cyber_card_types_all' );
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached && is_array( $cached ) ) {
+            wp_send_json_success( $cached );
+            return;
+        }
+        $res = $this->supa( 'GET', 'cyber_card_types?select=id,label,icon,color,category_id&order=label.asc', [], $this->sk() );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'] ?? 'Failed to fetch card types.' );
+            return;
+        }
+        $data = is_array( $res['data'] ) ? $res['data'] : [];
+        set_transient( $cache_key, $data, MINUTE_IN_SECONDS * 30 );
+        wp_send_json_success( $data );
+    }
+
+    public function ajax_load_classes(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+        $cache_key = $this->get_cache_key( 'cyber_classes_all' );
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached && is_array( $cached ) ) {
+            wp_send_json_success( $cached );
+            return;
+        }
+        $res = $this->supa( 'GET', 'cyber_classes?select=id,name,icon_slug&is_active=eq.true&order=name.asc', [], $this->sk() );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'] ?? 'Failed to fetch classes.' );
+            return;
+        }
+        $data = is_array( $res['data'] ) ? $res['data'] : [];
+        set_transient( $cache_key, $data, MINUTE_IN_SECONDS * 30 );
+        wp_send_json_success( $data );
+    }
+
+    public function ajax_save(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+
+        $id   = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+        $name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+        if ( ! $name ) {
+            wp_send_json_error( 'Name is required.' );
+            return;
+        }
+
+        $payload = [
+            'name'                    => $name,
+            'description'             => sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) ) ?: null,
+            'deck_category'           => $this->sanitize_category( sanitize_text_field( wp_unslash( $_POST['deck_category'] ?? 'action' ) ) ),
+            'type'                    => sanitize_text_field( wp_unslash( $_POST['type'] ?? 'Action' ) ),
+            'mechanic'                => sanitize_text_field( wp_unslash( $_POST['mechanic'] ?? '' ) ) ?: null,
+            'mechanic_goal'           => sanitize_textarea_field( wp_unslash( $_POST['mechanic_goal'] ?? '' ) ) ?: null,
+            'cost_number'             => max( 0, intval( wp_unslash( $_POST['cost_number'] ?? 0 ) ) ),
+            'effect'                  => sanitize_textarea_field( wp_unslash( $_POST['effect'] ?? '' ) ) ?: null,
+            'bonus'                   => $this->json_from_post( 'bonus', (object) [] ),
+            'ai_instruction'          => sanitize_textarea_field( wp_unslash( $_POST['ai_instruction'] ?? '' ) ) ?: null,
+            'gm'                      => sanitize_textarea_field( wp_unslash( $_POST['gm'] ?? '' ) ) ?: null,
+            'tags'                    => $this->json_from_post( 'tags', [] ),
+            'requirement_tags'        => $this->json_from_post( 'requirement_tags', [] ),
+            'denied_tags'             => $this->json_from_post( 'denied_tags', [] ),
+            'required_item_tags'      => $this->json_from_post( 'required_item_tags', [] ),
+            'required_location_tags'  => $this->json_from_post( 'required_location_tags', [] ),
+            'denied_location_tags'    => $this->json_from_post( 'denied_location_tags', [] ),
+            'requirement_description' => sanitize_textarea_field( wp_unslash( $_POST['requirement_description'] ?? '' ) ) ?: null,
+            'time_cost_minutes'       => max( 0, intval( wp_unslash( $_POST['time_cost_minutes'] ?? 0 ) ) ),
+            'cooldown_messages'       => max( 0, intval( wp_unslash( $_POST['cooldown_messages'] ?? 0 ) ) ),
+            'entropy_on_fail'         => max( 0, intval( wp_unslash( $_POST['entropy_on_fail'] ?? 0 ) ) ),
+            'rarity'                  => $this->sanitize_rarity( sanitize_text_field( wp_unslash( $_POST['rarity'] ?? 'common' ) ) ),
+            'level'                   => max( 1, min( 15, intval( wp_unslash( $_POST['level'] ?? 1 ) ) ) ),
+            'xp_current'              => max( 0, intval( wp_unslash( $_POST['xp_current'] ?? 0 ) ) ),
+            'xp_to_next'              => max( 1, intval( wp_unslash( $_POST['xp_to_next'] ?? 10 ) ) ),
+            'is_leveling'             => $this->bool_from_post( 'is_leveling', true ),
+            'is_disposable'           => $this->bool_from_post( 'is_disposable', false ),
+            'is_active'               => $this->bool_from_post( 'is_active', true ),
+            'sound_effect'            => sanitize_text_field( wp_unslash( $_POST['sound_effect'] ?? '' ) ) ?: null,
+            'img_url'                 => esc_url_raw( wp_unslash( $_POST['img_url'] ?? '' ) ) ?: null,
+            'base_damage'             => max( 0, min( 100, intval( wp_unslash( $_POST['base_damage'] ?? 0 ) ) ) ),
+            'ap_cost'                 => max( 0, intval( wp_unslash( $_POST['ap_cost'] ?? 1 ) ) ),
+            'mp_cost'                 => max( 0, intval( wp_unslash( $_POST['mp_cost'] ?? 0 ) ) ),
+            'level_scaling'           => $this->json_from_post( 'level_scaling', (object) [] ),
+            'xp_per_level'            => max( 1, intval( wp_unslash( $_POST['xp_per_level'] ?? 10 ) ) ),
+            'counts_toward_hand_limit'=> $this->bool_from_post( 'counts_toward_hand_limit', true ),
+            'asc_bonuses'             => $this->json_from_post( 'asc_bonuses', (object) [] ),
+        ];
+
+        // class_id (optional UUID)
+        $class_id = sanitize_text_field( wp_unslash( $_POST['class_id'] ?? '' ) );
+        if ( $class_id ) {
+            $payload['class_id'] = $class_id;
+        }
+
+        if ( $id ) {
+            $res = $this->supa( 'PATCH', $this->table . '?id=eq.' . $id, $payload, $this->sk() );
+        } else {
+            $res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+        }
+
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'] ?? 'Save failed.' );
+            return;
+        }
+
+        $this->bust_cache();
+        $row = is_array( $res['data'] ) ? ( $res['data'][0] ?? $res['data'] ) : $res['data'];
+        wp_send_json_success( $row );
+    }
+
+    public function ajax_delete(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+        $id = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid card ID.' );
+            return;
+        }
+        $res = $this->supa( 'DELETE', $this->table . '?id=eq.' . $id, [], $this->sk() );
+        if ( ! $res['ok'] ) {
+            wp_send_json_error( $res['error'] ?? 'Delete failed.' );
+            return;
+        }
+        $this->bust_cache();
+        wp_send_json_success( 'deleted' );
+    }
+
+    public function ajax_duplicate(): void {
+        check_ajax_referer( $this->nonce_action, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Forbidden', 403 );
+            return;
+        }
+        $id = intval( wp_unslash( $_POST['id'] ?? 0 ) );
+        if ( ! $id ) {
+            wp_send_json_error( 'Invalid card ID.' );
+            return;
+        }
+
+        $res = $this->supa( 'GET', $this->table . '?id=eq.' . $id . '&select=*', [], $this->sk() );
+        if ( ! $res['ok'] || empty( $res['data'] ) ) {
+            wp_send_json_error( 'Original card not found.' );
+            return;
+        }
+        $original = is_array( $res['data'] ) ? ( $res['data'][0] ?? [] ) : [];
+
+        $payload = $original;
+        unset( $payload['id'], $payload['created_at'] );
+        $payload['name']      = $original['name'] . ' (Copy)';
+        $payload['is_active'] = false;
+
+        $dup_res = $this->supa( 'POST', $this->table, $payload, $this->sk() );
+        if ( ! $dup_res['ok'] ) {
+            wp_send_json_error( $dup_res['error'] ?? 'Duplicate failed.' );
+            return;
+        }
+        $this->bust_cache();
+        $row = is_array( $dup_res['data'] ) ? ( $dup_res['data'][0] ?? $dup_res['data'] ) : $dup_res['data'];
+        wp_send_json_success( $row );
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    public function render_page(): void {
+        ?>
+<div class="nw-admin-panel nw-deck-panel">
+
+    <div class="nw-panel-header">
+        <h1 class="nw-panel-title">
+            <i data-lucide="layers"></i> Deck — Cards
+        </h1>
+        <button id="nw-btn-add" class="nw-btn nw-btn-primary">
+            <i data-lucide="plus"></i> Add Card
+        </button>
+    </div>
+
+    <div id="nw-notice" class="nw-notice" style="display:none;"></div>
+
+    <!-- Stats -->
+    <div class="nw-stats-row">
+        <div class="nw-stat-box"><span id="nw-total">—</span><small>Total</small></div>
+        <div class="nw-stat-box"><span id="nw-active">—</span><small>Active</small></div>
+        <div class="nw-stat-box"><span id="nw-inactive">—</span><small>Inactive</small></div>
+        <div class="nw-stat-box"><span id="nw-rareplus">—</span><small>Rare+</small></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="nw-filters-row">
+        <input type="text" id="nw-search" class="nw-input" placeholder="Search name…">
+        <select id="nw-filter-cat" class="nw-select">
+            <option value="">All categories</option>
+            <option value="action">Action</option>
+            <option value="combat">Combat</option>
+            <option value="magic">Magic</option>
+            <option value="social">Social</option>
+            <option value="equipment">Equipment</option>
+            <option value="tech">Tech</option>
+        </select>
+        <select id="nw-filter-rarity" class="nw-select">
+            <option value="">All rarities</option>
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="epic">Epic</option>
+            <option value="legendary">Legendary</option>
+        </select>
+        <select id="nw-filter-active" class="nw-select">
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+        </select>
+    </div>
+
+    <!-- Table -->
+    <div class="nw-table-wrap">
+        <table class="nw-table">
+            <thead>
+                <tr>
+                    <th>Img</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Rarity</th>
+                    <th>Lvl</th>
+                    <th>AP</th>
+                    <th>MP</th>
+                    <th>DMG</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="nw-deck-tbody">
+                <tr><td colspan="11" class="nw-table-loading">Loading cards…</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div><!-- .nw-deck-panel -->
+
+<!-- ── MODAL ──────────────────────────────────────────────────────── -->
+<div id="nw-modal" class="nw-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title">
+    <div class="nw-modal-backdrop"></div>
+    <div class="nw-modal-box nw-modal-wide">
+
+        <div class="nw-modal-header">
+            <h2 id="nw-modal-title" class="nw-modal-title">Add Card</h2>
+            <button class="nw-modal-close" aria-label="Close"><i data-lucide="x"></i></button>
+        </div>
+
+        <form id="nw-form">
+            <input type="hidden" id="nw-field-id" name="id" value="">
+
+            <!-- TABS -->
+            <div class="nw-tabs">
+                <button type="button" class="nw-tab nw-tab-active" data-tab="basic">Basic</button>
+                <button type="button" class="nw-tab" data-tab="combat">Combat</button>
+                <button type="button" class="nw-tab" data-tab="tags">Tags</button>
+                <button type="button" class="nw-tab" data-tab="advanced">Advanced</button>
+            </div>
+
+            <!-- TAB: Basic -->
+            <div class="nw-tab-panel" id="nw-tab-basic">
+                <div class="nw-form-grid">
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-name">Name *</label>
+                        <input type="text" id="nw-field-name" name="name" class="nw-input" required>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-deck-category">Category</label>
+                        <select id="nw-field-deck-category" name="deck_category" class="nw-select">
+                            <option value="action">Action</option>
+                            <option value="combat">Combat</option>
+                            <option value="magic">Magic</option>
+                            <option value="social">Social</option>
+                            <option value="equipment">Equipment</option>
+                            <option value="tech">Tech</option>
+                        </select>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-type">Type</label>
+                        <select id="nw-field-type" name="type" class="nw-select">
+                            <option value="">— loading —</option>
+                        </select>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-rarity">Rarity</label>
+                        <select id="nw-field-rarity" name="rarity" class="nw-select">
+                            <option value="common">Common</option>
+                            <option value="uncommon">Uncommon</option>
+                            <option value="rare">Rare</option>
+                            <option value="epic">Epic</option>
+                            <option value="legendary">Legendary</option>
+                        </select>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-class-id">Class (optional)</label>
+                        <select id="nw-field-class-id" name="class_id" class="nw-select">
+                            <option value="">— Any class —</option>
+                        </select>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-cost-number">Resource Cost</label>
+                        <input type="number" id="nw-field-cost-number" name="cost_number" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-description">Description</label>
+                        <textarea id="nw-field-description" name="description" class="nw-textarea" rows="3"></textarea>
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-effect">Effect (in-game text)</label>
+                        <textarea id="nw-field-effect" name="effect" class="nw-textarea" rows="3"></textarea>
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-img-url">Image URL</label>
+                        <input type="url" id="nw-field-img-url" name="img_url" class="nw-input" placeholder="https://…">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-sound-effect">Sound Effect slug</label>
+                        <input type="text" id="nw-field-sound-effect" name="sound_effect" class="nw-input" placeholder="e.g. card-draw">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-mechanic">Mechanic</label>
+                        <input type="text" id="nw-field-mechanic" name="mechanic" class="nw-input">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-mechanic-goal">Mechanic Goal</label>
+                        <textarea id="nw-field-mechanic-goal" name="mechanic_goal" class="nw-textarea" rows="2"></textarea>
+                    </div>
+                    <div class="nw-field nw-field-inline">
+                        <label><input type="checkbox" id="nw-field-is-active" name="is_active" value="1" checked> Active</label>
+                        <label><input type="checkbox" id="nw-field-is-leveling" name="is_leveling" value="1" checked> Can level up</label>
+                        <label><input type="checkbox" id="nw-field-is-disposable" name="is_disposable" value="1"> Disposable (single use)</label>
+                        <label><input type="checkbox" id="nw-field-counts-hand" name="counts_toward_hand_limit" value="1" checked> Counts toward hand limit</label>
+                    </div>
+                </div>
+            </div><!-- /tab-basic -->
+
+            <!-- TAB: Combat -->
+            <div class="nw-tab-panel" id="nw-tab-combat" style="display:none;">
+                <div class="nw-form-grid">
+                    <div class="nw-field">
+                        <label for="nw-field-base-damage">Base Damage (0–100)</label>
+                        <input type="number" id="nw-field-base-damage" name="base_damage" class="nw-input" value="0" min="0" max="100">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-ap-cost">AP Cost</label>
+                        <input type="number" id="nw-field-ap-cost" name="ap_cost" class="nw-input" value="1" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-mp-cost">MP Cost</label>
+                        <input type="number" id="nw-field-mp-cost" name="mp_cost" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-time-cost">Time Cost (minutes)</label>
+                        <input type="number" id="nw-field-time-cost" name="time_cost_minutes" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-cooldown">Cooldown (messages)</label>
+                        <input type="number" id="nw-field-cooldown" name="cooldown_messages" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-entropy">Entropy on Fail</label>
+                        <input type="number" id="nw-field-entropy" name="entropy_on_fail" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-level">Level (1–15)</label>
+                        <input type="number" id="nw-field-level" name="level" class="nw-input" value="1" min="1" max="15">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-xp-current">XP Current</label>
+                        <input type="number" id="nw-field-xp-current" name="xp_current" class="nw-input" value="0" min="0">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-xp-to-next">XP to Next</label>
+                        <input type="number" id="nw-field-xp-to-next" name="xp_to_next" class="nw-input" value="10" min="1">
+                    </div>
+                    <div class="nw-field">
+                        <label for="nw-field-xp-per-level">XP per Level</label>
+                        <input type="number" id="nw-field-xp-per-level" name="xp_per_level" class="nw-input" value="10" min="1">
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-bonus">Bonus (JSON)</label>
+                        <textarea id="nw-field-bonus" name="bonus" class="nw-textarea nw-json-field" rows="3" placeholder="{}"></textarea>
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-level-scaling">Level Scaling (JSON)</label>
+                        <textarea id="nw-field-level-scaling" name="level_scaling" class="nw-textarea nw-json-field" rows="3" placeholder="{}"></textarea>
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-asc-bonuses">Ascension Bonuses (JSON)</label>
+                        <textarea id="nw-field-asc-bonuses" name="asc_bonuses" class="nw-textarea nw-json-field" rows="3" placeholder="{}"></textarea>
+                    </div>
+                </div>
+            </div><!-- /tab-combat -->
+
+            <!-- TAB: Tags -->
+            <div class="nw-tab-panel" id="nw-tab-tags" style="display:none;">
+                <p class="nw-tab-hint">Type a tag and press Enter or comma to add. Click × to remove.</p>
+                <div class="nw-form-grid">
+                    <div class="nw-field nw-field-full">
+                        <label>Tags</label>
+                        <div class="nw-tag-input" data-field="tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="tags" id="nw-hidden-tags">
+                    </div>
+                    <div class="nw-field">
+                        <label>Requirement Tags</label>
+                        <div class="nw-tag-input" data-field="requirement_tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="requirement_tags" id="nw-hidden-requirement_tags">
+                    </div>
+                    <div class="nw-field">
+                        <label>Denied Tags</label>
+                        <div class="nw-tag-input" data-field="denied_tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="denied_tags" id="nw-hidden-denied_tags">
+                    </div>
+                    <div class="nw-field">
+                        <label>Required Item Tags</label>
+                        <div class="nw-tag-input" data-field="required_item_tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="required_item_tags" id="nw-hidden-required_item_tags">
+                    </div>
+                    <div class="nw-field">
+                        <label>Required Location Tags</label>
+                        <div class="nw-tag-input" data-field="required_location_tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="required_location_tags" id="nw-hidden-required_location_tags">
+                    </div>
+                    <div class="nw-field">
+                        <label>Denied Location Tags</label>
+                        <div class="nw-tag-input" data-field="denied_location_tags"><div class="nw-tag-input-inner"><input type="text" placeholder="add tag…"></div></div>
+                        <input type="hidden" name="denied_location_tags" id="nw-hidden-denied_location_tags">
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-req-description">Requirement Description</label>
+                        <textarea id="nw-field-req-description" name="requirement_description" class="nw-textarea" rows="2" placeholder="Human-readable requirement summary…"></textarea>
+                    </div>
+                </div>
+            </div><!-- /tab-tags -->
+
+            <!-- TAB: Advanced -->
+            <div class="nw-tab-panel" id="nw-tab-advanced" style="display:none;">
+                <div class="nw-info-box">
+                    <i data-lucide="info"></i>
+                    AI instructions are sent to the GM model on every card activation. Keep them concise but precise.
+                </div>
+                <div class="nw-form-grid" style="margin-top:12px;">
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-ai-instruction">AI Instruction
+                            <button type="button" class="nw-expand-btn" data-target="nw-field-ai-instruction">
+                                <i data-lucide="maximize-2"></i>
+                            </button>
+                        </label>
+                        <textarea id="nw-field-ai-instruction" name="ai_instruction" class="nw-textarea nw-textarea-tall" rows="6" placeholder="Instructions for the AI Game Master…"></textarea>
+                    </div>
+                    <div class="nw-field nw-field-full">
+                        <label for="nw-field-gm">GM Notes
+                            <button type="button" class="nw-expand-btn" data-target="nw-field-gm">
+                                <i data-lucide="maximize-2"></i>
+                            </button>
+                        </label>
+                        <textarea id="nw-field-gm" name="gm" class="nw-textarea nw-textarea-tall" rows="5" placeholder="Internal GM/designer notes…"></textarea>
+                    </div>
+                </div>
+            </div><!-- /tab-advanced -->
+
+            <div class="nw-modal-footer">
+                <button type="button" class="nw-btn nw-btn-ghost nw-modal-close">Cancel</button>
+                <button type="submit" class="nw-btn nw-btn-primary" id="nw-btn-save">
+                    <i data-lucide="save"></i> Save Card
+                </button>
+            </div>
+        </form>
+    </div><!-- .nw-modal-box -->
+</div><!-- #nw-modal -->
+
+<!-- ── DELETE CONFIRM MODAL ───────────────────────────────────────── -->
+<div id="nw-confirm-modal" class="nw-modal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="nw-modal-backdrop"></div>
+    <div class="nw-modal-box nw-modal-sm">
+        <div class="nw-modal-header">
+            <h2 class="nw-modal-title">Delete Card</h2>
+            <button class="nw-modal-close" data-modal="nw-confirm-modal" aria-label="Close"><i data-lucide="x"></i></button>
+        </div>
+        <p class="nw-confirm-text">Are you sure you want to delete <strong id="nw-confirm-name"></strong>? This cannot be undone.</p>
+        <div class="nw-modal-footer">
+            <button type="button" class="nw-btn nw-btn-ghost nw-modal-close" data-modal="nw-confirm-modal">Cancel</button>
+            <button type="button" id="nw-btn-confirm-delete" class="nw-btn nw-btn-danger">
+                <i data-lucide="trash-2"></i> Delete
+            </button>
+        </div>
+    </div>
+</div>
+        <?php
+    }
 }
