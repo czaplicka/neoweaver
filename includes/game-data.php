@@ -11,10 +11,15 @@ $GLOBALS['_tw_game_data_memo'] = [];
 
 /**
  * Transient TTL w sekundach.
- * 60s = sensowny kompromis między świeżością a liczbą zapytań do Supabase.
- * Zmień na niższą wartość jeśli game state zmienia się bardzo szybko.
+ * 60s = sensowny kompromis między świeżnością a liczbą zapytań do Supabase.
  */
 define( 'TW_GAME_DATA_TTL', 60 );
+
+/**
+ * Krótki TTL gdy sesja istnieje, ale brak przypisanej postaci lub kampanii.
+ * BUG-28: wcześniej ten przypadek zapisywał się z pełnym TTL=60s.
+ */
+define( 'TW_GAME_DATA_TTL_PARTIAL', 15 );
 
 /**
  * Klucz transient — per user, by avoid cross-user leaks.
@@ -47,13 +52,15 @@ function tw_invalidate_game_data_cache( int $wp_user_id ): void {
  *
  * Warstwa 2 — WordPress Transients (domyślnie WP Object Cache lub DB):
  *   TTL = TW_GAME_DATA_TTL sekund. Przy Redis/Memcached — ultra-szybkie.
- *   Przy braku zewnętrznego cache — zapis w wp_options, nadal ~10x szybszy
- *   niż 3 round-tripy do Supabase.
  *
  * Warstwa 3 — Supabase query (tylko gdy cache miss).
  *
  * INVALIDATION: wywołaj tw_invalidate_game_data_cache($wp_user_id) przy
  * każdej zmianie stanu sesji (nowa kampania, teleport, koniec sesji).
+ *
+ * BUG-28 FIX: dane z aktywną sesją ale pustym active_character_id zapisywane
+ * są z TTL=TW_GAME_DATA_TTL_PARTIAL (15s), nie pełnym TW_GAME_DATA_TTL (60s),
+ * żeby szybko odzwierciedlić przypisanie postaci.
  */
 if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
     function get_user_game_data_from_supabase( int $wp_user_id ): array {
@@ -63,7 +70,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             'active_character_id' => '',
             'active_scenario_id'  => '',
             'active_world_id'     => '',
-            'active_location_id'  => '',   // UUID — nigdy nie castuj na int
+            'active_location_id'  => '',
             'char_name'           => 'Nieznany Bohater',
             'char_class_id'       => '',
             'char_race_id'        => '',
@@ -76,7 +83,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             return $defaults;
         }
 
-        // ── Warstwa 1: per-request memo ─────────────────────────────────────
+        // ── Warstwa 1: per-request memo ────────────────────────────────────────
         if ( isset( $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] ) ) {
             return $GLOBALS['_tw_game_data_memo'][ $wp_user_id ];
         }
@@ -90,7 +97,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             return $cached;
         }
 
-        // ── Warstwa 3: Supabase query ────────────────────────────────────────
+        // ── Warstwa 3: Supabase query ──────────────────────────────────────
 
         // 1. Aktywna sesja
         $sessions = tw_supabase_get(
@@ -105,6 +112,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         );
 
         if ( ! is_array( $sessions ) || empty( $sessions ) || ! isset( $sessions[0] ) || ! is_array( $sessions[0] ) ) {
+            // Brak sesji — krótki TTL (15s), bo sesja może się pojawić lada chwila
             set_transient( $cache_key, $defaults, 15 );
             $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $defaults;
             return $defaults;
@@ -117,7 +125,6 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
         $defaults['active_character_id'] = isset( $session['character_id'] )  ? nw_sanitize_uuid( $session['character_id'] ) : '';
         $defaults['active_world_id']     = isset( $session['world_id'] )      ? nw_sanitize_uuid( $session['world_id'] )     : '';
         $defaults['active_scenario_id']  = ! empty( $session['scenario_id'] ) ? nw_sanitize_uuid( $session['scenario_id'] )  : '';
-        // UUID — przechowuj jako string, nigdy jako int
         $defaults['active_location_id']  = isset( $session['location_id'] )   ? nw_sanitize_uuid( $session['location_id'] )  : '';
 
         // 2. Postać + tagi (tylko gdy mamy character_id)
@@ -160,8 +167,11 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             }
         }
 
-        // Zapisz do Transient i memo
-        set_transient( $cache_key, $defaults, TW_GAME_DATA_TTL );
+        // BUG-28: jeśli sesja istnieje, ale brak postaci — krótki TTL (15s)
+        // Gracz mógł dopiero co przypisac postać; nie możemy czekać 60s.
+        $ttl = ( '' === $defaults['active_character_id'] ) ? TW_GAME_DATA_TTL_PARTIAL : TW_GAME_DATA_TTL;
+
+        set_transient( $cache_key, $defaults, $ttl );
         $GLOBALS['_tw_game_data_memo'][ $wp_user_id ] = $defaults;
 
         return $defaults;
@@ -187,6 +197,11 @@ if ( ! function_exists( 'tw_get_current_character_id' ) ) {
 /**
  * AUTO-INVALIDATION: podpina tw_invalidate_game_data_cache() do zdarzeń gry.
  * Callback i add_action() w bloku function_exists — bezpieczne przy wielokrotnym include.
+ *
+ * BUG-29 FIX: handlers.php::tw_start_scenario_generation odpalał
+ * do_action('tw_session_state_changed', ...), ale hook był zarejestrowany jako
+ * 'tw_session_started' — nazwy się nie zgadzały, cache nigdy nie był czyszczony.
+ * Dodano 'tw_session_state_changed' jako alias obok oryginalnego 'tw_session_started'.
  */
 if ( ! function_exists( 'tw_auto_invalidate_cache_hook' ) ) {
     function tw_auto_invalidate_cache_hook( int $wp_user_id ): void {
@@ -195,16 +210,19 @@ if ( ! function_exists( 'tw_auto_invalidate_cache_hook' ) ) {
         }
     }
 
-    // 1. Zmiana sesji — gdy gracz dołącza / opuszcza kampanię
-    add_action( 'tw_session_started',   'tw_auto_invalidate_cache_hook' );
-    add_action( 'tw_session_ended',     'tw_auto_invalidate_cache_hook' );
+    // Zmiana sesji — gdy gracz dołącza / opuszcza kampanię
+    add_action( 'tw_session_started',        'tw_auto_invalidate_cache_hook' );
+    add_action( 'tw_session_ended',          'tw_auto_invalidate_cache_hook' );
 
-    // 2. Zmiana lokalizacji (teleport, przejście)
-    add_action( 'tw_location_changed',  'tw_auto_invalidate_cache_hook' );
+    // BUG-29: alias dla tw_session_state_changed (handlers.php używa tej nazwy)
+    add_action( 'tw_session_state_changed',  'tw_auto_invalidate_cache_hook' );
 
-    // 3. Zmiana aktywnej postaci
-    add_action( 'tw_character_changed', 'tw_auto_invalidate_cache_hook' );
+    // Zmiana lokalizacji (teleport, przejście)
+    add_action( 'tw_location_changed',       'tw_auto_invalidate_cache_hook' );
 
-    // 4. Dołączenie do kampanii
-    add_action( 'tw_campaign_joined',   'tw_auto_invalidate_cache_hook' );
+    // Zmiana aktywnej postaci
+    add_action( 'tw_character_changed',      'tw_auto_invalidate_cache_hook' );
+
+    // Dołączenie do kampanii
+    add_action( 'tw_campaign_joined',        'tw_auto_invalidate_cache_hook' );
 }
