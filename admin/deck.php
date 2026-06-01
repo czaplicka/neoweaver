@@ -35,10 +35,14 @@ class NW_Admin_Deck {
     }
 
     public function register_menu( string $menu_parent = '' ): void {
+        // Inline SVG card icon — works in WP admin menu without Lucide JS
+        $icon = 'data:image/svg+xml;base64,' . base64_encode(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#adff00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>'
+        );
         add_submenu_page(
             $menu_parent ?: 'neoweaver',
             __( 'Deck / Cards', 'neoweaver' ),
-            '<span data-lucide-menu="id-card-lanyard"></span> Card Deck',
+            'Card Deck',
             'manage_options',
             $this->page_slug,
             [ $this, 'render_page' ]
@@ -69,7 +73,7 @@ class NW_Admin_Deck {
         ] );
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────────
 
     private function sk(): array {
         if ( ! defined( 'TW_SUPABASE_SERVICE_KEY' ) ) {
@@ -178,7 +182,7 @@ class NW_Admin_Deck {
         return ( JSON_ERROR_NONE === json_last_error() ) ? $decoded : $default;
     }
 
-    // ── AJAX ──────────────────────────────────────────────────────────────────
+    // ── AJAX ────────────────────────────────────────────────────────────────────────
 
     public function ajax_load(): void {
         check_ajax_referer( $this->nonce_action, 'nonce' );
@@ -368,7 +372,7 @@ class NW_Admin_Deck {
         wp_send_json_success( $row );
     }
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    // ── Render ───────────────────────────────────────────────────────────────────────
 
     public function render_page(): void {
         ?>
@@ -448,7 +452,7 @@ class NW_Admin_Deck {
 
 </div><!-- .nw-deck-panel -->
 
-<!-- ── MODAL ──────────────────────────────────────────────────────── -->
+<!-- ── MODAL ────────────────────────────────────────────────────────────── -->
 <div id="nw-modal" class="nw-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nw-modal-title">
     <div class="nw-modal-backdrop"></div>
     <div class="nw-modal-box nw-modal-wide">
@@ -685,7 +689,7 @@ class NW_Admin_Deck {
     </div><!-- .nw-modal-box -->
 </div><!-- #nw-modal -->
 
-<!-- ── DELETE CONFIRM MODAL ───────────────────────────────────────── -->
+<!-- ── DELETE CONFIRM MODAL ─────────────────────────────────────────────── -->
 <div id="nw-confirm-modal" class="nw-modal" style="display:none;" role="dialog" aria-modal="true">
     <div class="nw-modal-backdrop"></div>
     <div class="nw-modal-box nw-modal-sm">
