@@ -425,11 +425,13 @@ class NW_Admin_Deck {
         <table class="nw-table">
             <thead>
                 <tr>
-                    <th>Img</th>
                     <th>Name</th>
                     <th>Category</th>
                     <th>Type</th>
                     <th>Rarity</th>
+                    <th>Mechanic</th>
+                    <th>Effect</th>
+                    <th>Tags</th>
                     <th>Lvl</th>
                     <th>AP</th>
                     <th>MP</th>
@@ -439,7 +441,7 @@ class NW_Admin_Deck {
                 </tr>
             </thead>
             <tbody id="nw-deck-tbody">
-                <tr><td colspan="11" class="nw-table-loading">Loading cards…</td></tr>
+                <tr><td colspan="13" class="nw-table-loading">Loading cards…</td></tr>
             </tbody>
         </table>
     </div>
@@ -522,6 +524,10 @@ class NW_Admin_Deck {
                     <div class="nw-field">
                         <label for="nw-field-img-url">Image URL</label>
                         <input type="url" id="nw-field-img-url" name="img_url" class="nw-input" placeholder="https://…">
+                    </div>
+                    <div class="nw-field nw-field-img-preview">
+                        <label>Image Preview</label>
+                        <div id="nw-img-preview" class="nw-img-preview-box"><span class="nw-img-placeholder"><i data-lucide="image"></i></span></div>
                     </div>
                     <div class="nw-field">
                         <label for="nw-field-sound-effect">Sound Effect slug</label>

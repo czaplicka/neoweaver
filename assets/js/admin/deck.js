@@ -61,23 +61,42 @@
         return t ? `<span style="color:${t.color}">${t.label}</span>` : typeId;
     }
 
+    // ── Truncate helper ───────────────────────────────────────────────────────
+    function truncate(str, len = 55) {
+        if (!str) return '<span class="nw-muted">—</span>';
+        return str.length > len
+            ? `<span title="${str.replace(/"/g, '&quot;')}">${str.slice(0, len)}…</span>`
+            : str;
+    }
+
+    // ── Tags count badge ──────────────────────────────────────────────────────
+    function tagCount(r) {
+        const total = (r.tags || []).length
+            + (r.requirement_tags || []).length
+            + (r.denied_tags || []).length
+            + (r.required_item_tags || []).length
+            + (r.required_location_tags || []).length
+            + (r.denied_location_tags || []).length;
+        if (!total) return '<span class="nw-muted">—</span>';
+        const tags = (r.tags || []).slice(0, 3).join(', ');
+        const more = (r.tags || []).length > 3 ? ` +${(r.tags || []).length - 3}` : '';
+        const tip  = tags ? `${tags}${more}` : `${total} tags`;
+        return `<span class="nw-tag-count" title="${tip}">${total}</span>`;
+    }
+
     // ── Render table ──────────────────────────────────────────────────────────
     function renderTable(rows) {
         const $tbody = $('#nw-deck-tbody');
         if (!rows.length) {
-            $tbody.html('<tr><td colspan="11" class="nw-table-empty">No cards found.</td></tr>');
+            $tbody.html('<tr><td colspan="13" class="nw-table-empty">No cards found.</td></tr>');
             icons();
             return;
         }
         const html = rows.map(r => {
-            const img = r.img_url
-                ? `<img src="${r.img_url}" alt="${r.name}" class="nw-thumb" loading="lazy">`
-                : `<span class="nw-thumb-placeholder"><i data-lucide="image-off"></i></span>`;
             const active = r.is_active
                 ? '<span class="nw-status nw-status-on"><i data-lucide="check-circle-2"></i></span>'
                 : '<span class="nw-status nw-status-off"><i data-lucide="circle-dashed"></i></span>';
             return `<tr data-id="${r.id}">
-                <td class="nw-col-img">${img}</td>
                 <td class="nw-col-name">
                     <strong>${r.name}</strong>
                     ${r.is_disposable ? '<span class="nw-badge-disp" title="Disposable">1×</span>' : ''}
@@ -85,6 +104,9 @@
                 <td>${catBadge(r.deck_category)}</td>
                 <td>${typeName(r.type)}</td>
                 <td>${rarityBadge(r.rarity)}</td>
+                <td class="nw-col-mechanic">${r.mechanic ? `<code class="nw-mechanic-code">${r.mechanic}</code>` : '<span class="nw-muted">—</span>'}</td>
+                <td class="nw-col-effect">${truncate(r.effect)}</td>
+                <td class="nw-col-tags">${tagCount(r)}</td>
                 <td class="nw-col-num">${r.level ?? 1}</td>
                 <td class="nw-col-num nw-col-ap">${r.ap_cost ?? 1}</td>
                 <td class="nw-col-num nw-col-mp">${r.mp_cost ?? 0}</td>
@@ -122,7 +144,7 @@
 
     // ── Load data ─────────────────────────────────────────────────────────────
     function loadAll() {
-        $('#nw-deck-tbody').html('<tr><td colspan="11" class="nw-table-loading">Loading…</td></tr>');
+        $('#nw-deck-tbody').html('<tr><td colspan="13" class="nw-table-loading">Loading…</td></tr>');
         $.post(A, { action: 'nw_deck_load', nonce: N }, res => {
             if (!res.success) { notice(res.data || 'Load failed.', 'error'); return; }
             allRows = res.data || [];
@@ -229,6 +251,21 @@
         });
     }
 
+    // ── Image preview in modal ────────────────────────────────────────────────
+    function updateImgPreview(url) {
+        const $box = $('#nw-img-preview');
+        if (url) {
+            $box.html(`<img src="${url}" alt="Card image" style="max-width:120px;max-height:120px;border-radius:6px;">`);
+        } else {
+            $box.html('<span class="nw-img-placeholder"><i data-lucide="image"></i></span>');
+            icons();
+        }
+    }
+
+    $(document).on('input', '#nw-field-img-url', function () {
+        updateImgPreview($(this).val().trim());
+    });
+
     // ── Modal ─────────────────────────────────────────────────────────────────
     function openModal(card) {
         const isEdit = !!card;
@@ -243,6 +280,7 @@
         // clear form
         $('#nw-form')[0].reset();
         clearAllTagFields();
+        updateImgPreview('');
 
         if (isEdit) {
             $('#nw-field-id').val(card.id);
@@ -287,6 +325,9 @@
             $('#nw-field-req-description').val(card.requirement_description || '');
             $('#nw-field-ai-instruction').val(card.ai_instruction || '');
             $('#nw-field-gm').val(card.gm || '');
+
+            // image preview
+            updateImgPreview(card.img_url || '');
         } else {
             $('#nw-field-id').val('');
             // defaults
