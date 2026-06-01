@@ -1,6 +1,67 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+// ---------------------------------------------------------------------------
+// Helper: verify the current WP user is a participant (signup) or the host
+// of the given campaign. Returns true/false.
+// Used by the shortcode render (BUG 25) and can be reused by other handlers.
+// ---------------------------------------------------------------------------
+if ( ! function_exists( 'neoweave_current_user_can_view_lobby' ) ) {
+	function neoweave_current_user_can_view_lobby( string $campaign_id, int $user_id ): bool {
+		if ( ! function_exists( 'tw_supabase_url' ) || ! function_exists( 'tw_supabase_anon_key' ) ) {
+			return false;
+		}
+
+		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+		$anon_key      = tw_supabase_anon_key();
+		$headers       = array(
+			'apikey'        => $anon_key,
+			'Authorization' => 'Bearer ' . $anon_key,
+		);
+
+		// Check host.
+		$host_url = add_query_arg(
+			array(
+				'id'         => 'eq.' . $campaign_id,
+				'wp_user_id' => 'eq.' . $user_id,
+				'select'     => 'id',
+				'limit'      => 1,
+			),
+			$supabase_rest . 'cyber_campaign'
+		);
+		$host_res = wp_remote_get( $host_url, array( 'headers' => $headers, 'timeout' => 10 ) );
+		if ( ! is_wp_error( $host_res ) && 200 === (int) wp_remote_retrieve_response_code( $host_res ) ) {
+			$host_data = json_decode( wp_remote_retrieve_body( $host_res ), true );
+			if ( is_array( $host_data ) && ! empty( $host_data ) ) {
+				return true;
+			}
+		}
+
+		// Check signup.
+		$signup_url = add_query_arg(
+			array(
+				'campaign_id' => 'eq.' . $campaign_id,
+				'wp_user_id'  => 'eq.' . $user_id,
+				'select'      => 'wp_user_id',
+				'limit'       => 1,
+			),
+			$supabase_rest . 'cyber_campaign_signups'
+		);
+		$signup_res = wp_remote_get( $signup_url, array( 'headers' => $headers, 'timeout' => 10 ) );
+		if ( ! is_wp_error( $signup_res ) && 200 === (int) wp_remote_retrieve_response_code( $signup_res ) ) {
+			$signup_data = json_decode( wp_remote_retrieve_body( $signup_res ), true );
+			if ( is_array( $signup_data ) && ! empty( $signup_data ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Shortcode: [neoweave_lobby]
+// ---------------------------------------------------------------------------
 if ( ! function_exists( 'neoweave_lobby_terminal' ) ) {
 	function neoweave_lobby_terminal(): string {
 		$user_id = get_current_user_id();
@@ -21,6 +82,12 @@ if ( ! function_exists( 'neoweave_lobby_terminal' ) ) {
 
 		if ( empty( $campaign_id ) ) {
 			return '<div class="neoweave-terminal">ERROR: INVALID DEPLOYMENT REFERENCE.</div>';
+		}
+
+		// BUG 25 fix — verify the requesting user is the host or a signup
+		// before rendering any campaign data (name, host ID, etc.).
+		if ( ! neoweave_current_user_can_view_lobby( $campaign_id, $user_id ) ) {
+			return '<div class="neoweave-terminal">ERROR: ACCESS DENIED. YOU ARE NOT A PARTICIPANT OF THIS DEPLOYMENT.</div>';
 		}
 
 		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
@@ -125,6 +192,9 @@ if ( ! function_exists( 'neoweave_lobby_terminal' ) ) {
 	add_shortcode( 'neoweave_lobby', 'neoweave_lobby_terminal' );
 }
 
+// ---------------------------------------------------------------------------
+// AJAX: resolve WP user display names from a list of IDs
+// ---------------------------------------------------------------------------
 if ( ! function_exists( 'neoweave_user_labels' ) ) {
 	function neoweave_user_labels(): void {
 		check_ajax_referer( 'neoweave_labels', 'nonce' );
@@ -141,9 +211,19 @@ if ( ! function_exists( 'neoweave_user_labels' ) ) {
 			return;
 		}
 
+		// BUG 24 fix — reject nested arrays; ids must be a flat list of scalars.
+		// intval() on a nested array silently returns 0, which wp_unslash() does
+		// not catch. We strip any non-scalar element before casting.
+		$flat = array_filter(
+			$ids_raw,
+			static function ( $v ) {
+				return is_scalar( $v );
+			}
+		);
+
 		$ids = array_unique(
 			array_filter(
-				array_map( 'intval', wp_unslash( $ids_raw ) )
+				array_map( 'intval', wp_unslash( $flat ) )
 			)
 		);
 
@@ -171,6 +251,9 @@ if ( ! function_exists( 'neoweave_user_labels' ) ) {
 	add_action( 'wp_ajax_neoweave_user_labels', 'neoweave_user_labels' );
 }
 
+// ---------------------------------------------------------------------------
+// AJAX: launch campaign — create game sessions for all signups
+// ---------------------------------------------------------------------------
 if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 	function neoweave_launch_campaign(): void {
 		check_ajax_referer( 'neoweave_launch', 'nonce' );
@@ -198,9 +281,9 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			return;
 		}
 
-		$supabase_rest   = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
-		$supabase_anon   = tw_supabase_anon_key();
-		$supabase_svc    = tw_supabase_service_key();
+		$supabase_rest = trailingslashit( tw_supabase_url() ) . 'rest/v1/';
+		$supabase_anon = tw_supabase_anon_key();
+		$supabase_svc  = tw_supabase_service_key();
 
 		$read_headers = array(
 			'apikey'        => $supabase_anon,
@@ -213,6 +296,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			'Content-Type'  => 'application/json',
 		);
 
+		// Verify host.
 		$camp_url = add_query_arg(
 			array(
 				'id'     => 'eq.' . $campaign_id,
@@ -242,6 +326,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			return;
 		}
 
+		// Fetch world.
 		$world_id  = null;
 		$world_url = add_query_arg(
 			array(
@@ -272,6 +357,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			return;
 		}
 
+		// Fetch start location.
 		$location_id = null;
 		$loc_url     = add_query_arg(
 			array(
@@ -305,6 +391,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			return;
 		}
 
+		// Fetch signups.
 		$signup_url = add_query_arg(
 			array(
 				'campaign_id' => 'eq.' . $campaign_id,
@@ -344,11 +431,16 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			)
 		);
 
+		// BUG 23 fix (part 1) — cleanup filter scoped to this campaign only.
+		// Previously filtered only on wp_user_id IN (...), which paused active
+		// sessions from ALL campaigns for those users. Now requires campaign_id
+		// to match so other campaigns are untouched.
 		if ( ! empty( $user_ids ) ) {
 			$cleanup_url = add_query_arg(
 				array(
-					'wp_user_id' => 'in.(' . implode( ',', $user_ids ) . ')',
-					'status'     => 'eq.active',
+					'campaign_id' => 'eq.' . $campaign_id,
+					'wp_user_id'  => 'in.(' . implode( ',', $user_ids ) . ')',
+					'status'      => 'eq.active',
 				),
 				$supabase_rest . 'cyber_game_sessions'
 			);
@@ -364,6 +456,7 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			);
 		}
 
+		// Build sessions payload.
 		$sessions_payload = array();
 
 		foreach ( $signups as $s ) {
@@ -389,13 +482,21 @@ if ( ! function_exists( 'neoweave_launch_campaign' ) ) {
 			return;
 		}
 
+		// BUG 23 fix (part 2) — ON CONFLICT DO NOTHING via PostgREST resolution header.
+		// Requires a UNIQUE constraint on (campaign_id, wp_user_id) in
+		// cyber_game_sessions. If the host double-clicks, the second insert is a
+		// no-op instead of creating duplicate active sessions.
 		$session_url = $supabase_rest . 'cyber_game_sessions';
 		$session_res = wp_remote_post(
 			$session_url,
 			array(
 				'headers' => array_merge(
 					$write_headers,
-					array( 'Prefer' => 'return=minimal' )
+					array(
+						// resolution=ignore-duplicates maps to ON CONFLICT DO NOTHING.
+						// Requires: UNIQUE (campaign_id, wp_user_id) on cyber_game_sessions.
+						'Prefer' => 'return=minimal,resolution=ignore-duplicates',
+					)
 				),
 				'body'    => wp_json_encode( $sessions_payload ),
 				'timeout' => 15,
