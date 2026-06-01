@@ -11,7 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  *   tw_supabase_get()     → array (może być []) LUB WP_Error przy błędzie sieci/HTTP
  *   tw_supabase_request() → WP_Error przy błędzie sieci lub HTTP ≥ 300
- *                           array ['ok'=>true, 'code'=>int, 'data'=>mixed] przy sukcesie
+ *                           array ['ok'=>true, 'code'=>int] przy sukcesie (zawsze HTTP 2xx)
+ *                           BUG 32 FIX: 'code' jest zawsze w [200,299] — nie sprawdzaj
+ *                           < 200 || >= 300 po stronie wywołującej; używaj wyłącznie
+ *                           is_wp_error() do wykrywania błędów.
  *   tw_supabase_rpc()     → array (może być []) LUB WP_Error przy błędzie
  *
  * Wszystkie wywołujące handlery sprawdzają is_wp_error() zanim użyją wyniku.
@@ -150,6 +153,21 @@ if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
 }
 
 if ( ! function_exists( 'tw_supabase_request' ) ) {
+	/**
+	 * Wysyła zapytanie HTTP do Supabase REST API (POST/PATCH/DELETE itp.).
+	 *
+	 * Zwraca WP_Error przy błędzie sieci lub HTTP ≥ 300.
+	 * Przy sukcesie (HTTP 2xx) zwraca array ['ok' => true, 'code' => int, 'data' => mixed].
+	 *
+	 * BUG 32 FIX — kontrakt jest jednoznaczny: 'code' zawsze należy do [200, 299].
+	 * Wywołujący nie powinien sprawdzać $result['code'] < 200 || >= 300 — taki
+	 * warunek jest martwym kodem (dead code), bo błędy HTTP są już zamieniane na
+	 * WP_Error wewnątrz tej funkcji. Poprawny wzorzec:
+	 *
+	 *   $result = tw_supabase_request(...);
+	 *   if ( is_wp_error( $result ) ) { // obsłuż błąd }
+	 *   // tu $result['ok'] === true i $result['code'] jest 2xx
+	 */
 	function tw_supabase_request( string $method, string $endpoint, array $query = [], $body = null, array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
 		if ( empty( $base ) ) {
@@ -231,6 +249,24 @@ if ( ! function_exists( 'tw_supabase_request' ) ) {
 }
 
 if ( ! function_exists( 'tw_supabase_rpc' ) ) {
+	/**
+	 * Wywołuje funkcję RPC w Supabase (POST /rest/v1/rpc/{function_name}).
+	 *
+	 * BUG 33 FIX — $params MUSI być tablicą z kluczami stringowymi (named params).
+	 * PostgREST oczekuje obiektu JSON np. {"p_char_id":"abc"}.
+	 * Jeśli przekazana zostanie tablica z kluczami numerycznymi (np. [0=>'value']),
+	 * PHP zserializuje ją jako tablicę JSON (["value"]) zamiast obiektu — RPC
+	 * zwróci błąd 400. Przed zakodowaniem wymuszamy konwersję na obiekt przez
+	 * rzutowanie (object) niezależnie od tego czy $params jest pusty czy nie.
+	 * Wywołujący ZAWSZE musi przekazywać named params:
+	 *   tw_supabase_rpc('fn_name', ['p_id' => $id]);
+	 *   // NIE: tw_supabase_rpc('fn_name', [$id]);
+	 *
+	 * @param string $function_name  Nazwa funkcji RPC (tylko znaki [a-zA-Z0-9_]).
+	 * @param array  $params         Named parameters — klucze MUSZĄ być stringami.
+	 * @param array  $extra_args     Dodatkowe argumenty wp_remote_request.
+	 * @return array|WP_Error
+	 */
 	function tw_supabase_rpc( string $function_name, array $params = [], array $extra_args = [] ) {
 		$base = tw_supabase_rest_base();
 		if ( empty( $base ) ) {
@@ -244,6 +280,26 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 
 		if ( ! function_exists( 'tw_supabase_anon_key' ) ) {
 			return new WP_Error( 'tw_supabase_config', 'tw_supabase_anon_key() is not defined.' );
+		}
+
+		// BUG 33 FIX — zawsze rzutujemy na obiekt przed enkodowaniem.
+		// (object) ['p_id' => 'abc'] → {"p_id":"abc"} (poprawne)
+		// (object) []               → {}              (poprawne, pusta RPC)
+		// (object) [0 => 'val']     → {"0":"val"}     (niepoprawne wywołanie, ale
+		//                                               nie rozbija JSON — błąd
+		//                                               będzie widoczny w logach RPC)
+		$body_object = (object) $params;
+
+		// Dodatkowe zabezpieczenie: jeśli po rzutowaniu obiekt ma klucze numeryczne,
+		// logujemy ostrzeżenie — wywołanie jest złe i PostgREST odrzuci zapytanie.
+		foreach ( array_keys( $params ) as $key ) {
+			if ( is_int( $key ) ) {
+				error_log( sprintf(
+					'[NeoWeaver tw_supabase_rpc] BUG: numeryczny klucz parametru w RPC "%s". Przekazuj named params: [\'p_name\' => $val].',
+					$function_name
+				) );
+				break;
+			}
 		}
 
 		$url = $base . 'rpc/' . $function_name;
@@ -270,7 +326,7 @@ if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 			$extra_args,
 			[
 				'headers' => $merged_headers,
-				'body'    => wp_json_encode( (object) $params ),
+				'body'    => wp_json_encode( $body_object ),
 			]
 		);
 
