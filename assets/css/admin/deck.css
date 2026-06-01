@@ -1,200 +1,182 @@
-/* ============================================================
-   NeoWeaver Admin — DECK CARDS
-   Module-specific styles (extension for admin-core.css)
-   ============================================================ */
+/* NeoWeaver — Deck admin (extends admin-core.css) */
 
-/* ---- Table: Column Definition ---- */
-col.nw-col-img       { width: 56px; }
-col.nw-col-name      { width: 18%; }
-col.nw-col-category  { width: 110px; }
-col.nw-col-type      { width: 110px; }
-col.nw-col-rarity    { width: 120px; }
-col.nw-col-cost      { width: 130px; }
-col.nw-col-active    { width: 70px; }
-col.nw-col-actions   { width: 90px; }
+/* ── Rarity pills ───────────────────────────────────────────────────────── */
+.nw-deck-panel .nw-pill-common    { background: #3d3d3d; color: #ccc; }
+.nw-deck-panel .nw-pill-uncommon  { background: #1a3a1a; color: #6fcf6f; }
+.nw-deck-panel .nw-pill-rare      { background: #1a2a4a; color: #7ab4ff; }
+.nw-deck-panel .nw-pill-epic      { background: #2a1a4a; color: #c07aff; }
+.nw-deck-panel .nw-pill-legendary { background: #4a2a00; color: #ffb347; }
 
-/* ---- Card Identity & Visuals ---- */
-.nw-card-img,
-.nw-card-img-placeholder {
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    border: 1px solid #2e2e2e;
-}
-
-.nw-card-img { 
-    object-fit: cover; 
-    background: #1a1a1a; 
-}
-
-.nw-card-img-placeholder {
-    background: #1a1a1a;
-    display: flex;
+/* ── Category badges ─────────────────────────────────────────────────────── */
+.nw-cat-badge {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 20px;
-}
-
-.nw-item-name { 
-    font-weight: 600; 
-    color: #fff; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-}
-
-.nw-item-sub { 
-    font-size: 11px; 
-    color: #555; 
-    margin-top: 2px; 
-}
-
-/* ---- Categories & Types ---- */
-.nw-type-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 3px;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
-    color: #aaa;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    display: inline-block;
-}
-
-/* Category Specific Colors */
-.nw-cat-action    { border-color: #3a5200; color: #adff00; }
-.nw-cat-magic     { border-color: #004e60; color: #00d4ff; }
-.nw-cat-equipment { border-color: #5c4300; color: #ffb703; }
-
-.nw-type-label {
+    gap: 4px;
     font-size: 11px;
-    color: #aaa;
-    display: inline-block;
-    max-width: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ---- Card Mechanics & Stats ---- */
-.nw-level-badge {
-    font-size: 11px;
-    font-weight: 700;
-    color: #adff00;
-    background: #0d1a00;
+    font-family: 'Chakra Petch', monospace;
     padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.nw-cat-badge svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+.nw-cat-action    { background: rgba(173,255,0,0.10); color: #adff00; border: 1px solid rgba(173,255,0,0.25); }
+.nw-cat-combat    { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.nw-cat-magic     { background: rgba(167,139,250,0.12); color: #c07aff; border: 1px solid rgba(167,139,250,0.25); }
+.nw-cat-social    { background: rgba(59,190,255,0.10); color: #7ab4ff; border: 1px solid rgba(59,190,255,0.25); }
+.nw-cat-equipment { background: rgba(255,179,71,0.10); color: #ffb347; border: 1px solid rgba(255,179,71,0.25); }
+.nw-cat-tech      { background: rgba(34,211,238,0.10); color: #22d3ee; border: 1px solid rgba(34,211,238,0.25); }
+
+/* ── Combat stat columns ─────────────────────────────────────────────────── */
+.nw-col-num { text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+.nw-col-ap  { color: #adff00; }
+.nw-col-mp  { color: #7ab4ff; }
+.nw-col-dmg { color: #f87171; }
+
+/* ── Disposable badge ────────────────────────────────────────────────────── */
+.nw-badge-disp {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 10px;
+    background: rgba(239,68,68,0.18);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.3);
     border-radius: 3px;
-    border: 1px solid #3a5200;
+    padding: 0 4px;
+    vertical-align: middle;
+    font-family: 'Chakra Petch', monospace;
 }
 
-.nw-cost-info  { font-size: 12px; color: #aaa; }
-.nw-cost-label { color: #adff00; font-size: 11px; }
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.nw-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid rgba(173,255,0,0.18);
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.nw-tab {
+    font-family: 'Chakra Petch', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--nw-text-muted, #888);
+    cursor: pointer;
+    transition: color 150ms, border-color 150ms;
+    margin-bottom: -1px;
+}
+.nw-tab:hover { color: #adff00; }
+.nw-tab-active { color: #adff00 !important; border-bottom-color: #adff00; }
 
-/* ---- Rarity Palette ---- */
-.nw-rarity-common    { color: #aaa; }
-.nw-rarity-uncommon  { color: #4fc874; }
-.nw-rarity-rare      { color: #4da6ff; }
-.nw-rarity-epic      { color: #b084f5; }
-.nw-rarity-legendary { color: #ffd700; }
+/* ── Tag input ───────────────────────────────────────────────────────────── */
+.nw-tag-input {
+    min-height: 40px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: text;
+    transition: border-color 150ms;
+}
+.nw-tag-input:focus-within { border-color: rgba(173,255,0,0.45); }
 
-/* ---- Special UI Elements ---- */
-.nw-toggle-wrap { 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
+.nw-tag-input-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+}
+.nw-tag-input-inner input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e0e0e0;
+    font-family: 'Chakra Petch', monospace;
+    font-size: 12px;
+    min-width: 100px;
+    flex: 1;
+    padding: 3px 0;
 }
 
-/* Toggle Variants (Extension to core toggle) */
-.nw-toggle input:checked + .nw-toggle-slider.nw-toggle-blue {
-    background: #00263a;
-    border-color: #00d4ff;
+.nw-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(173,255,0,0.12);
+    border: 1px solid rgba(173,255,0,0.3);
+    color: #adff00;
+    border-radius: 4px;
+    padding: 2px 7px 2px 8px;
+    font-family: 'Chakra Petch', monospace;
+    font-size: 11px;
+    white-space: nowrap;
 }
-.nw-toggle input:checked + .nw-toggle-slider.nw-toggle-blue::before {
-    background: #00d4ff;
+.nw-tag-remove {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    font-size: 13px;
+    opacity: 0.7;
+    transition: opacity 120ms;
+}
+.nw-tag-remove:hover { opacity: 1; }
+
+/* Tab hint text */
+.nw-tab-hint {
+    font-size: 12px;
+    color: var(--nw-text-muted, #888);
+    margin-bottom: 14px;
 }
 
-.nw-toggle input:checked + .nw-toggle-slider.nw-toggle-orange {
-    background: #2a1500;
-    border-color: #ff6b35;
+/* ── JSON textarea styling ────────────────────────────────────────────────── */
+.nw-json-field {
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 12px;
+    color: #adff00;
+    background: rgba(0,0,0,0.35);
 }
-.nw-toggle input:checked + .nw-toggle-slider.nw-toggle-orange::before {
-    background: #ff6b35;
+
+/* ── Expand button for textarea ──────────────────────────────────────────── */
+.nw-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--nw-text-muted, #888);
+    padding: 0 0 0 6px;
+    vertical-align: middle;
+    transition: color 150ms;
 }
-.nw-deck-admin .nw-deck-modal-overlay {
-					position: fixed;
-					inset: 0;
-					background: rgba(0, 0, 0, 0.78);
-					z-index: 9999;
-					overflow-y: auto;
-					padding: 32px 16px;
-				}
-				.nw-deck-admin .nw-deck-modal-panel {
-					background: #050505;
-					color: #f2f2f2;
-					margin: 24px auto;
-					padding: 24px;
-					max-width: 980px;
-					border-radius: 14px;
-					position: relative;
-					border: 1px solid #2b2b2b;
-					box-shadow: 0 24px 80px rgba(0,0,0,.45);
-				}
-				.nw-deck-admin .nw-deck-modal-panel h2,
-				.nw-deck-admin .nw-deck-modal-panel th,
-				.nw-deck-admin .nw-deck-modal-panel label {
-					color: #f5f5f5;
-				}
-				.nw-deck-admin .nw-deck-modal-panel td,
-				.nw-deck-admin .nw-deck-modal-panel p,
-				.nw-deck-admin .nw-deck-modal-panel span {
-					color: #d6d6d6;
-				}
-				.nw-deck-admin .nw-deck-modal-panel input[type="text"],
-				.nw-deck-admin .nw-deck-modal-panel input[type="url"],
-				.nw-deck-admin .nw-deck-modal-panel input[type="number"],
-				.nw-deck-admin .nw-deck-modal-panel textarea,
-				.nw-deck-admin .nw-deck-modal-panel select {
-					background: #101010;
-					color: #f4f4f4;
-					border: 1px solid #313131;
-					border-radius: 8px;
-				}
-				.nw-deck-admin .nw-deck-modal-panel input:focus,
-				.nw-deck-admin .nw-deck-modal-panel textarea:focus,
-				.nw-deck-admin .nw-deck-modal-panel select:focus {
-					border-color: #adff00;
-					box-shadow: 0 0 0 1px #adff00;
-					outline: none;
-				}
-				.nw-deck-admin #nw-deck-modal-close {
-					color: #f5f5f5;
-					background: transparent;
-					border: 0;
-					cursor: pointer;
-				}
-				.nw-deck-admin .nw-deck-thumb {
-					width: 44px;
-					height: 44px;
-					object-fit: cover;
-					border-radius: 8px;
-					background: #111;
-					border: 1px solid #2a2a2a;
-					display: block;
-				}
-				.nw-deck-admin .nw-deck-thumb-placeholder {
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					color: #666;
-				}
-				.nw-deck-admin #nw-deck-image-preview {
-					display: block;
-					max-width: 220px;
-					max-height: 220px;
-					border-radius: 10px;
-					border: 1px solid #2f2f2f;
-					background: #111;
-					padding: 6px;
-				}
+.nw-expand-btn:hover { color: #adff00; }
+.nw-expand-btn svg { width: 13px; height: 13px; }
+.nw-textarea-tall { resize: vertical; }
+.nw-textarea-expanded { min-height: 320px; }
+
+/* ── Info box ─────────────────────────────────────────────────────────────── */
+.nw-info-box {
+    background: rgba(173,255,0,0.06);
+    border: 1px solid rgba(173,255,0,0.25);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #d4d4d4;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.nw-info-box svg { width: 15px; height: 15px; flex-shrink: 0; color: #adff00; margin-top: 1px; }
+
+/* ── Wide modal for multi-tab form ──────────────────────────────────────── */
+.nw-modal-wide {
+    max-width: 820px;
+    width: 96vw;
+}
