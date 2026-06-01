@@ -18,6 +18,19 @@ if ( ! function_exists( 'tw_register_cyber_hud_assets' ) ) {
 			file_exists( $css_path ) ? (string) filemtime( $css_path ) : NEOWEAVER_VERSION
 		);
 
+		// BUG 19 fix — error / offline state styles (separate file so they load
+		// even when the main HUD CSS is not yet cached / available).
+		$states_rel  = 'assets/css/cyber-hud-states.css';
+		$states_path = NEOWEAVER_PLUGIN_DIR . $states_rel;
+		$states_url  = NEOWEAVER_PLUGIN_URL . $states_rel;
+
+		wp_register_style(
+			'neoweaver-cyber-hud-states',
+			$states_url,
+			array( 'neoweaver-cyber-hud' ),
+			file_exists( $states_path ) ? (string) filemtime( $states_path ) : NEOWEAVER_VERSION
+		);
+
 		wp_register_script(
 			'neoweaver-cyber-hud',
 			$js_url,
@@ -33,6 +46,7 @@ if ( ! function_exists( 'tw_enqueue_cyber_hud_assets' ) ) {
 		static $inline_done = false;
 
 		wp_enqueue_style( 'neoweaver-cyber-hud' );
+		wp_enqueue_style( 'neoweaver-cyber-hud-states' ); // BUG 19 fix
 		wp_enqueue_script( 'neoweaver-cyber-hud' );
 
 		if ( true === $inline_done ) {
