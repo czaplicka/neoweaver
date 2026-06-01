@@ -14,6 +14,16 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 
 		const SHORTCODE = 'tw_adventure_terminal';
 
+		/**
+		 * BUG 11 FIX — init() było wywoływane wprost z poziomu pliku (file scope),
+		 * co oznaczało, że add_shortcode() odpalało się przy każdym require_once,
+		 * bez względu na to czy strona shortcode'a jest wyświetlana.
+		 *
+		 * Teraz rejestrujemy się na hooku 'init' (priorytet 10), który:
+		 * - jest standardowym miejscem dla add_shortcode() w WordPressie
+		 * - uruchamia się po wczytaniu pluginu, ale nadal przed renderą strony
+		 * - izoluje ewentualne przyszłe efekty uboczne w init() przed globalnym scope’em
+		 */
 		public static function init(): void {
 			add_shortcode( self::SHORTCODE, [ __CLASS__, 'render_shortcode' ] );
 		}
@@ -21,6 +31,27 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 		public static function render_shortcode( $atts = [] ): string {
 			if ( ! is_user_logged_in() ) {
 				return '<p class="tw-error">Please log in to access the Terminal.</p>';
+			}
+
+			/**
+			 * BUG 9 FIX — shortcode zawiera dane sesji zalogowanego użytkownika
+			 * (active_character_id, active_session_id, active_campaign_id).
+			 * Jeśli WP Super Cache / W3TC zcachuje tę stronę po renderze dla
+			 * zalogowanego gracza, kolejny (niezalogowany) visitor dostanie cudze UUID.
+			 *
+			 * Rozwiązanie: ustawiamy nagłówki HTTP zabraniające cachowania
+			 * ORAZ domyślną stałą DONOTCACHEPAGE, którą obsługują WP Super Cache,
+			 * W3TC, LiteSpeed Cache i inne popularne pluginy.
+			 *
+			 * UWAGA: anon key sam w sobie jest publiczny (przeznaczony do klienta),
+			 * ale reszta obiektu twAdventureData jest per-user i nie może wyciec.
+			 */
+			if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+				define( 'DONOTCACHEPAGE', true );
+			}
+			if ( ! headers_sent() ) {
+				header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+				header( 'Pragma: no-cache' );
 			}
 
 			$user_id = get_current_user_id();
@@ -41,6 +72,12 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 				'nonce'               => wp_create_nonce( 'tw_adventure_nonce' ),
 				'ajax_url'            => admin_url( 'admin-ajax.php' ),
 				'supabase_url'        => function_exists( 'tw_supabase_url' ) ? tw_supabase_url() : '',
+				/**
+				 * supabase_anon_key: celowo do JS — wymagane do Supabase Realtime
+				 * (subskrypcje kanałów chatów po stronie klienta).
+				 * To NIE jest service key. Service key — NIGDY do JS.
+				 * Patrz: cyber-hud.php poświęcony temu samemu wzorcowi.
+				 */
 				'supabase_anon_key'   => function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '',
 				'content_url'         => content_url(),
 			];
@@ -62,14 +99,27 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 			$c_xp      = $char['c_xp'] ?? 0;
 			$c_status  = $char['c_status'] ?? '';
 
-			// Dane JS wstrzykiwane bezpośrednio w HTML shortcode’a.
-			// wp_add_inline_script() nie działa po wp_head() — używamy <script> w outpucie.
-			$inline_js = '<script id="tw-adventure-data-js">';
-			$inline_js .= 'window.twAdventureData = ' . wp_json_encode( $adventure_payload ) . ';';
-			$inline_js .= 'window.twTacticalData = ' . wp_json_encode( $tactical_data ) . ';';
-			$inline_js .= '</script>';
+			/**
+			 * BUG 10 FIX — JSON_HEX_TAG zamienia < i > na sekwencje Unicode
+			 * (\u003C, \u003E), co uniemożliwia wyjście z bloku <script> przez
+			 * wartość zawierającą </script> (np. złośliwa nazwa postaci).
+			 *
+			 * JSON_HEX_AMP i JSON_HEX_APOS dla kompletności (ochrona przed
+			 * amp-encoding i apostrofami w kontekstach HTML atrybutu).
+			 *
+			 * JSON_UNESCAPED_UNICODE zostawiamy OFF (domyślne) — bezpieczniejsze
+			 * w kontekstach gdzie charset strony może być nieokreślony.
+			 */
+			$json_flags    = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS;
+			$inline_js     = '<script id="tw-adventure-data-js">';
+			$inline_js    .= 'window.twAdventureData = ' . wp_json_encode( $adventure_payload, $json_flags ) . ';';
+			$inline_js    .= 'window.twTacticalData = ' . wp_json_encode( $tactical_data, $json_flags ) . ';';
+			$inline_js    .= '</script>';
 
 			ob_start();
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- inline JS celowo nie jest escapowany przez esc_html;
+			// wszystkie dane użytkownika przeszły przez wp_json_encode z JSON_HEX_TAG
+			// (konwertuje </script> na \u003C/script\u003E), więc XSS jest niemożliwy.
 			echo $inline_js;
 			?>
 			<div class="adventure-shell chat-only" id="adventure-shell">
@@ -158,7 +208,7 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 								<textarea id="chat-input" class="chat-input" placeholder="What will you do?"></textarea>
 							</div>
 							<div class="chat-action-row">
-								<button id="send-btn" class="btn-send">TRANSMIT</button>
+							<button id="send-btn" class="btn-send">TRANSMIT</button>
 							</div>
 						</div>
 					</section>
@@ -254,5 +304,11 @@ if ( ! class_exists( 'TW_Adventure_Terminal_Shortcode' ) ) {
 		}
 	}
 
-	TW_Adventure_Terminal_Shortcode::init();
+	/**
+	 * BUG 11 FIX — rejestracja na hooku 'init' zamiast file scope.
+	 * add_shortcode() wywołane na 'init' jest idiomatycznym wzorcem WP;
+	 * chroni przed niezamierzonymi efektami ubocznymi przy przyszłych
+	 * zmianach w metodzie init().
+	 */
+	add_action( 'init', [ 'TW_Adventure_Terminal_Shortcode', 'init' ] );
 }
