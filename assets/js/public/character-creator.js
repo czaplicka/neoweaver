@@ -1043,7 +1043,7 @@ window.requestAnimationFrame(function () {
 function loadPackages(classId) {
   if (!classId) { state.packages = []; renderPackages([]); return Promise.resolve([]); }
 
-  return fetchPost('neoweaver_get_starting_packages', { class_name: state.class_label.toLowerCase() })
+ return fetchPost('neoweaver_get_starting_packages', { class_name: state.class_label.toLowerCase() })
     .then(function (res) {
       var rows = res && res.success && Array.isArray(res.data) ? res.data : [];
       state.packages = rows;
