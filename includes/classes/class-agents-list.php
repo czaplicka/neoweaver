@@ -22,7 +22,6 @@ class Neoweaver_Agents_List {
 		$characters = $this->repo->get_for_wp_user( $wp_user_id );
 
 		if ( empty( $characters ) ) {
-			// BUG-11 FIX: use home_url() instead of hardcoded /new-agent/
 			$new_agent_url = esc_url( apply_filters( 'neoweaver_new_agent_url', home_url( '/new-agent/' ) ) );
 			return '
 			<div class="tw-agents-empty">
@@ -37,7 +36,26 @@ class Neoweaver_Agents_List {
 
 		$default_avatar = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'assets/images/Avatar.svg';
 
+		// BUG 19 FIX: build a JS registry of character objects keyed by UUID.
+		// Embedding wp_json_encode() output directly in an HTML attribute is unsafe:
+		// JSON can contain `"`, `</script>`, and other sequences that break the
+		// attribute context even after esc_attr(). The safe pattern is a
+		// <script> block with JSON.parse() on a server-controlled string.
+		// twOpenModal() reads from window.nwCharRegistry[id] instead of
+		// reading a data- attribute.
+		$registry_entries = [];
+		foreach ( $characters as $char ) {
+			$cid = (string) ( $char['id'] ?? '' );
+			if ( $cid !== '' ) {
+				$registry_entries[] = wp_json_encode( $cid ) . ':' . wp_json_encode( $char );
+			}
+		}
+		$registry_js = 'window.nwCharRegistry = window.nwCharRegistry || {};'
+			. 'Object.assign(window.nwCharRegistry,{' . implode( ',', $registry_entries ) . '});';
+
 		ob_start();
+		// Emit registry before the card grid so twOpenModal() can read it immediately.
+		echo '<script>' . $registry_js . '</script>';
 		?>
 		<div class="tw-grid">
 			<?php foreach ( $characters as $char ) : ?>
@@ -51,7 +69,6 @@ class Neoweaver_Agents_List {
 				$char_id      = (string) ( $char['id'] ?? '' );
 				$char_id_attr = esc_attr( $char_id );
 				$legend_url   = add_query_arg( 'char_id', rawurlencode( $char_id ), home_url( '/legend/' ) );
-				$char_json    = wp_json_encode( $char );
 				?>
 				<div class="tw-card">
 					<div class="tw-top-meta" data-public-meta="<?php echo $char_id_attr; ?>">
@@ -118,17 +135,29 @@ class Neoweaver_Agents_List {
 					</div>
 
 					<div class="tw-card-actions">
+						<?php
+						// BUG 19 FIX: removed data-char="<?= esc_attr($char_json) ?>".
+						// twOpenModal() now reads from window.nwCharRegistry[data-char-id]
+						// via the <script> registry block emitted above the grid.
+						?>
 						<button
 							class="tw-btn"
-							data-char="<?php echo esc_attr( $char_json ); ?>"
+							data-char-id="<?php echo $char_id_attr; ?>"
 							onclick="twOpenModal(this)"
 						>
 							Agent Dossier
 						</button>
 
+						<?php
+						// BUG 20 FIX: removed onclick='twConfirmDeleteCharacter(<?= wp_json_encode($char_id) ?>, this)'.
+						// Inlining wp_json_encode() inside an onclick attribute is unsafe:
+						// a single-quote in the value breaks out of the attribute context.
+						// The handler is now attached via JS event delegation (see below);
+						// $char_id is passed only as a data-char-id attribute, safely escaped.
+						?>
 						<button
-							class="tw-btn tw-btn-danger"
-							onclick='twConfirmDeleteCharacter(<?php echo wp_json_encode( $char_id ); ?>, this)'
+							class="tw-btn tw-btn-danger tw-btn-delete-agent"
+							data-char-id="<?php echo $char_id_attr; ?>"
 						>
 							Delete Operative
 						</button>
@@ -143,6 +172,21 @@ class Neoweaver_Agents_List {
 				<div id="twModalBody"></div>
 			</div>
 		</div>
+
+		<script>
+		// BUG 20 FIX: event delegation for delete buttons.
+		// Reads char_id safely from data-char-id; no inline JS interpolation.
+		(function () {
+			document.addEventListener('click', function (e) {
+				var btn = e.target.closest('.tw-btn-delete-agent');
+				if (!btn) { return; }
+				var charId = btn.dataset.charId;
+				if (typeof twConfirmDeleteCharacter === 'function') {
+					twConfirmDeleteCharacter(charId, btn);
+				}
+			});
+		}());
+		</script>
 		<?php
 
 		return (string) ob_get_clean();
@@ -150,9 +194,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Return all agents for a WP user (living + dead), with tags and inventory.
-	 *
-	 * @param int $wp_user_id
-	 * @return array
 	 */
 	public function get_roster( int $wp_user_id ): array {
 		return $this->repo->get_for_wp_user( $wp_user_id );
@@ -160,10 +201,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Return living (non-STATUS_DEAD) agents for a WP user.
-	 * Used by campaign step 7 agent selector and multiplayer join screens.
-	 *
-	 * @param int $wp_user_id
-	 * @return array
 	 */
 	public function get_selectable_agents( int $wp_user_id ): array {
 		return $this->repo->get_living_for_wp_user( $wp_user_id );
@@ -171,9 +208,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Return all agents bound to a specific Node (world), regardless of owner.
-	 *
-	 * @param string|int $node_id  Supabase UUID of the cyber_worlds row.
-	 * @return array
 	 */
 	public function get_agents_in_node( $node_id ): array {
 		if ( empty( $node_id ) ) {
@@ -185,11 +219,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Return living agents belonging to a WP user that are bound to a specific Node.
-	 * These are the agents eligible for "Data Ghost" / observer mode.
-	 *
-	 * @param string|int $node_id
-	 * @param int        $wp_user_id
-	 * @return array
 	 */
 	public function get_data_ghosts_for_node( $node_id, int $wp_user_id ): array {
 		if ( empty( $node_id ) || empty( $wp_user_id ) ) {
@@ -200,7 +229,6 @@ class Neoweaver_Agents_List {
 		$in_node  = $this->repo->get_by_node( $node_id );
 		$living   = $this->repo->get_living_for_wp_user( $wp_user_id );
 
-		// Intersect: agents that are in the node AND owned by this user AND alive.
 		$living_ids = array_column( $living, 'id' );
 		$living_set = array_flip( array_map( 'strval', $living_ids ) );
 
@@ -214,10 +242,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Render an HTML <select> of living agents for a WP user.
-	 * Used server-side where a plain dropdown is sufficient.
-	 *
-	 * @param int $wp_user_id
-	 * @return string  HTML <select> or an empty-state message.
 	 */
 	public function render_agent_select( int $wp_user_id ): string {
 		$agents = $this->repo->get_living_for_wp_user( $wp_user_id );
@@ -240,10 +264,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Render a small badge showing the currently active agent for a WP user.
-	 * Returns an empty string when no active session / agent exists.
-	 *
-	 * @param int $wp_user_id
-	 * @return string  HTML badge or empty string.
 	 */
 	public function render_active_agent_badge( int $wp_user_id ): string {
 		$agent = $this->repo->get_active_for_wp_user( $wp_user_id );
@@ -267,10 +287,6 @@ class Neoweaver_Agents_List {
 
 	/**
 	 * Return a minimal array payload for each living agent, ready for JS / REST responses.
-	 * Keys: id, name, lvl, race, class, avatar, world_id.
-	 *
-	 * @param int $wp_user_id
-	 * @return array
 	 */
 	public function to_api_payload( int $wp_user_id ): array {
 		$agents  = $this->repo->get_living_for_wp_user( $wp_user_id );
