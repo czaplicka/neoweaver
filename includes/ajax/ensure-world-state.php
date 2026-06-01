@@ -16,7 +16,8 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			return;
 		}
 
-		if ( ! is_user_logged_in() ) {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
 			wp_send_json_error( [ 'message' => 'Unauthorized' ], 401 );
 			return;
 		}
@@ -32,6 +33,42 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 
 		if ( ! function_exists( 'tw_supabase_get' ) || ! function_exists( 'tw_supabase_request' ) ) {
 			wp_send_json_error( [ 'message' => 'Supabase helper missing' ], 500 );
+			return;
+		}
+
+		// BUG6 FIX: verify the calling user owns or is a participant of this campaign
+		// before allowing world state initialization.
+		// Check cyber_campaign (owner) OR cyber_campaign_characters (participant).
+		$is_owner = false;
+		if ( function_exists( 'tw_supabase_get_admin' ) ) {
+			$owner_row = tw_supabase_get_admin(
+				'cyber_campaign',
+				[
+					'id'         => 'eq.' . $campaign_id,
+					'wp_user_id' => 'eq.' . $user_id,
+					'select'     => 'id',
+					'limit'      => 1,
+				]
+			);
+			$is_owner = is_array( $owner_row ) && ! empty( $owner_row );
+		}
+
+		$is_participant = false;
+		if ( ! $is_owner && function_exists( 'tw_supabase_get_admin' ) ) {
+			$part_row = tw_supabase_get_admin(
+				'cyber_campaign_characters',
+				[
+					'campaign_id' => 'eq.' . $campaign_id,
+					'wp_user_id'  => 'eq.' . $user_id,
+					'select'      => 'campaign_id',
+					'limit'       => 1,
+				]
+			);
+			$is_participant = is_array( $part_row ) && ! empty( $part_row );
+		}
+
+		if ( ! $is_owner && ! $is_participant ) {
+			wp_send_json_error( [ 'message' => 'Campaign not found or access denied' ], 403 );
 			return;
 		}
 
