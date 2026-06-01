@@ -33,10 +33,29 @@ if ( ! function_exists( 'display_cyber_hud' ) ) {
 			);
 		}
 
+		// BUG 19 fix — check for active character / session before rendering the HUD shell.
+		// If no character is resolved, return a visible error state instead of empty bars.
+		$has_character = false;
+		if ( function_exists( 'tw_get_current_character_id' ) ) {
+			$has_character = ! empty( tw_get_current_character_id() );
+		}
+
+		if ( ! $has_character ) {
+			return '<div id="hud-wrapper" class="cyber-hud-wrapper cyber-hud-wrapper--offline" aria-live="polite">' .
+				'<div class="hud-status-label">// NO ACTIVE SESSION — NEURAL LINK OFFLINE</div>' .
+				'</div>';
+		}
+
 		ob_start();
 		?>
 
-		<div id="hud-wrapper" class="cyber-hud-wrapper">
+		<div id="hud-wrapper" class="cyber-hud-wrapper" aria-live="polite">
+			<!-- BUG 19 fix — noscript / JS-failure fallback: hidden by default, shown by CSS if
+			     .hud-js-ready is never added to #hud-wrapper (i.e. the JS bundle never executed). -->
+			<div class="hud-error-state" aria-hidden="true">
+				// HUD OFFLINE — SCRIPT LOAD FAILURE
+			</div>
+
 			<div class="status-dots-row" data-hud-toggle="1">
 				<div class="hud-status-label" id="hud-trigger-text">&rsaquo; SYSTEM_ACTIVE</div>
 				<div class="dots-group">
@@ -102,4 +121,6 @@ if ( ! function_exists( 'tw_register_cyber_hud_shortcode' ) ) {
 	}
 }
 
-tw_register_cyber_hud_shortcode();
+// BUG 18 fix — register on init instead of at file scope so WordPress shortcode
+// infrastructure is fully initialised before the hook fires.
+add_action( 'init', 'tw_register_cyber_hud_shortcode' );
