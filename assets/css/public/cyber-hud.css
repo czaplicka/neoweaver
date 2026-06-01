@@ -56,6 +56,53 @@
 }
 
 /* ==========================================================================
+   2a. OFFLINE STATE (brak sesji / postaci — PHP branch)
+   ========================================================================== */
+.cyber-hud-wrapper--offline {
+    max-height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
+}
+
+.cyber-hud-wrapper--offline .hud-status-label {
+    color: #ff4444;
+    text-shadow: 0 0 12px rgba(255, 68, 68, 0.7);
+    letter-spacing: 2px;
+    font-size: 10px;
+}
+
+/* ==========================================================================
+   2b. JS FAILURE FALLBACK
+   BUG 19 fix — .hud-error-state visible by default; hidden once JS adds
+   .hud-js-ready to #hud-wrapper. .cyber-hud-grid is hidden until JS ready.
+   ========================================================================== */
+.hud-error-state {
+    display: block;
+    padding: 0 30px;
+    height: 40px;
+    line-height: 40px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #ff4444;
+    text-shadow: 0 0 12px rgba(255, 68, 68, 0.7);
+}
+
+#hud-wrapper.hud-js-ready .hud-error-state {
+    display: none;
+}
+
+.cyber-hud-grid {
+    display: none;
+}
+
+#hud-wrapper.hud-js-ready .cyber-hud-grid {
+    display: flex;
+}
+
+/* ==========================================================================
    3. STATUS BAR
    ========================================================================== */
 .status-dots-row {
@@ -82,8 +129,8 @@
 /* ==========================================================================
    4. HUD GRID
    ========================================================================== */
+/* Base display: none — overridden by .hud-js-ready above */
 .cyber-hud-grid {
-    display: flex;
     overflow-x: auto;
     padding: 24px 28px 20px;
     gap: 18px;

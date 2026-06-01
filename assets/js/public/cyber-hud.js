@@ -371,6 +371,11 @@
 		}
 
 		hudInitDone = true;
+
+		// BUG 19 fix — mark wrapper as JS-ready so CSS can hide the
+		// .hud-error-state fallback and show the real .cyber-hud-grid.
+		document.getElementById('hud-wrapper')?.classList.add('hud-js-ready');
+
 		bindHudToggles();
 		initHudRealtimeFlow();
 	}
