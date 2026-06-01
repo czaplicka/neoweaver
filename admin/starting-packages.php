@@ -27,7 +27,7 @@ class NWStartingPackagesAdmin {
 
 	// ── Menu ─────────────────────────────────────────────────────────────────
 	public function register_menu(): void {
-		$menu_parent = 'nw-dashboard';
+		$menu_parent = 'neoweaver';
 		add_submenu_page(
 			$menu_parent,
 			__( 'Starting Packages', 'neoweaver' ),
