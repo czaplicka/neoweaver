@@ -638,6 +638,8 @@ if ( ! function_exists( 'nw_get_starting_packages_handler' ) ) {
 			100,
 			array( 'is_player_selectable' => 'eq.true' )
 		);
+		error_log('NW PACKAGES RAW: ' . print_r($rows, true));
+error_log('NW PACKAGES COUNT: ' . count($rows));
 		if ( is_wp_error( $rows ) ) {
 			wp_send_json_error( array( 'message' => $rows->get_error_message() ), 500 );
 			return;
