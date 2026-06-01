@@ -13,38 +13,59 @@ if ( ! function_exists( 'neoweaver_shortcode_character_creator' ) ) {
 			return '<div class="tw-char-login-required">You need to be logged in to create a character.</div>';
 		}
 
-		wp_enqueue_style( 'neoweaver-character-creator' );
-		wp_enqueue_script( 'neoweaver-character-creator' );
+		// BUG 14 — enqueue only when the handle is registered; register inline fallback if missing.
+		if ( wp_style_is( 'neoweaver-character-creator', 'registered' ) ) {
+			wp_enqueue_style( 'neoweaver-character-creator' );
+		} else {
+			$css_url = plugins_url( 'assets/css/character-creator.css', NW_PLUGIN_FILE );
+			wp_enqueue_style( 'neoweaver-character-creator', $css_url, [], NW_VERSION );
+		}
+
+		if ( wp_script_is( 'neoweaver-character-creator', 'registered' ) ) {
+			wp_enqueue_script( 'neoweaver-character-creator' );
+		} else {
+			$js_url = plugins_url( 'assets/js/character-creator.js', NW_PLUGIN_FILE );
+			wp_enqueue_script( 'neoweaver-character-creator', $js_url, [], NW_VERSION, true );
+		}
+
+		// BUG 15 — total step count is the single source of truth for the counter label.
+		// Add / remove steps here; the PHP counter and JS data attribute stay in sync automatically.
+		$steps = [
+			'IDENTITY SYNC',
+			'RACE PROTOCOL',
+			'CLASS MATRIX',
+			'BIOMETRIC CALIBRATION',
+			'SKILL SELECTION',
+			'STARTING PACKAGE',
+			'DATA ORIGIN',
+			'PREVIOUS OPERATION',
+			'SYNCHRONIZATION CRISIS',
+			'VISUAL SIGNATURE',
+			'SYSTEM REVIEW',
+		];
+		$total_steps = count( $steps );
 
 		ob_start();
 		?>
-		<div id="tw-char-creator-wrapper" class="tw-character-creator tw-char-creator">
+		<div id="tw-char-creator-wrapper" class="tw-character-creator tw-char-creator" data-total-steps="<?php echo esc_attr( (string) $total_steps ); ?>">
 			<div class="tw-progress-bar">
 				<div class="tw-progress-header">
 					<div class="tw-progress-label">
 						OPERATIVE INITIALIZATION <span class="tw-blink" aria-hidden="true"></span>
 					</div>
 					<div class="tw-progress-counter">
-						STEP <span id="tw-char-step-current">1</span> / 11
+						STEP <span id="tw-char-step-current">1</span> / <?php echo esc_html( (string) $total_steps ); ?>
 					</div>
 				</div>
 
 				<div class="tw-progress-track" aria-hidden="true">
 					<div id="tw-char-progress-fill" class="tw-progress-fill"></div>
-					<span class="tw-progress-tick active" data-tick="1"></span>
-					<span class="tw-progress-tick" data-tick="2"></span>
-					<span class="tw-progress-tick" data-tick="3"></span>
-					<span class="tw-progress-tick" data-tick="4"></span>
-					<span class="tw-progress-tick" data-tick="5"></span>
-					<span class="tw-progress-tick" data-tick="6"></span>
-					<span class="tw-progress-tick" data-tick="7"></span>
-					<span class="tw-progress-tick" data-tick="8"></span>
-					<span class="tw-progress-tick" data-tick="9"></span>
-					<span class="tw-progress-tick" data-tick="10"></span>
-					<span class="tw-progress-tick" data-tick="11"></span>
+					<?php for ( $i = 1; $i <= $total_steps; $i++ ) : ?>
+						<span class="tw-progress-tick<?php echo 1 === $i ? ' active' : ''; ?>" data-tick="<?php echo esc_attr( (string) $i ); ?>"></span>
+					<?php endfor; ?>
 				</div>
 
-				<div id="tw-char-progress-phase" class="tw-progress-phase">IDENTITY SYNC</div>
+				<div id="tw-char-progress-phase" class="tw-progress-phase"><?php echo esc_html( $steps[0] ); ?></div>
 			</div>
 
 			<section class="tw-char-step active" data-phase="IDENTITY SYNC">
