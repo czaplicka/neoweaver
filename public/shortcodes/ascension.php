@@ -127,10 +127,9 @@ function nw_shortcode_ascension( array $atts ): string {
 	}
 
 	// ── Query 1: character deck + card definition ──
-	// cyber_deck.deck_category = ID lub slug kategorii (text)
+	// NOTE: no is_locked filter — column may not exist
 	$owned = tw_supabase_get_admin( 'cyber_character_deck', [
 		'character_id' => 'eq.' . $character_id,
-		'is_locked'    => 'eq.false',
 		'select'       => 'id,deck_id,current_level,current_xp,ascension_level,cyber_deck(id,name,img_url,rarity,description,effect,asc_bonuses,deck_category)',
 	] );
 
@@ -141,6 +140,10 @@ function nw_shortcode_ascension( array $atts ): string {
 		</div>';
 
 	if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
+		// Debug: log the actual error if WP_Error
+		if ( is_wp_error( $owned ) ) {
+			error_log( 'NW Ascension: cyber_character_deck error — ' . $owned->get_error_message() );
+		}
 		$out = count( $characters ) > 1 ? _nw_asc_selector( $characters, $character_id ) : '';
 		return $out . $no_cards;
 	}
@@ -156,7 +159,6 @@ function nw_shortcode_ascension( array $atts ): string {
 	}
 
 	// ── Query 2: fetch cyber_card_categories for those IDs ──
-	// cat_map: category_id => [ 'label' => '', 'icon' => '', 'color' => '' ]
 	$cat_map = [];
 	if ( ! empty( $cat_ids ) ) {
 		$ids_csv = implode( ',', array_map( 'sanitize_text_field', array_keys( $cat_ids ) ) );
@@ -273,7 +275,6 @@ function nw_shortcode_ascension( array $atts ): string {
 			$rarity_cls = _nw_asc_rarity_class( $rarity );
 			$state_cls  = $can_ascend ? 'nw-card--ready' : ( $maxed ? '' : 'nw-card--dim' );
 
-			// Category — wszystko pochodzi z cyber_card_categories
 			$cat_label = $def['cat_label'];
 			$cat_icon  = $def['cat_icon'];
 			$cat_color = $def['cat_color'];
@@ -298,7 +299,6 @@ function nw_shortcode_ascension( array $atts ): string {
 				<span class="nw-asc-corner nw-asc-corner--bl"></span>
 				<span class="nw-asc-corner nw-asc-corner--br"></span>
 
-				<!-- Category badge — icon + color z cyber_card_categories -->
 				<?php if ( $cat_label ) : ?>
 				<div class="nw-asc-cat-badge"
 					style="background:<?php echo esc_attr( $cat_color ); ?>22; border-color:<?php echo esc_attr( $cat_color ); ?>66;"
