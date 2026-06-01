@@ -587,4 +587,3 @@ class NWScenariosAdmin {
 <?php
 	}
 }
-new NWScenariosAdmin();
