@@ -3,7 +3,15 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'tw_deck_panel_render' ) ) {
 	function tw_deck_panel_render(): string {
+
+		// BUG 20 fix — wrong template: render a visible admin-only notice instead of
+		// silently returning ''. Editors see the warning; front-end visitors see nothing.
 		if ( ! is_page_template( 'templates/adventure.php' ) ) {
+			if ( current_user_can( 'edit_posts' ) ) {
+				return '<p class="nw-shortcode-misplaced" style="color:#ff0033;font-size:0.75rem;font-family:monospace;">' .
+					'[tw_deck_panel] — ' . esc_html__( 'Shortcode must be used on a page with template templates/adventure.php', 'neoweaver' ) .
+					'</p>';
+			}
 			return '';
 		}
 
@@ -82,4 +90,5 @@ if ( ! function_exists( 'tw_register_deck_panel_shortcode' ) ) {
 	}
 }
 
-tw_register_deck_panel_shortcode();
+// BUG 20 fix — wrap in init so WP shortcode infrastructure is ready.
+add_action( 'init', 'tw_register_deck_panel_shortcode' );
