@@ -34,12 +34,12 @@ if ( ! function_exists( 'nw_shortcode_essences' ) ) {
 
 		$safe_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id );
 
-		// Fetch character row.
+		// Fetch character row — use actual column names: body, reflex, mind, spirit.
 		$character = null;
 		if ( function_exists( 'nw_supabase_base' ) && function_exists( 'nw_supabase_service_headers' ) ) {
 			$url = add_query_arg( [
 				'id'     => 'eq.' . $safe_id,
-				'select' => 'id,name,attr_body,attr_reflex,attr_mind,attr_spirit,race_id,class_id',
+				'select' => 'id,name,body,reflex,mind,spirit,race_id,class_id',
 				'limit'  => 1,
 			], nw_supabase_base() . 'cyber_characters' );
 
@@ -59,10 +59,10 @@ if ( ! function_exists( 'nw_shortcode_essences' ) ) {
 		}
 
 		$essences = [
-			'body'   => (int) ( $character['attr_body']   ?? 0 ),
-			'reflex' => (int) ( $character['attr_reflex'] ?? 0 ),
-			'mind'   => (int) ( $character['attr_mind']   ?? 0 ),
-			'spirit' => (int) ( $character['attr_spirit'] ?? 0 ),
+			'body'   => (int) ( $character['body']   ?? 0 ),
+			'reflex' => (int) ( $character['reflex'] ?? 0 ),
+			'mind'   => (int) ( $character['mind']   ?? 0 ),
+			'spirit' => (int) ( $character['spirit'] ?? 0 ),
 		];
 
 		ob_start();
