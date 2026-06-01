@@ -21,12 +21,14 @@ function nw_ajax_ascend_card(): void {
 
 	if ( ! $character_id || ! $deck_id ) {
 		wp_send_json_error( [ 'message' => 'Missing parameters.' ] );
+		return;
 	}
 
 	// Validate user owns this character (service key)
 	$user_id = get_current_user_id();
 	if ( ! function_exists( 'tw_user_owns_character' ) || ! tw_user_owns_character( $character_id, $user_id ) ) {
 		wp_send_json_error( [ 'message' => 'Character not found or not yours.' ] );
+		return;
 	}
 
 	// Cost table: next_ascension_level => required base copies
@@ -56,6 +58,7 @@ function nw_ajax_ascend_card(): void {
 
 	if ( $next_asc > 5 ) {
 		wp_send_json_error( [ 'message' => 'Card is already at maximum Ascension (5).' ] );
+		return;
 	}
 
 	$required = $asc_cost[ $next_asc ] ?? 999;
@@ -72,6 +75,7 @@ function nw_ajax_ascend_card(): void {
 
 	if ( is_wp_error( $copies ) || ! is_array( $copies ) ) {
 		wp_send_json_error( [ 'message' => 'Could not fetch cards.' ] );
+		return;
 	}
 
 	$count = count( $copies );
@@ -83,6 +87,7 @@ function nw_ajax_ascend_card(): void {
 				$required, $next_asc, $count
 			),
 		] );
+		return;
 	}
 
 	// Keep the best card, consume the rest up to $required
@@ -102,6 +107,7 @@ function nw_ajax_ascend_card(): void {
 	$keeper_id = nw_sanitize_uuid( (string) ( $keeper['id'] ?? '' ) );
 	if ( ! $keeper_id ) {
 		wp_send_json_error( [ 'message' => 'Invalid keeper card ID.' ] );
+		return;
 	}
 
 	$updated = tw_supabase_request(
@@ -117,6 +123,7 @@ function nw_ajax_ascend_card(): void {
 
 	if ( is_wp_error( $updated ) ) {
 		wp_send_json_error( [ 'message' => 'Failed to upgrade card: ' . $updated->get_error_message() ] );
+		return;
 	}
 
 	wp_send_json_success( [
