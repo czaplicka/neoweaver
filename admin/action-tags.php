@@ -1100,3 +1100,4 @@ jQuery(function($){
 
         wp_send_json_success( [ 'id' => $insert['data'][0]['id'] ?? 0 ] );
     }
+}
