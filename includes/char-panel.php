@@ -4,8 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * TALE WEAVER - CHARACTER PANEL LOGIC
- * Ładuje się tylko na stronie gry (templates/adventure.php).
+ * NEOWEAVER - CHARACTER PANEL LOGIC
+ * ᐚduje się tylko na stronie gry (templates/adventure.php).
  */
 
 add_action(
@@ -20,10 +20,14 @@ add_action(
 		$file_url  = trailingslashit( NEOWEAVER_PLUGIN_URL ) . $file_rel;
 		$version   = file_exists( $file_path ) ? (string) filemtime( $file_path ) : NEOWEAVER_VERSION;
 
+		// BUG 1 FIX — prawidłowy handle to 'nw-game-data' (zarejestrowany w neoweaver-wp-core.php
+		// i quick-actions.php). Poprzedni handle 'tw-gamedata' nie istniał, więc WordPress
+		// ignorował zależność i ładował char-panel.js zanim window.twCharacterPanelData
+		// było gotowe — skutkowało to JS TypeError przy każdym załadowaniu strony gry.
 		wp_enqueue_script(
 			'tw-char-panel',
 			$file_url,
-			array( 'tw-gamedata' ),
+			array( 'nw-game-data' ),
 			$version,
 			true
 		);
@@ -33,6 +37,20 @@ add_action(
 			? get_user_game_data_from_supabase( $user_id )
 			: array();
 
+		// BUG 2 UWAGA (dokumentacja wzorca, nie błąd w tym pliku):
+		// Ten obiekt celowo NIE zawiera supabaseKey.
+		//
+		// ZASADA: do twCharacterPanelData / twQuickActionsData i podobnych
+		// konfiguracji JS przekazujemy wyłącznie supabaseUrl.
+		// Klucze Supabase mogą trafić do JS TYLKO jeśli jest to:
+		//   • ANON KEY (tw_supabase_anon_key()) — dopuszczalne dla
+		//     subskrypcji Realtime po stronie klienta (patrz: cyber-hud.php).
+		//   • SERVICE KEY (≈ TW_SUPABASE_SERVICE_KEY) — NIGDY nie trafia do JS.
+		//     Występuje tylko server-side w tw_supabase_request() / tw_supabase_get_admin().
+		//
+		// Przed dodaniem klucza do wp_add_inline_script upewnij się, że to anon key,
+		// nie service key. Skopiowanie wzorca z cyber-hud.php z użyciem złego klucza
+		// ujawniłoby pełny dostęp do bazy danych.
 		$char_panel_data = array(
 			'supabaseUrl'       => function_exists( 'tw_supabase_url' ) ? (string) tw_supabase_url() : '',
 			'activeCharacterId' => (string) ( $game_data['active_character_id'] ?? '' ),
