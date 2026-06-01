@@ -2,12 +2,25 @@
 /**
  * Shortcode: [tw_create_campaign] — 8-step Deployment creation wizard.
  * Registration is handled by Neoweaver_Public::__construct() via shortcode_campaign_creator().
+ * A safety-net add_shortcode() is also registered here on the `init` hook so
+ * the shortcode works even if Neoweaver_Public fails to load (BUG 13).
  * @package Neoweaver
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// BUG 13 — fallback registration: if Neoweaver_Public never called add_shortcode(),
+// this fires on `init` and ensures [tw_create_campaign] is always available.
+add_action( 'init', function () {
+	if (
+		function_exists( 'neoweaver_shortcode_campaign_creator' ) &&
+		! shortcode_exists( 'tw_create_campaign' )
+	) {
+		add_shortcode( 'tw_create_campaign', 'neoweaver_shortcode_campaign_creator' );
+	}
+} );
 
 if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 	function neoweaver_shortcode_campaign_creator(): string {
@@ -16,6 +29,10 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 		if ( ! $user_id ) {
 			return '<div class="neoweaver-screen"><div class="tw-error">ACCESS DENIED: Unauthorized Operator.</div></div>';
 		}
+
+		// BUG 12 — filterable page slugs; override via add_filter() in wp-config or a child plugin.
+		$node_url  = esc_url( home_url( apply_filters( 'neoweaver_new_node_slug', '/new-node/' ) ) );
+		$agent_url = esc_url( home_url( apply_filters( 'neoweaver_new_agent_slug', '/new-agent/' ) ) );
 
 		$gm_styles = [
 			[ 'cinematic_heroic', 'Cinematic Heroic', 'Epic, legendary tone. Actions feel like destiny. Lethal but stylish.', '🎬' ],
@@ -200,14 +217,14 @@ if ( ! function_exists( 'neoweaver_shortcode_campaign_creator' ) ) {
 					<div class="tw-dynamic-grid" id="tw-camp-node-grid">
 						<div class="tw-loading-state"><span class="tw-loading-dot"></span>SCANNING AVAILABLE NODES…</div>
 					</div>
-					<p class="tw-helper-text">No worlds yet? <a href="<?php echo esc_url( home_url( '/new-node/' ) ); ?>" class="tw-link">Deploy a Node first &rarr;</a></p>
+					<p class="tw-helper-text">No worlds yet? <a href="<?php echo $node_url; ?>" class="tw-link">Deploy a Node first &rarr;</a></p>
 				</div>
 
 				<div class="tw-binding-section" style="margin-top:40px;">
 					<h3 class="tw-binding-label">// AGENT <span class="tw-optional-badge">OPTIONAL</span></h3>
 					<p class="tw-helper-text" id="tw-agent-hint" style="margin-bottom:12px;">Select a Node above to filter compatible agents.</p>
 					<div class="tw-dynamic-grid" id="tw-camp-agent-grid"></div>
-					<p class="tw-helper-text">No agents yet? <a href="<?php echo esc_url( home_url( '/new-agent/' ) ); ?>" class="tw-link">Create a Field Agent first &rarr;</a></p>
+					<p class="tw-helper-text">No agents yet? <a href="<?php echo $agent_url; ?>" class="tw-link">Create a Field Agent first &rarr;</a></p>
 				</div>
 
 				<div class="tw-nav-row"><button type="button" class="tw-btn-nav tw-btn-prev">&larr; BACK</button><button type="button" class="tw-btn-nav tw-btn-next">REVIEW &rarr;</button></div>
