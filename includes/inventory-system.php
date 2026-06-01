@@ -192,14 +192,11 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			$patch_body
 		);
 
+		// tw_supabase_request() zwraca WP_Error przy KAŻDYM błędzie HTTP (w tym 4xx/5xx).
+		// Sprawdzanie $result['code'] po tym bloku byłoby dead code — jeśli dotarliśmy
+		// tutaj, 'code' jest zawsze w [200, 299]. Patrz: supabase-helpers.php kontrakt.
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => 'Database update failed' ) );
-			return;
-		}
-
-		if ( is_array( $result ) && isset( $result['code'] ) && ( (int) $result['code'] < 200 || (int) $result['code'] >= 300 ) ) {
-			error_log( 'NW tw_handle_update_inventory_slot: Supabase PATCH failed, code=' . $result['code'] );
-			wp_send_json_error( array( 'message' => 'Database update failed', 'code' => $result['code'] ) );
 			return;
 		}
 
