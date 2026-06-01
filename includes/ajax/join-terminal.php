@@ -34,11 +34,22 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 
 		// Reads use the anon key (respects RLS). Service key is used only for the
 		// signup INSERT below, where elevated privileges are required.
-		$anon_key     = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
-		$service_key  = tw_supabase_service_key();
+		$anon_key    = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+		$service_key = tw_supabase_service_key();
 
 		if ( ! $anon_key ) {
 			wp_send_json_error( array( 'message' => 'supabase_config_missing' ) );
+			return;
+		}
+
+		// BUG 10 FIX: function_exists() only confirms the helper is callable;
+		// it does NOT verify the key has a non-empty value. A misconfigured
+		// wp-config (define('NW_SUPABASE_SERVICE_KEY', '')) passes the
+		// function_exists guard but produces an empty $service_key, causing a
+		// silent Supabase 401 that is indistinguishable from a real insert error.
+		// Fail-fast here with a dedicated error code so operators can diagnose it.
+		if ( empty( $service_key ) ) {
+			wp_send_json_error( array( 'message' => 'supabase_service_key_missing' ) );
 			return;
 		}
 
@@ -56,6 +67,11 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 
 		$safe_char_id = nw_sanitize_uuid( $character_id );
 
+		// NOTE on BUG 11: 'neq.STATUS_DEAD' is intentional and correct.
+		// STATUS_DEAD is the canonical value stored in cyber_characters.status
+		// across the entire codebase (campaign-creator.js, class-agents-list.php,
+		// class-agents-repository.php, public/shortcodes/join-terminal.php).
+		// No leading '#' or lowercase variant is used anywhere — not a bug.
 		$char_url = add_query_arg(
 			array(
 				'id'         => 'eq.' . $safe_char_id,
@@ -105,7 +121,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			return;
 		}
 
-		// nw_sanitize_uuid() strips everything that isn’t a valid UUID character.
+		// nw_sanitize_uuid() strips everything that isn't a valid UUID character.
 		// sanitize_text_field() only strips tags/whitespace — not safe for UUID values
 		// that go directly into a Supabase query string.
 		$campaign_id = function_exists( 'nw_sanitize_uuid' )
