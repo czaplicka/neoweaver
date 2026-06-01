@@ -139,14 +139,14 @@ function nw_shortcode_ascension( array $atts ): string {
 			<p>No cards available for Ascension.</p>
 		</div>';
 
-	if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
-		// Debug: log the actual error if WP_Error
-		if ( is_wp_error( $owned ) ) {
-			error_log( 'NW Ascension: cyber_character_deck error — ' . $owned->get_error_message() );
-		}
-		$out = count( $characters ) > 1 ? _nw_asc_selector( $characters, $character_id ) : '';
-		return $out . $no_cards;
-	}
+if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
+    if ( is_wp_error( $owned ) ) {
+        error_log( 'NW Ascension: cyber_character_deck error — ' . $owned->get_error_message() );
+        return '<pre>ERROR: ' . $owned->get_error_message() . '</pre>';
+    }
+    error_log( 'NW Ascension: owned empty, character_id=' . $character_id . ', count=' . count( (array)$owned ) );
+    return '<pre>DEBUG: character_id=' . esc_html($character_id) . ' | owned count=' . count((array)$owned) . ' | raw=' . esc_html(json_encode($owned)) . '</pre>';
+}
 
 	// ── Collect unique deck_category values ──
 	$cat_ids = [];
