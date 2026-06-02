@@ -13,11 +13,17 @@ class NWScenariosAdmin {
 
 	private string $page_slug    = 'nw-scenarios';
 	private string $menu_parent  = 'neoweaver';
+	private string $nonce_action = 'nw_scenarios_nonce';
+private string $table        = 'cyber_scenarios';
+
+private const TYPES = [ 'main', 'side', 'event', 'boss', 'daily' ];
+private const CATEGORIES = [ 'combat', 'stealth', 'social', 'exploration', 'crafting', 'survival' ];
 
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'wp_ajax_nw_scenarios_list',   [ $this, 'ajax_list' ] );
+add_action( 'wp_ajax_nw_scenarios_load',   [ $this, 'ajax_load' ] );
+add_action( 'wp_ajax_nw_scenarios_duplicate', [ $this, 'ajax_duplicate' ] );
 		add_action( 'wp_ajax_nw_scenarios_save',   [ $this, 'ajax_save' ] );
 		add_action( 'wp_ajax_nw_scenarios_delete', [ $this, 'ajax_delete' ] );
 	}
