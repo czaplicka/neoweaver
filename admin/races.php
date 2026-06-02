@@ -25,7 +25,7 @@ public function register_menu(): void {
 add_submenu_page(
     $this->menu_parent,
     'Races',                                                    // page_title
-    '<span data-lucide="users-round"></span> Races',            // menu_title
+    '<span data-lucide-menu="users-round"></span> Races',            // menu_title
     'manage_options',                                           // capability
     $this->page_slug,                                           // menu_slug
     [ $this, 'render_page' ]                                    // callback
