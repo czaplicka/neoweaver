@@ -8,6 +8,14 @@
  *   cyber_character_play_cards — cards currently in active game (pile/hand/discard)
  */
 
+// Detect shortcode BEFORE wp_head so tw_register_library_assets() can enqueue on time.
+add_action( 'wp', function () {
+	global $tw_library_needed, $post;
+	if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'cyber_deck_library' ) ) {
+		$tw_library_needed = true;
+	}
+} );
+
 add_shortcode( 'cyber_deck_library', 'tw_shortcode_deck_library' );
 function tw_shortcode_deck_library( $atts ): string {
 
@@ -115,7 +123,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── Enqueue assets ──────────────────────────────────────────────────
+	// ── Enqueue assets (fallback — normalnie odpala wp hook wyzej) ───────
 	if ( function_exists( 'tw_enqueue_library_assets' ) ) {
 		tw_enqueue_library_assets( [
 			'characterId' => $safe_id,
