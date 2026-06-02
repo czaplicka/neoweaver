@@ -130,7 +130,9 @@
 	height: 13px;
 }
 
-/* ── Card image (new wrapper + legacy img) ─────────────────── */
+/* ── Card image ─────────────────────────────────────────────── */
+
+/* new wrapper (library cards) */
 .nw-asc-img-wrap {
 	position: relative;
 	width: 100%;
@@ -173,7 +175,9 @@
 	filter: none;
 }
 
-/* ── Card body ─────────────────────────────────────────────── */
+/* ── Sections: header / body / footer ────────────────────────── */
+
+/* shared card body padding (ascension.php uses nw-asc-card-body) */
 .nw-asc-card-body {
 	padding: 0.85rem;
 	display: flex;
@@ -182,7 +186,7 @@
 	flex: 1;
 }
 
-/* new semantic sections (library cards) */
+/* semantic sections for library cards */
 .nw-asc-header {
 	padding: 0.55rem 0.85rem 0;
 	display: flex;
@@ -204,14 +208,9 @@
 	padding: 0.55rem 0.85rem 0.65rem;
 }
 
-/* ── Header row ─────────────────────────────────────────────── */
-.nw-asc-card-header {
-	display: flex;
-	align-items: center;
-	gap: 0.45rem;
-	overflow: hidden;
-}
+/* ── Text elements ───────────────────────────────────────────── */
 
+/* card name — used in both ascension.php (.nw-asc-card-header) and library (.nw-asc-header) */
 .nw-asc-name {
 	font-size: 0.88rem;
 	font-weight: 700;
@@ -235,6 +234,7 @@
 	opacity: 0.8;
 }
 
+/* category label (ascension.php) */
 .nw-asc-category {
 	font-size: 0.65rem;
 	text-transform: uppercase;
@@ -244,7 +244,6 @@
 	flex-shrink: 0;
 }
 
-/* ── Description & effect ──────────────────────────────────── */
 .nw-asc-desc {
 	font-size: 0.75rem;
 	color: #7a9e6a;
@@ -322,7 +321,7 @@
 	box-shadow: 0 0 5px rgba(173,255,0,0.5);
 }
 
-/* ── Button ────────────────────────────────────────────────── */
+/* ── Buttons ───────────────────────────────────────────────── */
 .nw-asc-btn {
 	margin-top: auto;
 	width: 100%;
@@ -344,7 +343,7 @@
 	transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-/* ready = active deck card → green glow */
+/* ready = active deck → green glow */
 .nw-asc-btn--ready,
 .nw-asc-card.ready .nw-asc-btn,
 .nw-asc-card.nw-card--ready .nw-asc-btn {
@@ -352,7 +351,6 @@
 	background: rgba(173,255,0,0.1);
 	color: #adff00;
 }
-
 .nw-asc-btn--ready:hover,
 .nw-asc-card.ready .nw-asc-btn:hover,
 .nw-asc-card.nw-card--ready .nw-asc-btn:hover {
@@ -365,7 +363,6 @@
 	border-color: rgba(173,255,0,0.18);
 	color: rgba(173,255,0,0.55);
 }
-
 .nw-asc-btn--locked:hover {
 	background: rgba(173,255,0,0.07);
 	border-color: rgba(173,255,0,0.4);
@@ -379,7 +376,7 @@
 	border-color: rgba(173,255,0,0.08);
 }
 
-/* loading state for toggle button */
+/* loading state */
 .nw-lib-toggle.is-loading {
 	opacity: 0.5;
 	pointer-events: none;
@@ -398,7 +395,7 @@
 	background: rgba(230,184,0,0.05);
 }
 
-/* ── Empty state ───────────────────────────────────────────── */
+/* ── Empty states ───────────────────────────────────────────── */
 .nw-ascension-empty {
 	text-align: center;
 	padding: 3rem 1rem;
@@ -411,7 +408,6 @@
 	align-items: center;
 	gap: 0.75rem;
 }
-
 .nw-ascension-empty svg {
 	width: 36px;
 	height: 36px;
