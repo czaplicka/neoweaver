@@ -26,7 +26,7 @@ class NWScenariosAdmin {
 		add_submenu_page(
 			$this->menu_parent,
 			'Scenarios',
-			'<span data-lucide="scroll-text"></span> Scenarios',
+			'<span data-lucide-menu="scroll-text"></span> Scenarios',
 			'manage_options',
 			$this->page_slug,
 			[ $this, 'render_page' ]
