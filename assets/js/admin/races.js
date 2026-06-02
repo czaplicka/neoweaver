@@ -125,7 +125,7 @@
 	// ── Load ──────────────────────────────────────────────────────────────────
 	function loadRaces() {
 		$('#nw-races-tbody').html(`<tr class="nw-loading-row"><td colspan="9"><span class="nw-spinner"></span> Loading races…</td></tr>`);
-		$.post(A, { action: 'nw_races_load', nonce: N }, res => {
+		$.post(A, { action: 'nw_races_list', nonce: N }, res => {
 			if (!res.success) { notice(res.data || 'Load failed.', 'error'); return; }
 			allRows = res.data;
 			updateStats(allRows);
