@@ -71,7 +71,7 @@ function tw_shortcode_deck_library( $atts ): string {
 	if ( function_exists( 'tw_supabase_get_admin' ) ) {
 		$raw = tw_supabase_get_admin( 'cyber_character_deck', [
 			'character_id' => 'eq.' . $safe_id,
-			'select' => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+			'select'       => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
 		] );
 		if ( is_array( $raw ) ) {
 			$all_assigned = $raw;
@@ -95,6 +95,36 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
+	// ── 2b. Fetch category labels / icons / colors ────────────────────────
+	$cat_ids = [];
+	foreach ( $all_assigned as $row ) {
+		$cdata  = is_array( $row['cyber_deck'] ?? null ) ? $row['cyber_deck'] : [];
+		$cat_id = (string) ( $cdata['deck_category'] ?? '' );
+		if ( $cat_id !== '' ) {
+			$cat_ids[ $cat_id ] = true;
+		}
+	}
+	$cat_map = [];
+	if ( ! empty( $cat_ids ) && function_exists( 'tw_supabase_get_admin' ) ) {
+		$ids_csv = implode( ',', array_map( 'sanitize_text_field', array_keys( $cat_ids ) ) );
+		$cats    = tw_supabase_get_admin( 'cyber_card_categories', [
+			'id'     => 'in.(' . $ids_csv . ')',
+			'select' => 'id,label,icon,color',
+		] );
+		if ( ! is_wp_error( $cats ) && is_array( $cats ) ) {
+			foreach ( $cats as $cat ) {
+				$cid = (string) ( $cat['id'] ?? '' );
+				if ( $cid !== '' ) {
+					$cat_map[ $cid ] = [
+						'label' => (string) ( $cat['label'] ?? $cid ),
+						'icon'  => (string) ( $cat['icon']  ?? 'tag' ),
+						'color' => (string) ( $cat['color'] ?? '#adff00' ),
+					];
+				}
+			}
+		}
+	}
+
 	// ── 3. Split into active vs library ─────────────────────────────
 	$active_cards  = [];
 	$library_cards = [];
@@ -106,14 +136,21 @@ function tw_shortcode_deck_library( $atts ): string {
 			continue;
 		}
 
+		$cat_id = (string) ( $cdata['deck_category'] ?? '' );
+		$cat    = $cat_map[ $cat_id ] ?? [ 'label' => '', 'icon' => 'tag', 'color' => '#adff00' ];
+
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
 			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
 			'name'        => (string) ( $cdata['name']        ?? '' ),
 			'description' => (string) ( $cdata['description'] ?? '' ),
+			'effect'      => (string) ( $cdata['effect']      ?? '' ),
 			'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
 			'rarity'      => (string) ( $cdata['rarity']      ?? '' ),
+			'cat_label'   => $cat['label'],
+			'cat_icon'    => $cat['icon'] !== '' ? $cat['icon'] : 'tag',
+			'cat_color'   => $cat['color'] !== '' ? $cat['color'] : '#adff00',
 		];
 
 		if ( in_array( $rid, $active_deck_ids, true ) ) {
@@ -133,10 +170,6 @@ function tw_shortcode_deck_library( $atts ): string {
 		] );
 	}
 
-	// Build chars JSON for JS (AJAX character switch)
-	$chars_json = wp_json_encode(
-		array_map( static fn( $c ) => [ 'id' => (string) ( $c['id'] ?? '' ), 'name' => (string) ( $c['name'] ?? '' ) ], $characters )
-	);
 	$ajax_nonce = wp_create_nonce( 'cyber_deck_library_switch' );
 	$ajax_url   = esc_url( admin_url( 'admin-ajax.php' ) );
 
@@ -174,7 +207,7 @@ function tw_shortcode_deck_library( $atts ): string {
 						<?php echo count( $active_cards ); ?>/50
 					</span>
 				</h3>
-				<div id="active-deck" class="nw-cards-grid">
+				<div id="active-deck" class="nw-ascension-grid">
 					<?php if ( empty( $active_cards ) ) : ?>
 						<p class="nw-cards-empty">No cards in active play.</p>
 					<?php else : ?>
@@ -188,7 +221,7 @@ function tw_shortcode_deck_library( $atts ): string {
 			<!-- ── Library ── -->
 			<div class="deck-section">
 				<h3>Library</h3>
-				<div id="library-deck" class="nw-cards-grid">
+				<div id="library-deck" class="nw-ascension-grid">
 					<?php if ( empty( $library_cards ) ) : ?>
 						<p class="nw-cards-empty">Library is empty.</p>
 					<?php else : ?>
@@ -211,7 +244,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		var sel = document.getElementById('char_id_select');
 		if ( ! sel ) return;
 		sel.addEventListener('change', function(){
-			var charId = this.value;
+			var charId  = this.value;
 			var spinner = document.getElementById('deck-switch-spinner');
 			var inner   = document.getElementById('deck-builder-inner');
 			if ( spinner ) spinner.style.display = 'inline';
@@ -247,13 +280,15 @@ function tw_shortcode_deck_library( $atts ): string {
 }
 
 /**
- * Render a single card using .nw-card classes from cards.css.
+ * Render a single library / active-deck card.
+ * Uses the same HTML structure as .nw-asc-card (ascension.php).
  *
- * @param array  $card     Card data array.
+ * @param array  $card     Card data.
  * @param string $location 'active' or 'library'.
- * @return string  HTML string.
+ * @return string HTML.
  */
 function tw_render_library_card( array $card, string $location ): string {
+
 	$rarity_map = [
 		'common'    => 'nw-card--common',
 		'uncommon'  => 'nw-card--uncommon',
@@ -261,63 +296,99 @@ function tw_render_library_card( array $card, string $location ): string {
 		'epic'      => 'nw-card--epic',
 		'legendary' => 'nw-card--legendary',
 	];
-	$cat_map = [
-		'magic'     => 'nw-card--magic',
-		'combat'    => 'nw-card--combat',
-		'action'    => 'nw-card--action',
-		'social'    => 'nw-card--social',
-		'equipment' => 'nw-card--equipment',
-		'tech'      => 'nw-card--tech',
+
+	$rarity_colors = [
+		'common'    => '#6b7280',
+		'uncommon'  => '#22c55e',
+		'rare'      => '#3b82f6',
+		'epic'      => '#a855f7',
+		'legendary' => '#f59e0b',
 	];
 
-	$rarity_key  = strtolower( $card['rarity'] );
-	$cat_key     = strtolower( $card['category'] );
-	$rarity_cls  = $rarity_map[ $rarity_key ] ?? 'nw-card--common';
-	$cat_cls     = $cat_map[ $cat_key ] ?? '';
-	$active_cls  = ( 'active' === $location ) ? 'nw-card--ready' : '';
-	$ctx_cls     = 'nw-card--library';
+	$rarity_key   = strtolower( $card['rarity'] );
+	$rarity_cls   = $rarity_map[ $rarity_key ] ?? 'nw-card--common';
+	$active_cls   = ( 'active' === $location ) ? 'nw-card--ready' : '';
+	$rarity_color = ( 'active' === $location ) ? '#adff00' : ( $rarity_colors[ $rarity_key ] ?? '#6b7280' );
 
-	$classes = trim( implode( ' ', array_filter( [
-		'nw-card',
-		$rarity_cls,
-		$cat_cls,
-		$active_cls,
-		$ctx_cls,
-	] ) ) );
+	$classes = trim( implode( ' ', array_filter( [ 'nw-asc-card', $rarity_cls, $active_cls ] ) ) );
 
-	$name    = esc_html( $card['name'] );
-	$level   = (int) $card['level'];
-	$desc    = esc_html( $card['description'] );
-	$iid     = esc_attr( (string) $card['instance_id'] );
-	$loc     = esc_attr( $location );
-	$cat_lbl = esc_html( ucfirst( $cat_key ) );
+	$name      = esc_html( $card['name'] );
+	$level     = (int) $card['level'];
+	$desc      = esc_html( $card['description'] );
+	$effect    = esc_html( $card['effect'] ?? '' );
+	$iid       = esc_attr( (string) $card['instance_id'] );
+	$loc       = esc_attr( $location );
+	$cat_label = esc_html( $card['cat_label'] ?? '' );
+	$cat_icon  = esc_attr( $card['cat_icon']  ?? 'tag' );
+	$cat_color = esc_attr( $card['cat_color'] ?? '#adff00' );
+	$r_color   = esc_attr( $rarity_color );
 
+	// Image
 	$img_html = '';
 	if ( ! empty( $card['img_url'] ) ) {
-		$img_html = sprintf(
-			'<img src="%s" alt="%s" loading="lazy" width="200" height="200" style="width:100%%;height:120px;object-fit:cover;">',
-			esc_url( $card['img_url'] ),
-			$name
-		);
+		$src      = esc_url( $card['img_url'] );
+		$img_html = <<<HTML
+<div class="nw-asc-img-wrap">
+	<img src="{$src}" alt="{$name}" loading="lazy" width="200" height="200">
+	<div class="nw-asc-img-overlay"></div>
+</div>
+HTML;
 	}
+
+	// Category badge
+	$cat_badge = '';
+	if ( $cat_label !== '' ) {
+		$cat_badge = <<<HTML
+<div class="nw-asc-cat-badge"
+	style="background:{$cat_color}22; border-color:{$cat_color}66;"
+	title="{$cat_label}">
+	<i data-lucide="{$cat_icon}" style="color:{$cat_color};"></i>
+</div>
+HTML;
+	}
+
+	// Effect line
+	$effect_html = $effect !== '' ? "<p class=\"nw-asc-effect\">{$effect}</p>" : '';
+
+	// Footer button
+	$action_label = ( 'active' === $location ) ? 'Remove' : 'Add to Deck';
+	$action_icon  = ( 'active' === $location ) ? 'minus-circle' : 'plus-circle';
+	$btn_cls      = ( 'active' === $location ) ? 'nw-asc-btn--ready' : 'nw-asc-btn--locked';
 
 	return <<<HTML
 <div class="{$classes}"
+	 style="--nw-rarity-color:{$r_color}; --nw-cat-color:{$cat_color};"
 	 draggable="true"
 	 data-instance-id="{$iid}"
 	 data-card-location="{$loc}">
+
+	<span class="nw-asc-corner nw-asc-corner--tl"></span>
+	<span class="nw-asc-corner nw-asc-corner--tr"></span>
+	<span class="nw-asc-corner nw-asc-corner--bl"></span>
+	<span class="nw-asc-corner nw-asc-corner--br"></span>
+
+	{$cat_badge}
 	{$img_html}
-	<div class="nw-card__header">
-		<span class="nw-card__name">{$name}</span>
-		<span class="nw-card__level">LVL&nbsp;{$level}</span>
-		<span class="nw-card__rarity-dot"></span>
+
+	<div class="nw-asc-header">
+		<span class="nw-asc-name">{$name}</span>
+		<span class="nw-asc-level">LVL&nbsp;{$level}</span>
 	</div>
-	<div class="nw-card__body">
-		<p class="nw-card__desc">{$desc}</p>
-		<div class="nw-card__tags">
-			<span class="nw-card__tag">{$cat_lbl}</span>
-		</div>
+
+	<div class="nw-asc-body">
+		<p class="nw-asc-desc">{$desc}</p>
+		{$effect_html}
 	</div>
+
+	<div class="nw-asc-footer">
+		<button class="nw-asc-btn {$btn_cls} nw-lib-toggle"
+			data-instance-id="{$iid}"
+			data-location="{$loc}">
+			<i data-lucide="{$action_icon}" style="width:11px;height:11px;vertical-align:middle;"></i>
+			{$action_label}
+		</button>
+	</div>
+
 </div>
 HTML;
 }
@@ -339,22 +410,19 @@ function tw_ajax_deck_library_switch(): void {
 		wp_send_json_error( [ 'message' => 'Invalid character.' ] );
 	}
 
-	// Verify character belongs to user
 	$characters = function_exists( 'tw_get_user_characters' ) ? tw_get_user_characters( $user_id ) : [];
 	$allowed    = array_map( static fn( $c ) => (string) ( $c['id'] ?? '' ), $characters );
 	if ( ! in_array( $safe_id, $allowed, true ) ) {
 		wp_send_json_error( [ 'message' => 'Access denied.' ] );
 	}
 
-	// Init play cards
 	tw_supabase_rpc( 'cyber_init_play_cards', [ 'p_character_id' => $safe_id ] );
 
-	// Fetch cards (admin key)
 	$all_assigned = [];
 	if ( function_exists( 'tw_supabase_get_admin' ) ) {
 		$raw = tw_supabase_get_admin( 'cyber_character_deck', [
 			'character_id' => 'eq.' . $safe_id,
-			'select' => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+			'select'       => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
 		] );
 		if ( is_array( $raw ) ) $all_assigned = $raw;
 	}
@@ -373,6 +441,34 @@ function tw_ajax_deck_library_switch(): void {
 		}
 	}
 
+	// Fetch categories
+	$cat_ids = [];
+	foreach ( $all_assigned as $row ) {
+		$cdata  = is_array( $row['cyber_deck'] ?? null ) ? $row['cyber_deck'] : [];
+		$cat_id = (string) ( $cdata['deck_category'] ?? '' );
+		if ( $cat_id !== '' ) $cat_ids[ $cat_id ] = true;
+	}
+	$cat_map = [];
+	if ( ! empty( $cat_ids ) && function_exists( 'tw_supabase_get_admin' ) ) {
+		$ids_csv = implode( ',', array_map( 'sanitize_text_field', array_keys( $cat_ids ) ) );
+		$cats    = tw_supabase_get_admin( 'cyber_card_categories', [
+			'id'     => 'in.(' . $ids_csv . ')',
+			'select' => 'id,label,icon,color',
+		] );
+		if ( ! is_wp_error( $cats ) && is_array( $cats ) ) {
+			foreach ( $cats as $cat ) {
+				$cid = (string) ( $cat['id'] ?? '' );
+				if ( $cid !== '' ) {
+					$cat_map[ $cid ] = [
+						'label' => (string) ( $cat['label'] ?? $cid ),
+						'icon'  => (string) ( $cat['icon']  ?? 'tag' ),
+						'color' => (string) ( $cat['color'] ?? '#adff00' ),
+					];
+				}
+			}
+		}
+	}
+
 	$active_cards  = [];
 	$library_cards = [];
 	foreach ( $all_assigned as $row ) {
@@ -380,14 +476,21 @@ function tw_ajax_deck_library_switch(): void {
 		$cdata = is_array( $row['cyber_deck'] ?? null ) ? $row['cyber_deck'] : [];
 		if ( ! $rid || empty( $cdata ) ) continue;
 
+		$cat_id = (string) ( $cdata['deck_category'] ?? '' );
+		$cat    = $cat_map[ $cat_id ] ?? [ 'label' => '', 'icon' => 'tag', 'color' => '#adff00' ];
+
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
 			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
 			'name'        => (string) ( $cdata['name']        ?? '' ),
 			'description' => (string) ( $cdata['description'] ?? '' ),
+			'effect'      => (string) ( $cdata['effect']      ?? '' ),
 			'category'    => (string) ( $cdata['cyber_card_types']['category_id'] ?? '' ),
 			'rarity'      => (string) ( $cdata['rarity']      ?? '' ),
+			'cat_label'   => $cat['label'],
+			'cat_icon'    => $cat['icon'] !== '' ? $cat['icon'] : 'tag',
+			'cat_color'   => $cat['color'] !== '' ? $cat['color'] : '#adff00',
 		];
 
 		if ( in_array( $rid, $active_deck_ids, true ) ) {
@@ -407,7 +510,7 @@ function tw_ajax_deck_library_switch(): void {
 					<?php echo count( $active_cards ); ?>/50
 				</span>
 			</h3>
-			<div id="active-deck" class="nw-cards-grid">
+			<div id="active-deck" class="nw-ascension-grid">
 				<?php if ( empty( $active_cards ) ) : ?>
 					<p class="nw-cards-empty">No cards in active play.</p>
 				<?php else : foreach ( $active_cards as $card ) : ?>
@@ -418,7 +521,7 @@ function tw_ajax_deck_library_switch(): void {
 
 		<div class="deck-section">
 			<h3>Library</h3>
-			<div id="library-deck" class="nw-cards-grid">
+			<div id="library-deck" class="nw-ascension-grid">
 				<?php if ( empty( $library_cards ) ) : ?>
 					<p class="nw-cards-empty">Library is empty.</p>
 				<?php else : foreach ( $library_cards as $card ) : ?>
