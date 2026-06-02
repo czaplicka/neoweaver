@@ -1,11 +1,19 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+/**
+ * Flaga: czy na tej stronie jest shortcode [nw_library]?
+ * Ustawiana w public/shortcodes/library.php przez tw_library_shortcode_detect()
+ * zanim wp_head wyemituje <head>.
+ */
+global $tw_library_needed;
+$tw_library_needed = false;
+
 if ( ! function_exists( 'tw_register_library_assets' ) ) {
 	function tw_register_library_assets(): void {
-		$cards_rel = 'assets/css/public/cards.css';
-		$css_rel   = 'assets/css/public/library.css';
-		$js_rel    = 'assets/js/public/library.js';
+		$cards_rel  = 'assets/css/public/cards.css';
+		$css_rel    = 'assets/css/public/library.css';
+		$js_rel     = 'assets/js/public/library.js';
 		$cards_path = NEOWEAVER_PLUGIN_DIR . $cards_rel;
 		$css_path   = NEOWEAVER_PLUGIN_DIR . $css_rel;
 		$js_path    = NEOWEAVER_PLUGIN_DIR . $js_rel;
@@ -33,9 +41,15 @@ if ( ! function_exists( 'tw_register_library_assets' ) ) {
 			file_exists( $js_path ) ? (string) filemtime( $js_path ) : NEOWEAVER_VERSION,
 			true
 		);
+
+		// Enqueue tylko jeśli strona ma shortcode library
+		global $tw_library_needed;
+		if ( $tw_library_needed ) {
+			tw_enqueue_library_assets();
+		}
 	}
 
-	add_action( 'wp_enqueue_scripts', 'tw_register_library_assets', 5 );
+	add_action( 'wp_enqueue_scripts', 'tw_register_library_assets', 15 );
 }
 
 if ( ! function_exists( 'tw_enqueue_library_assets' ) ) {
@@ -53,8 +67,6 @@ if ( ! function_exists( 'tw_enqueue_library_assets' ) ) {
 
 		$done = true;
 
-		// Ensure ajaxUrl and nonce are always present regardless of caller.
-		// save-deck.php verifies nonce 'cyber_deck_builder'.
 		$config = array_merge(
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
