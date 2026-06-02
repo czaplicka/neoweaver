@@ -73,11 +73,11 @@ add_action( 'wp_ajax_nw_scenarios_duplicate', [ $this, 'ajax_duplicate' ] );
 	private function supa( string $method, string $endpoint, array $body = [], array $extra_headers = [] ): array {
 		$method = strtoupper( $method );
 
-		if ( $method === 'GET' && function_exists( 'tw_supabase_get' ) ) {
+		if ( $method === 'GET' && function_exists( 'tw_supabase_get_admin' ) ) {
 			[ $table, $qs ] = array_pad( explode( '?', $endpoint, 2 ), 2, '' );
 			$query = [];
 			if ( $qs ) parse_str( $qs, $query );
-			$data = tw_supabase_get( $table, $query, array_merge( $this->sk(), $extra_headers ) );
+			$data = tw_supabase_get_admin( $table, $query, array_merge( $this->sk(), $extra_headers ) );
 			if ( ! is_array( $data ) ) return [ 'ok' => false, 'code' => 0, 'data' => null, 'error' => 'Non-array response' ];
 			if ( isset( $data['code'], $data['message'] ) ) return [ 'ok' => false, 'code' => (int) $data['code'], 'data' => null, 'error' => $data['message'] ];
 			return [ 'ok' => true, 'code' => 200, 'data' => $data, 'error' => null ];
