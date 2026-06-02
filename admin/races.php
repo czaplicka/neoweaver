@@ -20,6 +20,7 @@ class NWRacesAdmin {
 		add_action( 'wp_ajax_nw_races_list', [ $this, 'ajax_list' ] );
 		add_action( 'wp_ajax_nw_races_save', [ $this, 'ajax_save' ] );
 		add_action( 'wp_ajax_nw_races_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_races_duplicate', [ $this, 'ajax_duplicate' ] );
 	}
 public function register_menu(): void {
 add_submenu_page(
@@ -77,4 +78,22 @@ add_submenu_page(
 		$resp = nw_supa_delete( 'cyber_races?id=eq.' . $id );
 		wp_send_json( $resp );
 	}
+	public function ajax_duplicate(): void {
+    check_ajax_referer( 'nw_races_nonce', 'nonce' );
+    $id   = intval( $_POST['id'] ?? 0 );
+    $orig = nw_supa_get( 'cyber_races?id=eq.' . $id . '&select=*' );
+
+    if ( empty( $orig['data'][0] ) ) {
+        wp_send_json_error( 'Race not found.' );
+        return;
+    }
+
+    $row = $orig['data'][0];
+    unset( $row['id'], $row['created_at'], $row['updated_at'] );
+    $row['name']      = $row['name'] . ' (copy)';
+    $row['is_active'] = false;
+
+    $resp = nw_supa_post( 'cyber_races', $row );
+    wp_send_json( $resp );
+}
 }
