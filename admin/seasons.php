@@ -23,26 +23,28 @@ class NWSeasonsAdmin {
 		);
 	}
 
-	public function enqueue( $hook ) {
-		if ( strpos( $hook, 'nw-seasons' ) === false ) return;
-		wp_enqueue_style(
-			'nw-seasons-css',
-			plugins_url( 'assets/css/admin/seasons.css', NW_PLUGIN_FILE ),
-			[ 'nw-admin-core' ],
-			NW_VERSION
-		);
-		wp_enqueue_script(
-			'nw-seasons-js',
-			plugins_url( 'assets/js/admin/seasons.js', NW_PLUGIN_FILE ),
-			[ 'jquery', 'nw-admin-core' ],
-			NW_VERSION,
-			true
-		);
-		wp_localize_script( 'nw-seasons-js', 'NWSeasons', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'nwseasonsnonce' ),
-		] );
-	}
+	public function enqueue( $hook ): void {
+    if ( ! str_contains( $hook, 'nw-seasons' ) ) return;
+    wp_enqueue_style( 'nw-admin-core' );
+    wp_enqueue_style(
+        'nw-seasons-css',
+        NW_PLUGIN_URL . 'assets/css/admin/seasons.css',
+        [],
+        NW_VERSION
+    );
+    wp_enqueue_script( 'nw-lucide' );
+    wp_enqueue_script(
+        'nw-seasons-js',
+        NW_PLUGIN_URL . 'assets/js/admin/seasons.js',
+        [ 'nw-lucide' ],
+        NW_VERSION,
+        true
+    );
+    wp_localize_script( 'nw-seasons-js', 'NWSeasons', [
+        'ajaxurl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( 'nwseasonsnonce' ),
+    ] );
+}
 
 	public function render_page() {
 		?>
