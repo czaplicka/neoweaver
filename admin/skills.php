@@ -1,14 +1,17 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 class NWSkillsAdmin {
 
 	public function __construct() {
-		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
+		add_action( 'admin_menu', [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
-		add_action( 'wp_ajax_nw_skills_load',      [ $this, 'ajax_load' ] );
-		add_action( 'wp_ajax_nw_skills_save',      [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_skills_delete',    [ $this, 'ajax_delete' ] );
+
+		add_action( 'wp_ajax_nw_skills_load', [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_skills_save', [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_skills_delete', [ $this, 'ajax_delete' ] );
 		add_action( 'wp_ajax_nw_skills_duplicate', [ $this, 'ajax_duplicate' ] );
 	}
 
@@ -24,24 +27,33 @@ class NWSkillsAdmin {
 	}
 
 	public function enqueue( $hook ) {
-		if ( strpos( $hook, 'nw-skills' ) === false ) return;
+		if ( false === strpos( $hook, 'nw-skills' ) ) {
+			return;
+		}
+
 		wp_enqueue_style(
 			'nw-skills-css',
-			plugins_url( 'assets/css/admin/skills.css', NW_PLUGIN_FILE ),
+			NW_PLUGIN_URL . 'assets/css/admin/skills.css',
 			[ 'nw-admin-core' ],
 			NW_VERSION
 		);
+
 		wp_enqueue_script(
 			'nw-skills-js',
-			plugins_url( 'assets/js/admin/skills.js', NW_PLUGIN_FILE ),
+			NW_PLUGIN_URL . 'assets/js/admin/skills.js',
 			[ 'jquery', 'nw-admin-core' ],
 			NW_VERSION,
 			true
 		);
-		wp_localize_script( 'nw-skills-js', 'NWSkills', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'nwskillsnonce' ),
-		] );
+
+		wp_localize_script(
+			'nw-skills-js',
+			'NWSkills',
+			[
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'nwskillsnonce' ),
+			]
+		);
 	}
 
 	public function render_page() {
@@ -80,7 +92,7 @@ class NWSkillsAdmin {
 					<select id="nw-filter-category" class="nw-input nw-input-sm nw-select-sm">
 						<option value="">All categories</option>
 						<?php foreach ( $categories as $c ) : ?>
-						<option value="<?= esc_attr($c); ?>"><?= esc_html($c); ?></option>
+							<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( $c ); ?></option>
 						<?php endforeach; ?>
 					</select>
 					<select id="nw-filter-active" class="nw-input nw-input-sm nw-select-sm">
@@ -92,6 +104,7 @@ class NWSkillsAdmin {
 						<i data-lucide="x" style="width:11px;height:11px"></i> Clear
 					</button>
 				</div>
+
 				<div class="nw-table-wrap">
 					<table class="nw-table">
 						<thead>
@@ -113,13 +126,15 @@ class NWSkillsAdmin {
 				</div>
 			</div>
 
-			<!-- MODAL -->
 			<div id="nw-modal-overlay" class="nw-modal-overlay" style="display:none">
 				<div class="nw-modal nw-modal-skills">
 					<div class="nw-modal-header">
 						<h2 id="nw-modal-title">New Skill</h2>
-						<button id="nw-modal-close" class="nw-btn nw-btn-ghost nw-btn-sm"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+						<button id="nw-modal-close" class="nw-btn nw-btn-ghost nw-btn-sm" type="button">
+							<i data-lucide="x" style="width:14px;height:14px"></i>
+						</button>
 					</div>
+
 					<div class="nw-modal-body">
 						<form id="nw-skill-form" autocomplete="off">
 							<input type="hidden" id="nw-field-id">
@@ -134,7 +149,7 @@ class NWSkillsAdmin {
 									<select id="nw-field-category" class="nw-input">
 										<option value="">— none —</option>
 										<?php foreach ( $categories as $c ) : ?>
-										<option value="<?= esc_attr($c); ?>"><?= esc_html($c); ?></option>
+											<option value="<?php echo esc_attr( $c ); ?>"><?php echo esc_html( $c ); ?></option>
 										<?php endforeach; ?>
 									</select>
 								</div>
@@ -164,6 +179,7 @@ class NWSkillsAdmin {
 									</div>
 									<input type="hidden" id="nw-field-tags" value="[]">
 								</div>
+
 								<div class="nw-form-row">
 									<label class="nw-label">Linked Attributes</label>
 									<div id="nw-attrs-wrap" class="nw-tag-input-wrap">
@@ -190,13 +206,14 @@ class NWSkillsAdmin {
 							</div>
 						</form>
 					</div>
+
 					<div class="nw-modal-footer">
-						<button id="nw-delete-btn" class="nw-btn nw-btn-danger nw-btn-sm" style="display:none">
+						<button id="nw-delete-btn" class="nw-btn nw-btn-danger nw-btn-sm" type="button" style="display:none">
 							<i data-lucide="trash-2" style="width:13px;height:13px"></i> Delete
 						</button>
 						<div class="nw-modal-footer-right">
-							<button id="nw-cancel-btn" class="nw-btn nw-btn-ghost nw-btn-sm">Cancel</button>
-							<button id="nw-save-btn" class="nw-btn nw-btn-primary nw-btn-sm">
+							<button id="nw-cancel-btn" class="nw-btn nw-btn-ghost nw-btn-sm" type="button">Cancel</button>
+							<button id="nw-save-btn" class="nw-btn nw-btn-primary nw-btn-sm" type="button">
 								<i data-lucide="save" style="width:13px;height:13px"></i>
 								<span id="nw-save-label">Create Skill</span>
 							</button>
@@ -208,99 +225,160 @@ class NWSkillsAdmin {
 		<?php
 	}
 
-	/* ---- Supabase helper ---- */
-	private function supa( $method, $endpoint, $body = null ) {
-		$url    = TWSUPABASE_URL . '/rest/v1/' . $endpoint;
-		$apikey = TWSUPABASE_KEY;
-		$args   = [
-			'method'  => $method,
-			'headers' => [
-				'apikey'        => $apikey,
-				'Authorization' => 'Bearer ' . $apikey,
-				'Content-Type'  => 'application/json',
-				'Prefer'        => 'return=representation',
-			],
-		];
-		if ( $body !== null ) $args['body'] = wp_json_encode( $body );
-		$res = wp_remote_request( $url, $args );
-		if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
-		return [ 'code' => wp_remote_retrieve_response_code( $res ), 'data' => json_decode( wp_remote_retrieve_body( $res ), true ) ];
+	private function current_user_can_manage() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'No permission.' );
+		}
 	}
 
 	private function check_nonce() {
-		if ( ! check_ajax_referer( 'nwskillsnonce', 'nonce', false ) ) wp_send_json_error( 'Invalid nonce.' );
+		$this->current_user_can_manage();
+
+		if ( ! check_ajax_referer( 'nwskillsnonce', 'nonce', false ) ) {
+			wp_send_json_error( 'Invalid nonce.' );
+		}
 	}
 
 	private function parse_json_field( $raw, $fallback = [] ) {
-		if ( empty( $raw ) || $raw === 'null' ) return $fallback;
+		if ( empty( $raw ) || 'null' === $raw ) {
+			return $fallback;
+		}
+
 		$decoded = json_decode( stripslashes( $raw ), true );
+
 		return is_array( $decoded ) ? $decoded : $fallback;
 	}
 
 	public function ajax_load() {
 		$this->check_nonce();
-		$res = $this->supa( 'GET', 'cyber_skills?order=name.asc' );
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
-		wp_send_json_success( $res['data'] );
+
+		$res = tw_supabase_get_admin( 'cyber_skills?order=name.asc' );
+
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( $res->get_error_message() );
+		}
+
+		wp_send_json_success( $res );
 	}
 
 	public function ajax_save() {
 		$this->check_nonce();
+
 		$id   = sanitize_text_field( $_POST['id'] ?? '' );
 		$name = sanitize_text_field( $_POST['name'] ?? '' );
-		if ( ! $name ) { wp_send_json_error( 'Name is required.' ); return; }
 
-		$cat = sanitize_text_field( $_POST['category'] ?? '' );
+		if ( ! $name ) {
+			wp_send_json_error( 'Name is required.' );
+		}
+
+		$cat          = sanitize_text_field( $_POST['category'] ?? '' );
 		$allowed_cats = [ 'Physical', 'Social', 'Mental', 'Exploration', '' ];
-		if ( ! in_array( $cat, $allowed_cats, true ) ) { wp_send_json_error( 'Invalid category.' ); return; }
+
+		if ( ! in_array( $cat, $allowed_cats, true ) ) {
+			wp_send_json_error( 'Invalid category.' );
+		}
 
 		$payload = [
-			'name'               => $name,
-			'description'        => sanitize_textarea_field( $_POST['description'] ?? '' ) ?: null,
-			'category'           => $cat ?: null,
-			'application'        => sanitize_textarea_field( $_POST['application'] ?? '' ) ?: null,
-			'card_effect'        => sanitize_textarea_field( $_POST['card_effect'] ?? '' ) ?: null,
-			'img_url'            => esc_url_raw( $_POST['img_url'] ?? '' ) ?: null,
-			'tags'               => $this->parse_json_field( $_POST['tags'] ?? '' ),
-			'linked_attributes'  => $this->parse_json_field( $_POST['linked_attributes'] ?? '' ),
-			'is_active'          => ! empty( $_POST['is_active'] ),
+			'name'              => $name,
+			'description'       => sanitize_textarea_field( $_POST['description'] ?? '' ) ?: null,
+			'category'          => $cat ?: null,
+			'application'       => sanitize_textarea_field( $_POST['application'] ?? '' ) ?: null,
+			'card_effect'       => sanitize_textarea_field( $_POST['card_effect'] ?? '' ) ?: null,
+			'img_url'           => esc_url_raw( $_POST['img_url'] ?? '' ) ?: null,
+			'tags'              => $this->parse_json_field( $_POST['tags'] ?? '' ),
+			'linked_attributes' => $this->parse_json_field( $_POST['linked_attributes'] ?? '' ),
+			'is_active'         => ! empty( $_POST['is_active'] ),
 		];
 
 		if ( $id ) {
-			$res = $this->supa( 'PATCH', 'cyber_skills?id=eq.' . rawurlencode( $id ), $payload );
+			$res = tw_supabase_request(
+				'PATCH',
+				'cyber_skills?id=eq.' . rawurlencode( $id ),
+				$payload
+			);
 		} else {
-			$res = $this->supa( 'POST', 'cyber_skills', $payload );
+			$res = tw_supabase_request(
+				'POST',
+				'cyber_skills',
+				$payload
+			);
 		}
 
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
-		if ( ! in_array( $res['code'], [ 200, 201 ] ) ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] ) ? $res['data']['message'] : 'Save failed (HTTP ' . $res['code'] . ').';
-			wp_send_json_error( $msg ); return;
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( $res->get_error_message() );
 		}
-		wp_send_json_success( $res['data'] );
+
+		$reload = tw_supabase_get_admin(
+			'cyber_skills' . ( $id ? '?id=eq.' . rawurlencode( $id ) : '?name=eq.' . rawurlencode( $name ) ) . '&order=name.asc'
+		);
+
+		if ( is_wp_error( $reload ) ) {
+			wp_send_json_success( [] );
+		}
+
+		wp_send_json_success( $reload );
 	}
 
 	public function ajax_delete() {
 		$this->check_nonce();
+
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
-		if ( ! $id ) { wp_send_json_error( 'ID required.' ); return; }
-		$res = $this->supa( 'DELETE', 'cyber_skills?id=eq.' . rawurlencode( $id ) );
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+
+		if ( ! $id ) {
+			wp_send_json_error( 'ID required.' );
+		}
+
+		$res = tw_supabase_request(
+			'DELETE',
+			'cyber_skills?id=eq.' . rawurlencode( $id )
+		);
+
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( $res->get_error_message() );
+		}
+
 		wp_send_json_success( 'Deleted.' );
 	}
 
 	public function ajax_duplicate() {
 		$this->check_nonce();
+
 		$id = sanitize_text_field( $_POST['id'] ?? '' );
-		if ( ! $id ) { wp_send_json_error( 'ID required.' ); return; }
-		$res = $this->supa( 'GET', 'cyber_skills?id=eq.' . rawurlencode( $id ) );
-		if ( isset( $res['error'] ) || empty( $res['data'][0] ) ) { wp_send_json_error( 'Skill not found.' ); return; }
-		$row = $res['data'][0];
+
+		if ( ! $id ) {
+			wp_send_json_error( 'ID required.' );
+		}
+
+		$res = tw_supabase_get_admin( 'cyber_skills?id=eq.' . rawurlencode( $id ) );
+
+		if ( is_wp_error( $res ) || empty( $res[0] ) ) {
+			wp_send_json_error( 'Skill not found.' );
+		}
+
+		$row = $res[0];
+
 		unset( $row['id'], $row['created_at'] );
+
 		$row['name'] = $row['name'] . ' (copy)';
-		$res2 = $this->supa( 'POST', 'cyber_skills', $row );
-		if ( isset( $res2['error'] ) ) { wp_send_json_error( $res2['error'] ); return; }
-		if ( ! in_array( $res2['code'], [ 200, 201 ] ) ) { wp_send_json_error( 'Duplicate failed.' ); return; }
-		wp_send_json_success( $res2['data'] );
+
+		$res2 = tw_supabase_request(
+			'POST',
+			'cyber_skills',
+			$row
+		);
+
+		if ( is_wp_error( $res2 ) ) {
+			wp_send_json_error( $res2->get_error_message() );
+		}
+
+		$reload = tw_supabase_get_admin(
+			'cyber_skills?name=eq.' . rawurlencode( $row['name'] )
+		);
+
+		if ( is_wp_error( $reload ) ) {
+			wp_send_json_success( [] );
+		}
+
+		wp_send_json_success( $reload );
 	}
 }
