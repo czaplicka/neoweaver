@@ -26,35 +26,39 @@ class NWSkillsAdmin {
 		);
 	}
 
-	public function enqueue( $hook ) {
-		if ( false === strpos( $hook, 'nw-skills' ) ) {
-			return;
-		}
-
-		wp_enqueue_style(
-			'nw-skills-css',
-			NW_PLUGIN_URL . 'assets/css/admin/skills.css',
-			[ 'nw-admin-core' ],
-			NW_VERSION
-		);
-
-		wp_enqueue_script(
-			'nw-skills-js',
-			NW_PLUGIN_URL . 'assets/js/admin/skills.js',
-			[ 'jquery', 'nw-admin-core' ],
-			NW_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			'nw-skills-js',
-			'NWSkills',
-			[
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'nwskillsnonce' ),
-			]
-		);
+public function enqueue( string $hook ): void {
+	if ( ! str_contains( $hook, 'nw-skills' ) ) {
+		return;
 	}
+
+	wp_enqueue_style( 'nw-admin-core' );
+
+	wp_enqueue_style(
+		'nw-skills-css',
+		NW_PLUGIN_URL . 'assets/css/admin/skills.css',
+		[],
+		NW_VERSION
+	);
+
+	wp_enqueue_script( 'nw-lucide' );
+
+	wp_enqueue_script(
+		'nw-skills-js',
+		NW_PLUGIN_URL . 'assets/js/admin/skills.js',
+		[ 'jquery', 'nw-lucide' ],
+		NW_VERSION,
+		true
+	);
+
+	wp_localize_script(
+		'nw-skills-js',
+		'NWSkills',
+		[
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'nwskillsnonce' ),
+		]
+	);
+}
 
 	public function render_page() {
 		$categories = [ 'Physical', 'Social', 'Mental', 'Exploration' ];
