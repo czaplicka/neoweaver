@@ -46,8 +46,8 @@ function tw_shortcode_deck_library( $atts ): string {
 	}
 
 	$allowed_char_ids = array_values( array_filter(
-		array_map( static fn( $c ) => isset( $c->id ) ? (string) $c->id : '', $characters )
-	) );
+    array_map( static fn( $c ) => isset( $c['id'] ) ? (string) $c['id'] : '', $characters )
+) );
 
 	if ( empty( $allowed_char_ids ) ) {
 		return '<p class="nw-notice">No characters found. Create one first.</p>';
@@ -150,8 +150,8 @@ function tw_shortcode_deck_library( $atts ): string {
 			<label class="ach-filter-label" for="char_id_select">Character</label>
 			<select id="char_id_select" name="char_id">
 				<?php foreach ( $characters as $char ) :
-					$cid   = (string) ( $char->id ?? '' );
-					$cname = (string) ( $char->name ?? $cid );
+$cid   = (string) ( $char['id'] ?? '' );
+$cname = (string) ( $char['name'] ?? $cid );
 				?>
 				<option value="<?php echo esc_attr( $cid ); ?>"
 					<?php selected( $cid, $safe_id ); ?>>
@@ -341,7 +341,7 @@ function tw_ajax_deck_library_switch(): void {
 
 	// Verify character belongs to user
 	$characters = function_exists( 'tw_get_user_characters' ) ? tw_get_user_characters( $user_id ) : [];
-	$allowed    = array_map( static fn( $c ) => (string) ( $c->id ?? '' ), $characters );
+	array_map( static fn( $c ) => [ 'id' => (string) ( $c['id'] ?? '' ), 'name' => (string) ( $c['name'] ?? '' ) ], $characters )
 	if ( ! in_array( $safe_id, $allowed, true ) ) {
 		wp_send_json_error( [ 'message' => 'Access denied.' ] );
 	}
