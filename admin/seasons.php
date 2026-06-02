@@ -6,13 +6,13 @@ class NWSeasonsAdmin {
 	public function __construct() {
 		add_action( 'admin_menu',            [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
-		add_action( 'wp_ajax_nw_seasons_load',      [ $this, 'ajax_load' ] );
-		add_action( 'wp_ajax_nw_seasons_save',      [ $this, 'ajax_save' ] );
-		add_action( 'wp_ajax_nw_seasons_delete',    [ $this, 'ajax_delete' ] );
-		add_action( 'wp_ajax_nw_seasons_reorder',   [ $this, 'ajax_reorder' ] );
+		add_action( 'wp_ajax_nw_seasons_load',    [ $this, 'ajax_load' ] );
+		add_action( 'wp_ajax_nw_seasons_save',    [ $this, 'ajax_save' ] );
+		add_action( 'wp_ajax_nw_seasons_delete',  [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_nw_seasons_reorder', [ $this, 'ajax_reorder' ] );
 	}
 
-	public function register_menu() {
+	public function register_menu(): void {
 		add_submenu_page(
 			'neoweaver',
 			'Seasons Config',
@@ -23,30 +23,30 @@ class NWSeasonsAdmin {
 		);
 	}
 
-	public function enqueue( $hook ): void {
-    if ( ! str_contains( $hook, 'nw-seasons' ) ) return;
-    wp_enqueue_style( 'nw-admin-core' );
-    wp_enqueue_style(
-        'nw-seasons-css',
-        NW_PLUGIN_URL . 'assets/css/admin/seasons.css',
-        [],
-        NW_VERSION
-    );
-    wp_enqueue_script( 'nw-lucide' );
-    wp_enqueue_script(
-        'nw-seasons-js',
-        NW_PLUGIN_URL . 'assets/js/admin/seasons.js',
-        [ 'nw-lucide' ],
-        NW_VERSION,
-        true
-    );
-    wp_localize_script( 'nw-seasons-js', 'NWSeasons', [
-        'ajaxurl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'nwseasonsnonce' ),
-    ] );
-}
+	public function enqueue( string $hook ): void {
+		if ( ! str_contains( $hook, 'nw-seasons' ) ) return;
+		wp_enqueue_style( 'nw-admin-core' );
+		wp_enqueue_style(
+			'nw-seasons-css',
+			NW_PLUGIN_URL . 'assets/css/admin/seasons.css',
+			[],
+			NW_VERSION
+		);
+		wp_enqueue_script( 'nw-lucide' );
+		wp_enqueue_script(
+			'nw-seasons-js',
+			NW_PLUGIN_URL . 'assets/js/admin/seasons.js',
+			[ 'nw-lucide' ],
+			NW_VERSION,
+			true
+		);
+		wp_localize_script( 'nw-seasons-js', 'NWSeasons', [
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'nwseasonsnonce' ),
+		] );
+	}
 
-	public function render_page() {
+	public function render_page(): void {
 		?>
 		<div class="nw-admin-wrap" style="font-family:'Chakra Petch',monospace">
 			<div class="nw-admin-header">
@@ -191,42 +191,15 @@ class NWSeasonsAdmin {
 		<?php
 	}
 
-	/* ---- AJAX ---- */
+	/* ---- helpers ---- */
 
-	private function supa( $method, $endpoint, $body = null ) {
-		$url    = TWSUPABASE_URL . '/rest/v1/' . $endpoint;
-		$apikey = TWSUPABASE_KEY;
-		$args   = [
-			'method'  => $method,
-			'headers' => [
-				'apikey'        => $apikey,
-				'Authorization' => 'Bearer ' . $apikey,
-				'Content-Type'  => 'application/json',
-				'Prefer'        => 'return=representation',
-			],
-		];
-		if ( $body !== null ) $args['body'] = wp_json_encode( $body );
-		$res = wp_remote_request( $url, $args );
-		if ( is_wp_error( $res ) ) return [ 'error' => $res->get_error_message() ];
-		$code = wp_remote_retrieve_response_code( $res );
-		$data = json_decode( wp_remote_retrieve_body( $res ), true );
-		return [ 'code' => $code, 'data' => $data ];
-	}
-
-	private function check_nonce() {
+	private function check_nonce(): void {
 		if ( ! check_ajax_referer( 'nwseasonsnonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Invalid nonce.' );
 		}
 	}
 
-	public function ajax_load() {
-		$this->check_nonce();
-		$res = $this->supa( 'GET', 'cyber_seasons_config?order=sort_order.asc,season_name.asc' );
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
-		wp_send_json_success( $res['data'] );
-	}
-
-	private function build_payload( $post ) {
+	private function build_payload( array $post ): array {
 		$weathers = [ 'sun', 'cloudy', 'rain', 'fog', 'storm', 'snow' ];
 		$weights  = [];
 		$total    = 0;
@@ -244,60 +217,67 @@ class NWSeasonsAdmin {
 		$name = sanitize_text_field( $post['season_name'] ?? '' );
 		if ( ! $name ) return [ 'error' => 'Season name is required.' ];
 
-		$payload = array_merge( [
-			'season_name'    => $name,
-			'description'    => sanitize_textarea_field( $post['description'] ?? '' ) ?: null,
-			'temp_modifier'  => $temp,
-			'color'          => sanitize_hex_color( $post['color'] ?? '' ) ?: null,
-			'icon'           => sanitize_text_field( $post['icon'] ?? '' ) ?: null,
-			'sort_order'     => intval( $post['sort_order'] ?? 0 ),
+		return array_merge( [
+			'season_name'   => $name,
+			'description'   => sanitize_textarea_field( $post['description'] ?? '' ) ?: null,
+			'temp_modifier' => $temp,
+			'color'         => sanitize_hex_color( $post['color'] ?? '' ) ?: null,
+			'icon'          => sanitize_text_field( $post['icon'] ?? '' ) ?: null,
+			'sort_order'    => intval( $post['sort_order'] ?? 0 ),
 		], $weights );
-
-		return $payload;
 	}
 
-	public function ajax_save() {
+	/* ---- AJAX ---- */
+
+	public function ajax_load(): void {
 		$this->check_nonce();
-		$payload      = $this->build_payload( $_POST );
+		$res = tw_supabase_get_admin( 'cyber_seasons_config?order=sort_order.asc,season_name.asc' );
+		if ( is_wp_error( $res ) ) { wp_send_json_error( $res->get_error_message() ); return; }
+		wp_send_json_success( $res );
+	}
+
+	public function ajax_save(): void {
+		$this->check_nonce();
+		$payload = $this->build_payload( $_POST );
 		if ( isset( $payload['error'] ) ) { wp_send_json_error( $payload['error'] ); return; }
 
 		$original_name = sanitize_text_field( $_POST['original_name'] ?? '' );
-		$is_new        = empty( $original_name );
 
-		if ( $is_new ) {
-			$res = $this->supa( 'POST', 'cyber_seasons_config', $payload );
+		if ( empty( $original_name ) ) {
+			$res = tw_supabase_request( 'POST', 'cyber_seasons_config', $payload );
 		} else {
 			$endpoint = 'cyber_seasons_config?season_name=eq.' . rawurlencode( $original_name );
-			$res      = $this->supa( 'PATCH', $endpoint, $payload );
+			$res      = tw_supabase_request( 'PATCH', $endpoint, $payload );
 		}
 
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
-		if ( ! in_array( $res['code'], [ 200, 201 ] ) ) {
-			$msg = is_array( $res['data'] ) && isset( $res['data']['message'] ) ? $res['data']['message'] : 'Save failed (HTTP ' . $res['code'] . ').';
-			wp_send_json_error( $msg );
-			return;
-		}
-		wp_send_json_success( $res['data'] );
+		if ( is_wp_error( $res ) ) { wp_send_json_error( $res->get_error_message() ); return; }
+		wp_send_json_success( $res );
 	}
 
-	public function ajax_delete() {
+	public function ajax_delete(): void {
 		$this->check_nonce();
 		$name = sanitize_text_field( $_POST['season_name'] ?? '' );
 		if ( ! $name ) { wp_send_json_error( 'Season name is required.' ); return; }
 
-		$res = $this->supa( 'DELETE', 'cyber_seasons_config?season_name=eq.' . rawurlencode( $name ) );
-		if ( isset( $res['error'] ) ) { wp_send_json_error( $res['error'] ); return; }
+		$res = tw_supabase_request( 'DELETE', 'cyber_seasons_config?season_name=eq.' . rawurlencode( $name ) );
+		if ( is_wp_error( $res ) ) { wp_send_json_error( $res->get_error_message() ); return; }
 		wp_send_json_success( 'Deleted.' );
 	}
 
-	public function ajax_reorder() {
+	public function ajax_reorder(): void {
 		$this->check_nonce();
 		$items = json_decode( stripslashes( $_POST['items'] ?? '[]' ), true );
 		if ( ! is_array( $items ) ) { wp_send_json_error( 'Invalid data.' ); return; }
 		foreach ( $items as $item ) {
 			$name = sanitize_text_field( $item['season_name'] ?? '' );
 			$sort = intval( $item['sort_order'] );
-			if ( $name ) $this->supa( 'PATCH', 'cyber_seasons_config?season_name=eq.' . rawurlencode( $name ), [ 'sort_order' => $sort ] );
+			if ( $name ) {
+				tw_supabase_request(
+					'PATCH',
+					'cyber_seasons_config?season_name=eq.' . rawurlencode( $name ),
+					[ 'sort_order' => $sort ]
+				);
+			}
 		}
 		wp_send_json_success( 'Reordered.' );
 	}
