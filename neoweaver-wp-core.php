@@ -20,7 +20,6 @@ defined( 'NW_PLUGIN_DIR' )  || define( 'NW_PLUGIN_DIR', NEOWEAVER_PLUGIN_DIR );
 defined( 'NW_PLUGIN_PATH' ) || define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );
 defined( 'NW_PLUGIN_URL' )  || define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 define( 'NW_UPLOADS_URL', trailingslashit( wp_upload_dir()['baseurl'] ) );
-
 /**
  * Zwraca pełny URL do pliku w katalogu uploads.
  * Jeśli $filename już jest pełnym URL-em (http/https), zwraca go bez zmian.
