@@ -82,7 +82,7 @@
 			return `<tr data-id="${r.id}">
 				<td>${img}</td>
 				<td>
-					<strong>${r.name}</strong>
+					<strong>${r.name ?? '(no name)'}</strong>
 					${r.description ? `<br><small class="nw-muted">${r.description.substring(0,60)}${r.description.length > 60 ? '…' : ''}</small>` : ''}
 				</td>
 				<td>${parent}</td>
@@ -114,7 +114,7 @@
 		$('#nw-clear-filters').toggle(!!hasFilter);
 
 		const filtered = allRows.filter(r => {
-			if (q && !r.name.toLowerCase().includes(q) && !(r.description || '').toLowerCase().includes(q)) return false;
+			if (q && !(r.name || '').toLowerCase().includes(q) && !(r.description || '').toLowerCase().includes(q)) return false;
 			if (active !== '') { if (r.is_active !== (active === '1')) return false; }
 			if (conflict && r.conflict_axis !== conflict) return false;
 			return true;
