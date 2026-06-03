@@ -73,7 +73,7 @@ function uploadsUrl(filename) {
 		const html = rows.map(r => {
 			const imgSrc = uploadsUrl(r.img_url);
 const img = imgSrc
-				? `<img src="${r.img_url}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px" loading="lazy">`
+				? `<img src="${imgSrc}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px" loading="lazy">`
 				: `<span class="nw-no-img"><i data-lucide="image-off" style="width:14px;height:14px"></i></span>`;
 			const active = r.is_active
 				? `<span class="nw-status-dot nw-dot-on"></span>`
