@@ -98,6 +98,7 @@ final class NeoWeaver_Core {
 
 			// Shared core.
 			'includes/trait-transient-cache.php',
+			'includes/adventure-popup.php',
 			'includes/adventure-data.php',
 			'includes/assets.php',
 			'includes/char-panel.php',
