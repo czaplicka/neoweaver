@@ -39,14 +39,14 @@ function nw_csc_enqueue( string $hook ): void {
 
     wp_enqueue_style(
         'nw-class-starting-cards',
-        $base . 'assets/css/admin/class-starting-cards.css',
+        $base . 'assets/css/admin/starting-cards.css',
         [],
         '1.0.0'
     );
 
     wp_enqueue_script(
         'nw-class-starting-cards',
-        $base . 'assets/js/admin/class-starting-cards.js',
+        $base . 'assets/js/admin/starting-cards.js',
         [ 'jquery' ],
         '1.0.0',
         true
