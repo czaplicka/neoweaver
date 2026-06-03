@@ -30,27 +30,50 @@ function nw_csc_register_menu(): void {
    ASSETS
    ════════════════════════════════════════════════════════════════════════════ */
 add_action( 'admin_enqueue_scripts', 'nw_csc_enqueue' );
-function nw_csc_enqueue( string $hook ): void {
-    if ( $hook !== 'neoweaver_page_nw-class-starting-cards' ) {
-        return;
-    }
 
-    $base = plugin_dir_url( dirname( __DIR__ ) ); // katalog plugina
+public function enqueue_assets( string $hook ): void {
+		if ( ! str_contains( $hook, $this->page_slug ) ) {
+			return;
+		}
 
-    wp_enqueue_style(
-        'nw-class-starting-cards',
-        $base . 'assets/css/admin/starting-cards.css',
-        [],
-        '1.0.0'
-    );
+		if ( ! wp_style_is( 'chakra-petch', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'chakra-petch',
+				'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap',
+				[],
+				null
+			);
+		}
 
-    wp_enqueue_script(
-        'nw-class-starting-cards',
-        $base . 'assets/js/admin/starting-cards.js',
-        [ 'jquery' ],
-        '1.0.0',
-        true
-    );
+		wp_enqueue_style(
+			'nw-admin-core',
+			NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+			[ 'chakra-petch' ],
+			NW_VERSION
+		);
+
+		wp_enqueue_style(
+			'nw-starting-cards-style',
+			NW_PLUGIN_URL . 'assets/css/admin/starting-cards.css',
+			[ 'chakra-petch', 'nw-admin-core' ],
+			NW_VERSION
+		);
+
+		wp_enqueue_script(
+			'lucide',
+			'https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js',
+			[],
+			'0.468.0',
+			true
+		);
+
+		wp_enqueue_script(
+			'nw-starting-cards-script',
+			NW_PLUGIN_URL . 'assets/js/admin/starting-cards.js',
+			[ 'jquery', 'lucide' ],
+			NW_VERSION,
+			true
+		);
 
     wp_localize_script( 'nw-class-starting-cards', 'NWCards', [
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
