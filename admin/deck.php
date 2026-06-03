@@ -12,7 +12,6 @@ declare( strict_types=1 );
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 class NW_Admin_Deck {
 
     private string $page_slug    = 'nw-deck';
