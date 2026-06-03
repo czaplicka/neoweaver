@@ -255,156 +255,46 @@ if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
 		<h2 class="nw-ascension-title">⬡ Ascension Forge</h2>
 
 		<div class="nw-ascension-grid">
-		<?php foreach ( $eligible as $did ) :
-			$def = $defs_map[ $did ] ?? null;
-			if ( ! $def ) continue;
+<?php foreach ( $eligible as $did ) :
+    $def = $defs_map[ $did ] ?? null;
+    if ( ! $def ) continue;
 
-			$base_copies = $groups[ $did ]['copies'];
-			$base_count  = count( $base_copies );
-			$ascended    = $groups[ $did ]['ascended'];
-			$cur_asc     = ! empty( $ascended )
-				? (int) max( array_column( $ascended, 'ascension_level' ) )
-				: 0;
-			$next_asc    = $cur_asc + 1;
-			$required    = $asc_cost[ $next_asc ] ?? 999;
-			$can_ascend  = ( $base_count >= $required && $next_asc <= 5 );
-			$maxed       = ( $cur_asc >= 5 );
-			$all_bonuses = $def['asc_bonuses'];
+    $base_copies = $groups[ $did ]['copies'];
+    $base_count  = count( $base_copies );
+    $ascended    = $groups[ $did ]['ascended'];
+    $cur_asc     = ! empty( $ascended )
+        ? (int) max( array_column( $ascended, 'ascension_level' ) )
+        : 0;
+    $next_asc    = $cur_asc + 1;
+    $required    = $asc_cost[ $next_asc ] ?? 999;
+    $can_ascend  = ( $base_count >= $required && $next_asc <= 5 );
+    $maxed       = ( $cur_asc >= 5 );
+    $state_cls   = $can_ascend ? 'nw-card--ready' : ( $maxed ? '' : 'nw-card--dim' );
 
-			$rarity     = strtolower( $def['rarity'] );
-			$rarity_cls = _nw_asc_rarity_class( $rarity );
-			$state_cls  = $can_ascend ? 'nw-card--ready' : ( $maxed ? '' : 'nw-card--dim' );
+    echo nw_render_card( [
+        'instance_id' => (string) ( $base_copies[0]['id'] ?? $did ),
+        'deck_id'     => $did,
+        'name'        => $def['name'],
+        'rarity'      => $def['rarity'],
+        'description' => $def['description'] ?? '',
+        'effect'      => $def['effect'] ?? '',
+        'img_url'     => $def['img_url'] ?? '',
+        'cat_label'   => $def['cat_label'],
+        'cat_icon'    => $def['cat_icon'],
+        'cat_color'   => $def['cat_color'],
+        'level'       => (int) ( $base_copies[0]['current_level'] ?? 1 ),
+        'cur_asc'     => $cur_asc,
+        'next_asc'    => $next_asc,
+        'base_count'  => $base_count,
+        'required'    => $required,
+        'can_ascend'  => $can_ascend,
+        'maxed'       => $maxed,
+        'all_bonuses' => $def['asc_bonuses'] ?? [],
+        'state_cls'   => $state_cls,
+        'nonce'       => $nonce,
+    ], 'ascension' );
 
-			$cat_label = $def['cat_label'];
-			$cat_icon  = $def['cat_icon'];
-			$cat_color = $def['cat_color'];
-
-			$progress_pct = $required > 0 ? min( 100, round( $base_count / $required * 100 ) ) : 100;
-
-			$rarity_colors = [
-				'common'    => '#6b7280',
-				'uncommon'  => '#22c55e',
-				'rare'      => '#3b82f6',
-				'epic'      => '#a855f7',
-				'legendary' => '#f59e0b',
-			];
-			$card_color = $can_ascend ? '#adff00' : ( $rarity_colors[ $rarity ] ?? '#6b7280' );
-		?>
-			<div class="nw-asc-card <?php echo esc_attr( "$rarity_cls $state_cls" ); ?>"
-				style="--nw-rarity-color:<?php echo esc_attr( $card_color ); ?>; --nw-cat-color:<?php echo esc_attr( $cat_color ); ?>;"
-				data-instance-id="<?php echo esc_attr( (string) ( $base_copies[0]['id'] ?? $did ) ); ?>">
-
-				<span class="nw-asc-corner nw-asc-corner--tl"></span>
-				<span class="nw-asc-corner nw-asc-corner--tr"></span>
-				<span class="nw-asc-corner nw-asc-corner--bl"></span>
-				<span class="nw-asc-corner nw-asc-corner--br"></span>
-
-				<?php if ( $cat_label ) : ?>
-				<div class="nw-asc-cat-badge"
-					style="background:<?php echo esc_attr( $cat_color ); ?>22; border-color:<?php echo esc_attr( $cat_color ); ?>66;"
-					title="<?php echo esc_attr( $cat_label ); ?>">
-					<i data-lucide="<?php echo esc_attr( $cat_icon ); ?>" style="color:<?php echo esc_attr( $cat_color ); ?>;"></i>
-				</div>
-				<?php endif; ?>
-
-				<?php if ( ! empty( $def['img_url'] ) ) : ?>
-				<div class="nw-asc-img-wrap">
-					<img src="<?php echo esc_url( $def['img_url'] ); ?>"
-						alt="<?php echo esc_attr( $def['name'] ); ?>"
-						loading="lazy" width="200" height="200">
-					<div class="nw-asc-img-overlay"></div>
-				</div>
-				<?php endif; ?>
-
-				<div class="nw-asc-header">
-					<span class="nw-asc-name"><?php echo esc_html( $def['name'] ); ?></span>
-					<span class="nw-asc-level">
-						<?php if ( $cur_asc > 0 ) : ?>
-							<i data-lucide="chevrons-up" style="width:9px;height:9px;"></i>&nbsp;ASC&nbsp;<?php echo $cur_asc; ?>
-						<?php else : ?>
-							LVL&nbsp;<?php echo (int) ( $base_copies[0]['current_level'] ?? 1 ); ?>
-						<?php endif; ?>
-					</span>
-				</div>
-
-				<div class="nw-asc-body">
-					<?php if ( ! empty( $def['description'] ) ) : ?>
-						<p class="nw-asc-desc"><?php echo esc_html( $def['description'] ); ?></p>
-					<?php endif; ?>
-					<?php if ( ! empty( $def['effect'] ) ) : ?>
-						<p class="nw-asc-effect"><?php echo esc_html( $def['effect'] ); ?></p>
-					<?php endif; ?>
-
-					<div class="nw-asc-dots">
-						<?php for ( $i = 1; $i <= 5; $i++ ) : ?>
-							<span class="nw-asc-dot <?php echo $i <= $cur_asc ? 'nw-asc-dot--lit' : ''; ?>"></span>
-						<?php endfor; ?>
-					</div>
-
-					<?php
-					if ( $cur_asc > 0 && ! empty( $all_bonuses ) ) {
-						echo _nw_asc_render_bonuses( $all_bonuses, $cur_asc );
-					}
-					if ( ! $maxed && ! empty( $all_bonuses ) ) {
-						$next_key = (string) $next_asc;
-						if ( ! empty( $all_bonuses[ $next_key ] ) ) : ?>
-							<div class="nw-asc-bonuses-preview">
-								<span class="nw-asc-preview-label">
-									<i data-lucide="chevron-right" style="width:10px;height:10px;vertical-align:middle;"></i>
-									ASC <?php echo $next_asc; ?> unlocks:
-								</span>
-								<?php
-								$bonus_icons = [ 'damage' => 'sword', 'defense' => 'shield', 'xp_gain' => 'star', 'hp' => 'heart', 'speed' => 'zap', 'crit' => 'crosshair', 'special' => 'sparkles', 'unlock_effect' => 'unlock' ];
-								foreach ( $all_bonuses[ $next_key ] as $bonus ) :
-									if ( ! is_array( $bonus ) ) continue;
-									$type  = (string) ( $bonus['type']  ?? 'bonus' );
-									$value = $bonus['value'] ?? null;
-									$icon  = $bonus_icons[ $type ] ?? 'plus';
-									$label = is_numeric( $value )
-										? esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ' +' . esc_html( $value )
-										: esc_html( ucwords( str_replace( '_', ' ', $type ) ) ) . ( $value !== null ? ': ' . esc_html( $value ) : '' );
-									?>
-									<span class="nw-asc-bonus-pill nw-asc-bonus-pill--next">
-										<i data-lucide="<?php echo esc_attr( $icon ); ?>" style="width:10px;height:10px;vertical-align:middle;"></i>
-										<?php echo $label; ?>
-									</span>
-								<?php endforeach; ?>
-							</div>
-						<?php endif;
-					} ?>
-
-					<?php if ( ! $maxed ) : ?>
-					<div class="nw-asc-progress-wrap">
-						<div class="nw-asc-progress-bar">
-							<div class="nw-asc-progress-fill" style="width:<?php echo $progress_pct; ?>%"></div>
-						</div>
-						<div class="nw-asc-progress-label">
-							<span><?php echo $base_count; ?> / <?php echo $required; ?> copies</span>
-							<span>→ ASC <?php echo $next_asc; ?></span>
-						</div>
-					</div>
-					<?php endif; ?>
-				</div><!-- /.nw-asc-body -->
-
-				<div class="nw-asc-footer">
-					<?php if ( $maxed ) : ?>
-						<span class="nw-asc-btn nw-asc-btn--max">MAX ⬡</span>
-					<?php elseif ( $can_ascend ) : ?>
-						<button class="nw-asc-btn nw-asc-btn--ready nw-asc-trigger"
-							data-deck-id="<?php echo esc_attr( $did ); ?>"
-							data-nonce="<?php echo esc_attr( $nonce ); ?>">
-							<i data-lucide="zap" style="width:11px;height:11px;vertical-align:middle;"></i>
-							Ascend → Tier <?php echo $next_asc; ?>
-						</button>
-					<?php else : ?>
-						<button class="nw-asc-btn nw-asc-btn--locked" disabled>
-							<i data-lucide="lock" style="width:11px;height:11px;vertical-align:middle;"></i>
-							Need <?php echo ( $required - $base_count ); ?> more
-						</button>
-					<?php endif; ?>
-				</div>
-
-			</div><!-- /.nw-asc-card -->
+endforeach; ?>
 		<?php endforeach; ?>
 		</div><!-- /.nw-ascension-grid -->
 	</div><!-- /.nw-ascension-wrap -->
