@@ -19,7 +19,7 @@ function nw_csc_register_menu(): void {
     add_submenu_page(
         'neoweaver',                            // parent slug – Twoje główne menu NW
         'Class Starting Cards',
-        'Starting Cards',
+        '<span data-lucide-menu="card-sim"></span> Starting Cards',
         'manage_options',
         'nw-class-starting-cards',
         'nw_csc_render_page'
