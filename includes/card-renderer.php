@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 if ( ! function_exists( 'nw_render_card' ) ) :
 
 function nw_render_card( array $card, string $mode = 'library' ): string {
-
+error_log('NW render_card mode=' . $mode . ' keys=' . implode(',', array_keys($card)));
     $rarity_map = [
         'common'    => 'nw-card--common',
         'uncommon'  => 'nw-card--uncommon',
