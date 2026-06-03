@@ -18,6 +18,19 @@ if ( ! defined( 'ABSPATH' ) ) {
  *    Does NOT require an active game session.
  */
 
+// Guard: bail early if supabase-helpers.php was not loaded yet.
+// Prevents fatal call-to-undefined-function instead of a silent 500.
+// Pattern mirrors ascension.php.
+foreach ( [ 'nw_sanitize_uuid', 'tw_supabase_get', 'tw_supabase_get_admin' ] as $_nw_fn ) {
+	if ( ! function_exists( $_nw_fn ) ) {
+		error_log(
+			'NeoWeaver get-char-state.php: required helper ' . $_nw_fn
+			. '() not found — skipping handler registration. Check include order.'
+		);
+		return;
+	}
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // 1. ACTIVE GAME HUD — full state from cyber_state_of_the_campaign
 // ──────────────────────────────────────────────────────────────────────────────
@@ -30,19 +43,17 @@ if ( ! function_exists( 'tw_get_char_state_active_handler' ) ) {
 		// by comparing 500 vs 403 response codes, fingerprinting plugin state.
 		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
 
-		if ( ! function_exists( 'tw_supabase_get' ) ) {
-			wp_send_json_error( 'Core functions missing', 500 );
-			return;
-		}
-
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			wp_send_json_error( 'Not logged in', 401 );
 			return;
 		}
 
-		// Resolve active session (status = active only, NOT paused).
-		$sessions = tw_supabase_get(
+		// Use service key (tw_supabase_get_admin) to bypass RLS.
+		// tw_supabase_get (anon key) is subject to RLS; a misconfigured policy
+		// silently returns empty rows with no error, giving no diagnostic path.
+		// wp_user_id filter here acts as the ownership guard instead of RLS.
+		$sessions = tw_supabase_get_admin(
 			'cyber_game_sessions',
 			[
 				'wp_user_id' => 'eq.' . $user_id,
@@ -58,8 +69,6 @@ if ( ! function_exists( 'tw_get_char_state_active_handler' ) ) {
 			return;
 		}
 
-		// BUG: sanitize UUIDs from session data with nw_sanitize_uuid,
-		// consistent with every other handler in the codebase.
 		$character_id = isset( $sessions[0]['character_id'] )
 			? nw_sanitize_uuid( (string) $sessions[0]['character_id'] )
 			: '';
@@ -104,11 +113,6 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 	function tw_get_char_state_profile_handler(): void {
 		check_ajax_referer( 'tw_adventure_nonce', 'nonce' );
 
-		if ( ! function_exists( 'tw_supabase_get' ) ) {
-			wp_send_json_error( 'Core functions missing', 500 );
-			return;
-		}
-
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			wp_send_json_error( 'Not logged in', 401 );
@@ -122,6 +126,9 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 
 		$params = [
 			'wp_user_id' => 'eq.' . $user_id,
+			// Exclude dead agents from character select, consistent with
+			// join-terminal.php, campaign-creator.js and class-agents-repository.php.
+			'status'     => 'neq.STATUS_DEAD',
 			'select'     => 'id,name,avatar_url,class,level,hp,mp,world_id',
 			'order'      => 'name.asc',
 		];
