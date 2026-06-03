@@ -66,7 +66,7 @@ if ( ! function_exists( 'tw_supa_headers' ) ) {
 
 if ( ! function_exists( 'tw_sanitize_supabase_id' ) ) {
 	function tw_sanitize_supabase_id( $raw_id ): string {
-		$sanitized = preg_replace( '/[^a-fA-F0-9\\-]/', '', (string) $raw_id );
+		$sanitized = preg_replace( '/[^a-fA-F0-9\-]/', '', (string) $raw_id );
 		return strtolower( $sanitized );
 	}
 }
@@ -260,18 +260,48 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 			return;
 		}
 
-		if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
-			wp_send_json_error( array( 'message' => 'Game data helper missing' ), 500 );
-			return;
-		}
-
 		if ( ! function_exists( 'tw_invalidate_game_data_cache' ) ) {
 			wp_send_json_error( array( 'message' => 'Cache helper missing' ), 500 );
 			return;
 		}
 
-		$game_data  = get_user_game_data_from_supabase( $wp_user_id );
-		$session_id = tw_sanitize_supabase_id( $game_data['active_session_id'] ?? '' );
+		// FIX: look up active_session_id using service key to bypass RLS on cyber_game_sessions.
+		$session_url = tw_supa_url(
+			'cyber_game_sessions',
+			array(
+				'campaign_id' => 'eq.' . $campaign_id,
+				'select'      => 'id',
+				'limit'       => 1,
+			)
+		);
+
+		if ( '' === $session_url ) {
+			wp_send_json_error( array( 'message' => 'Supabase config missing' ), 500 );
+			return;
+		}
+
+		$session_response = wp_remote_get(
+			$session_url,
+			array(
+				'headers'   => tw_supa_headers( 'service' ),
+				'timeout'   => 10,
+				'sslverify' => true,
+			)
+		);
+
+		if ( is_wp_error( $session_response ) ) {
+			wp_send_json_error( array( 'message' => 'Session lookup failed' ), 502 );
+			return;
+		}
+
+		$session_code = wp_remote_retrieve_response_code( $session_response );
+		if ( $session_code < 200 || $session_code >= 300 ) {
+			wp_send_json_error( array( 'message' => 'Session lookup error' ), 502 );
+			return;
+		}
+
+		$session_data = json_decode( wp_remote_retrieve_body( $session_response ), true );
+		$session_id   = tw_sanitize_supabase_id( $session_data[0]['id'] ?? '' );
 
 		if ( ! $session_id ) {
 			wp_send_json_error( array( 'message' => 'No active session found' ), 404 );
@@ -373,7 +403,13 @@ if ( ! function_exists( 'tw_get_lore_tips' ) ) {
 	add_action( 'wp_ajax_tw_get_lore_tips', 'tw_get_lore_tips' );
 
 	function tw_get_lore_tips(): void {
-		if ( ! is_user_logged_in() ) {
+		// FIX: nonce check prevents unauthenticated/CSRF hammering of Supabase tips table.
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => 'Security check failed' ), 403 );
+			return;
+		}
+
+		if ( ! get_current_user_id() ) {
 			wp_send_json_error( array( 'message' => 'Unauthorized' ), 401 );
 			return;
 		}
