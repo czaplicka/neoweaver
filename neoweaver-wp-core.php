@@ -61,7 +61,12 @@ final class NeoWeaver_Core {
 
 		return ! is_admin();
 	}
-
+function nw_uploads_url( string $filename ): string {
+    if ( str_starts_with( $filename, 'http' ) ) {
+        return $filename; // już pełny URL — nie ruszaj
+    }
+    return NW_UPLOADS_URL . ltrim( $filename, '/' );
+}
 	/* ---------------------------------------------------------------- */
 	/* File loading                                                     */
 	/* ---------------------------------------------------------------- */
