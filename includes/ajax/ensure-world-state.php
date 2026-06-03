@@ -11,7 +11,10 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 	add_action( 'wp_ajax_tw_ensure_world_state', 'tw_ensure_world_state' );
 
 	function tw_ensure_world_state(): void {
-		if ( ! check_ajax_referer( 'tw_nonce', 'nonce', false ) ) {
+		// BUG FIX: was 'tw_nonce' — adventure.js sends twAdventureData.nonce which
+		// in head-injection.php is keyed 'adventure_nonce' => tw_adventure_nonce.
+		// Align with every other handler in the codebase.
+		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( [ 'message' => 'Security check failed' ], 403 );
 			return;
 		}
@@ -95,10 +98,13 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 		);
 
 		if ( ! is_wp_error( $insert ) ) {
+			// BUG FIX: tw_supabase_request returns the decoded body directly
+			// (an array of rows when Prefer: return=representation is set),
+			// NOT a wrapper with a 'data' key. $insert['data'][0] was always null.
 			wp_send_json_success(
 				[
 					'status' => 'created',
-					'row'    => $insert['data'][0] ?? null,
+					'row'    => $insert[0] ?? null,
 				]
 			);
 			return;
