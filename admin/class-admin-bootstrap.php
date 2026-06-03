@@ -96,7 +96,7 @@ private const PARENT_SLUG = 'neoweaver';
 		],
 			[
 			'file'  => 'starting-cards.php',
-			'class' => 'NWStartingPackagesAdmin',
+			'class' => 'NWStartingCardsAdmin',
 			'slug'  => 'nw-class-starting-cards',
 			'root'  => false,
 		],
