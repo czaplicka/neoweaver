@@ -67,6 +67,7 @@ function nw_uploads_url( string $filename ): string {
     }
     return NW_UPLOADS_URL . ltrim( $filename, '/' );
 }
+
 	/* ---------------------------------------------------------------- */
 	/* File loading                                                     */
 	/* ---------------------------------------------------------------- */
@@ -91,6 +92,7 @@ function nw_uploads_url( string $filename ): string {
 			'includes/api-endpoints.php',
 			'includes/api-endpoints-character-data.php',
 			'includes/api-endpoints-character-write.php',
+			'includes/api-endpoints-deployments.php',
 
 			// Shared classes / repositories.
 			'includes/classes/class-supabase.php',
