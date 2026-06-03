@@ -259,17 +259,24 @@ wp_enqueue_style(
 	}
 
 	public function ajax_load() {
-		$this->check_nonce();
+    $this->check_nonce();
 
-		$res = tw_supabase_get_admin( 'cyber_skills?order=name.asc' );
+    $res = tw_supabase_get_admin( 'cyber_skills?order=name.asc' );
 
-		if ( is_wp_error( $res ) ) {
-			wp_send_json_error( $res->get_error_message() );
-		}
+    if ( is_wp_error( $res ) ) {
+        wp_send_json_error( $res->get_error_message() );
+    }
 
-		wp_send_json_success( $res );
-	}
+    // doklejamy pełny URL do img_url przed wysłaniem do JS
+    $res = array_map( function( $row ) {
+        if ( ! empty( $row['img_url'] ) ) {
+            $row['img_url'] = nw_uploads_url( $row['img_url'] );
+        }
+        return $row;
+    }, $res );
 
+    wp_send_json_success( $res );
+}
 	public function ajax_save() {
 		$this->check_nonce();
 
