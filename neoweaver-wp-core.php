@@ -10,7 +10,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 defined( 'NEOWEAVER_VERSION' )     || define( 'NEOWEAVER_VERSION', '0.7.5' );
 defined( 'NEOWEAVER_PLUGIN_FILE' ) || define( 'NEOWEAVER_PLUGIN_FILE', __FILE__ );
 defined( 'NEOWEAVER_PLUGIN_DIR' )  || define( 'NEOWEAVER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
