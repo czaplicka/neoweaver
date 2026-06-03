@@ -10,6 +10,7 @@ if ( ! function_exists( 'nw_render_card' ) ) :
 
 function nw_render_card( array $card, string $mode = 'library' ): string {
 error_log('NW render_card mode=' . $mode . ' keys=' . implode(',', array_keys($card)));
+    error_log('NW render_card asc_body_extra=' . substr($asc_body_extra ?? 'NOT SET', 0, 100));
     $rarity_map = [
         'common'    => 'nw-card--common',
         'uncommon'  => 'nw-card--uncommon',
