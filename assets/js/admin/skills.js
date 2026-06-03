@@ -175,7 +175,9 @@
 			$('#nw-field-description').val(row.description || '');
 			$('#nw-field-application').val(row.application || '');
 			$('#nw-field-card-effect').val(row.card_effect || '');
-			$('#nw-field-img-url').val(row.img_url || '');
+			const uploadsBase = 'https://neoweaver.nieodparady.pl/wp-content/uploads/';
+const rawImg = (row.img_url || '').replace(uploadsBase, '');
+$('#nw-field-img-url').val(rawImg);
 			$('#nw-field-is-active').prop('checked', !!row.is_active);
 			tagsEditor.setItems(row.tags || []);
 			attrsEditor.setItems(row.linked_attributes || []);
