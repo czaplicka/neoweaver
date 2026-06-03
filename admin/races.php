@@ -41,9 +41,9 @@ class NWRacesAdmin {
 		wp_enqueue_script( 'nw-lucide' );
 		wp_enqueue_script( 'nw-admin-races', NW_PLUGIN_URL . 'assets/js/admin/races.js',  [ 'jquery', 'nw-lucide' ], NW_VERSION, true );
 		wp_localize_script( 'nw-admin-races', 'NWRaces', [
-			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'nw_races_nonce' ),
-						   'uploads_url' => NW_UPLOADS_URL,
+			'ajaxurl'     => admin_url( 'admin-ajax.php' ),
+			'nonce'       => wp_create_nonce( 'nw_races_nonce' ),
+			'uploads_url' => NW_UPLOADS_URL,
 		] );
 	}
 
@@ -224,10 +224,10 @@ class NWRacesAdmin {
 							<input id="nw-field-bonus" type="text" class="nw-input" placeholder='{"hp":+10}'>
 						</div>
 
-						<!-- Image URL -->
+						<!-- Image filename or URL -->
 						<div class="nw-form-group">
-							<label class="nw-label" for="nw-field-img-url">Image URL</label>
-							<input id="nw-field-img-url" type="url" class="nw-input" placeholder="https://…">
+							<label class="nw-label" for="nw-field-img-url">Image <span class="nw-muted">(filename.svg or full URL)</span></label>
+							<input id="nw-field-img-url" type="text" class="nw-input" placeholder="e.g. lion.svg or https://…">
 							<div id="nw-img-preview-wrap" style="display:none;margin-top:8px">
 								<img id="nw-img-preview" src="" alt="" style="max-width:120px;max-height:120px;border-radius:6px;object-fit:cover" loading="lazy">
 							</div>
@@ -285,7 +285,9 @@ class NWRacesAdmin {
 			return;
 		}
 
-		$id   = isset( $_POST['id'] ) ? sanitize_text_field( $_POST['id'] ) : '';
+		$id      = isset( $_POST['id'] ) ? sanitize_text_field( $_POST['id'] ) : '';
+		$img_raw = sanitize_text_field( $_POST['img_url'] ?? '' );
+
 		$data = [
 			'name'             => sanitize_text_field( $_POST['name'] ?? '' ),
 			'description'      => sanitize_textarea_field( $_POST['description'] ?? '' ),
@@ -296,7 +298,7 @@ class NWRacesAdmin {
 			'parent_race'      => sanitize_text_field( $_POST['parent_race'] ?? '' ) ?: null,
 			'conflict_axis'    => sanitize_text_field( $_POST['conflict_axis'] ?? '' ) ?: null,
 			'conflict_side'    => sanitize_text_field( $_POST['conflict_side'] ?? '' ) ?: null,
-			'img_url'          => esc_url_raw( $_POST['img_url'] ?? '' ) ?: null,
+			'img_url'          => $img_raw ?: null,
 			'gm_instructions'  => sanitize_textarea_field( $_POST['gm_instructions'] ?? '' ),
 			'bonus'            => ! empty( $_POST['bonus'] ) ? json_decode( stripslashes( $_POST['bonus'] ) ) : null,
 		];
