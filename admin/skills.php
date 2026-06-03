@@ -31,14 +31,19 @@ public function enqueue( string $hook ): void {
 		return;
 	}
 
-	wp_enqueue_style( 'nw-admin-core' );
+wp_enqueue_style(
+    'nw-admin-core',
+    NW_PLUGIN_URL . 'assets/css/admin/admin-core.css',
+    [],
+    NW_VERSION
+);
 
-	wp_enqueue_style(
-		'nw-skills-css',
-		NW_PLUGIN_URL . 'assets/css/admin/skills.css',
-		[],
-		NW_VERSION
-	);
+wp_enqueue_style(
+    'nw-skills-css',
+    NW_PLUGIN_URL . 'assets/css/admin/skills.css',
+    [ 'nw-admin-core' ],
+    NW_VERSION
+);
 
 	wp_enqueue_script( 'nw-lucide' );
 
