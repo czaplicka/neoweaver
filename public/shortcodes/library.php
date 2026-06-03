@@ -281,116 +281,13 @@ function tw_shortcode_deck_library( $atts ): string {
 
 /**
  * Render a single library / active-deck card.
- * Uses the same HTML structure as .nw-asc-card (ascension.php).
- *
- * @param array  $card     Card data.
- * @param string $location 'active' or 'library'.
- * @return string HTML.
+ * Deleguje do nw_render_card() z card-renderer.php.
  */
 function tw_render_library_card( array $card, string $location ): string {
-
-	$rarity_map = [
-		'common'    => 'nw-card--common',
-		'uncommon'  => 'nw-card--uncommon',
-		'rare'      => 'nw-card--rare',
-		'epic'      => 'nw-card--epic',
-		'legendary' => 'nw-card--legendary',
-	];
-
-	$rarity_colors = [
-		'common'    => '#6b7280',
-		'uncommon'  => '#22c55e',
-		'rare'      => '#3b82f6',
-		'epic'      => '#a855f7',
-		'legendary' => '#f59e0b',
-	];
-
-	$rarity_key   = strtolower( $card['rarity'] );
-	$rarity_cls   = $rarity_map[ $rarity_key ] ?? 'nw-card--common';
-	$active_cls   = ( 'active' === $location ) ? 'nw-card--ready' : '';
-	$rarity_color = ( 'active' === $location ) ? '#adff00' : ( $rarity_colors[ $rarity_key ] ?? '#6b7280' );
-
-	$classes = trim( implode( ' ', array_filter( [ 'nw-asc-card', $rarity_cls, $active_cls ] ) ) );
-
-	$name      = esc_html( $card['name'] );
-	$level     = (int) $card['level'];
-	$desc      = esc_html( $card['description'] );
-	$effect    = esc_html( $card['effect'] ?? '' );
-	$iid       = esc_attr( (string) $card['instance_id'] );
-	$loc       = esc_attr( $location );
-	$cat_label = esc_html( $card['cat_label'] ?? '' );
-	$cat_icon  = esc_attr( $card['cat_icon']  ?? 'tag' );
-	$cat_color = esc_attr( $card['cat_color'] ?? '#adff00' );
-	$r_color   = esc_attr( $rarity_color );
-
-	// Image
-	$img_html = '';
-	if ( ! empty( $card['img_url'] ) ) {
-		$src      = esc_url( $card['img_url'] );
-		$img_html = <<<HTML
-<div class="nw-asc-img-wrap">
-	<img src="{$src}" alt="{$name}" loading="lazy" width="200" height="200">
-	<div class="nw-asc-img-overlay"></div>
-</div>
-HTML;
-	}
-
-	// Category badge
-	$cat_badge = '';
-	if ( $cat_label !== '' ) {
-		$cat_badge = <<<HTML
-<div class="nw-asc-cat-badge"
-	style="background:{$cat_color}22; border-color:{$cat_color}66;"
-	title="{$cat_label}">
-	<i data-lucide="{$cat_icon}" style="color:{$cat_color};"></i>
-</div>
-HTML;
-	}
-
-	// Effect line
-	$effect_html = $effect !== '' ? "<p class=\"nw-asc-effect\">{$effect}</p>" : '';
-
-	// Footer button
-	$action_label = ( 'active' === $location ) ? 'Remove' : 'Add to Deck';
-	$action_icon  = ( 'active' === $location ) ? 'minus-circle' : 'plus-circle';
-	$btn_cls      = ( 'active' === $location ) ? 'nw-asc-btn--ready' : 'nw-asc-btn--locked';
-
-	return <<<HTML
-<div class="{$classes}"
-	 style="--nw-rarity-color:{$r_color}; --nw-cat-color:{$cat_color};"
-	 draggable="true"
-	 data-instance-id="{$iid}"
-	 data-card-location="{$loc}">
-
-	<span class="nw-asc-corner nw-asc-corner--tl"></span>
-	<span class="nw-asc-corner nw-asc-corner--tr"></span>
-	<span class="nw-asc-corner nw-asc-corner--bl"></span>
-	<span class="nw-asc-corner nw-asc-corner--br"></span>
-
-	{$cat_badge}
-	{$img_html}
-
-	<div class="nw-asc-header">
-		<span class="nw-asc-name">{$name}</span>
-		<span class="nw-asc-level">LVL&nbsp;{$level}</span>
-	</div>
-
-	<div class="nw-asc-body">
-		<p class="nw-asc-desc">{$desc}</p>
-		{$effect_html}
-	</div>
-
-	<div class="nw-asc-footer">
-		<button class="nw-asc-btn {$btn_cls} nw-lib-toggle"
-			data-instance-id="{$iid}"
-			data-location="{$loc}">
-			<i data-lucide="{$action_icon}" style="width:11px;height:11px;vertical-align:middle;"></i>
-			{$action_label}
-		</button>
-	</div>
-
-</div>
-HTML;
+    $card['location'] = $location;
+    return function_exists( 'nw_render_card' )
+        ? nw_render_card( $card, 'library' )
+        : '<!-- nw_render_card() not loaded -->';
 }
 
 // ── AJAX handler: zwraca tylko inner HTML deck-builder-container ────────────
