@@ -295,7 +295,6 @@ if ( is_wp_error( $owned ) || ! is_array( $owned ) || empty( $owned ) ) {
     ], 'ascension' );
 
 endforeach; ?>
-		<?php endforeach; ?>
 		</div><!-- /.nw-ascension-grid -->
 	</div><!-- /.nw-ascension-wrap -->
 
