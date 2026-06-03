@@ -101,6 +101,7 @@ final class NeoWeaver_Core {
 			'includes/adventure-popup.php',
 			'includes/adventure-data.php',
 			'includes/assets.php',
+			'includes/card-renderer.php',
 			'includes/char-panel.php',
 			'includes/checkout.php',
 			'includes/deck-core.php',
