@@ -288,7 +288,7 @@ public function enqueue( string $hook ): void {
 			'category'          => $cat ?: null,
 			'application'       => sanitize_textarea_field( $_POST['application'] ?? '' ) ?: null,
 			'card_effect'       => sanitize_textarea_field( $_POST['card_effect'] ?? '' ) ?: null,
-			'img_url'           => esc_url_raw( $_POST['img_url'] ?? '' ) ?: null,
+			'img_url'           => nw_uploads_url( esc_url_raw( $_POST['img_url'] ?? '' ) ) ?: null,
 			'tags'              => $this->parse_json_field( $_POST['tags'] ?? '' ),
 			'linked_attributes' => $this->parse_json_field( $_POST['linked_attributes'] ?? '' ),
 			'is_active'         => ! empty( $_POST['is_active'] ),
