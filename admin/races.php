@@ -8,7 +8,6 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 class NWRacesAdmin {
 	private string $page_slug   = 'nw-races';
 	private string $menu_parent = 'neoweaver';
