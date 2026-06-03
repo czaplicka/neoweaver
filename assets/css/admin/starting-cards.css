@@ -1,0 +1,136 @@
+/*
+ * NeoWeaver — Class Starting Cards
+ * assets/css/admin/class-starting-cards.css
+ * Zależy od: admin-core.css
+ */
+
+/* ── Pick-group badge ──────────────────────────────────────────────────────── */
+.nw-pick-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(173, 255, 0, 0.10);
+    color: #adff00;
+    border: 1px solid rgba(173, 255, 0, 0.22);
+    white-space: nowrap;
+}
+
+/* ── Type badges ───────────────────────────────────────────────────────────── */
+.nw-badge-optional {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(255, 180, 0, 0.10);
+    color: #ffb400;
+    border: 1px solid rgba(255, 180, 0, 0.22);
+}
+.nw-badge-required {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(0, 200, 130, 0.08);
+    color: #00c882;
+    border: 1px solid rgba(0, 200, 130, 0.20);
+}
+
+/* ── Status dot ────────────────────────────────────────────────────────────── */
+.nw-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+.nw-dot-active   { background: #adff00; box-shadow: 0 0 6px rgba(173,255,0,.45); }
+.nw-dot-inactive { background: #555; }
+
+/* ── Class label z kolorowym dotem ────────────────────────────────────────── */
+.nw-class-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.nw-class-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+/* ── Qty stepper inline ────────────────────────────────────────────────────── */
+.nw-qty-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.nw-qty-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    color: #adff00;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 120ms, border-color 120ms;
+    padding: 0;
+}
+.nw-qty-btn:hover:not(:disabled) {
+    background: rgba(173,255,0,0.12);
+    border-color: #adff00;
+}
+.nw-qty-btn:disabled { opacity: .35; cursor: not-allowed; }
+.nw-qty-val {
+    min-width: 22px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    color: #e8e8e8;
+    transition: color 200ms;
+    font-variant-numeric: tabular-nums;
+}
+.nw-qty-val.saving { color: #adff00; }
+
+/* ── Pick count value ──────────────────────────────────────────────────────── */
+.nw-pick-count {
+    display: inline-block;
+    background: rgba(173,255,0,0.08);
+    color: #adff00;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ── Stats pill specjalny ──────────────────────────────────────────────────── */
+.nw-csc-pill-group {
+    border-color: rgba(173,255,0,0.25) !important;
+    color: #adff00 !important;
+}
+
+/* ── Table tweaks ──────────────────────────────────────────────────────────── */
+.nw-csc-table td { vertical-align: middle; }
+
+/* ── Help text pod pick group ──────────────────────────────────────────────── */
+.nw-field-help {
+    font-size: 12px;
+    color: rgba(255,255,255,0.38);
+    margin: -4px 0 12px;
+    line-height: 1.5;
+    max-width: 520px;
+}
