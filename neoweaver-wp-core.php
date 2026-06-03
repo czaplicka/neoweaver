@@ -22,6 +22,17 @@ defined( 'NW_PLUGIN_PATH' ) || define( 'NW_PLUGIN_PATH', NEOWEAVER_PLUGIN_DIR );
 defined( 'NW_PLUGIN_URL' )  || define( 'NW_PLUGIN_URL', NEOWEAVER_PLUGIN_URL );
 define( 'NW_UPLOADS_URL', trailingslashit( wp_upload_dir()['baseurl'] ) );
 
+/**
+ * Zwraca pełny URL do pliku w katalogu uploads.
+ * Jeśli $filename już jest pełnym URL-em (http/https), zwraca go bez zmian.
+ */
+function nw_uploads_url( string $filename ): string {
+	if ( str_starts_with( $filename, 'http' ) ) {
+		return $filename;
+	}
+	return NW_UPLOADS_URL . ltrim( $filename, '/' );
+}
+
 final class NeoWeaver_Core {
 
 	public static function init(): void {
@@ -320,12 +331,6 @@ final class NeoWeaver_Core {
 
 		$bootstrapped = true;
 	}
-}
-function nw_uploads_url( string $filename ): string {
-    if ( str_starts_with( $filename, 'http' ) ) {
-        return $filename; // już pełny URL — nie ruszaj
-    }
-    return NW_UPLOADS_URL . ltrim( $filename, '/' );
 }
 
 NeoWeaver_Core::init();
