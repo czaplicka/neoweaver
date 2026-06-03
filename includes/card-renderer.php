@@ -3,6 +3,7 @@
  * card-renderer.php — centralna funkcja renderująca kartę NeoWeaver
  * Używana przez library.php i ascension.php
  */
+error_log('NW: card-renderer.php loaded');
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 if ( ! function_exists( 'nw_render_card' ) ) :
