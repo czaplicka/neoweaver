@@ -5,7 +5,12 @@
 
 	const A = NWRaces.ajaxurl;
 	const N = NWRaces.nonce;
-
+const UPLOADS = NWRaces.uploads_url || '';
+function uploadsUrl(filename) {
+    if (!filename) return '';
+    if (filename.startsWith('http')) return filename;
+    return UPLOADS + filename.replace(/^\//, '');
+}
 	let allRows = [];
 
 	// ── Lucide ────────────────────────────────────────────────────────────────
@@ -66,7 +71,8 @@
 			return;
 		}
 		const html = rows.map(r => {
-			const img = r.img_url
+			const imgSrc = uploadsUrl(r.img_url);
+const img = imgSrc
 				? `<img src="${r.img_url}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px" loading="lazy">`
 				: `<span class="nw-no-img"><i data-lucide="image-off" style="width:14px;height:14px"></i></span>`;
 			const active = r.is_active
@@ -187,8 +193,8 @@
 				$(`#nw-bar-${k}`).css('width', (v * 10) + '%');
 			});
 
-			if (row.img_url) {
-				$('#nw-img-preview').attr('src', row.img_url);
+if (row.img_url) {
+    $('#nw-img-preview').attr('src', uploadsUrl(row.img_url));
 				$('#nw-img-preview-wrap').show();
 			}
 			$('#nw-delete-btn').show().data('id', row.id);
