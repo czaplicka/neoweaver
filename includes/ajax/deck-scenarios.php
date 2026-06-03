@@ -17,15 +17,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ---------------------------------------------------------------------------
 // 1. Localize deck config vars on the terminal page
-// Hooked directly on wp_enqueue_scripts (priority 11) with is_page() guard.
-// The previous 'wp' wrapper caused localization to be skipped on AJAX requests.
+// Hooked directly on wp_enqueue_scripts (priority 11) with is_page_template() guard.
+// is_page_template() is slug-independent — survives page renames.
+// Template file: template-adventure.php
 // ---------------------------------------------------------------------------
 
 add_action( 'wp_enqueue_scripts', 'tw_localize_deck_vars', 11 );
 
 function tw_localize_deck_vars() {
 
-	if ( ! is_page( 'terminal' ) ) {
+	if ( ! is_page_template( 'template-adventure.php' ) ) {
 		return;
 	}
 
@@ -153,15 +154,19 @@ function tw_get_scenarios_ajax(): void {
 		return;
 	}
 
-	// UUID-safe: keep scenario_id as string, never cast to int.
-	$played      = $played ?: [];
-	$played_ids  = ! empty( $played )
-		? array_filter(
-			array_map(
-				static fn( $row ) => preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $row['scenario_id'] ?? '' ) ),
-				$played
-			),
-			static fn( $v ) => '' !== $v
+	// UUID-safe: explicit '' !== $v callback — default array_filter would drop
+	// any value that loosely evaluates to false (e.g. '0', '', null).
+	// UUIDs never equal '0' in practice, but the explicit check is correct by contract.
+	$played     = $played ?: [];
+	$played_ids = ! empty( $played )
+		? array_values(
+			array_filter(
+				array_map(
+					static fn( $row ) => preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $row['scenario_id'] ?? '' ) ),
+					$played
+				),
+				static fn( $v ) => '' !== $v
+			)
 		)
 		: [];
 
