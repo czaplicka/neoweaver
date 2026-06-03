@@ -13,6 +13,18 @@
  *   - module type fits the requested slot
  *   - module is not already installed in another slot of the same vehicle
  * - vehicle PATCH uses tw_supabase_request() (service key by default)
+ *
+ * FIX (Bug 1): neoweave_get_vehicle_storage_info used 'slot_utility(effect_tags)'
+ *   as if slot_utility were a PostgREST embedded resource. Because the column stores
+ *   a plain UUID string (no FK constraint), PostgREST returns it as a raw string and
+ *   $vehicle['slot_utility']['effect_tags'] is always null — capacity silently defaulted
+ *   to 5 for every vehicle regardless of installed module.
+ *   Fix: fetch slot_utility UUID, then do a second targeted query against
+ *   cyber_vehicle_module_types to get effect_tags.
+ *
+ * FIX (Bug 2): neoweave_calculate_travel_cost accepted $vehicle_id from the caller
+ *   without verifying the vehicle belongs to $character_id. Added ownership check.
+ *   Also added wp_cache to avoid redundant HTTP calls within the same request.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -91,10 +103,10 @@ if ( ! function_exists( 'neoweave_update_vehicle_module' ) ) {
 
 		$wp_user_id = get_current_user_id();
 
-		$vehicle_id   = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $_POST['vehicle_id'] ?? '' ) ) );
-		$module_id    = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $_POST['module_id'] ?? '' ) ) );
+		$vehicle_id   = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['vehicle_id'] ?? '' ) ) );
+		$module_id    = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['module_id'] ?? '' ) ) );
 		$target_slot  = sanitize_key( (string) ( $_POST['target_slot'] ?? '' ) );
-		$character_id = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $_POST['character_id'] ?? '' ) ) );
+		$character_id = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) ( $_POST['character_id'] ?? '' ) ) );
 
 		if ( ! $vehicle_id || ! $module_id || ! $target_slot || ! $character_id ) {
 			wp_send_json_error( [ 'message' => 'Missing required fields.' ], 400 );
@@ -238,7 +250,7 @@ if ( ! function_exists( 'neoweave_get_vehicle_cargo_weight' ) ) {
 			return 0;
 		}
 
-		$vehicle_id = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', $vehicle_id ) );
+		$vehicle_id = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', $vehicle_id ) );
 
 		if ( '' === $vehicle_id ) {
 			return 0;
@@ -267,41 +279,83 @@ if ( ! function_exists( 'neoweave_get_vehicle_cargo_weight' ) ) {
 
 /**
  * Get vehicle storage capacity and current usage.
+ *
+ * FIX (Bug 1): The original query used 'slot_utility(effect_tags)' as a PostgREST
+ * embedded resource join. Because cyber_vehicles.slot_utility holds a plain UUID
+ * string without a database-level FK constraint pointing to cyber_vehicle_module_types,
+ * PostgREST returns it as a raw scalar — $vehicle['slot_utility']['effect_tags'] is
+ * always null and max capacity silently defaulted to 5 for every vehicle.
+ *
+ * Fix: fetch slot_utility as a plain UUID, then do an explicit second query to
+ * cyber_vehicle_module_types. Results are stored in wp_cache so multiple calls within
+ * the same request (e.g. storage info + travel cost) do not repeat the HTTP round-trips.
  */
 if ( ! function_exists( 'neoweave_get_vehicle_storage_info' ) ) {
 	function neoweave_get_vehicle_storage_info( string $vehicle_id ): array {
+		$default = [ 'current' => 0, 'max' => 5, 'is_overloaded' => false ];
+
 		if ( ! function_exists( 'tw_supabase_get' ) ) {
-			return [ 'current' => 0, 'max' => 5, 'is_overloaded' => false ];
+			return $default;
 		}
 
-		$vehicle_id = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', $vehicle_id ) );
+		$vehicle_id = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', $vehicle_id ) );
 
 		if ( '' === $vehicle_id ) {
-			return [ 'current' => 0, 'max' => 5, 'is_overloaded' => false ];
+			return $default;
 		}
 
+		// ── Cache check ───────────────────────────────────────────────────────
+		$cache_key = 'nw_vsi_' . $vehicle_id;
+		$cached    = wp_cache_get( $cache_key, 'neoweaver' );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		// ── Step 1: fetch vehicle row, slot_utility UUID only ─────────────────
 		$vehicles = tw_supabase_get(
 			'cyber_vehicles',
 			[
 				'id'     => 'eq.' . $vehicle_id,
-				'select' => 'id,slot_utility(effect_tags)',
+				'select' => 'id,slot_utility',
 				'limit'  => 1,
 			]
 		);
 
 		if ( is_wp_error( $vehicles ) || empty( $vehicles ) ) {
-			return [ 'current' => 0, 'max' => 5, 'is_overloaded' => false ];
+			return $default;
 		}
 
-		$vehicle      = $vehicles[0] ?? [];
-		$max_capacity = 5;
+		$vehicle         = $vehicles[0] ?? [];
+		$max_capacity    = 5;
+		$slot_utility_id = isset( $vehicle['slot_utility'] ) && is_string( $vehicle['slot_utility'] )
+			? strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', $vehicle['slot_utility'] ) )
+			: '';
 
-		if ( isset( $vehicle['slot_utility']['effect_tags'] ) && is_array( $vehicle['slot_utility']['effect_tags'] ) ) {
-			foreach ( $vehicle['slot_utility']['effect_tags'] as $tag ) {
-				if ( strpos( (string) $tag, 'storage_' ) === 0 ) {
-					$parsed = (int) str_replace( 'storage_', '', (string) $tag );
-					if ( $parsed > 0 ) {
-						$max_capacity = $parsed;
+		// ── Step 2: if a utility module is installed, fetch its effect_tags ───
+		if ( '' !== $slot_utility_id ) {
+			$module_rows = tw_supabase_get(
+				'cyber_vehicle_module_types',
+				[
+					'id'     => 'eq.' . $slot_utility_id,
+					'select' => 'effect_tags',
+					'limit'  => 1,
+				]
+			);
+
+			if ( ! is_wp_error( $module_rows ) && ! empty( $module_rows[0]['effect_tags'] ) ) {
+				$effect_tags = $module_rows[0]['effect_tags'];
+				if ( is_string( $effect_tags ) ) {
+					// Supabase may return a JSON-encoded array as a string.
+					$effect_tags = json_decode( $effect_tags, true ) ?: [];
+				}
+				if ( is_array( $effect_tags ) ) {
+					foreach ( $effect_tags as $tag ) {
+						if ( strpos( (string) $tag, 'storage_' ) === 0 ) {
+							$parsed = (int) str_replace( 'storage_', '', (string) $tag );
+							if ( $parsed > 0 ) {
+								$max_capacity = $parsed;
+							}
+						}
 					}
 				}
 			}
@@ -309,23 +363,61 @@ if ( ! function_exists( 'neoweave_get_vehicle_storage_info' ) ) {
 
 		$current_mass = neoweave_get_vehicle_cargo_weight( $vehicle_id );
 
-		return [
+		$result = [
 			'current'       => $current_mass,
 			'max'           => $max_capacity,
 			'is_overloaded' => ( $current_mass > $max_capacity ),
 		];
+
+		wp_cache_set( $cache_key, $result, 'neoweaver', 60 );
+
+		return $result;
 	}
 }
 
 /**
  * Calculate travel fuel cost for a vehicle.
+ *
+ * FIX (Bug 2): The original function accepted $vehicle_id from the caller without
+ * verifying ownership. Any code path (or future AJAX handler) could pass an arbitrary
+ * vehicle_id and get a cost calculation based on that vehicle's storage state.
+ * Fix: verify vehicle belongs to $character_id before proceeding.
+ * neoweave_get_vehicle_storage_info results are wp_cached, so the extra ownership
+ * query is the only added overhead.
  */
 if ( ! function_exists( 'neoweave_calculate_travel_cost' ) ) {
 	function neoweave_calculate_travel_cost( string $vehicle_id, string $character_id ): float {
-		$vehicle_id   = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', $vehicle_id ) );
-		$character_id = strtolower( preg_replace( '/[^a-zA-Z0-9\\-]/', '', $character_id ) );
+		$vehicle_id   = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', $vehicle_id ) );
+		$character_id = strtolower( preg_replace( '/[^a-zA-Z0-9\-]/', '', $character_id ) );
 
 		if ( '' === $vehicle_id || '' === $character_id ) {
+			return 1.0;
+		}
+
+		// ── Ownership check ───────────────────────────────────────────────────
+		if ( ! function_exists( 'tw_supabase_get' ) ) {
+			return 1.0;
+		}
+
+		$ownership_cache_key = 'nw_vown_' . $vehicle_id . '_' . $character_id;
+		$owns                = wp_cache_get( $ownership_cache_key, 'neoweaver' );
+
+		if ( false === $owns ) {
+			$owns_rows = tw_supabase_get(
+				'cyber_vehicles',
+				[
+					'id'       => 'eq.' . $vehicle_id,
+					'owner_id' => 'eq.' . $character_id,
+					'select'   => 'id',
+					'limit'    => 1,
+				]
+			);
+			$owns = ( ! is_wp_error( $owns_rows ) && ! empty( $owns_rows ) ) ? 'yes' : 'no';
+			wp_cache_set( $ownership_cache_key, $owns, 'neoweaver', 60 );
+		}
+
+		if ( 'yes' !== $owns ) {
+			// Vehicle does not belong to this character — return neutral cost.
 			return 1.0;
 		}
 
