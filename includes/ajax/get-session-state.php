@@ -61,16 +61,17 @@ if ( ! function_exists( 'tw_get_session_state_handler' ) ) {
 }
 
 /**
- * BUG 9 FIX: localize neoweaver_chat nonce to the frontend chat script.
+ * BUG 9 FIX (updated): localize neoweaver_chat nonce using Object.assign pattern.
  *
- * Piggybacks on nwChat (chat-engine.js handle 'nw-chat-engine') which is the
- * only frontend consumer of tw_get_session_state. Hooked at priority 20 so
- * the script is already registered when we call wp_localize_script().
+ * wp_localize_script() replaces the entire named JS object on every call,
+ * wiping any properties already set by other handlers on the same nwChat object.
+ * We use wp_add_inline_script() with Object.assign instead so this handler
+ * only adds/updates `session_nonce` without touching other nwChat properties.
  *
- * JS usage:  nwChat.session_nonce  (send as `nonce` POST field)
+ * JS usage: nwChat.session_nonce  (send as `nonce` POST field)
  *
- * If nw-chat-engine is not enqueued on the current page, falls back to
- * wp_add_inline_script on jquery-core so the nonce is always available.
+ * The inline snippet runs AFTER the target script (position 'after'), so
+ * nwChat initialised by the script itself is already in scope.
  */
 if ( ! function_exists( 'nw_localize_session_nonce' ) ) {
 	function nw_localize_session_nonce(): void {
@@ -78,21 +79,18 @@ if ( ! function_exists( 'nw_localize_session_nonce' ) ) {
 			return;
 		}
 
+		$nonce  = wp_json_encode( wp_create_nonce( 'neoweaver_chat' ) );
 		$handle = 'nw-chat-engine';
 
+		// Merge-safe snippet: never overwrites the whole nwChat object.
+		$snippet = 'window.nwChat = Object.assign( window.nwChat || {}, { session_nonce: ' . $nonce . ' } );';
+
 		if ( wp_script_is( $handle, 'enqueued' ) || wp_script_is( $handle, 'registered' ) ) {
-			wp_localize_script(
-				$handle,
-				'nwChat',
-				[ 'session_nonce' => wp_create_nonce( 'neoweaver_chat' ) ]
-			);
+			// Attach after nw-chat-engine so the script's own nwChat init runs first.
+			wp_add_inline_script( $handle, $snippet, 'after' );
 		} else {
-			// Fallback: inline on jquery so any script on the page can read it.
-			wp_add_inline_script(
-				'jquery-core',
-				'window.nwChat = window.nwChat || {}; ' .
-				'nwChat.session_nonce = ' . wp_json_encode( wp_create_nonce( 'neoweaver_chat' ) ) . ';'
-			);
+			// Fallback: attach after jquery-core when chat engine is not loaded.
+			wp_add_inline_script( 'jquery-core', $snippet, 'after' );
 		}
 	}
 }
