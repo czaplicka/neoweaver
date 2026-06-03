@@ -19,7 +19,7 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 
 	function tw_ajax_save_deck(): void {
 
-		// ── Auth & nonce ────────────────────────────────────────────
+		// ── Auth & nonce ───────────────────────────────────────────
 		if ( ! check_ajax_referer( 'tw_deck_nonce', 'nonce', false ) ) {
 			wp_send_json_error( 'Invalid nonce', 403 );
 			return;
@@ -32,7 +32,14 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 		}
 
 		// ── Character ownership check ─────────────────────────────
-		$char_id = sanitize_text_field( wp_unslash( $_POST['character_id'] ?? '' ) );
+		// FIX: sanitize_text_field only strips tags/whitespace; it does not
+		// validate UUID format. nw_sanitize_uuid strips everything outside
+		// [a-f0-9-] and returns '' for invalid input, so empty() below
+		// catches both missing and malformed values before they reach
+		// the Supabase query string.
+		$char_id = nw_sanitize_uuid(
+			sanitize_text_field( wp_unslash( $_POST['character_id'] ?? '' ) )
+		);
 		if ( empty( $char_id ) ) {
 			wp_send_json_error( 'Missing character_id', 400 );
 			return;
@@ -73,7 +80,7 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			return;
 		}
 
-		// ── Parse active ids ──────────────────────────────────────────
+		// ── Parse active ids ─────────────────────────────────────────────
 		$raw_active = (string) ( $_POST['active'] ?? '' );
 		$active_ids = array_values(
 			array_filter(
@@ -86,7 +93,7 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			)
 		);
 
-		// ── BUG 16 FIX: configurable deck size limits ──────────────────
+		// ── BUG 16 FIX: configurable deck size limits ────────────────────
 		// Hardcoded 20/50 silently rejects valid decks when game design changes.
 		// Use apply_filters() so any plugin/theme can override without touching core.
 		$deck_min = (int) apply_filters( 'nw_deck_min_size', 20 );
@@ -141,7 +148,8 @@ if ( ! function_exists( 'tw_ajax_save_deck' ) ) {
 			return;
 		}
 
-		// ── Call RPC cyber_sync_deck ───────────────────────────────────
+		// ── Call RPC cyber_sync_deck ────────────────────────────────────────
+		// tw_supabase_rpc() is defined in includes/supabase-helpers.php.
 		if ( ! function_exists( 'tw_supabase_rpc' ) ) {
 			wp_send_json_error( 'tw_supabase_rpc() not available', 500 );
 			return;
