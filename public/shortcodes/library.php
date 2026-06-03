@@ -7,7 +7,7 @@
  *   cyber_character_deck       — all cards owned by the character
  *   cyber_character_play_cards — cards currently in active game (pile/hand/discard)
  */
-
+error_log('NW: tw_render_library_card called, nw_render_card exists: ' . (function_exists('nw_render_card') ? 'YES' : 'NO'));
 // Detect shortcode BEFORE wp_head so tw_register_library_assets() can enqueue on time.
 add_action( 'wp', function () {
 	global $tw_library_needed, $post;
