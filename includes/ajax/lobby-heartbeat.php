@@ -65,16 +65,22 @@ if ( ! function_exists( 'neoweave_lobby_signups_url' ) ) {
 			return '';
 		}
 
+		// FIX (BUG 5 pattern): UUID hyphens are URL-safe — rawurlencode() converts
+		// them to %2D which PostgREST treats as a literal string, not a hyphen,
+		// so 'eq.550e8400%2De29b%2D...' never matches any row.
+		// Plain string concatenation is correct here; $campaign_id is already
+		// stripped to [a-zA-Z0-9-] by neoweave_sanitize_campaign_id().
 		return trailingslashit( tw_supabase_url() )
 			. 'rest/v1/cyber_campaign_signups'
-			. '?campaign_id=eq.' . rawurlencode( $campaign_id )
+			. '?campaign_id=eq.' . $campaign_id
 			. '&wp_user_id=eq.' . $wp_user_id;
 	}
 }
 
 // ─── NONCE LOCALISATION ───────────────────────────────────────────────────────
 // BUG 12 FIX: expose both nonces to JS so each action uses its own token.
-// Attaches to nw-lobby-js if registered; falls back to inline on jquery-core.
+// Uses Object.assign (not wp_localize_script) so other nwLobby properties
+// set elsewhere are never overwritten.
 
 if ( ! function_exists( 'neoweave_localize_lobby_nonces' ) ) {
 	function neoweave_localize_lobby_nonces(): void {
@@ -87,15 +93,13 @@ if ( ! function_exists( 'neoweave_localize_lobby_nonces' ) ) {
 			'leave_nonce'     => wp_create_nonce( 'neoweave_leave_lobby' ),
 		];
 
-		$handle = 'nw-lobby-js';
+		$snippet = 'window.nwLobby = Object.assign( window.nwLobby || {}, ' . wp_json_encode( $data ) . ' );';
+		$handle  = 'nw-lobby-js';
+
 		if ( wp_script_is( $handle, 'enqueued' ) || wp_script_is( $handle, 'registered' ) ) {
-			wp_localize_script( $handle, 'nwLobby', $data );
+			wp_add_inline_script( $handle, $snippet, 'after' );
 		} else {
-			wp_add_inline_script(
-				'jquery-core',
-				'window.nwLobby = window.nwLobby || {}; ' .
-				'Object.assign(window.nwLobby, ' . wp_json_encode( $data ) . ');'
-			);
+			wp_add_inline_script( 'jquery-core', $snippet, 'after' );
 		}
 	}
 }
@@ -129,6 +133,27 @@ if ( ! function_exists( 'neoweave_lobby_heartbeat' ) ) {
 		$url = neoweave_lobby_signups_url( $campaign_id, $wp_user_id );
 		if ( '' === $url ) {
 			wp_send_json_error( [ 'message' => 'supabase_url_missing' ], 500 );
+			return;
+		}
+
+		// FIX: verify the signup row exists before PATCHing.
+		// PostgREST silently patches zero rows and returns 204 when the WHERE
+		// clause matches nothing — a heartbeat for a campaign the user never
+		// joined would return heartbeat_ok with no row actually touched.
+		$read_headers = neoweave_lobby_supabase_headers();
+		unset( $read_headers['Content-Type'], $read_headers['Prefer'] );
+
+		$check_url = $url . '&select=id&limit=1';
+		$check_res = wp_remote_get( $check_url, [ 'headers' => $read_headers, 'timeout' => 5 ] );
+
+		if ( is_wp_error( $check_res ) ) {
+			wp_send_json_error( [ 'message' => 'supabase_check_failed' ], 502 );
+			return;
+		}
+
+		$check_rows = json_decode( wp_remote_retrieve_body( $check_res ), true );
+		if ( empty( $check_rows[0] ) ) {
+			wp_send_json_error( [ 'message' => 'not_signed_up' ], 403 );
 			return;
 		}
 
