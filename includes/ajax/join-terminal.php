@@ -17,8 +17,15 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			return;
 		}
 
-		$join_code    = isset( $_POST['join_code'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_POST['join_code'] ) ) ) : '';
-		$character_id = isset( $_POST['character_id'] ) ? sanitize_text_field( wp_unslash( $_POST['character_id'] ) ) : '';
+		$join_code = isset( $_POST['join_code'] )
+			? strtoupper( sanitize_text_field( wp_unslash( $_POST['join_code'] ) ) )
+			: '';
+
+		// Read from POST into a dedicated $raw_char_id, then sanitize immediately
+		// into $character_id. The raw value is never used again after this point.
+		$character_id = isset( $_POST['character_id'] )
+			? nw_sanitize_uuid( sanitize_text_field( wp_unslash( $_POST['character_id'] ) ) )
+			: '';
 
 		if ( '' === $join_code ) {
 			wp_send_json_error( array( 'message' => 'missing_join_code' ) );
@@ -35,6 +42,13 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		// Reads use the anon key (respects RLS). Service key is used only for the
 		// signup INSERT below, where elevated privileges are required.
 		$anon_key    = function_exists( 'tw_supabase_anon_key' ) ? tw_supabase_anon_key() : '';
+
+		// FIX: Check the RETURN VALUE of tw_supabase_service_key(), not just whether
+		// the function exists. The function_exists gate above only ensures the helper
+		// is callable; it says nothing about whether wp-config defines a non-empty key.
+		// A blank define('NW_SUPABASE_SERVICE_KEY', '') passes function_exists but
+		// produces an empty string here, leading to a silent Supabase 401 that is
+		// indistinguishable from a real insert error without this explicit guard.
 		$service_key = tw_supabase_service_key();
 
 		if ( ! $anon_key ) {
@@ -42,12 +56,6 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			return;
 		}
 
-		// BUG 10 FIX: function_exists() only confirms the helper is callable;
-		// it does NOT verify the key has a non-empty value. A misconfigured
-		// wp-config (define('NW_SUPABASE_SERVICE_KEY', '')) passes the
-		// function_exists guard but produces an empty $service_key, causing a
-		// silent Supabase 401 that is indistinguishable from a real insert error.
-		// Fail-fast here with a dedicated error code so operators can diagnose it.
 		if ( empty( $service_key ) ) {
 			wp_send_json_error( array( 'message' => 'supabase_service_key_missing' ) );
 			return;
@@ -65,28 +73,31 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			'Prefer'        => 'return=minimal',
 		);
 
-		$safe_char_id = nw_sanitize_uuid( $character_id );
-
 		// NOTE on BUG 11: 'neq.STATUS_DEAD' is intentional and correct.
 		// STATUS_DEAD is the canonical value stored in cyber_characters.status
 		// across the entire codebase (campaign-creator.js, class-agents-list.php,
 		// class-agents-repository.php, public/shortcodes/join-terminal.php).
 		// No leading '#' or lowercase variant is used anywhere — not a bug.
+		//
+		// FIX: also fetch world_id so we can verify world compatibility with the
+		// campaign before allowing the signup (see world_id check below).
 		$char_url = add_query_arg(
 			array(
-				'id'         => 'eq.' . $safe_char_id,
+				'id'         => 'eq.' . $character_id,
 				'wp_user_id' => 'eq.' . $user_id,
 				'status'     => 'neq.STATUS_DEAD',
-				'select'     => 'id',
+				'select'     => 'id,world_id',
 				'limit'      => 1,
 			),
 			$base . 'cyber_characters'
 		);
 
+		// FIX: also fetch world_id from the campaign so we can compare with the
+		// character's world_id before inserting the signup row.
 		$camp_url = add_query_arg(
 			array(
 				'join_code' => 'eq.' . $join_code,
-				'select'    => 'id',
+				'select'    => 'id,world_id',
 				'limit'     => 1,
 			),
 			$base . 'cyber_campaign'
@@ -102,12 +113,13 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 
 		$char_rows = json_decode( wp_remote_retrieve_body( $char_resp ), true );
 
-		if ( empty( $char_rows ) ) {
+		if ( empty( $char_rows[0] ) ) {
 			wp_send_json_error( array( 'message' => 'character_not_owned_or_dead' ) );
 			return;
 		}
 
-		$character_id = $safe_char_id;
+		// $character_id is already sanitized — no reassignment needed.
+		$char_world_id = nw_sanitize_uuid( (string) ( $char_rows[0]['world_id'] ?? '' ) );
 
 		if ( is_wp_error( $camp_resp ) || 200 !== (int) wp_remote_retrieve_response_code( $camp_resp ) ) {
 			wp_send_json_error( array( 'message' => 'campaign_lookup_failed' ) );
@@ -124,12 +136,19 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		// nw_sanitize_uuid() strips everything that isn't a valid UUID character.
 		// sanitize_text_field() only strips tags/whitespace — not safe for UUID values
 		// that go directly into a Supabase query string.
-		$campaign_id = function_exists( 'nw_sanitize_uuid' )
-			? nw_sanitize_uuid( (string) $camp_rows[0]['id'] )
-			: sanitize_text_field( (string) $camp_rows[0]['id'] );
+		$campaign_id    = nw_sanitize_uuid( (string) $camp_rows[0]['id'] );
+		$campaign_world = nw_sanitize_uuid( (string) ( $camp_rows[0]['world_id'] ?? '' ) );
 
 		if ( empty( $campaign_id ) ) {
 			wp_send_json_error( array( 'message' => 'invalid_campaign_id' ) );
+			return;
+		}
+
+		// FIX: Verify the character belongs to the same world as the campaign.
+		// Without this check a character bound to World A can join a campaign
+		// running in World B — world rules, tags, and lore would be mismatched.
+		if ( empty( $char_world_id ) || empty( $campaign_world ) || $char_world_id !== $campaign_world ) {
+			wp_send_json_error( array( 'message' => 'world_mismatch' ) );
 			return;
 		}
 
