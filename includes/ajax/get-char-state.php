@@ -58,8 +58,14 @@ if ( ! function_exists( 'tw_get_char_state_active_handler' ) ) {
 			return;
 		}
 
-		$character_id = $sessions[0]['character_id'] ?? '';
-		$campaign_id  = $sessions[0]['campaign_id']  ?? '';
+		// BUG: sanitize UUIDs from session data with nw_sanitize_uuid,
+		// consistent with every other handler in the codebase.
+		$character_id = isset( $sessions[0]['character_id'] )
+			? nw_sanitize_uuid( (string) $sessions[0]['character_id'] )
+			: '';
+		$campaign_id  = isset( $sessions[0]['campaign_id'] )
+			? nw_sanitize_uuid( (string) $sessions[0]['campaign_id'] )
+			: '';
 
 		if ( empty( $character_id ) || empty( $campaign_id ) ) {
 			wp_send_json_error( 'Session missing character or campaign', 422 );
@@ -111,7 +117,7 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 
 		// Optional: filter by specific character_id passed from JS.
 		$character_id = isset( $_POST['character_id'] )
-			? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['character_id'] )
+			? nw_sanitize_uuid( (string) $_POST['character_id'] )
 			: '';
 
 		$params = [
@@ -125,12 +131,26 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 			$params['limit'] = 1;
 		}
 
-		// Optional: filter by world_id.
+		// Optional: filter by world_id — verify it belongs to the current user
+		// to prevent probing other users' worlds via this endpoint.
 		$world_id = isset( $_POST['world_id'] )
-			? preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['world_id'] )
+			? nw_sanitize_uuid( (string) $_POST['world_id'] )
 			: '';
 
 		if ( ! empty( $world_id ) ) {
+			$world_check = tw_supabase_get(
+				'cyber_worlds',
+				[
+					'id'         => 'eq.' . $world_id,
+					'wp_user_id' => 'eq.' . $user_id,
+					'select'     => 'id',
+					'limit'      => 1,
+				]
+			);
+			if ( is_wp_error( $world_check ) || empty( $world_check[0] ) ) {
+				wp_send_json_error( 'Invalid world_id', 403 );
+				return;
+			}
 			$params['world_id'] = 'eq.' . $world_id;
 		}
 
