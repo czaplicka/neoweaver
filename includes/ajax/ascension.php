@@ -9,9 +9,21 @@
  *  - required copies per tier follow the asc_cost table (2/3/4/5/6), not a hardcoded 2
  *  - add_action guarded with function_exists to prevent double-include fatal
  *  - tw_supabase_get_admin return checked with is_wp_error() before iterating
+ *  - guard nw_sanitize_uuid / tw_supabase_get_admin / tw_supabase_request existence
+ *    before registering the handler — prevents fatal when include order is wrong
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+
+// Bail early (with an error log) if supabase-helpers.php was not loaded yet.
+// This prevents a fatal call-to-undefined-function instead of silently failing.
+foreach ( [ 'nw_sanitize_uuid', 'tw_supabase_get_admin', 'tw_supabase_request' ] as $_nw_fn ) {
+	if ( ! function_exists( $_nw_fn ) ) {
+		error_log( 'NeoWeaver ascension.php: required helper ' . $_nw_fn . '() not found — skipping handler registration. Check include order.' );
+		return;
+	}
+}
+unset( $_nw_fn );
 
 if ( ! function_exists( 'nw_ajax_ascend_card' ) ) {
 
