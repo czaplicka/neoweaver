@@ -31,7 +31,7 @@ function nw_csc_register_menu(): void {
    ════════════════════════════════════════════════════════════════════════════ */
 add_action( 'admin_enqueue_scripts', 'nw_csc_enqueue' );
 
-public function enqueue_assets( string $hook ): void {
+function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, $this->page_slug ) ) {
 			return;
 		}
