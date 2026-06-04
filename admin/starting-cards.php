@@ -1,12 +1,6 @@
 <?php
 /**
  * NeoWeaver — Admin: Class Starting Cards
- *
- * Plik:    includes/admin/class-starting-cards.php
- * Dołącz:  require_once plugin_dir_path( __FILE__ ) . 'includes/admin/class-starting-cards.php';
- *
- * Zależy od: tw_supabase_get(), tw_supabase_get_admin(),
- *            tw_supabase_request(), tw_supabase_rpc() (compat).
  */
 
 defined( 'ABSPATH' ) || exit;
