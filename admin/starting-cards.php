@@ -26,7 +26,7 @@ function nw_csc_register_menu(): void {
 add_action( 'admin_enqueue_scripts', 'enqueue_assets' );
 
 function enqueue_assets( string $hook ): void {
-		if ( ! str_contains( $hook, $this->page_slug ) ) {
+if ( ! str_contains( $hook, 'nw-class-starting-cards' ) ) {
 			return;
 		}
 
@@ -69,7 +69,7 @@ function enqueue_assets( string $hook ): void {
 			true
 		);
 
-    wp_localize_script( 'nw-class-starting-cards', 'NWCards', [
+wp_localize_script( 'nw-starting-cards-script', 'NWCards', [
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
         'nonce'   => wp_create_nonce( 'nw_csc_nonce' ),
     ] );
