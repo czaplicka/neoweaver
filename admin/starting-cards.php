@@ -29,7 +29,7 @@ function nw_csc_register_menu(): void {
 /* ════════════════════════════════════════════════════════════════════════════
    ASSETS
    ════════════════════════════════════════════════════════════════════════════ */
-add_action( 'admin_enqueue_scripts', 'nw_csc_enqueue' );
+add_action( 'admin_enqueue_scripts', 'enqueue_assets' );
 
 function enqueue_assets( string $hook ): void {
 		if ( ! str_contains( $hook, $this->page_slug ) ) {
