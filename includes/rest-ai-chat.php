@@ -176,7 +176,7 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 				'channel_id'   => 'eq.' . $channel_id,
 				'message_type' => 'in.(player,gm)',
 				'order'        => 'created_at.desc',
-				'limit'        => '20',
+				'limit'        => 20, // FIX: integer, nie string
 				'select'       => 'message_type,content',
 			]
 		);
@@ -218,6 +218,12 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			if ( count( $deduped ) >= 14 ) {
 				break;
 			}
+		}
+
+		// FIX: defensywny slice — gwarantuje max 14 par nawet jeśli logika
+		// powyżej ulegnie zmianie w przyszłości.
+		if ( count( $deduped ) > 14 ) {
+			$deduped = array_slice( $deduped, 0, 14 );
 		}
 
 		// Przywróć porządek chronologiczny (najstarsza → najnowsza).
@@ -305,7 +311,12 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						tw_rest_ai_supa_rpc( 'fn_move_character', [ 'p_char_id' => $char_id, 'p_location_id' => $val ] );
 
 						$wp_user_id = (int) ( $context['char']['wp_user_id'] ?? 0 );
-						do_action( 'tw_location_changed', $wp_user_id, [ 'char_id' => $char_id, 'location_id' => $val ] );
+						// FIX: nie wywołuj do_action jeśli wp_user_id nieznany (==0)
+						if ( $wp_user_id > 0 ) {
+							do_action( 'tw_location_changed', $wp_user_id, [ 'char_id' => $char_id, 'location_id' => $val ] );
+						} else {
+							error_log( '[NeoWeaver ai-chat] LOC: brak wp_user_id dla char ' . $char_id );
+						}
 					}
 					break;
 				case 'ENTROPY_UP':
@@ -477,12 +488,18 @@ function tw_rest_ai_supa_post( string $table, array $body ): void {
 }
 
 /**
+ * RPC call do Supabase (POST na /rest/v1/rpc/{fn}).
+ *
+ * FIX: sprawdzamy HTTP status przed dekodowaniem — identycznie jak supa_get.
+ * Wcześniej błąd 4xx/5xx z Supabase był cicho dekodowany jako prawidłowe dane
+ * i zwracany do wywołujących (np. tw_rest_ai_apply_tags → fn_apply_hp_change).
+ *
  * @param string $fn
  * @param array  $params
- * @return array|WP_Error|null
+ * @return array|WP_Error
  */
 function tw_rest_ai_supa_rpc( string $fn, array $params ) {
-	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/rpc/' . $fn;
+	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/rpc/' . rawurlencode( $fn );
 	$response = wp_remote_post( $url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
@@ -493,7 +510,18 @@ function tw_rest_ai_supa_rpc( string $fn, array $params ) {
 		'timeout' => 8,
 	] );
 	if ( is_wp_error( $response ) ) {
+		error_log( '[NeoWeaver rpc] network error ' . $fn . ': ' . $response->get_error_message() );
 		return $response;
 	}
-	return json_decode( wp_remote_retrieve_body( $response ), true );
+	$http_code = (int) wp_remote_retrieve_response_code( $response );
+	if ( $http_code < 200 || $http_code >= 300 ) {
+		error_log( sprintf(
+			'[NeoWeaver rpc] %s returned HTTP %d: %s',
+			$fn,
+			$http_code,
+			wp_remote_retrieve_body( $response )
+		) );
+		return new WP_Error( 'tw_rpc_error', 'RPC ' . $fn . ' failed with HTTP ' . $http_code );
+	}
+	return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
 }
