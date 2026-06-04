@@ -10,6 +10,7 @@
  *    <img ...>
  *    <div class="nw-card__header">
  *      <span class="nw-card__name">Nazwa</span>
+ *      <div class="nw-card__xp-bar">...</div>  ← pasek XP
  *      <span class="nw-card__level">LVL 3</span>
  *    </div>
  *    <div class="nw-card__body">
@@ -461,6 +462,57 @@
 }
 
 /* ============================================================
+   XP PROGRESS BAR
+   Generowany przez nw_render_card() — pełna szerokość w headerze,
+   pod nazwą karty, nad poziomem. Max XP = level × 10.
+   ============================================================ */
+.nw-card__xp-bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  /* header ma flex row — wyciągamy pasek do osobnej linii */
+  flex-basis: 100%;
+  order: 10;   /* po nazwie i levelu, przed body */
+  margin: 2px 0 0;
+  cursor: default;
+}
+
+.nw-card__xp-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--nw-card-accent, #adff00) 0%,
+    color-mix(in srgb, var(--nw-card-accent, #adff00) 60%, #fff) 100%
+  );
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 4px var(--nw-card-accent, #adff00);
+}
+
+.nw-card__xp-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-family: var(--nw-card-font);
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.0);  /* niewidoczny domyślnie */
+  transition: color 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* przy hoverze na karcie — pokaż etykietę XP */
+.nw-card:hover .nw-card__xp-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ============================================================
    NOTES DLA DEVELOPERA
    ============================================================
 
@@ -494,6 +546,10 @@
           echo "</div>";
       }
 
-   4. Pamiętaj wywołać lucide.createIcons() po każdym renderowaniu kart przez AJAX.
+   4. XP BAR — generowany automatycznie przez nw_render_card().
+      Max XP = level × 10 (lvl 1 → 10 XP, lvl 2 → 20 XP).
+      Etykieta "X / Y XP" pojawia się przy hoverze na karcie.
+
+   5. Pamiętaj wywołać lucide.createIcons() po każdym renderowaniu kart przez AJAX.
 
    ============================================================ */
