@@ -69,7 +69,9 @@ function nw_supabase_base(): string {
 function neoweaver_create_world( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_WORLD: START (REST API)' );
 
-	$nonce = $request->get_param( 'nonce' ) ?? '';
+	// SEC FIX: nonce must come from X-WP-Nonce header, not body param.
+	// Body params are not part of WP REST nonce convention and break cookie auth.
+	$nonce = $request->get_header( 'X-WP-Nonce' ) ?? '';
 	if ( ! wp_verify_nonce( $nonce, 'tw_world_nonce' ) ) {
 		return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
 	}
@@ -171,7 +173,8 @@ function neoweaver_create_world( WP_REST_Request $request ) {
 /**
  * GET /wp-json/neoweaver/v1/worlds/list
  * Returns all worlds belonging to the logged-in user.
- * Uses service key to bypass RLS (WP auth handles access control).
+ * SEC FIX: uses anon key so RLS enforces ownership as a second layer of defence.
+ * wp_user_id filter is the primary guard; RLS is the safety net.
  *
  * @return WP_REST_Response|WP_Error
  */
@@ -192,9 +195,10 @@ function neoweaver_list_worlds( WP_REST_Request $request ) {
 		'order'      => 'created_at.desc',
 	], $base . 'cyber_worlds' );
 
-	// READ with service key — bypasses RLS, WP login already verified above
+	// SEC FIX: READ with anon key — RLS enforces ownership as safety net.
+	// Previously used service key which bypasses RLS entirely.
 	$response = wp_remote_get( $url, [
-		'headers' => nw_supabase_service_headers(),
+		'headers' => nw_supabase_headers(),
 		'timeout' => 15,
 	] );
 
@@ -247,8 +251,12 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		'limit'      => 1,
 	], $base . 'cyber_worlds' );
 
-	$check = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	if ( is_wp_error( $check ) || empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
+	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$check_code = wp_remote_retrieve_response_code( $check );
+	// SEC FIX: verify HTTP status before trusting the response body.
+	// Previously a non-2xx response (e.g. 500) with empty body would pass the ownership check.
+	if ( is_wp_error( $check ) || $check_code < 200 || $check_code >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
 		return new WP_Error( 'not_found', 'World not found or access denied.', [ 'status' => 404 ] );
 	}
 
@@ -279,7 +287,8 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 function neoweaver_create_character( WP_REST_Request $request ) {
 	error_log( 'TW_ENDPOINT_CHARACTER: START (REST API)' );
 
-	$nonce = $request->get_param( 'nonce' ) ?? '';
+	// SEC FIX: nonce from X-WP-Nonce header (same fix as neoweaver_create_world).
+	$nonce = $request->get_header( 'X-WP-Nonce' ) ?? '';
 	if ( ! wp_verify_nonce( $nonce, 'tw_character_nonce' ) ) {
 		return new WP_Error( 'nonce_failed', 'Nonce verification failed.', [ 'status' => 403 ] );
 	}
@@ -456,26 +465,32 @@ function neoweaver_change_character( WP_REST_Request $request ) {
 	}
 
 	// Verify campaign belongs to this user
-	$camp_url   = add_query_arg( [
+	$camp_url    = add_query_arg( [
 		'id'         => 'eq.' . $campaign_id,
 		'wp_user_id' => 'eq.' . $user_id,
 		'select'     => 'id',
 		'limit'      => 1,
 	], $base . 'cyber_campaign' );
-	$camp_check = wp_remote_get( $camp_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	if ( is_wp_error( $camp_check ) || empty( json_decode( wp_remote_retrieve_body( $camp_check ), true ) ) ) {
+	$camp_check  = wp_remote_get( $camp_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$camp_code   = wp_remote_retrieve_response_code( $camp_check );
+	// SEC FIX: verify HTTP status before trusting the response body (same as neoweaver_delete_world).
+	if ( is_wp_error( $camp_check ) || $camp_code < 200 || $camp_code >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $camp_check ), true ) ) ) {
 		return new WP_Error( 'not_found', 'Campaign not found or access denied.', [ 'status' => 404 ] );
 	}
 
 	// Verify character belongs to this user
-	$char_url   = add_query_arg( [
+	$char_url    = add_query_arg( [
 		'id'         => 'eq.' . $new_character_id,
 		'wp_user_id' => 'eq.' . $user_id,
 		'select'     => 'id',
 		'limit'      => 1,
 	], $base . 'cyber_characters' );
-	$char_check = wp_remote_get( $char_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	if ( is_wp_error( $char_check ) || empty( json_decode( wp_remote_retrieve_body( $char_check ), true ) ) ) {
+	$char_check  = wp_remote_get( $char_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$char_code   = wp_remote_retrieve_response_code( $char_check );
+	// SEC FIX: verify HTTP status before trusting the response body.
+	if ( is_wp_error( $char_check ) || $char_code < 200 || $char_code >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $char_check ), true ) ) ) {
 		return new WP_Error( 'not_found', 'Character not found or access denied.', [ 'status' => 404 ] );
 	}
 
