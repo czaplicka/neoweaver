@@ -9,7 +9,7 @@
  *     img (bezpośrednio lub w nw-card__img-wrap)
  *     .nw-card__header
  *       .nw-card__name
- *       .nw-card__xp          ← XP pod nazwą (zawsze widoczny, nawet 0)
+ *       .nw-card__xp-bar      ← pasek XP (0 do level×10)
  *       .nw-card__level
  *     .nw-card__body
  *       .nw-card__desc
@@ -18,6 +18,7 @@
  *     .nw-card__footer
  *
  * Dane XP: klucz 'current_xp' z cyber_character_deck.current_xp
+ *          klucz 'level'       z cyber_character_deck.current_level
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -113,6 +114,7 @@ HTML;
 		$did         = esc_attr( (string) ( $card['deck_id'] ?? '' ) );
 		$nonce       = esc_attr( $card['nonce'] ?? '' );
 		$state_cls   = esc_attr( $card['state_cls'] ?? '' );
+		$level       = (int) ( $card['level'] ?? 1 );
 
 		$rarity_color = esc_attr( $can_ascend
 			? '#adff00'
@@ -241,9 +243,20 @@ HTML;
 		$type_icon = "<div class=\"nw-card__type-icon\" title=\"{$cat_label}\"><i data-lucide=\"{$cat_icon}\"></i></div>";
 	}
 
-	/* XP pod nazwą — zawsze widoczny (nawet gdy 0) */
-	$xp_val  = esc_html( number_format( $current_xp ) );
-	$xp_html = "<span class=\"nw-card__xp\"><i data-lucide=\"star\" style=\"width:9px;height:9px;vertical-align:middle;\"></i>&nbsp;{$xp_val}&nbsp;XP</span>";
+	/* ── XP pasek postępu ────────────────────────────────
+	 * Max XP na dany poziom = level × 10
+	 * (lvl 1 → 10 XP, lvl 2 → 20 XP, itd.)
+	 */
+	$level_for_xp = isset( $level ) ? $level : (int) ( $card['level'] ?? 1 );
+	$xp_max       = max( 1, $level_for_xp * 10 );
+	$xp_pct       = min( 100, round( $current_xp / $xp_max * 100 ) );
+	$xp_label     = esc_html( "{$current_xp} / {$xp_max} XP" );
+	$xp_html      = <<<HTML
+<div class="nw-card__xp-bar" title="{$xp_label}">
+	<div class="nw-card__xp-fill" style="width:{$xp_pct}%"></div>
+	<span class="nw-card__xp-label">{$xp_label}</span>
+</div>
+HTML;
 
 	/* effect */
 	$effect_html = $effect !== '' ? "<p class=\"nw-card__effect\">{$effect}</p>" : '';
