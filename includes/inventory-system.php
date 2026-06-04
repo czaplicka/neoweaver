@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * NEOWEAVER - INVENTORY SYSTEM
  * Drag & drop, paperdoll, ekwipunek postaci.
- * ᐚduje się tylko na stronie gry (templates/adventure.php).
+ * ၁aduje się tylko na stronie gry (templates/adventure.php).
  */
 
 /**
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * define() zamiast const:
  * - PHP const na poziomie pliku (poza klasą) jest legalne, ale staje się
  *   fatal error gdy plik zostanie dołączony wewnątrz funkcji lub warunku.
- * - define() działa bezpiecznie w każdym kontekście include/require.
+ * - define() działa bezpiecznie w każdym kontekcie include/require.
  * - Wartości zamrożone — stałe globalne dla całego request.
  */
 if ( ! defined( 'NW_VALID_SLOTS' ) ) {
@@ -127,7 +127,7 @@ add_action(
 	40
 );
 
-// ─── AJAX handler: tw_update_inventory_slot ─────────────────────────────────
+// ─── AJAX handler: tw_update_inventory_slot ───────────────────────────────────────────
 add_action( 'wp_ajax_tw_update_inventory_slot', 'tw_handle_update_inventory_slot' );
 
 if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
@@ -205,7 +205,7 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 		 *    empty() na obiekcie WP_Error zwraca FALSE (obiekt nie jest pusty),
 		 *    więc bez tej kolejności błąd sieciowy byłby traktowany jako sukces.
 		 *
-		 * 2. empty() sprawdza czy Supabase zwróciło puste array
+		 * 2. empty() sprawdza czy Supabase zwróciło pusty array
 		 *    (brak wiersza = brak własności lub nieistniejące ID).
 		 */
 		if ( is_wp_error( $ownership_rows ) ) {
@@ -235,15 +235,27 @@ if ( ! function_exists( 'tw_handle_update_inventory_slot' ) ) {
 			'equipped_slot' => $slot_name,
 		);
 
+		// FIX: PATCH filter zawiera teraz również character_id, nie tylko id.
+		//
+		// Poprzednio: array( 'id' => 'eq.' . $inventory_id )
+		// Teraz:      array( 'id' => 'eq.' . $inventory_id, 'character_id' => 'eq.' . $character_id )
+		//
+		// Dzięki temu nawet jeśli SELECT ownership check zostanie pominięty lub
+		// wystąpi race condition między SELECT a PATCH, Supabase odrzuci PATCH
+		// dla wiersza należącego do innej postaci — zwróci 0 dotkniętych wierszy
+		// zamiast dokonać niezautoryzowanej modyfikacji.
 		$result = tw_supabase_request(
 			'PATCH',
 			'cyber_character_inventory',
-			array( 'id' => 'eq.' . $inventory_id ),
+			array(
+				'id'           => 'eq.' . $inventory_id,
+				'character_id' => 'eq.' . $character_id,
+			),
 			$patch_body
 		);
 
 		// tw_supabase_request() zwraca WP_Error przy każdym błędzie HTTP (w tym 4xx/5xx).
-		// Sprawdzanie $result['code'] po tym bloku byłoby dead code — jeśli dotarliśmy
+		// Sprawdzanie $result['code'] po tym bloku byłoby dead code — jeśli dotarłyśmy
 		// tutaj, 'code' jest zawsze w [200, 299]. Patrz: supabase-helpers.php kontrakt.
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => 'Database update failed' ) );
