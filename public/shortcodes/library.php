@@ -29,7 +29,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		return '<p class="nw-notice">Log in to manage your deck.</p>';
 	}
 
-	// ── Character selection ───────────────────────────────────────────────
+	// ── Character selection ──────────────────────────────────────────────
 	$selected_char_id = null;
 	if ( isset( $_GET['char_id'] ) && is_scalar( $_GET['char_id'] ) ) {
 		$selected_char_id = sanitize_text_field( wp_unslash( $_GET['char_id'] ) );
@@ -71,7 +71,7 @@ function tw_shortcode_deck_library( $atts ): string {
 	if ( function_exists( 'tw_supabase_get_admin' ) ) {
 		$raw = tw_supabase_get_admin( 'cyber_character_deck', [
 			'character_id' => 'eq.' . $safe_id,
-			'select'       => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+			'select'       => 'id,deck_id,current_level,current_xp,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
 		] );
 		if ( is_array( $raw ) ) {
 			$all_assigned = $raw;
@@ -95,7 +95,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── 2b. Fetch category labels / icons / colors ────────────────────────
+	// ── 2b. Fetch category labels / icons / colors ────────────────────
 	$cat_ids = [];
 	foreach ( $all_assigned as $row ) {
 		$cdata  = is_array( $row['cyber_deck'] ?? null ) ? $row['cyber_deck'] : [];
@@ -125,7 +125,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		}
 	}
 
-	// ── 3. Split into active vs library ─────────────────────────────
+	// ── 3. Split into active vs library ────────────────────────
 	$active_cards  = [];
 	$library_cards = [];
 
@@ -142,6 +142,7 @@ function tw_shortcode_deck_library( $atts ): string {
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
+			'current_xp'  => (int) ( $row['current_xp']   ?? 0 ),
 			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
 			'name'        => (string) ( $cdata['name']        ?? '' ),
 			'description' => (string) ( $cdata['description'] ?? '' ),
@@ -173,7 +174,7 @@ function tw_shortcode_deck_library( $atts ): string {
 	$ajax_nonce = wp_create_nonce( 'cyber_deck_library_switch' );
 	$ajax_url   = esc_url( admin_url( 'admin-ajax.php' ) );
 
-	// ── HTML ───────────────────────────────────────────────────────────
+	// ── HTML ───────────────────────────────────────────────────
 	ob_start();
 	?>
 	<div class="deck-builder-wrap" data-deck-builder-root data-character-id="<?php echo esc_attr( $safe_id ); ?>">
@@ -290,7 +291,7 @@ function tw_render_library_card( array $card, string $location ): string {
         : '<!-- nw_render_card() not loaded -->';
 }
 
-// ── AJAX handler: zwraca tylko inner HTML deck-builder-container ────────────
+// ── AJAX handler: zwraca tylko inner HTML deck-builder-container ──────────
 add_action( 'wp_ajax_nw_deck_library_switch', 'tw_ajax_deck_library_switch' );
 function tw_ajax_deck_library_switch(): void {
 	check_ajax_referer( 'cyber_deck_library_switch', 'nonce' );
@@ -319,7 +320,7 @@ function tw_ajax_deck_library_switch(): void {
 	if ( function_exists( 'tw_supabase_get_admin' ) ) {
 		$raw = tw_supabase_get_admin( 'cyber_character_deck', [
 			'character_id' => 'eq.' . $safe_id,
-			'select'       => 'id,deck_id,current_level,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
+			'select'       => 'id,deck_id,current_level,current_xp,cyber_deck!cyber_character_deck_deck_id_fkey(id,name,img_url,type,rarity,description,effect,deck_category,cyber_card_types!cyber_deck_type_fkey(id,category_id))',
 		] );
 		if ( is_array( $raw ) ) $all_assigned = $raw;
 	}
@@ -379,6 +380,7 @@ function tw_ajax_deck_library_switch(): void {
 		$card = [
 			'instance_id' => $rid,
 			'level'       => (int) ( $row['current_level'] ?? 1 ),
+			'current_xp'  => (int) ( $row['current_xp']   ?? 0 ),
 			'img_url'     => (string) ( $cdata['img_url']     ?? '' ),
 			'name'        => (string) ( $cdata['name']        ?? '' ),
 			'description' => (string) ( $cdata['description'] ?? '' ),
