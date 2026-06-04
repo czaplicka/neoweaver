@@ -21,7 +21,7 @@
 		const MAX = cfg.limits?.maxActive ?? 50;
 
 		function countActive() {
-			return activeContainer.querySelectorAll( '.cyber-card' ).length;
+			return activeContainer.querySelectorAll( '.nw-card' ).length;
 		}
 
 		function updateCounter() {
@@ -38,7 +38,7 @@
 		let dragged = null;
 
 		root.addEventListener( 'dragstart', function ( e ) {
-			const card = e.target.closest( '.cyber-card' );
+			const card = e.target.closest( '.nw-card' );
 			if ( ! card ) return;
 			dragged = card;
 			setTimeout( () => card.classList.add( 'is-dragging' ), 0 );
@@ -46,7 +46,7 @@
 		} );
 
 		root.addEventListener( 'dragend', function ( e ) {
-			const card = e.target.closest( '.cyber-card' );
+			const card = e.target.closest( '.nw-card' );
 			if ( card ) card.classList.remove( 'is-dragging' );
 			[ activeContainer, libraryContainer ].forEach( c => c.classList.remove( 'drag-over' ) );
 			dragged = null;
@@ -87,7 +87,34 @@
 
 		// ── Double-click to move ──────────────────────────────────────────────
 		root.addEventListener( 'dblclick', function ( e ) {
-			const card = e.target.closest( '.cyber-card' );
+			const card = e.target.closest( '.nw-card' );
+			if ( ! card ) return;
+
+			const isInActive = card.parentElement === activeContainer;
+
+			if ( ! isInActive ) {
+				if ( countActive() >= MAX ) {
+					showWarning( 'Active deck is full (' + MAX + ' cards max).' );
+					return;
+				}
+				activeContainer.appendChild( card );
+				card.dataset.cardLocation = 'active';
+			} else {
+				libraryContainer.appendChild( card );
+				card.dataset.cardLocation = 'library';
+			}
+
+			updateEmptyNotes();
+			updateCounter();
+			validateDeck( false );
+		} );
+
+		// ── Button: Add to Deck / Remove ──────────────────────────────────────
+		root.addEventListener( 'click', function ( e ) {
+			const btn = e.target.closest( '.nw-lib-toggle' );
+			if ( ! btn ) return;
+
+			const card = btn.closest( '.nw-card' );
 			if ( ! card ) return;
 
 			const isInActive = card.parentElement === activeContainer;
@@ -158,7 +185,7 @@
 
 		function collectByAttr( container, attr ) {
 			return Array.from(
-				container.querySelectorAll( '.cyber-card[' + attr + ']' )
+				container.querySelectorAll( '.nw-card[' + attr + ']' )
 			).map( c => c.getAttribute( attr ) ).filter( Boolean );
 		}
 
@@ -202,7 +229,7 @@
 		}
 
 		function updateNote( container, text ) {
-			const hasCards = container.querySelector( '.cyber-card' );
+			const hasCards = container.querySelector( '.nw-card' );
 			let note       = container.querySelector( '.deck-empty-note' );
 			if ( hasCards ) {
 				if ( note ) note.remove();
