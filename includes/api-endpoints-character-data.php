@@ -185,16 +185,24 @@ if ( ! function_exists( 'nw_supabase_request' ) ) {
 				error_log( 'NW SUPABASE QUERY ARGS ' . wp_json_encode( $query ) );
 			}
 		}
-		$method  = strtoupper( $method );
+		$method = strtoupper( $method );
+
+		// Use service key for write operations so they are not blocked by RLS
+		// when called from server-side handlers. Read operations keep the anon key.
+		$is_write = in_array( $method, array( 'POST', 'PATCH', 'PUT', 'DELETE' ), true );
+		$api_key  = ( $is_write && function_exists( 'tw_supabase_service_key' ) )
+			? tw_supabase_service_key()
+			: tw_supabase_anon_key();
+
 		$headers = array(
-			'apikey'        => tw_supabase_anon_key(),
-			'Authorization' => 'Bearer ' . tw_supabase_anon_key(),
+			'apikey'        => $api_key,
+			'Authorization' => 'Bearer ' . $api_key,
 			'Accept'        => 'application/json',
 		);
 		if ( $return_representation ) {
 			$headers['Prefer'] = 'return=representation';
 		}
-		if ( in_array( $method, array( 'POST', 'PATCH', 'PUT' ), true ) ) {
+		if ( $is_write ) {
 			$headers['Content-Type'] = 'application/json';
 		}
 		$args = array(
@@ -384,17 +392,19 @@ if ( ! function_exists( 'nw_map_starting_package_shape' ) ) {
 	}
 }
 
-function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
-    $class_name = strtolower( trim( $class_name ) );
-    return array_values(
-        array_filter(
-            $rows,
-            static function ( $row ) use ( $class_name ) {
-                $name = strtolower( trim( (string) ( $row['package_name'] ?? '' ) ) );
-                return str_contains( $name, $class_name );
-            }
-        )
-    );
+if ( ! function_exists( 'nw_filter_packages_by_class_name' ) ) {
+	function nw_filter_packages_by_class_name( array $rows, string $class_name ): array {
+		$class_name = strtolower( trim( $class_name ) );
+		return array_values(
+			array_filter(
+				$rows,
+				static function ( $row ) use ( $class_name ) {
+					$name = strtolower( trim( (string) ( $row['package_name'] ?? '' ) ) );
+					return str_contains( $name, $class_name );
+				}
+			)
+		);
+	}
 }
 
 // ─── Lookup finders ──────────────────────────────────────────────────────────
