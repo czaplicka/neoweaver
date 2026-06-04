@@ -58,7 +58,7 @@ function nw_render_card( array $card, string $mode = 'library' ): string {
 	$name      = esc_html( $card['name'] ?? '' );
 	$desc      = esc_html( $card['description'] ?? '' );
 	$effect    = esc_html( $card['effect'] ?? '' );
-	$xp        = isset( $card['xp'] ) ? (int) $card['xp'] : null;
+	$xp = array_key_exists( 'xp', $card ) ? (int) $card['xp'] : 0;
 	$cat_label = esc_html( $card['cat_label'] ?? '' );
 	$cat_icon  = esc_attr( $card['cat_icon'] ?? 'tag' );
 	$cat_color = esc_attr( $card['cat_color'] ?? '#adff00' );
@@ -241,7 +241,7 @@ HTML;
 
 	/* XP pod nazwą */
 	$xp_html = '';
-	if ( $xp !== null ) {
+	if ( 'ascension' === $mode || array_key_exists( 'xp', $card ) ) {
 		$xp_val  = esc_html( number_format( $xp ) );
 		$xp_html = "<span class=\"nw-card__xp\"><i data-lucide=\"star\" style=\"width:9px;height:9px;vertical-align:middle;\"></i>&nbsp;{$xp_val}&nbsp;XP</span>";
 	}
