@@ -9,13 +9,15 @@
  *     img (bezpośrednio lub w nw-card__img-wrap)
  *     .nw-card__header
  *       .nw-card__name
- *       .nw-card__xp          ← XP pod nazwą
+ *       .nw-card__xp          ← XP pod nazwą (zawsze widoczny, nawet 0)
  *       .nw-card__level
  *     .nw-card__body
  *       .nw-card__desc
  *       .nw-card__effect      ← efekt karty
  *       [ascension extras]
  *     .nw-card__footer
+ *
+ * Dane XP: klucz 'current_xp' z cyber_character_deck.current_xp
  */
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
@@ -54,16 +56,16 @@ function nw_render_card( array $card, string $mode = 'library' ): string {
 	$rarity_cls = $rarity_map[ $rarity ] ?? 'nw-card--common';
 
 	/* ── podstawowe dane ─────────────────────────────── */
-	$iid       = esc_attr( (string) ( $card['instance_id'] ?? '' ) );
-	$name      = esc_html( $card['name'] ?? '' );
-	$desc      = esc_html( $card['description'] ?? '' );
-	$effect    = esc_html( $card['effect'] ?? '' );
-	$xp = array_key_exists( 'xp', $card ) ? (int) $card['xp'] : 0;
-	$cat_label = esc_html( $card['cat_label'] ?? '' );
-	$cat_icon  = esc_attr( $card['cat_icon'] ?? 'tag' );
-	$cat_color = esc_attr( $card['cat_color'] ?? '#adff00' );
-	$cat_key   = strtolower( $card['cat_key'] ?? $card['cat_label'] ?? '' );
-	$cat_cls   = $cat_class_map[ $cat_key ] ?? '';
+	$iid        = esc_attr( (string) ( $card['instance_id'] ?? '' ) );
+	$name       = esc_html( $card['name'] ?? '' );
+	$desc       = esc_html( $card['description'] ?? '' );
+	$effect     = esc_html( $card['effect'] ?? '' );
+	$current_xp = (int) ( $card['current_xp'] ?? 0 );   // zawsze int, domyślnie 0
+	$cat_label  = esc_html( $card['cat_label'] ?? '' );
+	$cat_icon   = esc_attr( $card['cat_icon'] ?? 'tag' );
+	$cat_color  = esc_attr( $card['cat_color'] ?? '#adff00' );
+	$cat_key    = strtolower( $card['cat_key'] ?? $card['cat_label'] ?? '' );
+	$cat_cls    = $cat_class_map[ $cat_key ] ?? '';
 
 	/* ── tryb: library ──────────────────────────────── */
 	if ( 'library' === $mode ) {
@@ -239,12 +241,9 @@ HTML;
 		$type_icon = "<div class=\"nw-card__type-icon\" title=\"{$cat_label}\"><i data-lucide=\"{$cat_icon}\"></i></div>";
 	}
 
-	/* XP pod nazwą */
-	$xp_html = '';
-	if ( 'ascension' === $mode || array_key_exists( 'xp', $card ) ) {
-		$xp_val  = esc_html( number_format( $xp ) );
-		$xp_html = "<span class=\"nw-card__xp\"><i data-lucide=\"star\" style=\"width:9px;height:9px;vertical-align:middle;\"></i>&nbsp;{$xp_val}&nbsp;XP</span>";
-	}
+	/* XP pod nazwą — zawsze widoczny (nawet gdy 0) */
+	$xp_val  = esc_html( number_format( $current_xp ) );
+	$xp_html = "<span class=\"nw-card__xp\"><i data-lucide=\"star\" style=\"width:9px;height:9px;vertical-align:middle;\"></i>&nbsp;{$xp_val}&nbsp;XP</span>";
 
 	/* effect */
 	$effect_html = $effect !== '' ? "<p class=\"nw-card__effect\">{$effect}</p>" : '';
