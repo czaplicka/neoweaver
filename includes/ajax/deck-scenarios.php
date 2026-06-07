@@ -2,7 +2,7 @@
 /**
  * TALE WEAVER - Deck / Scenarios AJAX
  *
- * 1. tw_localize_deck_vars()  - localizes twGameConfig to JS on the terminal page.
+ * 1. tw_localize_deck_vars()  - merges deck vars into twGameConfig on the adventure page.
  * 2. tw_get_scenarios_ajax()  - returns available (unplayed) scenarios for a campaign.
  *
  * All Supabase reads use tw_supabase_get() (anon key, respects RLS).
@@ -16,28 +16,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Localize deck config vars on the terminal page
-// Hooked directly on wp_enqueue_scripts (priority 11) with is_page_template() guard.
-// is_page_template() is slug-independent — survives page renames.
-// Template file: template-adventure.php
+// 1. Merge deck config vars into twGameConfig on the adventure page.
+//
+// FIX: is_page_template() slug must match _wp_page_template post meta.
+//      Registered in neoweaver-wp-core.php as 'templates/adventure.php'
+//      (via filter_page_templates), so the check must use that path.
+//
+// FIX: wp_localize_script() replaces the entire twGameConfig object,
+//      destroying keys set by other handlers (e.g. buffer.php sets
+//      use_card_nonce / foundry_nonce). We now use wp_add_inline_script()
+//      with Object.assign() so all handlers merge non-destructively,
+//      matching the pattern already used in buffer.php.
 // ---------------------------------------------------------------------------
 
 add_action( 'wp_enqueue_scripts', 'tw_localize_deck_vars', 11 );
 
 function tw_localize_deck_vars() {
 
-	if ( ! is_page_template( 'template-adventure.php' ) ) {
+	if ( ! is_page_template( 'templates/adventure.php' ) ) {
 		return;
 	}
 
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
-		error_log( 'tw_localize_deck_vars: user not logged in' );
 		return;
 	}
 
 	// campaign_id from query var or GET fallback.
-	// cyber_campaign.id is a UUID — keep as string, sanitize by stripping non-alphanumeric/hyphen.
+	// cyber_campaign.id is a UUID — sanitize by stripping non-alphanumeric/hyphen.
 	$campaign_id_raw = get_query_var( 'campaign_id' );
 
 	if ( ! is_string( $campaign_id_raw ) || $campaign_id_raw === '' ) {
@@ -62,27 +68,25 @@ function tw_localize_deck_vars() {
 			]
 		);
 
-		if ( is_wp_error( $result ) ) {
-			error_log( 'tw_localize_deck_vars: campaign lookup error: ' . $result->get_error_message() );
-		} elseif ( ! empty( $result[0]['id'] ) ) {
+		if ( ! is_wp_error( $result ) && ! empty( $result[0]['id'] ) ) {
 			$campaign_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $result[0]['id'] );
-			error_log( 'tw_localize_deck_vars: found campaign_id=' . $campaign_id . ' dla user ' . $user_id );
-		} else {
-			error_log( 'tw_localize_deck_vars: no campaign found for user ' . $user_id );
 		}
 	}
 
-	error_log( 'tw_localize_deck_vars fired, campaign_id=' . $campaign_id . ', user_id=' . $user_id );
-
-	wp_localize_script(
-		'adventure-js',
-		'twGameConfig',
+	// Merge into existing twGameConfig via Object.assign — non-destructive.
+	$data = wp_json_encode(
 		[
 			'ajaxurl'     => admin_url( 'admin-ajax.php' ),
 			'nonce'       => wp_create_nonce( 'tw_deck_nonce' ),
 			'campaign_id' => $campaign_id,
 			'user_id'     => (int) $user_id,
 		]
+	);
+
+	wp_add_inline_script(
+		'adventure-js',
+		'window.twGameConfig = Object.assign( window.twGameConfig || {}, ' . $data . ' );',
+		'before'
 	);
 }
 
@@ -112,8 +116,6 @@ function tw_get_scenarios_ajax(): void {
 		wp_send_json_error( [ 'message' => 'Missing campaign_id' ], 400 );
 		return;
 	}
-
-	error_log( 'tw_get_scenarios_ajax: campaign_id=' . $campaign_id );
 
 	// 1. Campaign row.
 	$campaigns = tw_supabase_get(
@@ -156,7 +158,6 @@ function tw_get_scenarios_ajax(): void {
 
 	// UUID-safe: explicit '' !== $v callback — default array_filter would drop
 	// any value that loosely evaluates to false (e.g. '0', '', null).
-	// UUIDs never equal '0' in practice, but the explicit check is correct by contract.
 	$played     = $played ?: [];
 	$played_ids = ! empty( $played )
 		? array_values(
@@ -169,8 +170,6 @@ function tw_get_scenarios_ajax(): void {
 			)
 		)
 		: [];
-
-	error_log( 'tw_get_scenarios_ajax: played_ids=' . ( $played_ids ? implode( ',', $played_ids ) : 'none' ) );
 
 	// 3. Difficulty range (min 1).
 	$difficulty_values = array_unique( array_filter(
