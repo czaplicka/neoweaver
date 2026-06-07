@@ -11,9 +11,6 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 	add_action( 'wp_ajax_tw_ensure_world_state', 'tw_ensure_world_state' );
 
 	function tw_ensure_world_state(): void {
-		// BUG FIX: was 'tw_nonce' — adventure.js sends twAdventureData.nonce which
-		// in head-injection.php is keyed 'adventure_nonce' => tw_adventure_nonce.
-		// Align with every other handler in the codebase.
 		if ( ! check_ajax_referer( 'tw_adventure_nonce', 'nonce', false ) ) {
 			wp_send_json_error( [ 'message' => 'Security check failed' ], 403 );
 			return;
@@ -39,9 +36,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			return;
 		}
 
-		// BUG6 FIX: verify the calling user owns or is a participant of this campaign
-		// before allowing world state initialization.
-		// Check cyber_campaign (owner) OR cyber_campaign_characters (participant).
+		// Verify the calling user owns or is a participant of this campaign.
 		$is_owner = false;
 		if ( function_exists( 'tw_supabase_get_admin' ) ) {
 			$owner_row = tw_supabase_get_admin(
@@ -98,13 +93,13 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 		);
 
 		if ( ! is_wp_error( $insert ) ) {
-			// BUG FIX: tw_supabase_request returns the decoded body directly
-			// (an array of rows when Prefer: return=representation is set),
-			// NOT a wrapper with a 'data' key. $insert['data'][0] was always null.
+			// tw_supabase_request returns ['ok' => true, 'code' => int, 'data' => mixed].
+			// With Prefer: return=representation, 'data' contains the inserted rows array.
+			$inserted_row = is_array( $insert['data'] ?? null ) ? ( $insert['data'][0] ?? null ) : null;
 			wp_send_json_success(
 				[
 					'status' => 'created',
-					'row'    => $insert[0] ?? null,
+					'row'    => $inserted_row,
 				]
 			);
 			return;
@@ -122,7 +117,6 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 		}
 
 		// PostgREST returns HTTP 409 for unique constraint violations (SQLSTATE 23505).
-		// $status holds the HTTP status code, not the PostgreSQL SQLSTATE.
 		$is_unique_violation =
 			409 === $status ||
 			'23505' === $sqlstate ||
@@ -144,7 +138,6 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 					. $existing->get_error_message()
 					. ' | campaign_id=' . $campaign_id
 				);
-
 				wp_send_json_error(
 					[
 						'message' => 'World state exists but fetch failed',
@@ -166,9 +159,7 @@ if ( ! function_exists( 'tw_ensure_world_state' ) ) {
 			}
 
 			wp_send_json_error(
-				[
-					'message' => 'World state conflict detected but existing row was not found',
-				],
+				[ 'message' => 'World state conflict detected but existing row was not found' ],
 				409
 			);
 			return;
