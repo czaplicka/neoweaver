@@ -23,7 +23,15 @@ if ( ! function_exists( 'tw_get_session_state_handler' ) ) {
 			return;
 		}
 
-		$session_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $_POST['session_id'] );
+		// FIX: replaced preg_replace('/[^a-zA-Z0-9\-]/', '', ...) with nw_sanitize_uuid().
+		// The old sanitizer allowed uppercase letters, but Postgres stores UUIDs lowercase
+		// and PostgREST eq. filter is case-sensitive against the stored form — an uppercase
+		// UUID would silently return 0 rows. nw_sanitize_uuid() lowercases and validates
+		// the full UUID format, consistent with every other UUID sanitization in the codebase.
+		$session_id = function_exists( 'nw_sanitize_uuid' )
+			? nw_sanitize_uuid( sanitize_text_field( wp_unslash( (string) $_POST['session_id'] ) ) )
+			: preg_replace( '/[^a-f0-9\-]/', '', strtolower( (string) $_POST['session_id'] ) );
+
 		if ( empty( $session_id ) ) {
 			wp_send_json_error( [ 'message' => 'Invalid session_id' ], 400 );
 			return;
