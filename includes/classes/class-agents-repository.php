@@ -18,9 +18,9 @@
  *  - Never allow an Agent to be bound to a Node it was not created in.
  *  - All table names use the cyber_ prefix (e.g. cyber_characters).
  *
- * COLUMN NAMES in cyber_characters (no underscores on FK columns):
- *  - worldid    (FK → cyber_worlds)      — NOT world_id
- *  - locationid (FK → cyber_world_map)   — NOT location_id
+ * COLUMN NAMES in cyber_characters (FK columns use underscores):
+ *  - world_id    (FK → cyber_worlds)      — NOT worldid
+ *  - locationid  (FK → cyber_world_map)   — NOT location_id
  *
  * @package Neoweaver
  */
@@ -280,8 +280,7 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Fetch all Field Agents currently bound to a specific Node (world).
 	 *
-	 * NOTE: the FK column in cyber_characters is `worldid` (no underscore),
-	 * NOT `world_id`. Using `world_id` returns zero rows silently.
+	 * NOTE: the FK column in cyber_characters is `world_id` (with underscore).
 	 *
 	 * @param string|int $node_id  UUID of the cyber_worlds row.
 	 * @return array
@@ -295,7 +294,7 @@ class Neoweaver_Agents_Repository {
 		}
 
 		$url = $this->table_url( 'cyber_characters', [
-			'worldid' => 'eq.' . $safe_id,
+			'world_id' => 'eq.' . $safe_id,
 		] );
 		return $this->get_json( $url );
 	}
