@@ -7,8 +7,9 @@
  *
  * Kontrakt zwracanych wartości (stabilny dla callerów):
  *   get_all()  → array wierszy LUB ['error' => string]
- *   get_one()  → array wiersza LUB ['error' => string]
- *   insert()   → ['ok' => bool, 'code' => int, 'data' => mixed, 'error' => ?string]
+ *   get_one()  → array wiersza  LUB ['error' => string]
+ *   insert()   → array wierszy  LUB ['error' => string]
+ *               (użyj $result[0]['id'] bezpośrednio po udanym insercie)
  *   patch()    → ['ok' => bool, 'code' => int, 'data' => mixed, 'error' => ?string]
  *   delete()   → ['ok' => bool, 'code' => int, 'data' => mixed, 'error' => ?string]
  *
@@ -26,25 +27,8 @@ if ( class_exists( 'NW_Supabase' ) ) {
 class NW_Supabase {
 
 	// --------------------------------------------------------
-	// PRYWATNY HELPER: service-key headers
-	// Oba klucze muszą być service key gdy pomijamy RLS.
-	// --------------------------------------------------------
-
-	private static function service_headers( array $extra = [] ): array {
-		$key = function_exists( 'tw_supabase_service_key' ) ? tw_supabase_service_key() : '';
-		return array_merge(
-			[
-				'apikey'        => $key,
-				'Authorization' => 'Bearer ' . $key,
-				'Content-Type'  => 'application/json',
-			],
-			$extra
-		);
-	}
-
-	// --------------------------------------------------------
 	// PRYWATNY HELPER: normalizuje WP_Error → ['error' => string]
-	// Używany przez get_all() i get_one() żeby zachować stary kontrakt.
+	// Używany przez read i insert żeby zachować spójny kontrakt.
 	// --------------------------------------------------------
 
 	private static function wp_error_to_array( WP_Error $error ): array {
@@ -115,20 +99,42 @@ class NW_Supabase {
 	// WRITE
 	// --------------------------------------------------------
 
+	/**
+	 * Wstawia wiersz do tabeli i zwraca tablice wierszy (jak get_all).
+	 *
+	 * tw_supabase_request() zwraca wrapper ['ok','code','data'] — rozpakowujemy
+	 * 'data' żeby callerzy mogli robić $result[0]['id'] bezpośrednio.
+	 * Błąd → ['error' => string], spójnie z get_all()/get_one().
+	 */
 	public static function insert( string $table, array $payload ): array {
 		$result = tw_supabase_request(
 			'POST',
 			$table,
 			[ 'select' => '*' ],
 			$payload,
-			[
-				'headers' => self::service_headers( [ 'Prefer' => 'return=representation' ] ),
-			]
+			[ 'prefer' => 'return=representation' ]
 		);
 
-		return is_wp_error( $result )
-			? self::wp_error_to_result( $result )
-			: $result;
+		if ( is_wp_error( $result ) ) {
+			return self::wp_error_to_array( $result );
+		}
+
+		// Rozpakuj wrapper tw_supabase_request → surowa tablica wierszy.
+		if ( isset( $result['data'] ) ) {
+			$rows = $result['data'];
+			if ( is_array( $rows ) ) {
+				return $rows;
+			}
+			// data może być null gdy Supabase zwraca 204 bez treści
+			return [];
+		}
+
+		// Stary kształt helpera — bezpośrednio tablica wierszy
+		if ( isset( $result[0] ) || [] === $result ) {
+			return $result;
+		}
+
+		return [ 'error' => 'Unexpected response shape from Supabase.' ];
 	}
 
 	public static function patch( string $table, string $id, array $payload ): array {
@@ -142,9 +148,7 @@ class NW_Supabase {
 				'select' => '*',
 			],
 			$payload,
-			[
-				'headers' => self::service_headers( [ 'Prefer' => 'return=representation' ] ),
-			]
+			[ 'prefer' => 'return=representation' ]
 		);
 
 		return is_wp_error( $result )
@@ -159,10 +163,7 @@ class NW_Supabase {
 			'DELETE',
 			$table,
 			[ 'id' => 'eq.' . $safe_id ],
-			null,
-			[
-				'headers' => self::service_headers(),
-			]
+			null
 		);
 
 		return is_wp_error( $result )
