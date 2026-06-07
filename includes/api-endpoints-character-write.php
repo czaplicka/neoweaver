@@ -99,8 +99,6 @@ if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
 }
 if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
 	function nw_validate_backstory_tags( array $tag_ids ) {
-		error_log( 'NW BACKSTORY raw tag_ids ' . wp_json_encode( $tag_ids ) );
-
 		$requested = array_values(
 			array_unique(
 				array_filter(
@@ -109,10 +107,7 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
 			)
 		);
 
-		error_log( 'NW BACKSTORY requested sanitized IDs ' . wp_json_encode( $requested ) );
-
 		if ( empty( $requested ) ) {
-			error_log( 'NW BACKSTORY requested is empty -> backstory_tags_required' );
 			return new WP_Error(
 				'backstory_tags_required',
 				'Backstory tags are required.',
@@ -122,24 +117,15 @@ if ( ! function_exists( 'nw_validate_backstory_tags' ) ) {
 
 		$defs = nw_find_tag_defs_by_ids( $requested );
 
-		if ( is_wp_error( $defs ) ) {
-			error_log( 'NW BACKSTORY nw_find_tag_defs_by_ids returned WP_Error ' . $defs->get_error_message() );
-		} else {
-			error_log( 'NW BACKSTORY defs from Supabase ' . wp_json_encode( $defs ) );
-		}
-
 		$found = array_map(
-    static function ( $row ) {
-        return isset( $row['id'] ) ? (string) $row['id'] : '';
-    },
-    is_array( $defs ) ? $defs : array()
-);
+			static function ( $row ) {
+				return isset( $row['id'] ) ? (string) $row['id'] : '';
+			},
+			is_array( $defs ) ? $defs : array()
+		);
 
-$requested_str = array_map( 'strval', $requested );
-$missing = array_values( array_diff( $requested_str, $found ) );
-
-		error_log( 'NW BACKSTORY found IDs ' . wp_json_encode( $found ) );
-		error_log( 'NW BACKSTORY missing IDs ' . wp_json_encode( $missing ) );
+		$requested_str = array_map( 'strval', $requested );
+		$missing       = array_values( array_diff( $requested_str, $found ) );
 
 		if ( ! empty( $missing ) ) {
 			return new WP_Error(
@@ -510,7 +496,7 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
         $stored_race_id = $race_validation['stored_race_id'];
 
         $payload = array(
-            'user_id'      => $user_id,
+            'wp_user_id'   => $user_id,
             'name'         => $name,
             'pronouns'     => $pronouns,
             'bio'          => $bio,
@@ -576,9 +562,9 @@ if ( ! function_exists( 'tw_supabase_get_admin' ) ) {
             return new WP_Error( 'config_missing', 'tw_supabase_rest_base not available.', array( 'status' => 500 ) );
         }
 
-        $service_key = defined( 'NW_SUPABASE_SERVICE_KEY' ) ? NW_SUPABASE_SERVICE_KEY : '';
+        $service_key = defined( 'TW_SUPABASE_SERVICE_KEY' ) ? TW_SUPABASE_SERVICE_KEY : '';
         if ( '' === $service_key ) {
-            return new WP_Error( 'config_missing', 'NW_SUPABASE_SERVICE_KEY not defined in wp-config.php.', array( 'status' => 500 ) );
+            return new WP_Error( 'config_missing', 'TW_SUPABASE_SERVICE_KEY not defined in wp-config.php.', array( 'status' => 500 ) );
         }
 
         $base = tw_supabase_rest_base();
