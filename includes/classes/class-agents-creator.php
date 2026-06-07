@@ -57,7 +57,7 @@ class Neoweaver_Agents_Creator {
 		$world_id = nw_sanitize_uuid( (string) $data['world_id'] );
 
 		// ------------------------------------------------------------------
-		// BUG 3 FIX: enforce "1 Agent per World" before inserting.
+		// BUG 3 FIX: enforce “1 Agent per World” before inserting.
 		// tw_supabase_first() never existed — use tw_supabase_get_admin() directly.
 		// ------------------------------------------------------------------
 		if ( $wp_user_id && $world_id && function_exists( 'tw_supabase_get_admin' ) ) {
@@ -97,26 +97,47 @@ class Neoweaver_Agents_Creator {
 			$payload['pronouns'] = sanitize_text_field( $data['pronouns'] );
 		}
 
+		// race_id and class_id: accept either a UUID or a positive integer ID.
+		// nw_sanitize_uuid() is UUID-only; integer IDs (e.g. "5") would survive
+		// the regex but would silently pass a non-UUID text string if the column
+		// is text. Validate the type explicitly so Supabase always gets the right
+		// shape and an invalid value is rejected early.
 		if ( ! empty( $data['race_id'] ) ) {
-			$payload['race_id'] = nw_sanitize_uuid( (string) $data['race_id'] );
+			$race_raw = (string) $data['race_id'];
+			if ( ctype_digit( $race_raw ) ) {
+				$payload['race_id'] = (int) $race_raw;
+			} else {
+				$sanitized = nw_sanitize_uuid( $race_raw );
+				if ( '' === $sanitized ) {
+					return new WP_Error( 'invalid_race_id', 'race_id must be a UUID or positive integer.' );
+				}
+				$payload['race_id'] = $sanitized;
+			}
 		}
 
 		if ( ! empty( $data['class_id'] ) ) {
-			$payload['class_id'] = nw_sanitize_uuid( (string) $data['class_id'] );
+			$class_raw = (string) $data['class_id'];
+			if ( ctype_digit( $class_raw ) ) {
+				$payload['class_id'] = (int) $class_raw;
+			} else {
+				$sanitized = nw_sanitize_uuid( $class_raw );
+				if ( '' === $sanitized ) {
+					return new WP_Error( 'invalid_class_id', 'class_id must be a UUID or positive integer.' );
+				}
+				$payload['class_id'] = $sanitized;
+			}
 		}
 
+		// tw_supabase_request already injects the service key and Content-Type
+		// internally — no need to pass headers here. The previous inline
+		// 'apikey'/'Authorization'/'Prefer' in $extra_args were redundant and
+		// fragile (they bypassed tw_supabase_request’s key-selection logic).
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_characters',
 			[],
 			$payload,
-			[
-				'headers' => [
-					'apikey'        => TW_SUPABASE_SERVICE_KEY,
-					'Authorization' => 'Bearer ' . TW_SUPABASE_SERVICE_KEY,
-					'Prefer'        => 'return=representation',
-				],
-			]
+			[ 'prefer' => 'return=representation' ]
 		);
 
 		if ( is_wp_error( $result ) ) {
