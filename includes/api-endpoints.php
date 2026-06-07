@@ -67,7 +67,9 @@ function nw_supabase_base(): string {
  * @return WP_REST_Response|WP_Error
  */
 function neoweaver_create_world( WP_REST_Request $request ) {
-	error_log( 'TW_ENDPOINT_WORLD: START (REST API)' );
+	// FIX: removed unconditional error_log('TW_ENDPOINT_WORLD: START (REST API)') —
+	// it fired on every world creation request in production, spamming the error log.
+	// Error-path logs below are kept (they fire only on actual failures).
 
 	// SEC FIX: nonce must come from X-WP-Nonce header, not body param.
 	// Body params are not part of WP REST nonce convention and break cookie auth.
@@ -155,8 +157,6 @@ function neoweaver_create_world( WP_REST_Request $request ) {
 		}
 	}
 
-	error_log( 'TW_ENDPOINT_WORLD: SUCCESS world_id=' . $safe_world_id );
-
 	return rest_ensure_response( [
 		'success' => true,
 		'data'    => [
@@ -243,7 +243,13 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	// Verify ownership before deleting
+	// Verify ownership before deleting.
+	// FIX: switched from nw_supabase_service_headers() to nw_supabase_headers() (anon key).
+	// Using the service key bypasses RLS entirely, leaving wp_user_id filter as the sole
+	// ownership guard — a bug in query construction (e.g. dropped eq. filter) would silently
+	// allow any world to be deleted. The anon key adds RLS as a second layer of defence,
+	// consistent with how neoweaver_list_worlds was fixed.
+	// The actual DELETE below still uses the service key (writes must bypass RLS).
 	$check_url = add_query_arg( [
 		'id'         => 'eq.' . $world_id,
 		'wp_user_id' => 'eq.' . $user_id,
@@ -251,7 +257,7 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		'limit'      => 1,
 	], $base . 'cyber_worlds' );
 
-	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
+	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_headers(), 'timeout' => 10 ] );
 	$check_code = wp_remote_retrieve_response_code( $check );
 	// SEC FIX: verify HTTP status before trusting the response body.
 	// Previously a non-2xx response (e.g. 500) with empty body would pass the ownership check.
@@ -277,7 +283,6 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		return new WP_Error( 'delete_failed', 'Delete failed. HTTP ' . $code, [ 'status' => $code ] );
 	}
 
-	error_log( 'TW_WORLD_DELETE: SUCCESS world_id=' . $world_id );
 	return rest_ensure_response( [ 'success' => true, 'data' => [ 'world_id' => $world_id ] ] );
 }
 
@@ -285,7 +290,8 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
  * @return WP_REST_Response|WP_Error
  */
 function neoweaver_create_character( WP_REST_Request $request ) {
-	error_log( 'TW_ENDPOINT_CHARACTER: START (REST API)' );
+	// FIX: removed unconditional error_log('TW_ENDPOINT_CHARACTER: START (REST API)') —
+	// same issue as neoweaver_create_world; fires on every request in production.
 
 	// SEC FIX: nonce from X-WP-Nonce header (same fix as neoweaver_create_world).
 	$nonce = $request->get_header( 'X-WP-Nonce' ) ?? '';
@@ -420,8 +426,6 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		}
 	}
 
-	error_log( 'TW_ENDPOINT_CHARACTER: SUCCESS agent_id=' . $agent_id );
-
 	return rest_ensure_response( [
 		'success' => true,
 		'data'    => [
@@ -445,8 +449,6 @@ function neoweaver_create_character( WP_REST_Request $request ) {
  * @return WP_REST_Response|WP_Error
  */
 function neoweaver_change_character( WP_REST_Request $request ) {
-	error_log( 'TW_ENDPOINT_CHARACTER_CHANGE: START' );
-
 	$user_id = get_current_user_id();
 	if ( ! $user_id ) {
 		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
@@ -551,8 +553,6 @@ function neoweaver_change_character( WP_REST_Request $request ) {
 		'new_character_id' => $new_character_id,
 		'old_character_id' => $old_char_id,
 	] );
-
-	error_log( 'TW_CHARACTER_CHANGE: SUCCESS campaign=' . $campaign_id . ' new_char=' . $new_character_id );
 
 	return rest_ensure_response( [
 		'success' => true,
