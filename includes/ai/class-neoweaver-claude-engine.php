@@ -22,7 +22,7 @@ if ( ! defined( 'NEOWEAVER_TOKENS_GM' ) ) {
  *
  * process( $char_id, $message )
  *   — użyj gdy engine ma sam budować kontekst i pobierać historię po char_id.
- *   — zapisuje historię do cyber_chat_messages po char_id.
+ *   — NIE zapisuje historii — zapis leży po stronie wywołującego (tak jak process_with_context).
  *
  * process_with_context( $context, $history, $message )
  *   — użyj gdy kontekst i historia są już zbudowane zewnętrznie (np. rest-ai-chat.php).
@@ -82,7 +82,9 @@ PROMPT;
     // ============================================================
     // PUBLIC: process() — engine sam buduje kontekst i historię
     // Wywołuj z miejsc, gdzie nie masz jeszcze kontekstu.
-    // Zapisuje historię per char_id.
+    // UWAGA: NIE zapisuje historii — zapis należy do wywołującego,
+    //        tak samo jak w process_with_context(). Zapobiega to
+    //        podwójnemu zapisowi gdy wywołujący też pisze do cyber_chat_messages.
     // Zwraca: ['text'=>'...', 'tags'=>[...], 'protocol'=>'...', 'tokens'=>[...]]
     // ============================================================
     public function process( string $char_id, string $message ): array {
@@ -114,7 +116,8 @@ PROMPT;
             return [ 'error' => $result->get_error_message() ];
         }
 
-        $this->save_to_history( $char_id, $message, $result['content'] );
+        // Historia NIE jest tu zapisywana — wywołujący jest odpowiedzialny za zapis,
+        // identycznie jak w ścieżce process_with_context / rest-ai-chat.php.
         $this->log_tokens( $char_id, $ctx['world_id'] ?? null, $result['usage'], $protocol );
 
         $parsed = $this->parse_tags( $result['content'] );
@@ -218,14 +221,17 @@ PROMPT;
     // Pomocniczy helper Supabase REST
     // GET: endpoint = '/rest/v1/table', params = ['col' => 'eq.val', ...]
     // POST/DELETE: endpoint = '/rest/v1/table', body = [...]
+    //
+    // FIX: add_query_arg już samo URL-enkoduje wartości — NIE owijamy
+    //      $params w rawurlencode(), bo to powoduje podwójne kodowanie
+    //      (np. 'eq.uuid' → 'eq.uuid' OK, ale z rawurlencode → 'eq.uuid%2D...' BROKEN).
     // ============================================================
     private function supabase_request( string $method, string $endpoint, array $body = [], array $extra_headers = [], array $params = [] ): ?array {
         $base_url = trailingslashit( tw_supabase_url() ) . ltrim( $endpoint, '/' );
 
-        // For GET requests build the query string safely via add_query_arg.
-        // Never concatenate raw query strings to avoid double-encoding.
+        // add_query_arg handles encoding internally — do NOT pre-encode $params values.
         if ( $method === 'GET' && ! empty( $params ) ) {
-            $base_url = add_query_arg( array_map( 'rawurlencode', $params ), $base_url );
+            $base_url = add_query_arg( $params, $base_url );
         }
 
         $args = [
@@ -328,11 +334,18 @@ PROMPT;
 
     /**
      * Reset historii gracza (nowa sesja, śmierć postaci itp.)
+     *
+     * FIX: zamiast sklejania stringa z urlencode() (który koduje myślniki jako %2D
+     *      i psuje UUID), używamy supabase_request() z tablicą $params —
+     *      add_query_arg wewnątrz poprawnie obsługuje enkodowanie.
      */
     public function reset_history( string $char_id ): void {
         $this->supabase_request(
             'DELETE',
-            '/rest/v1/cyber_chat_messages?char_id=eq.' . urlencode( $char_id )
+            '/rest/v1/cyber_chat_messages',
+            [],
+            [ 'Prefer' => 'return=minimal' ],
+            [ 'char_id' => 'eq.' . $char_id ]
         );
     }
 
