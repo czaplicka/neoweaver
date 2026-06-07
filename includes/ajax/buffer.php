@@ -308,8 +308,11 @@ if ( ! function_exists( 'handle_save_cyber_deck_rpc' ) ) {
 		}
 
 		if ( ! empty( $sanitized_ids ) ) {
+			// FIX: was 'cyber_character_deck_cards' — canonical table name is
+			// 'cyber_character_deck', consistent with every other handler in the
+			// codebase (save-deck.php, ascension.php, library.php, fate-of-loom.js).
 			$owned_cards = tw_supabase_get(
-				'cyber_character_deck_cards',
+				'cyber_character_deck',
 				[
 					'character_id' => 'eq.' . $character_id,
 					'id'           => 'in.(' . implode( ',', $sanitized_ids ) . ')',
