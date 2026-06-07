@@ -126,10 +126,21 @@ if ( ! function_exists( 'tw_rest_ai_build_context' ) ) {
 			return new WP_Error( 'tw_ai_no_char', 'Nie znaleziono postaci: ' . $char_id, [ 'status' => 404 ] );
 		}
 
-		// BUG 8 FIX — weryfikacja właściciela postaci.
-		// permission_callback sprawdza tylko is_user_logged_in(); musimy tu
-		// upewnić się, że zalogowany użytkownik faktycznie posiada tę postać.
-		if ( (int) ( $char['wp_user_id'] ?? 0 ) !== get_current_user_id() ) {
+		// BUG FIX — weryfikacja właściciela postaci.
+		// Rozróżniamy dwa przypadki: wp_user_id === null (problem z bazą/RLS)
+		// vs wp_user_id !== zalogowany użytkownik (próba dostępu do cudzej postaci).
+		// Oba skutkują 403, ale logujemy null osobno żeby można było debugować.
+		$owner_id = isset( $char['wp_user_id'] ) ? (int) $char['wp_user_id'] : null;
+
+		if ( $owner_id === null ) {
+			error_log( sprintf(
+				'[NeoWeaver rest-ai-chat] build_context: wp_user_id is NULL for char %s (missing column or RLS projection). Returning 403.',
+				$char_id
+			) );
+			return new WP_Error( 'tw_ai_forbidden', 'Brak dostępu do tej postaci.', [ 'status' => 403 ] );
+		}
+
+		if ( $owner_id !== get_current_user_id() ) {
 			return new WP_Error( 'tw_ai_forbidden', 'Brak dostępu do tej postaci.', [ 'status' => 403 ] );
 		}
 
@@ -191,11 +202,6 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 
 		// BUG 31 FIX — strategia deduplicacji: zachowujemy OSTATNIE wystąpienie
 		// w grupie wiadomości tej samej roli (nie pierwsze).
-		// Scenariusz retry: gracz wysyła wiadomość, nie dostaje odpowiedzi, wysyła
-		// ponownie — w bazie są dwie wiadomości `player` z rzędu. Stara logika
-		// zachowywała PIERWSZĄ (starszą), więc GM odpowiadał na przestarzały tekst.
-		// Nowa logika: iterujemy od końca (najnowsze najpierw), zatem przy kolizji
-		// ról zachowujemy nowszą wiadomość i pomijamy wcześniejszą.
 		$rows_reversed = array_reverse( $rows ); // teraz: najnowsze na początku
 		$deduped       = [];
 		$prev_role     = null;
@@ -208,7 +214,6 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			$role = ( ( $row['message_type'] ?? '' ) === 'player' ) ? 'user' : 'assistant';
 
 			if ( $role === $prev_role ) {
-				// Duplikat roli — pomiń; zachowamy już dodaną (nowszą) wiadomość.
 				continue;
 			}
 
@@ -220,16 +225,12 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			}
 		}
 
-		// FIX: defensywny slice — gwarantuje max 14 par nawet jeśli logika
-		// powyżej ulegnie zmianie w przyszłości.
 		if ( count( $deduped ) > 14 ) {
 			$deduped = array_slice( $deduped, 0, 14 );
 		}
 
-		// Przywróć porządek chronologiczny (najstarsza → najnowsza).
 		$history = array_reverse( $deduped );
 
-		// Claude musi zaczynać od 'user'
 		while ( ! empty( $history ) && $history[0]['role'] === 'assistant' ) {
 			array_shift( $history );
 		}
@@ -311,7 +312,6 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						tw_rest_ai_supa_rpc( 'fn_move_character', [ 'p_char_id' => $char_id, 'p_location_id' => $val ] );
 
 						$wp_user_id = (int) ( $context['char']['wp_user_id'] ?? 0 );
-						// FIX: nie wywołuj do_action jeśli wp_user_id nieznany (==0)
 						if ( $wp_user_id > 0 ) {
 							do_action( 'tw_location_changed', $wp_user_id, [ 'char_id' => $char_id, 'location_id' => $val ] );
 						} else {
@@ -320,11 +320,7 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					}
 					break;
 				case 'ENTROPY_UP':
-					// BUG 7 FIX — ENTROPY_UP musi faktycznie zapisać zmianę w Supabase.
-					// Poprzednia implementacja tylko emitowała do_action() bez żadnego
-					// nasłuchującego handlera — zdarzenie było cicho gubione.
-					// Teraz: (1) bezpośredni zapis przez RPC fn_apply_entropy_change,
-					// (2) do_action() zachowany dla zewnętrznych listenerów (Make.com itp.).
+					// BUG 7 FIX — ENTROPY_UP zapisuje zmianę do Supabase przez RPC.
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
 					if ( $delta !== 0 && $world_id ) {
@@ -333,6 +329,20 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 							'p_delta'    => $delta,
 						] );
 						do_action( 'tw_entropy_change', $world_id, $delta, $context );
+					}
+					break;
+				case 'ENTROPY_DOWN':
+					// FIX — ENTROPY_DOWN był w KNOWN_TAGS silnika, ale nie miał handlera.
+					// Efekt: GM emitował tag obniżający entropię, który był cicho gubiony
+					// w default: — entropia świata nie mogła nigdy spaść przez czat.
+					$delta    = (int) $val;
+					$world_id = $context['world']['id'] ?? null;
+					if ( $delta !== 0 && $world_id ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_entropy_change', [
+							'p_world_id' => $world_id,
+							'p_delta'    => -abs( $delta ), // zawsze ujemna delta (obniżenie)
+						] );
+						do_action( 'tw_entropy_change', $world_id, -abs( $delta ), $context );
 					}
 					break;
 				case 'STATUS_ADD':
@@ -371,7 +381,6 @@ if ( ! function_exists( 'tw_rest_ai_realtime_send' ) ) {
 if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
 	/**
 	 * Zwraca błąd REST z kodem HTTP dopasowanym do typu błędu.
-	 * Kod odczytywany z WP_Error->get_error_data()['status'] lub z $error_code.
 	 *
 	 * @param string|null $session_id
 	 * @param string      $message
@@ -386,7 +395,6 @@ if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
 	): WP_REST_Response {
 
 		if ( $http_status === 0 ) {
-			// Mapuj znane kody błędów WP na HTTP status.
 			$map = [
 				'tw_ai_no_char'      => 404,
 				'tw_ai_unauthorized' => 401,
@@ -409,21 +417,22 @@ if ( ! function_exists( 'tw_rest_ai_broadcast_error' ) ) {
 // ============================================================
 
 /**
- * GET z Supabase. Parametry przekazywane jako tablica — zostaną
- * zakodowane przez http_build_query(), co eliminuje problemy
- * ze spacjami i nawiasami w wartościach filtrów PostgREST.
+ * GET z Supabase.
  *
- * BUG 9 FIX — sprawdzamy HTTP status przed dekodowaniem.
- * Supabase przy błędzie 4xx/5xx zwraca JSON {"code":"...","message":"..."},
- * który bez tej kontroli był po cichu traktowany jako prawidłowe dane wierszy.
+ * FIX — URL construction: nie używamy rawurlencode() na nazwie tabeli.
+ * Nazwy tabel cyber_* zawierają tylko litery, cyfry i podkreślenia —
+ * są URL-safe bez kodowania. rawurlencode() jest zachowane dla RPC (nazwy
+ * funkcji), ale tutaj ujednolicamy z tw_rest_ai_supa_post (brak encode).
+ * Dzięki temu obie prywatne funkcje budują URL identycznie i każda
+ * przyszła tabela z myślnikiem nie złamie tylko jednej z nich.
  *
  * @param string $table
- * @param array  $params  np. [ 'id' => 'eq.abc', 'select' => 'id,name', 'limit' => '1' ]
+ * @param array  $params
  * @return array
  */
 function tw_rest_ai_supa_get( string $table, array $params ): array {
 	$query    = http_build_query( $params, '', '&', PHP_QUERY_RFC3986 );
-	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . rawurlencode( $table ) . '?' . $query;
+	$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table . '?' . $query;
 	$response = wp_remote_get( $url, [
 		'headers' => [
 			'apikey'        => tw_supabase_service_key(),
@@ -451,11 +460,6 @@ function tw_rest_ai_supa_get( string $table, array $params ): array {
 
 /**
  * POST do Supabase.
- *
- * BUG 30 FIX — logujemy odpowiedzi non-2xx (np. odrzucenie przez RLS).
- * Poprzednio funkcja sprawdzała tylko is_wp_error() (błąd sieciowy),
- * ale cicho ignorowała HTTP 4xx/5xx z Supabase. Teraz każda nieudana
- * próba zapisu trafia do error_log z kodem HTTP i treścią odpowiedzi.
  *
  * @param string $table
  * @param array  $body
@@ -489,10 +493,6 @@ function tw_rest_ai_supa_post( string $table, array $body ): void {
 
 /**
  * RPC call do Supabase (POST na /rest/v1/rpc/{fn}).
- *
- * FIX: sprawdzamy HTTP status przed dekodowaniem — identycznie jak supa_get.
- * Wcześniej błąd 4xx/5xx z Supabase był cicho dekodowany jako prawidłowe dane
- * i zwracany do wywołujących (np. tw_rest_ai_apply_tags → fn_apply_hp_change).
  *
  * @param string $fn
  * @param array  $params
