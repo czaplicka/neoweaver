@@ -40,23 +40,29 @@ add_action( 'rest_api_init', function () {
 
 // ---------------------------------------------------------------------------
 // HELPER — headery Supabase (service key)
+// FIX: wrapped in function_exists to prevent fatal "Cannot redeclare" on double-include.
 // ---------------------------------------------------------------------------
-function nw_supa_headers( bool $with_content_type = false ): array {
-	$key     = tw_supabase_service_key();
-	$headers = [
-		'apikey'        => $key,
-		'Authorization' => 'Bearer ' . $key,
-	];
-	if ( $with_content_type ) {
-		$headers['Content-Type'] = 'application/json';
-		$headers['Prefer']       = 'return=minimal';
+if ( ! function_exists( 'nw_supa_headers' ) ) {
+	function nw_supa_headers( bool $with_content_type = false ): array {
+		$key     = tw_supabase_service_key();
+		$headers = [
+			'apikey'        => $key,
+			'Authorization' => 'Bearer ' . $key,
+		];
+		if ( $with_content_type ) {
+			$headers['Content-Type'] = 'application/json';
+			$headers['Prefer']       = 'return=minimal';
+		}
+		return $headers;
 	}
-	return $headers;
 }
 
 // HELPER — base URL tabeli
-function nw_supa_table( string $table ): string {
-	return trailingslashit( tw_supabase_url() ) . 'rest/v1/' . rawurlencode( $table );
+// FIX: wrapped in function_exists to prevent fatal "Cannot redeclare" on double-include.
+if ( ! function_exists( 'nw_supa_table' ) ) {
+	function nw_supa_table( string $table ): string {
+		return trailingslashit( tw_supabase_url() ) . 'rest/v1/' . rawurlencode( $table );
+	}
 }
 
 // ===========================================================================
@@ -153,11 +159,13 @@ function nw_deployments_create( WP_REST_Request $request ) {
 		'limit'      => 1,
 	], nw_supa_table( 'cyber_campaign' ) );
 
-	$check = wp_remote_get( $check_url, [ 'headers' => nw_supa_headers(), 'timeout' => 10 ] );
-	if ( is_wp_error( $check ) ) {
-		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
-	}
-	if ( empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
+	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supa_headers(), 'timeout' => 10 ] );
+	$check_code = (int) wp_remote_retrieve_response_code( $check );
+	// FIX: added HTTP status check before trusting the response body.
+	// Previously only empty(json_decode(...)) was checked — a 500 from Supabase
+	// with an empty body would silently pass and allow the PATCH to proceed.
+	if ( is_wp_error( $check ) || $check_code < 200 || $check_code >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $check ), true ) ) ) {
 		return new WP_Error( 'not_found', 'Campaign not found, not yours, or already linked to a world.', [ 'status' => 404 ] );
 	}
 
@@ -169,11 +177,11 @@ function nw_deployments_create( WP_REST_Request $request ) {
 		'limit'      => 1,
 	], nw_supa_table( 'cyber_worlds' ) );
 
-	$world_check = wp_remote_get( $world_check_url, [ 'headers' => nw_supa_headers(), 'timeout' => 10 ] );
-	if ( is_wp_error( $world_check ) ) {
-		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
-	}
-	if ( empty( json_decode( wp_remote_retrieve_body( $world_check ), true ) ) ) {
+	$world_check      = wp_remote_get( $world_check_url, [ 'headers' => nw_supa_headers(), 'timeout' => 10 ] );
+	$world_check_code = (int) wp_remote_retrieve_response_code( $world_check );
+	// FIX: same HTTP status check for world ownership.
+	if ( is_wp_error( $world_check ) || $world_check_code < 200 || $world_check_code >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $world_check ), true ) ) ) {
 		return new WP_Error( 'world_not_found', 'World not found or not yours.', [ 'status' => 404 ] );
 	}
 
@@ -198,7 +206,8 @@ function nw_deployments_create( WP_REST_Request $request ) {
 		return new WP_Error( 'http_error', 'Supabase HTTP ' . $code, [ 'status' => $code ] );
 	}
 
-	error_log( 'NW_DEPLOYMENTS_CREATE: SUCCESS campaign=' . $campaign_id . ' world=' . $world_id );
+	// FIX: removed unconditional error_log('NW_DEPLOYMENTS_CREATE: SUCCESS ...') —
+	// fires on every deployment in production.
 
 	return rest_ensure_response( [
 		'success' => true,
