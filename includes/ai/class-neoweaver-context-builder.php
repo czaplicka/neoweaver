@@ -46,7 +46,11 @@ class NeoWeaver_Context_Builder {
 	private function get_core_context( string $char_id ): array {
 		$char = $this->query(
 			'cyber_characters',
-			'id=eq.' . $char_id . '&select=id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid,archetype,level,mind,spirit&limit=1'
+			[
+				'id'     => 'eq.' . $char_id,
+				'select' => 'id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,worldid,archetype,level,mind,spirit',
+				'limit'  => '1',
+			]
 		)[0] ?? [];
 
 		$location = [];
@@ -55,14 +59,22 @@ class NeoWeaver_Context_Builder {
 		if ( ! empty( $char['locationid'] ) ) {
 			$location = $this->query(
 				'cyber_world_map',
-				'id=eq.' . $this->sanitize_uuid( $char['locationid'] ) . '&select=id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type&limit=1'
+				[
+					'id'     => 'eq.' . $this->sanitize_uuid( $char['locationid'] ),
+					'select' => 'id,locationname,instancetags,aiprompt,threatlevel,nid,eid,sid,wid,location_type',
+					'limit'  => '1',
+				]
 			)[0] ?? [];
 		}
 
 		if ( ! empty( $char['worldid'] ) ) {
 			$world = $this->query(
 				'cyber_worlds',
-				'id=eq.' . $this->sanitize_uuid( $char['worldid'] ) . '&select=id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype,tech_vs_nature,chaos_vs_order,gold_vs_thief&limit=1'
+				[
+					'id'     => 'eq.' . $this->sanitize_uuid( $char['worldid'] ),
+					'select' => 'id,worldname,entropy,globaltag1,globaltag2,globaltag3,difficulty,archetype,tech_vs_nature,chaos_vs_order,gold_vs_thief',
+					'limit'  => '1',
+				]
 			)[0] ?? [];
 		}
 
@@ -83,12 +95,21 @@ class NeoWeaver_Context_Builder {
 				return [
 					'monsters' => $this->query(
 						'cyber_monsters',
-						'locationid=eq.' . $loc_id . '&select=name,hp,attack,defense,tags&limit=3'
+						[
+							'locationid' => 'eq.' . $loc_id,
+							'select'     => 'name,hp,attack,defense,tags',
+							'limit'      => '3',
+						]
 					),
 					// cyber_buffer = karty aktualnie w ręce gracza
 					'hand' => $this->query(
 						'cyber_buffer',
-						'char_id=eq.' . $char_id . '&zone=eq.hand&select=name,category,tags,base_effect&limit=10'
+						[
+							'char_id' => 'eq.' . $char_id,
+							'zone'    => 'eq.hand',
+							'select'  => 'name,category,tags,base_effect',
+							'limit'   => '10',
+						]
 					),
 				];
 
@@ -96,7 +117,11 @@ class NeoWeaver_Context_Builder {
 				return [
 					'npc_inventory' => $this->query(
 						'cyber_npc_inventory',
-						'locationid=eq.' . $loc_id . '&select=item_name,price,quantity&limit=10'
+						[
+							'locationid' => 'eq.' . $loc_id,
+							'select'     => 'item_name,price,quantity',
+							'limit'      => '10',
+						]
 					),
 					'player_gold' => (int) ( $core['char']['gold'] ?? 0 ),
 				];
@@ -108,7 +133,11 @@ class NeoWeaver_Context_Builder {
 					if ( ! empty( $core['location'][ $col ] ) ) {
 						$dest = $this->query(
 							'cyber_world_map',
-							'id=eq.' . $this->sanitize_uuid( $core['location'][ $col ] ) . '&select=id,locationname,threatlevel,location_type&limit=1'
+							[
+								'id'     => 'eq.' . $this->sanitize_uuid( $core['location'][ $col ] ),
+								'select' => 'id,locationname,threatlevel,location_type',
+								'limit'  => '1',
+							]
 						)[0] ?? null;
 						if ( $dest ) {
 							$exits[ $label ] = $dest;
@@ -121,24 +150,29 @@ class NeoWeaver_Context_Builder {
 				return [
 					'npcs' => $this->query(
 						'cyber_npcs',
-						'locationid=eq.' . $loc_id . '&select=name,role,ai_personality_prompt,relationship_tags&limit=3'
+						[
+							'locationid' => 'eq.' . $loc_id,
+							'select'     => 'name,role,ai_personality_prompt,relationship_tags',
+							'limit'      => '3',
+						]
 					),
 				];
 
 			case 'LORE':
-				// Złożone warunki (GIN arrays + wiele pól numerycznych) — używamy RPC
-				// Wymaga funkcji get_relevant_lore() w Supabase (SQL poniżej komentarza)
+				// Złożone warunki (GIN arrays + wiele pól numerycznych) — używamy RPC.
+				// FIX: p_location_id i p_archetype_id to UUID stringi — NIE castujemy do int.
+				// Rzutowanie UUID na int dawało 0 i RPC zawsze zwracało pusty wynik.
 				return [
 					'lore_entries' => $this->rpc( 'get_relevant_lore', [
-						'p_location_id'  => (int) ( $core['location']['id'] ?? 0 ),
-						'p_archetype_id' => (int) ( $core['world']['archetype'] ?? 0 ),
-						'p_entropy'      => (int) ( $core['world']['entropy'] ?? 0 ),
-						'p_level'        => (int) ( $core['char']['level'] ?? 1 ),
-						'p_mind'         => (int) ( $core['char']['mind'] ?? 0 ),
-						'p_spirit'       => (int) ( $core['char']['spirit'] ?? 0 ),
-						'p_tech_vs_nature'  => (int) ( $core['world']['tech_vs_nature'] ?? 0 ),
-						'p_chaos_vs_order'  => (int) ( $core['world']['chaos_vs_order'] ?? 0 ),
-						'p_gold_vs_thief'   => (int) ( $core['world']['gold_vs_thief'] ?? 0 ),
+						'p_location_id'  => $loc_id,
+						'p_archetype_id' => $core['world']['archetype'] ?? null,
+						'p_entropy'      => (int) ( $core['world']['entropy']      ?? 0 ),
+						'p_level'        => (int) ( $core['char']['level']          ?? 1 ),
+						'p_mind'         => (int) ( $core['char']['mind']           ?? 0 ),
+						'p_spirit'       => (int) ( $core['char']['spirit']         ?? 0 ),
+						'p_tech_vs_nature'  => (int) ( $core['world']['tech_vs_nature']  ?? 0 ),
+						'p_chaos_vs_order'  => (int) ( $core['world']['chaos_vs_order']  ?? 0 ),
+						'p_gold_vs_thief'   => (int) ( $core['world']['gold_vs_thief']   ?? 0 ),
 					] ),
 				];
 
@@ -153,7 +187,11 @@ class NeoWeaver_Context_Builder {
 					// Pełny stan talii gracza: ręka + odrzucone + do zagrania
 					'deck_state' => $this->query(
 						'cyber_buffer',
-						'char_id=eq.' . $char_id . '&select=zone,name,category,tags&limit=30'
+						[
+							'char_id' => 'eq.' . $char_id,
+							'select'  => 'zone,name,category,tags',
+							'limit'   => '30',
+						]
 					),
 				];
 
@@ -167,12 +205,14 @@ class NeoWeaver_Context_Builder {
 	// ============================================================
 
 	private function build_block_a( array $core ): string {
-		$archetype = esc_html( $core['world']['archetype'] ?? 'EPIC' );
-		return "You are the AI Game Master of NeoWeave — a dark, narrative RPG.\n"
+		// Sanitacja dla plain-text AI promptu — wp_strip_all_tags usuwa znaczniki HTML,
+		// ale NIE konwertuje & na &amp; (jak robiłoby esc_html).
+		$archetype = wp_strip_all_tags( $core['world']['archetype'] ?? 'EPIC' );
+		return "You are the AI Game Master of NeoWeave \u2014 a dark, narrative RPG.\n"
 			. "Archetype: {$archetype}\n"
 			. "Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.\n"
 			. "Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #LOC:42, #STATUS_POISONED, #HP_CHANGE:-10, #GOLD_CHANGE:-5).\n"
-			. "Tags are parsed by the system — the player never sees them. Never explain tags to the player.\n"
+			. "Tags are parsed by the system \u2014 the player never sees them. Never explain tags to the player.\n"
 			. "Respond in the same language the player uses.";
 	}
 
@@ -187,13 +227,16 @@ class NeoWeaver_Context_Builder {
 		}
 		$tags = is_array( $echo_tags_raw ) && ! empty( $echo_tags_raw ) ? implode( ', ', $echo_tags_raw ) : 'none';
 
-		return "WORLD: " . esc_html( $w['worldname'] ?? '' ) . " | Entropy: " . (int) ( $w['entropy'] ?? 0 ) . "/100 | Difficulty: " . esc_html( $w['difficulty'] ?? 'normal' ) . "\n"
-			. "WORLD_TAGS: " . esc_html( implode( ', ', array_filter( [ $w['globaltag1'] ?? '', $w['globaltag2'] ?? '', $w['globaltag3'] ?? '' ] ) ) ) . "\n"
-			. "AGENT: " . esc_html( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['currenthp'] ?? 0 ) . "/" . (int) ( $c['maxhp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
+		// FIX: używamy wp_strip_all_tags() zamiast esc_html().
+		// Bloki są plain-text system promptem dla Claude — NIE HTML.
+		// esc_html() konwertuje & → &amp;, < → &lt; itd., co zatruwało kontekst GM.
+		return "WORLD: " . wp_strip_all_tags( $w['worldname'] ?? '' ) . " | Entropy: " . (int) ( $w['entropy'] ?? 0 ) . "/100 | Difficulty: " . wp_strip_all_tags( $w['difficulty'] ?? 'normal' ) . "\n"
+			. "WORLD_TAGS: " . wp_strip_all_tags( implode( ', ', array_filter( [ $w['globaltag1'] ?? '', $w['globaltag2'] ?? '', $w['globaltag3'] ?? '' ] ) ) ) . "\n"
+			. "AGENT: " . wp_strip_all_tags( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['currenthp'] ?? 0 ) . "/" . (int) ( $c['maxhp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
 			. "BIOMETRICS: Satiety " . (int) ( $c['satiety'] ?? 0 ) . "% | Hydration " . (int) ( $c['hydration'] ?? 0 ) . "%\n"
-			. "ECHO: " . esc_html( $tags ) . "\n"
-			. "LOCATION: " . esc_html( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . esc_html( $l['instancetags'] ?? '' ) . "\n"
-			. "GM_NOTE: " . esc_html( $l['aiprompt'] ?? '' );
+			. "ECHO: " . wp_strip_all_tags( $tags ) . "\n"
+			. "LOCATION: " . wp_strip_all_tags( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . wp_strip_all_tags( $l['instancetags'] ?? '' ) . "\n"
+			. "GM_NOTE: " . wp_strip_all_tags( $l['aiprompt'] ?? '' );
 	}
 
 	private function build_block_c( string $protocol, array $extra ): string {
@@ -203,21 +246,21 @@ class NeoWeaver_Context_Builder {
 
 			case 'TRAVEL':
 				foreach ( $extra['exits'] ?? [] as $label => $dest ) {
-					$lines[] = "EXIT_{$label}: " . esc_html( $dest['locationname'] ) . " (id:{$dest['id']}, threat:{$dest['threatlevel']})";
+					$lines[] = "EXIT_{$label}: " . wp_strip_all_tags( $dest['locationname'] ) . " (id:{$dest['id']}, threat:{$dest['threatlevel']})";
 				}
 				break;
 
 			case 'COMBAT':
 				foreach ( $extra['monsters'] ?? [] as $m ) {
-					$lines[] = "ENEMY: " . esc_html( $m['name'] ) . " HP:{$m['hp']} ATK:{$m['attack']} DEF:{$m['defense']}";
+					$lines[] = "ENEMY: " . wp_strip_all_tags( $m['name'] ) . " HP:{$m['hp']} ATK:{$m['attack']} DEF:{$m['defense']}";
 				}
 				$hand    = array_column( $extra['hand'] ?? [], 'name' );
-				$lines[] = "PLAYER_HAND: " . implode( ', ', array_map( 'esc_html', $hand ) );
+				$lines[] = "PLAYER_HAND: " . implode( ', ', array_map( 'wp_strip_all_tags', $hand ) );
 				break;
 
 			case 'TRADE':
 				$items   = array_map(
-					fn( $i ) => esc_html( $i['item_name'] ) . "(" . (int) $i['price'] . "g x" . (int) ( $i['quantity'] ?? 1 ) . ")",
+					fn( $i ) => wp_strip_all_tags( $i['item_name'] ) . "(" . (int) $i['price'] . "g x" . (int) ( $i['quantity'] ?? 1 ) . ")",
 					$extra['npc_inventory'] ?? []
 				);
 				$lines[] = "SHOP: " . implode( ', ', $items );
@@ -226,14 +269,14 @@ class NeoWeaver_Context_Builder {
 
 			case 'DIALOG':
 				foreach ( $extra['npcs'] ?? [] as $npc ) {
-					$personality = mb_substr( esc_html( $npc['ai_personality_prompt'] ?? '' ), 0, 200 );
-					$lines[]     = "NPC: " . esc_html( $npc['name'] ) . " | Role: " . esc_html( $npc['role'] ?? '' ) . " | Personality: {$personality}";
+					$personality = mb_substr( wp_strip_all_tags( $npc['ai_personality_prompt'] ?? '' ), 0, 200 );
+					$lines[]     = "NPC: " . wp_strip_all_tags( $npc['name'] ) . " | Role: " . wp_strip_all_tags( $npc['role'] ?? '' ) . " | Personality: {$personality}";
 				}
 				break;
 
 			case 'LORE':
 				foreach ( $extra['lore_entries'] ?? [] as $t ) {
-					$lines[] = "LORE [" . esc_html( $t['lore_key'] ?? '' ) . "]: " . esc_html( mb_substr( $t['lore'] ?? '', 0, 300 ) );
+					$lines[] = "LORE [" . wp_strip_all_tags( $t['lore_key'] ?? '' ) . "]: " . wp_strip_all_tags( mb_substr( $t['lore'] ?? '', 0, 300 ) );
 				}
 				break;
 
@@ -246,7 +289,7 @@ class NeoWeaver_Context_Builder {
 				$zones = [];
 				foreach ( $extra['deck_state'] ?? [] as $r ) {
 					$zone           = strtoupper( $r['zone'] ?? 'UNKNOWN' );
-					$zones[ $zone ][] = esc_html( $r['name'] ?? '?' );
+					$zones[ $zone ][] = wp_strip_all_tags( $r['name'] ?? '?' );
 				}
 				foreach ( $zones as $zone => $cards ) {
 					$lines[] = "{$zone}: " . implode( ', ', $cards );
@@ -259,10 +302,15 @@ class NeoWeaver_Context_Builder {
 
 	// ============================================================
 	// HELPER: GET do Supabase REST
+	//
+	// FIX: $params zmienione z surowego stringa na array.
+	// add_query_arg() obsługuje enkodowanie wartości — wartości zawierające
+	// ampersandy (np. nazwy lokacji) nie psują już query stringa.
 	// ============================================================
+	private function query( string $table, array $params ): array {
+		$base_url = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table;
+		$url      = add_query_arg( $params, $base_url );
 
-	private function query( string $table, string $params ): array {
-		$url      = trailingslashit( tw_supabase_url() ) . 'rest/v1/' . $table . '?' . $params;
 		$response = wp_remote_get( $url, [
 			'headers' => [
 				'apikey'        => tw_supabase_service_key(),
