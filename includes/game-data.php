@@ -54,6 +54,10 @@ function tw_invalidate_game_data_cache( int $wp_user_id ): void {
  *   TTL = TW_GAME_DATA_TTL sekund. Przy Redis/Memcached — ultra-szybkie.
  *
  * Warstwa 3 — Supabase query (tylko gdy cache miss).
+ *   Używa tw_supabase_get_admin (service key) dla sesji, postaci i kampanii,
+ *   ponieważ to wywołania server-side — RLS nie powinno ich blokować.
+ *   Przy anon key ewentualna błędna konfiguracja RLS zwracałaby cicho [],
+ *   co jest nie do odróżnienia od "brak sesji".
  *
  * INVALIDATION: wywołaj tw_invalidate_game_data_cache($wp_user_id) przy
  * każdej zmianie stanu sesji (nowa kampania, teleport, koniec sesji).
@@ -97,10 +101,10 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
             return $cached;
         }
 
-        // ── Warstwa 3: Supabase query ──────────────────────────────────────
+        // ── Warstwa 3: Supabase query (service key — omija RLS) ───────────────
 
         // 1. Aktywna sesja
-        $sessions = tw_supabase_get(
+        $sessions = tw_supabase_get_admin(
             'cyber_game_sessions',
             [
                 'wp_user_id' => 'eq.' . $wp_user_id,
@@ -110,6 +114,11 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
                 'select'     => 'id,campaign_id,character_id,scenario_id,world_id,location_id',
             ]
         );
+
+        if ( is_wp_error( $sessions ) ) {
+            error_log( 'NW game-data: session query failed for user ' . $wp_user_id . ' — ' . $sessions->get_error_message() );
+            return $defaults;
+        }
 
         if ( ! is_array( $sessions ) || empty( $sessions ) || ! isset( $sessions[0] ) || ! is_array( $sessions[0] ) ) {
             // Brak sesji — krótki TTL (15s), bo sesja może się pojawić lada chwila
@@ -129,13 +138,19 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
         // 2. Postać + tagi (tylko gdy mamy character_id)
         if ( $defaults['active_character_id'] ) {
-            $tags_data = tw_supabase_get(
+            $tags_data = tw_supabase_get_admin(
                 'cyber_character_complete_tags',
                 [ 'character_id' => 'eq.' . $defaults['active_character_id'] ]
             );
+
+            if ( is_wp_error( $tags_data ) ) {
+                error_log( 'NW game-data: tags query failed for character ' . $defaults['active_character_id'] . ' — ' . $tags_data->get_error_message() );
+                $tags_data = [];
+            }
+
             $defaults['char_tags'] = is_array( $tags_data ) ? $tags_data : [];
 
-            $chars = tw_supabase_get(
+            $chars = tw_supabase_get_admin(
                 'cyber_characters',
                 [
                     'id'     => 'eq.' . $defaults['active_character_id'],
@@ -144,7 +159,9 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
                 ]
             );
 
-            if ( is_array( $chars ) && isset( $chars[0] ) && is_array( $chars[0] ) ) {
+            if ( is_wp_error( $chars ) ) {
+                error_log( 'NW game-data: character query failed for id ' . $defaults['active_character_id'] . ' — ' . $chars->get_error_message() );
+            } elseif ( is_array( $chars ) && isset( $chars[0] ) && is_array( $chars[0] ) ) {
                 $defaults['char_name']     = $chars[0]['name']     ?? 'Bohater';
                 $defaults['char_class_id'] = $chars[0]['class_id'] ?? '';
                 $defaults['char_race_id']  = $chars[0]['race_id']  ?? '';
@@ -153,7 +170,7 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
 
         // 3. Kampania (tylko gdy mamy campaign_id)
         if ( $defaults['active_campaign_id'] ) {
-            $campaigns = tw_supabase_get(
+            $campaigns = tw_supabase_get_admin(
                 'cyber_campaign',
                 [
                     'id'     => 'eq.' . $defaults['active_campaign_id'],
@@ -162,7 +179,9 @@ if ( ! function_exists( 'get_user_game_data_from_supabase' ) ) {
                 ]
             );
 
-            if ( is_array( $campaigns ) && isset( $campaigns[0] ) && is_array( $campaigns[0] ) ) {
+            if ( is_wp_error( $campaigns ) ) {
+                error_log( 'NW game-data: campaign query failed for id ' . $defaults['active_campaign_id'] . ' — ' . $campaigns->get_error_message() );
+            } elseif ( is_array( $campaigns ) && isset( $campaigns[0] ) && is_array( $campaigns[0] ) ) {
                 $defaults['campaign_world_type'] = $campaigns[0]['world_type'] ?? 1;
             }
         }
