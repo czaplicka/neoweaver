@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 require_once __DIR__ . '/class-neoweaver-claude-client.php';
 
-// ── Fallback constant (in case wp-config.php is missing it) ───────────────
+// ── Fallback constant (in case wp-config.php is missing it) ─────────────
 if ( ! defined( 'NEOWEAVER_MODEL_ROUTER' ) ) {
     define( 'NEOWEAVER_MODEL_ROUTER', 'claude-haiku-4-5-20251001' );
 }
@@ -13,20 +13,22 @@ class NeoWeaver_Intent_Router {
     /**
      * Classifies the player message into a gameplay protocol.
      * First tries regex rules (cheap), then falls back to Claude (more expensive).
+     *
+     * Game language: English only.
      */
     public static function classify(string $message): string {
         $msg = mb_strtolower(trim($message));
 
-        // Regex rules (order matters)
+        // Regex rules (order matters — more specific patterns first)
         $rules = [
-            'META'   => '/^(status|hp|mp|stats|ekwipunek|inventory|karty|hand|mapa|map)\b/i',
-            'COMBAT' => '/\b(atakuję|atak|attack|use card|zagraj kartę|walcz|fight|strike|shoot|cast)\b/i',
-            'TRAVEL' => '/\b(idę|idę do|move|go to|north|south|east|west|północ|południe|wschód|zachód|travel|wejdź|enter|wyjśdź)\b/i',
-            'TRADE'  => '/\b(kup|kupuję|sprzedaj|sprzedaję|buy|sell|trade|handel|ile kosztuje|price|cena|shop|sklep)\b/i',
-            'REST'   => '/\b(odpoczywa|śpię|rest|sleep|camp|nocleg|odpoczynek|czekam|wait)\b/i',
-            'DECK'   => '/\b(dobierz|dobierz kartę|talia|deck|draw|karty|hand|shuffle|przetasuj)\b/i',
-            'LORE'   => '/\b(co wiem|opowiedz|lore|historia|gossip|plotki|kim jest|what is|tell me about)\b/i',
-            'DIALOG' => '/\b(mówię|pytam|zagaduję|powiedz|rozmawiam|say|ask|talk|speak|greet)\b/i',
+            'META'   => '/^(status|hp|mp|stats|inventory|hand|map)\b/i',
+            'COMBAT' => '/\b(attack|use card|fight|strike|shoot|cast)\b/i',
+            'TRAVEL' => '/\b(move|go to|north|south|east|west|travel|enter|exit|leave)\b/i',
+            'TRADE'  => '/\b(buy|sell|trade|price|shop|cost|how much)\b/i',
+            'REST'   => '/\b(rest|sleep|camp|wait)\b/i',
+            'DECK'   => '/\b(deck|draw|shuffle|hand|cards)\b/i',
+            'LORE'   => '/\b(lore|history|gossip|who is|what is|tell me about)\b/i',
+            'DIALOG' => '/\b(say|ask|talk|speak|greet)\b/i',
         ];
 
         foreach ($rules as $protocol => $pattern) {
@@ -35,14 +37,14 @@ class NeoWeaver_Intent_Router {
             }
         }
 
-        return self::classify_with_gpt($message);
+        return self::classify_with_claude($message);
     }
 
     /**
      * Fallback intent classification via Claude.
      * Returns exactly one allowed protocol label.
      */
-    private static function classify_with_gpt(string $message): string {
+    private static function classify_with_claude(string $message): string {
         $result = NeoWeaver_Claude_Client::call(
             'Classify the player message into ONE word: TRAVEL, COMBAT, TRADE, DIALOG, LORE, REST, DECK, META. Reply with ONLY that word.',
             [
