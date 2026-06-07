@@ -140,12 +140,15 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 
 		// Optional: filter by world_id — verify it belongs to the current user
 		// to prevent probing other users' worlds via this endpoint.
+		// FIX: use tw_supabase_get_admin (service key) so RLS misconfiguration
+		// cannot silently block the ownership check, consistent with all other
+		// server-side ownership guards in the codebase.
 		$world_id = isset( $_POST['world_id'] )
 			? nw_sanitize_uuid( (string) $_POST['world_id'] )
 			: '';
 
 		if ( ! empty( $world_id ) ) {
-			$world_check = tw_supabase_get(
+			$world_check = tw_supabase_get_admin(
 				'cyber_worlds',
 				[
 					'id'         => 'eq.' . $world_id,
@@ -161,7 +164,13 @@ if ( ! function_exists( 'tw_get_char_state_profile_handler' ) ) {
 			$params['world_id'] = 'eq.' . $world_id;
 		}
 
-		$data = tw_supabase_get( 'cyber_characters', $params );
+		// FIX: use tw_supabase_get_admin (service key) instead of tw_supabase_get
+		// (anon key). This handler runs server-side; RLS on cyber_characters could
+		// silently return empty rows on a misconfigured policy, making character
+		// select appear empty with no error. The wp_user_id filter in $params is
+		// the ownership guard — consistent with tw_get_char_state_active_handler
+		// and all other server-side reads in the codebase.
+		$data = tw_supabase_get_admin( 'cyber_characters', $params );
 
 		if ( is_wp_error( $data ) ) {
 			wp_send_json_error( 'Supabase error: ' . $data->get_error_message(), 502 );
