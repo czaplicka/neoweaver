@@ -77,11 +77,10 @@ if ( ! function_exists( 'nw_resolve_img_urls' ) ) {
 	}
 }
 
-if ( ! function_exists( 'tw_supabase_get' ) ) {
-	function tw_supabase_get( string $table, array $query = array() ) {
-		return nw_supabase_request( 'GET', $table, $query );
-	}
-}
+// NOTE: tw_supabase_get is defined in supabase-helpers.php.
+// The local stub that delegated to nw_supabase_request has been removed to
+// avoid a divergent auth code path. nw_fetch_lookup_table calls tw_supabase_get
+// directly, which is the canonical implementation.
 
 if ( ! function_exists( 'nw_normalize_tag_label' ) ) {
 	function nw_normalize_tag_label( $value ) {
@@ -483,16 +482,14 @@ if ( ! function_exists( 'nw_find_skills_by_ids' ) ) {
 		if ( empty( $skill_ids ) ) {
 			return array();
 		}
-		$quoted = array_map(
-			static function ( $id ) { return '"' . str_replace( '"', '\\"', $id ) . '"'; },
-			$skill_ids
-		);
+		// PostgREST in.(...) expects bare values, not JSON-style double-quoted strings.
+		// e.g. in.(abc-123,def-456) — NOT in.("abc-123","def-456").
 		$rows = nw_supabase_request(
 			'GET',
 			'cyber_skills',
 			array(
 				'select'    => 'id,is_active',
-				'id'        => 'in.(' . implode( ',', $quoted ) . ')',
+				'id'        => 'in.(' . implode( ',', $skill_ids ) . ')',
 				'is_active' => 'eq.true',
 			)
 		);
