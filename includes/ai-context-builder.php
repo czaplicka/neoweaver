@@ -7,7 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * NEOWEAVER — AI CONTEXT BUILDER
  *
  * Pobiera z Supabase minimalny, specyficzny zestaw danych per protokół.
- * Zwraca tablicę gotową do przekazania do tw_ai_gm():\n *
+ * Zwraca tablicę gotową do przekazania do tw_ai_gm():
+ *
  *   tw_ai_build_context( string $char_id, string $protocol ): array
  *
  * Struktura zwracanego array:
@@ -39,7 +40,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 			'cyber_characters',
 			[
 				'id'     => 'eq.' . $safe_char_id,
-				'select' => 'id,name,currenthp,maxhp,mp,satiety,hydration,locationid,echo_tags,gold,world_id,archetype',
+				'select' => 'id,name,current_hp,max_hp,mp,satiety,hydration,location_id,echo_tags,gold,world_id,archetype',
 				'limit'  => 1,
 			]
 		);
@@ -51,8 +52,8 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 
 		// --- Core: dane lokacji ---
 		$location = [];
-		if ( ! empty( $char['locationid'] ) ) {
-			$safe_loc_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['locationid'] ) );
+		if ( ! empty( $char['location_id'] ) ) {
+			$safe_loc_id = preg_replace( '/[^a-f0-9\-]/', '', strtolower( $char['location_id'] ) );
 			$loc_rows = tw_supabase_get(
 				'cyber_world_map',
 				[
@@ -205,7 +206,7 @@ if ( ! function_exists( 'tw_ai_build_context' ) ) {
 				$safe_zone     = ! empty( $instance_tags ) && ( strpos( $instance_tags, 'safe' ) !== false );
 				$extra .= 'SAFE_ZONE: ' . ( $safe_zone ? 'yes' : 'no' ) . "\n";
 				$extra .= 'SATIETY: ' . (int)( isset( $char['satiety'] ) ? $char['satiety'] : 0 ) . ' | HYDRATION: ' . (int)( isset( $char['hydration'] ) ? $char['hydration'] : 0 ) . "\n";
-				$extra .= 'HP_MISSING: ' . max( 0, (int)( isset( $char['maxhp'] ) ? $char['maxhp'] : 100 ) - (int)( isset( $char['currenthp'] ) ? $char['currenthp'] : 0 ) ) . "\n";
+				$extra .= 'HP_MISSING: ' . max( 0, (int)( isset( $char['max_hp'] ) ? $char['max_hp'] : 100 ) - (int)( isset( $char['current_hp'] ) ? $char['current_hp'] : 0 ) ) . "\n";
 				break;
 
 			case 'DECK':

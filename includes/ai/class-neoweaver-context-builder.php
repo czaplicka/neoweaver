@@ -20,8 +20,8 @@ require_once dirname( __DIR__ ) . '/supabase-config.php';
  *   world_id    (z podkreślnikiem) — FK do cyber_worlds
  *   location_id (z podkreślnikiem) — FK do cyber_world_map
  *
- * Kolumny HP/level:
- *   hp  (nie currenthp/maxhp)
+ * Kolumny HP:
+ *   current_hp / max_hp
  *   lvl (nie level)
  */
 class NeoWeaver_Context_Builder {
@@ -52,7 +52,7 @@ class NeoWeaver_Context_Builder {
 			'cyber_characters',
 			[
 				'id'     => 'eq.' . $char_id,
-				'select' => 'id,name,hp,lvl,mp,gold,world_id,location_id,echo_tags,archetype,mind,spirit,body,reflex,satiety,hydration',
+				'select' => 'id,name,current_hp,max_hp,lvl,mp,gold,world_id,location_id,echo_tags,archetype,mind,spirit,body,reflex,satiety,hydration',
 				'limit'  => '1',
 			]
 		)[0] ?? [];
@@ -179,7 +179,7 @@ class NeoWeaver_Context_Builder {
 			case 'REST':
 				return [
 					'safe_zone'  => ! empty( $core['location']['instancetags'] ) && str_contains( $core['location']['instancetags'], 'safe' ),
-					'hp_missing' => max( 0, (int) ( $core['char']['maxhp'] ?? 100 ) - (int) ( $core['char']['hp'] ?? 0 ) ),
+					'hp_missing' => max( 0, (int) ( $core['char']['max_hp'] ?? 100 ) - (int) ( $core['char']['current_hp'] ?? 0 ) ),
 				];
 
 			case 'DECK':
@@ -205,11 +205,11 @@ class NeoWeaver_Context_Builder {
 
 	private function build_block_a( array $core ): string {
 		$archetype = wp_strip_all_tags( $core['world']['archetype'] ?? 'EPIC' );
-		return "You are the AI Game Master of NeoWeave \u2014 a dark, narrative RPG.\n"
+		return "You are the AI Game Master of NeoWeave — a dark, narrative RPG.\n"
 			. "Archetype: {$archetype}\n"
 			. "Rules: Respond in character as the world. Keep answers under 120 words unless combat demands more.\n"
 			. "Embed system tags in your response using syntax #TAG or #TAG:value (e.g. #ENTROPY_UP:5, #LOC:42, #STATUS_POISONED, #HP_CHANGE:-10, #GOLD_CHANGE:-5).\n"
-			. "Tags are parsed by the system \u2014 the player never sees them. Never explain tags to the player.\n"
+			. "Tags are parsed by the system — the player never sees them. Never explain tags to the player.\n"
 			. "Respond in the same language the player uses.";
 	}
 
@@ -226,7 +226,7 @@ class NeoWeaver_Context_Builder {
 
 		return "WORLD: " . wp_strip_all_tags( $w['worldname'] ?? '' ) . " | Entropy: " . (int) ( $w['entropy'] ?? 0 ) . "/100 | Difficulty: " . wp_strip_all_tags( $w['difficulty'] ?? 'normal' ) . "\n"
 			. "WORLD_TAGS: " . wp_strip_all_tags( implode( ', ', array_filter( [ $w['globaltag1'] ?? '', $w['globaltag2'] ?? '', $w['globaltag3'] ?? '' ] ) ) ) . "\n"
-			. "AGENT: " . wp_strip_all_tags( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['hp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
+			. "AGENT: " . wp_strip_all_tags( $c['name'] ?? '' ) . " | HP: " . (int) ( $c['current_hp'] ?? 0 ) . "/" . (int) ( $c['max_hp'] ?? 0 ) . " | MP: " . (int) ( $c['mp'] ?? 0 ) . " | Gold: " . (int) ( $c['gold'] ?? 0 ) . "\n"
 			. "BIOMETRICS: Satiety " . (int) ( $c['satiety'] ?? 0 ) . "% | Hydration " . (int) ( $c['hydration'] ?? 0 ) . "%\n"
 			. "ECHO: " . wp_strip_all_tags( $tags ) . "\n"
 			. "LOCATION: " . wp_strip_all_tags( $l['locationname'] ?? '' ) . " | Threat: " . (int) ( $l['threatlevel'] ?? 0 ) . " | Tags: " . wp_strip_all_tags( $l['instancetags'] ?? '' ) . "\n"
