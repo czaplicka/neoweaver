@@ -342,6 +342,7 @@ if ( ! function_exists( 'tw_start_scenario_generation' ) ) {
 
 // ============================================================
 // 2. CHECK SCENARIO STATUS
+// POST only — campaign_id via $_POST['campaign_id'].
 // ============================================================
 
 if ( ! function_exists( 'tw_check_scenario_status' ) ) {
@@ -371,7 +372,8 @@ if ( ! function_exists( 'tw_check_scenario_status' ) ) {
 			return;
 		}
 
-		$campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? $_GET['campaign_id'] ?? '' );
+		// POST only — consistent with all other handlers in this file.
+		$campaign_id = tw_sanitize_supabase_id( $_POST['campaign_id'] ?? '' );
 
 		if ( empty( $campaign_id ) ) {
 			wp_send_json_error(
