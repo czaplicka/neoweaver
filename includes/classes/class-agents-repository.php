@@ -105,17 +105,28 @@ class Neoweaver_Agents_Repository {
 	/**
 	 * Build a Supabase `in.(...)` filter value safe for both integer and UUID keys.
 	 *
+	 * Returns an empty string when the resulting ID list would be empty —
+	 * callers must guard against an empty return before using this value
+	 * in a query (PostgREST rejects `in.()` with a syntax error).
+	 *
 	 * @param  array $ids
-	 * @return string  e.g. "in.(1,2,3)" or "in.(uuid1,uuid2)"
+	 * @return string  e.g. "in.(uuid1,uuid2)" or "" when no valid IDs remain.
 	 */
 	private function in_filter( array $ids ): string {
-		$safe = array_map(
-			function ( $id ) {
-				return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $id );
-			},
-			$ids
+		$safe = array_filter(
+			array_map(
+				function ( $id ) {
+					return preg_replace( '/[^a-zA-Z0-9\-]/', '', (string) $id );
+				},
+				$ids
+			)
 		);
-		return 'in.(' . implode( ',', array_filter( $safe ) ) . ')';
+
+		if ( empty( $safe ) ) {
+			return '';
+		}
+
+		return 'in.(' . implode( ',', $safe ) . ')';
 	}
 
 	/**
@@ -154,6 +165,18 @@ class Neoweaver_Agents_Repository {
 
 		$char_ids  = wp_list_pluck( $characters, 'id' );
 		$ids_query = $this->in_filter( $char_ids );
+
+		// Guard: all IDs sanitized to empty strings (malformed UUIDs from DB).
+		// in_filter() returns '' in this case — PostgREST would reject in.().
+		if ( '' === $ids_query ) {
+			error_log( 'TW Repository: get_for_wp_user — all character IDs failed sanitization for wp_user_id=' . $wp_user_id );
+			foreach ( $characters as &$c ) {
+				$c['tags']      = [];
+				$c['inventory'] = [];
+			}
+			unset( $c );
+			return $characters;
+		}
 
 		$tags_url = $this->table_url( 'cyber_character_complete_tags', [
 			'character_id' => $ids_query,
