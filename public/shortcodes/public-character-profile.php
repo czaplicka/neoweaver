@@ -83,7 +83,7 @@ if ( ! class_exists( 'TW_Public_Character_Profile_Shortcode' ) ) {
 				[
 					'id'        => 'eq.' . $character_id,
 					'is_public' => 'eq.true',
-					'select'    => 'id,name,bio,avatar,hp,mp,body,mind,reflex,spirit,lvl,view_count,created_at,cyber_classes(name),cyber_races(name)',
+					'select'    => 'id,name,bio,avatar,max_hp,mp,body,mind,reflex,spirit,lvl,view_count,created_at,cyber_classes(name),cyber_races(name)',
 					'limit'     => 1,
 				],
 				trailingslashit( $supabase_url ) . 'rest/v1/cyber_characters'
@@ -312,7 +312,7 @@ if ( ! class_exists( 'TW_Public_Character_Profile_Shortcode' ) ) {
 					<div class="character-panel">
 						<h2>Combat Parameters</h2>
 						<ul class="stats-list">
-							<li><span>HP</span><span><?php echo esc_html( $char['hp'] ); ?></span></li>
+							<li><span>HP</span><span><?php echo esc_html( $char['max_hp'] ); ?></span></li>
 							<li><span>MP</span><span><?php echo esc_html( $char['mp'] ); ?></span></li>
 							<li><span>Body</span><span><?php echo esc_html( $char['body'] ); ?></span></li>
 							<li><span>Mind</span><span><?php echo esc_html( $char['mind'] ); ?></span></li>

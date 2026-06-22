@@ -57,7 +57,7 @@ class Neoweaver_Agents_Creator {
 		$world_id = nw_sanitize_uuid( (string) $data['world_id'] );
 
 		// ------------------------------------------------------------------
-		// BUG 3 FIX: enforce “1 Agent per World” before inserting.
+		// BUG 3 FIX: enforce "1 Agent per World" before inserting.
 		// tw_supabase_first() never existed — use tw_supabase_get_admin() directly.
 		// ------------------------------------------------------------------
 		if ( $wp_user_id && $world_id && function_exists( 'tw_supabase_get_admin' ) ) {
@@ -89,7 +89,8 @@ class Neoweaver_Agents_Creator {
 			'mind'       => isset( $data['attr_mind'] )   ? (int) $data['attr_mind']   : 0,
 			'reflex'     => isset( $data['attr_reflex'] ) ? (int) $data['attr_reflex'] : 0,
 			'spirit'     => isset( $data['attr_spirit'] ) ? (int) $data['attr_spirit'] : 0,
-			'hp'         => 10,
+			'max_hp'     => 10,
+			'current_hp' => 10,
 			'mp'         => 10,
 		];
 
@@ -131,7 +132,7 @@ class Neoweaver_Agents_Creator {
 		// tw_supabase_request already injects the service key and Content-Type
 		// internally — no need to pass headers here. The previous inline
 		// 'apikey'/'Authorization'/'Prefer' in $extra_args were redundant and
-		// fragile (they bypassed tw_supabase_request’s key-selection logic).
+		// fragile (they bypassed tw_supabase_request's key-selection logic).
 		$result = tw_supabase_request(
 			'POST',
 			'cyber_characters',
