@@ -196,13 +196,11 @@ if ( ! function_exists( 'tw_rest_ai_get_history' ) ) {
 			return [];
 		}
 
-		// Pobieramy 20 (więcej niż potrzeba), żeby po odwróceniu mieć zapas
-		// do wycięcia osieroconych wpisów. Zwracamy max 14 do Claude.
-		$rows = array_reverse( $rows );
-
-		// BUG 31 FIX — strategia deduplicacji: zachowujemy OSTATNIE wystąpienie
-		// w grupie wiadomości tej samej roli (nie pierwsze).
-		$rows_reversed = array_reverse( $rows ); // teraz: najnowsze na początku
+		// Supabase zwraca order=created_at.desc → $rows ma najnowsze na początku.
+		// Iterujemy od najnowszych (deduplicacja zachowuje OSTATNIE wystąpienie
+		// w grupie wiadomości tej samej roli), potem odwracamy do chronologicznego
+		// porządku dla Claude API. Pierwsze odwracanie jest zbędne — usunięte.
+		$rows_reversed = $rows; // najnowsze na początku — gotowe do deduplicacji
 		$deduped       = [];
 		$prev_role     = null;
 
@@ -301,12 +299,28 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						tw_rest_ai_supa_rpc( 'fn_apply_hp_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
 					}
 					break;
+
+				case 'MP_CHANGE':
+					$delta = (int) $val;
+					if ( $delta !== 0 ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_mp_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					}
+					break;
+
+				case 'XP_CHANGE':
+					$delta = (int) $val;
+					if ( $delta !== 0 ) {
+						tw_rest_ai_supa_rpc( 'fn_apply_xp_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
+					}
+					break;
+
 				case 'GOLD_CHANGE':
 					$delta = (int) $val;
 					if ( $delta !== 0 ) {
 						tw_rest_ai_supa_rpc( 'fn_apply_gold_change', [ 'p_char_id' => $char_id, 'p_delta' => $delta ] );
 					}
 					break;
+
 				case 'LOC':
 					if ( $val ) {
 						tw_rest_ai_supa_rpc( 'fn_move_character', [ 'p_char_id' => $char_id, 'p_location_id' => $val ] );
@@ -319,6 +333,7 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						}
 					}
 					break;
+
 				case 'ENTROPY_UP':
 					// BUG 7 FIX — ENTROPY_UP zapisuje zmianę do Supabase przez RPC.
 					$delta    = (int) $val;
@@ -331,6 +346,7 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						do_action( 'tw_entropy_change', $world_id, $delta, $context );
 					}
 					break;
+
 				case 'ENTROPY_DOWN':
 					// FIX — ENTROPY_DOWN był w KNOWN_TAGS silnika, ale nie miał handlera.
 					// Efekt: GM emitował tag obniżający entropię, który był cicho gubiony
@@ -345,11 +361,55 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 						do_action( 'tw_entropy_change', $world_id, -abs( $delta ), $context );
 					}
 					break;
+
+				case 'STATUS_POISONED':
+				case 'STATUS_STUNNED':
+				case 'STATUS_BURNING':
+				case 'STATUS_FROZEN':
+				case 'STATUS_BLEEDING':
+				case 'STATUS_CURSED':
+					// FIX — silnik emituje konkretne named status tagi, nie generyczny STATUS_ADD.
+					// Używamy nazwy tagu jako wartości statusu (np. "STATUS_POISONED").
+					// Jeśli fn_add_status oczekuje krótkiej formy, zmień na: str_replace('STATUS_', '', $tag)
+					tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $tag ] );
+					break;
+
 				case 'STATUS_ADD':
+					// Fallback: generyczny tag ze starszych buildów silnika
 					if ( $val ) {
 						tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $val ] );
 					}
 					break;
+
+				case 'ITEM_GAINED':
+					if ( $val ) {
+						tw_rest_ai_supa_rpc( 'fn_add_item', [ 'p_char_id' => $char_id, 'p_item_id' => $val ] );
+					}
+					break;
+
+				case 'ITEM_LOST':
+					if ( $val ) {
+						tw_rest_ai_supa_rpc( 'fn_remove_item', [ 'p_char_id' => $char_id, 'p_item_id' => $val ] );
+					}
+					break;
+
+				case 'COMBAT_START':
+					do_action( 'tw_combat_start', $char_id, $val, $context );
+					break;
+
+				case 'COMBAT_END':
+					do_action( 'tw_combat_end', $char_id, $val, $context );
+					break;
+
+				case 'SCENE_CHANGE':
+					do_action( 'tw_scene_change', $char_id, $val, $context );
+					break;
+
+				case 'CARD_DRAW':
+					$count = max( 1, (int) $val );
+					tw_rest_ai_supa_rpc( 'fn_draw_cards', [ 'p_char_id' => $char_id, 'p_count' => $count ] );
+					break;
+
 				default:
 					error_log( 'NeoWeaver ai-chat: nieobsługiwany tag ' . $tag . ':' . $val );
 			}
