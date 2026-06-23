@@ -51,6 +51,11 @@ if ( ! function_exists( 'nw_validate_starting_package_selection' ) ) {
 
 		return true;
 	}
+	// TODO: nw_validate_starting_package_selection() confirms the package reference is valid
+	// and stores package_id on the character row, but never applies the package contents
+	// (items_list, attack_cards_pool, defense_cards_pool) to cyber_character_inventory or
+	// the deck tables. This is a missing feature — applying the starting package and
+	// ensuring it cannot be claimed twice needs its own implementation.
 }
 if ( ! function_exists( 'nw_validate_skill_selection' ) ) {
     function nw_validate_skill_selection( string $class_id, array $skills ) {
@@ -192,6 +197,8 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
         return new WP_Error( 'invalid_race', 'Selected parent race does not exist.', array( 'status' => 400 ) );
     }
 
+    // NOTE: parent_race null from Postgres is safely coerced to '' by (string)(...??''),
+    // so the empty-string check below is correct.
     $race_parent = isset( $race_row['parent_race'] ) ? (string) $race_row['parent_race'] : '';
 
     if ( '' !== $race_parent ) {
@@ -213,6 +220,10 @@ function nw_validate_race_selection( string $race_id_input, string $subrace_id_i
     $race_name_normalized = trim( strtolower( (string) ( $race_row['name'] ?? '' ) ) );
     $race_id_normalized   = trim( strtolower( (string) ( $race_row['id']   ?? '' ) ) );
 
+    // SCHEMA NOTE: parent_race column inconsistently stores either a race name or a race UUID
+    // depending on which rows were seeded — this dual-match papers over that ambiguity.
+    // The correct fix is a data migration normalising parent_race to always store a UUID FK,
+    // at which point the name fallback below can be removed.
     if ( $subrace_parent !== $race_name_normalized && $subrace_parent !== $race_id_normalized ) {
         return new WP_Error( 'subrace_mismatch', 'Selected subrace does not belong to the chosen race.', array( 'status' => 400 ) );
     }
@@ -330,9 +341,15 @@ if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
      * empty string if no file was uploaded,
      * or WP_Error on failure.
      *
+     * On success also populates the $upload_path out-param with the server path
+     * so the caller can delete the file if a later step fails (orphan prevention).
+     *
+     * @param string &$upload_path Filled with the server filesystem path on success.
      * @return string|WP_Error
      */
-    function nw_handle_avatar_upload_strict() {
+    function nw_handle_avatar_upload_strict( string &$upload_path = '' ) {
+        $upload_path = '';
+
         if ( empty( $_FILES['avatar']['tmp_name'] ) ) {
             return '';
         }
@@ -382,7 +399,45 @@ if ( ! function_exists( 'nw_handle_avatar_upload_strict' ) ) {
             );
         }
 
+        if ( ! empty( $uploaded['file'] ) ) {
+            $upload_path = (string) $uploaded['file'];
+        }
+
         return isset( $uploaded['url'] ) ? (string) $uploaded['url'] : '';
+    }
+}
+
+/**
+ * Deletes a character row from cyber_characters by ID.
+ * Used as a rollback after a successful character insert when a subsequent
+ * skills or backstory-tags insert fails.
+ *
+ * BUG FIX: this function was called in two rollback paths in nw_create_character_from_request()
+ * but was never defined anywhere — causing a PHP fatal error that masked the original
+ * skills/tags DB error with an unrelated "Call to undefined function" fatal.
+ *
+ * @param string $character_id UUID of the character to delete.
+ * @return void  Errors are logged but not re-thrown — the caller already has an error to report.
+ */
+if ( ! function_exists( 'nw_delete_character_by_id' ) ) {
+    function nw_delete_character_by_id( string $character_id ): void {
+        $character_id = sanitize_text_field( $character_id );
+        if ( '' === $character_id ) {
+            error_log( 'NW: nw_delete_character_by_id called with empty ID — skipping.' );
+            return;
+        }
+
+        $result = tw_supabase_request(
+            'DELETE',
+            'cyber_characters',
+            array( 'id' => 'eq.' . $character_id ),
+            null,
+            false
+        );
+
+        if ( is_wp_error( $result ) ) {
+            error_log( 'NW: rollback delete of character ' . $character_id . ' failed — ' . $result->get_error_message() );
+        }
     }
 }
 
@@ -478,20 +533,12 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
             return;
         }
 
-        $avatar_upload_url = nw_handle_avatar_upload_strict();
-        if ( is_wp_error( $avatar_upload_url ) ) {
-            wp_send_json_error( array( 'message' => $avatar_upload_url->get_error_message() ), 400 );
-            return;
-        }
-
         $avatar_url_from_gallery = '';
         if ( isset( $_POST['avatarurlgallery'] ) ) {
             $avatar_url_from_gallery = nw_normalize_media_url( $_POST['avatarurlgallery'] );
         } elseif ( isset( $_POST['avatar_url'] ) ) {
             $avatar_url_from_gallery = nw_normalize_media_url( $_POST['avatar_url'] );
         }
-
-        $final_avatar_url = '' !== $avatar_upload_url ? $avatar_upload_url : $avatar_url_from_gallery;
 
         $stored_race_id = $race_validation['stored_race_id'];
 
@@ -506,11 +553,17 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
             'attr_reflex'  => $reflex,
             'attr_mind'    => $mind,
             'attr_spirit'  => $spirit,
-            'avatar_url'   => $final_avatar_url,
+            'avatar_url'   => $avatar_url_from_gallery,
             'package_id'   => $start_pack ?: null,
             'status'       => 'active',
         );
 
+        // BUG FIX (orphaned upload): avatar upload moved to AFTER the character row is
+        // successfully inserted. Previously, upload happened before the INSERT — if the
+        // INSERT failed the uploaded file was left on disk with no character pointing to it.
+        // Now: character row is created first; if that fails we return immediately with no
+        // file written. Upload happens next; if it fails we roll back the character row.
+        // Any subsequent failure (skills/tags) also cleans up the file via wp_delete_file().
         $result = nw_supabase_request( 'POST', 'cyber_characters', array(), $payload, true );
 
         if ( is_wp_error( $result ) ) {
@@ -527,9 +580,41 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
 
         $character_id = (string) $character['id'];
 
+        // Avatar upload — happens AFTER the character row exists so a failed upload
+        // can be recovered cleanly (roll back the row; no orphan file).
+        $avatar_upload_path = '';
+        $avatar_upload_url  = nw_handle_avatar_upload_strict( $avatar_upload_path );
+        if ( is_wp_error( $avatar_upload_url ) ) {
+            nw_delete_character_by_id( $character_id );
+            wp_send_json_error( array( 'message' => $avatar_upload_url->get_error_message() ), 400 );
+            return;
+        }
+
+        // If an upload succeeded, update the character row with the avatar URL.
+        if ( '' !== $avatar_upload_url ) {
+            $patch_result = tw_supabase_request(
+                'PATCH',
+                'cyber_characters',
+                array( 'id' => 'eq.' . $character_id ),
+                array( 'avatar_url' => $avatar_upload_url ),
+                false
+            );
+            if ( is_wp_error( $patch_result ) ) {
+                // Upload is already on disk but failed to link — delete the file and the character.
+                wp_delete_file( $avatar_upload_path );
+                nw_delete_character_by_id( $character_id );
+                wp_send_json_error( array( 'message' => 'Avatar could not be linked to the character.' ), 500 );
+                return;
+            }
+            $character['avatar_url'] = $avatar_upload_url;
+        }
+
         if ( ! empty( $skills ) ) {
             $skills_stored = nw_store_character_skills( $character_id, $skills );
             if ( is_wp_error( $skills_stored ) ) {
+                if ( '' !== $avatar_upload_path ) {
+                    wp_delete_file( $avatar_upload_path );
+                }
                 nw_delete_character_by_id( $character_id );
                 wp_send_json_error( array( 'message' => 'Skills could not be saved: ' . $skills_stored->get_error_message() ), 500 );
                 return;
@@ -539,6 +624,9 @@ if ( ! function_exists( 'nw_create_character_from_request' ) ) {
         if ( ! empty( $resolved_backstory_tag_ids ) ) {
             $tags_stored = nw_store_character_backstory_tags( $character_id, $resolved_backstory_tag_ids );
             if ( is_wp_error( $tags_stored ) ) {
+                if ( '' !== $avatar_upload_path ) {
+                    wp_delete_file( $avatar_upload_path );
+                }
                 nw_delete_character_by_id( $character_id );
                 wp_send_json_error( array( 'message' => 'Backstory tags could not be saved: ' . $tags_stored->get_error_message() ), 500 );
                 return;
