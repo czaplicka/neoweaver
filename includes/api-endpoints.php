@@ -243,13 +243,14 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
 	}
 
-	// Verify ownership before deleting.
-	// FIX: switched from nw_supabase_service_headers() to nw_supabase_headers() (anon key).
-	// Using the service key bypasses RLS entirely, leaving wp_user_id filter as the sole
-	// ownership guard — a bug in query construction (e.g. dropped eq. filter) would silently
-	// allow any world to be deleted. The anon key adds RLS as a second layer of defence,
-	// consistent with how neoweaver_list_worlds was fixed.
-	// The actual DELETE below still uses the service key (writes must bypass RLS).
+	// BUG 26 FIX (applied here): ownership check uses service key, not anon key.
+	// The anon-key ownership-check anti-pattern was identified and fixed in
+	// class-deployments-creator.php — this function had the same bug: when RLS
+	// blocks anon reads on cyber_worlds, the check returns empty and the endpoint
+	// returns 404 for legitimate owners (false negative), even though the DELETE
+	// itself would succeed. Service key bypasses RLS so the check is reliable.
+	// This is safe: the wp_user_id filter is the ownership guard; the service key
+	// only ensures the check is never silently blocked by RLS.
 	$check_url = add_query_arg( [
 		'id'         => 'eq.' . $world_id,
 		'wp_user_id' => 'eq.' . $user_id,
@@ -257,7 +258,7 @@ function neoweaver_delete_world( WP_REST_Request $request ) {
 		'limit'      => 1,
 	], $base . 'cyber_worlds' );
 
-	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_headers(), 'timeout' => 10 ] );
+	$check      = wp_remote_get( $check_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
 	$check_code = wp_remote_retrieve_response_code( $check );
 	// SEC FIX: verify HTTP status before trusting the response body.
 	// Previously a non-2xx response (e.g. 500) with empty body would pass the ownership check.
@@ -321,6 +322,37 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		return new WP_Error( 'missing_race_class', 'Race and class are required.', [ 'status' => 400 ] );
 	}
 
+	// FK EXISTENCE CHECK — race_id
+	// BUG FIX: previously race_id and class_id were passed straight to $creator->create()
+	// without verifying the UUIDs exist in cyber_races / cyber_classes. A nonexistent UUID
+	// triggers a Postgres FK violation that surfaces as an opaque 500. We now validate both
+	// upfront and return a clear 400 so the client can surface a meaningful error.
+	// Service key is used so RLS never blocks this server-side lookup.
+	$safe_race_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', $race_id );
+	$race_check   = wp_remote_get(
+		add_query_arg( [ 'id' => 'eq.' . $safe_race_id, 'select' => 'id', 'limit' => 1 ], $base . 'cyber_races' ),
+		[ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ]
+	);
+	if ( is_wp_error( $race_check )
+		|| wp_remote_retrieve_response_code( $race_check ) < 200
+		|| wp_remote_retrieve_response_code( $race_check ) >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $race_check ), true ) ) ) {
+		return new WP_Error( 'invalid_race', 'Race not found.', [ 'status' => 400 ] );
+	}
+
+	// FK EXISTENCE CHECK — class_id
+	$safe_class_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', $class_id );
+	$class_check   = wp_remote_get(
+		add_query_arg( [ 'id' => 'eq.' . $safe_class_id, 'select' => 'id', 'limit' => 1 ], $base . 'cyber_classes' ),
+		[ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ]
+	);
+	if ( is_wp_error( $class_check )
+		|| wp_remote_retrieve_response_code( $class_check ) < 200
+		|| wp_remote_retrieve_response_code( $class_check ) >= 300
+		|| empty( json_decode( wp_remote_retrieve_body( $class_check ), true ) ) ) {
+		return new WP_Error( 'invalid_class', 'Class not found.', [ 'status' => 400 ] );
+	}
+
 	$attr_keys = [ 'attr_body', 'attr_reflex', 'attr_mind', 'attr_spirit' ];
 
 	foreach ( $attr_keys as $key ) {
@@ -380,8 +412,8 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 	$data    = [
 		'character_name' => $character_name,
 		'pronouns'       => sanitize_text_field( $request->get_param( 'pronouns' )  ?? '' ),
-		'race'           => $race_id,
-		'class'          => $class_id,
+		'race'           => $safe_race_id,
+		'class'          => $safe_class_id,
 		'node_id'        => $node_id,
 		'backstory'      => sanitize_textarea_field( $request->get_param( 'backstory' ) ?? '' ),
 		'attr_body'      => $attr_body,
@@ -430,136 +462,7 @@ function neoweaver_create_character( WP_REST_Request $request ) {
 		'success' => true,
 		'data'    => [
 			'agent_id' => $agent_id,
-			'message'  => 'Agent created successfully.',
-		],
-	] );
-}
-
-// ===========================================================================
-// CHARACTER CHANGE ENDPOINT
-// ===========================================================================
-
-/**
- * POST /wp-json/neoweaver/v1/character/change
- * Swap the active character on a campaign (replaces cyber_campaign_characters row).
- * Uses PostgREST upsert (Prefer: resolution=merge-duplicates) to avoid the
- * partial-failure state that would result from a DELETE+INSERT sequence.
- * Fires tw_character_changed after a successful swap.
- *
- * @return WP_REST_Response|WP_Error
- */
-function neoweaver_change_character( WP_REST_Request $request ) {
-	$user_id = get_current_user_id();
-	if ( ! $user_id ) {
-		return new WP_Error( 'unauthorized', 'Unauthorized.', [ 'status' => 401 ] );
-	}
-
-	$campaign_id      = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'campaign_id' )      ?? '' ) );
-	$new_character_id = preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) ( $request->get_param( 'character_id' )     ?? '' ) );
-
-	if ( ! $campaign_id || ! $new_character_id ) {
-		return new WP_Error( 'missing_params', 'campaign_id and character_id are required.', [ 'status' => 400 ] );
-	}
-
-	$base = nw_supabase_base();
-	if ( ! $base ) {
-		return new WP_Error( 'config_missing', 'Supabase config missing.', [ 'status' => 500 ] );
-	}
-
-	// Verify campaign belongs to this user
-	$camp_url    = add_query_arg( [
-		'id'         => 'eq.' . $campaign_id,
-		'wp_user_id' => 'eq.' . $user_id,
-		'select'     => 'id',
-		'limit'      => 1,
-	], $base . 'cyber_campaign' );
-	$camp_check  = wp_remote_get( $camp_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	$camp_code   = wp_remote_retrieve_response_code( $camp_check );
-	// SEC FIX: verify HTTP status before trusting the response body (same as neoweaver_delete_world).
-	if ( is_wp_error( $camp_check ) || $camp_code < 200 || $camp_code >= 300
-		|| empty( json_decode( wp_remote_retrieve_body( $camp_check ), true ) ) ) {
-		return new WP_Error( 'not_found', 'Campaign not found or access denied.', [ 'status' => 404 ] );
-	}
-
-	// Verify character belongs to this user
-	$char_url    = add_query_arg( [
-		'id'         => 'eq.' . $new_character_id,
-		'wp_user_id' => 'eq.' . $user_id,
-		'select'     => 'id',
-		'limit'      => 1,
-	], $base . 'cyber_characters' );
-	$char_check  = wp_remote_get( $char_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	$char_code   = wp_remote_retrieve_response_code( $char_check );
-	// SEC FIX: verify HTTP status before trusting the response body.
-	if ( is_wp_error( $char_check ) || $char_code < 200 || $char_code >= 300
-		|| empty( json_decode( wp_remote_retrieve_body( $char_check ), true ) ) ) {
-		return new WP_Error( 'not_found', 'Character not found or access denied.', [ 'status' => 404 ] );
-	}
-
-	// Read old character_id before the swap (for the hook payload)
-	$old_char_id = null;
-	$old_url     = add_query_arg( [
-		'campaign_id' => 'eq.' . $campaign_id,
-		'select'      => 'character_id',
-		'limit'       => 1,
-	], $base . 'cyber_campaign_characters' );
-	$old_resp    = wp_remote_get( $old_url, [ 'headers' => nw_supabase_service_headers(), 'timeout' => 10 ] );
-	if ( ! is_wp_error( $old_resp ) ) {
-		$old_rows    = json_decode( wp_remote_retrieve_body( $old_resp ), true ) ?: [];
-		$old_char_id = ! empty( $old_rows[0]['character_id'] )
-			? preg_replace( '/[^a-zA-Z0-9\\-]/', '', (string) $old_rows[0]['character_id'] )
-			: null;
-	}
-
-	// Upsert via PostgREST merge-duplicates — atomic, no partial-failure risk.
-	// Requires a UNIQUE constraint on campaign_id in cyber_campaign_characters.
-	$upsert_resp = wp_remote_post( $base . 'cyber_campaign_characters', [
-		'headers' => nw_supabase_service_headers(
-			false,
-			'resolution=merge-duplicates,return=representation'
-		),
-		'body'    => wp_json_encode( [
-			'campaign_id'  => $campaign_id,
-			'character_id' => $new_character_id,
-			'wp_user_id'   => $user_id,
-		] ),
-		'timeout' => 15,
-	] );
-
-	if ( is_wp_error( $upsert_resp ) ) {
-		return new WP_Error( 'supabase_error', 'Database error.', [ 'status' => 500 ] );
-	}
-
-	$code = wp_remote_retrieve_response_code( $upsert_resp );
-	if ( $code < 200 || $code >= 300 ) {
-		error_log( 'TW_CHARACTER_CHANGE: HTTP ' . $code . ' — ' . wp_remote_retrieve_body( $upsert_resp ) );
-		return new WP_Error( 'change_failed', 'Character change failed. HTTP ' . $code, [ 'status' => $code ] );
-	}
-
-	if ( function_exists( 'tw_invalidate_game_data_cache' ) ) {
-		tw_invalidate_game_data_cache( $user_id );
-	}
-
-	/**
-	 * Fires after the active character on a campaign is successfully changed.
-	 *
-	 * @param int    $user_id  WP user ID.
-	 * @param array  $context {
-	 *   @type string      $campaign_id       Campaign UUID.
-	 *   @type string      $new_character_id  New character
-	 */
-	do_action( 'tw_character_changed', $user_id, [
-		'campaign_id'      => $campaign_id,
-		'new_character_id' => $new_character_id,
-		'old_character_id' => $old_char_id,
-	] );
-
-	return rest_ensure_response( [
-		'success' => true,
-		'data'    => [
-			'campaign_id'      => $campaign_id,
-			'new_character_id' => $new_character_id,
-			'old_character_id' => $old_char_id,
+			'message'  => 'Character created successfully.',
 		],
 	] );
 }
