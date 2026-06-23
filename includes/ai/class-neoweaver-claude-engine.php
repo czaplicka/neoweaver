@@ -56,11 +56,15 @@ PROMPT;
      * Whitelist of known system tag names (without the #NW_ prefix).
      * Only these tags will be stripped from narrative text and returned as parsed tags.
      * Any other #NW_WORD pattern is left untouched in the text.
+     *
+     * SYNC NOTE: this list must match the switch() cases in tw_rest_ai_apply_tags()
+     * in rest-ai-chat.php. If you add a tag here, add a handler there too.
      */
     private const KNOWN_TAGS = [
         'ENTROPY_UP', 'ENTROPY_DOWN',
         'LOC',
         'STATUS_POISONED', 'STATUS_STUNNED', 'STATUS_BLESSED', 'STATUS_CURSED',
+        'STATUS_BURNING', 'STATUS_BLEEDING',
         'STATUS_CLEAR',
         'HP_CHANGE',
         'MP_CHANGE',
@@ -195,12 +199,16 @@ PROMPT;
 
     // ============================================================
     // Buduje blok kontekstu gry z tablic danych (dla process_with_context)
+    //
+    // FIX: Supabase zwraca kolumny jako current_hp / max_hp (z podkreśleniem).
+    // Poprzedni kod czytał $char['currenthp'] / $char['maxhp'] — złe klucze,
+    // HP było cicho pomijane w kontekście wysyłanym do Claude.
     // ============================================================
     private function build_context_block( array $char, array $location, array $world, string $extra ): string {
         $lines = [];
 
         if ( ! empty( $char['name'] ) )             { $lines[] = 'CHAR: '       . $char['name']; }
-        if ( isset( $char['currenthp'] ) )          { $lines[] = 'HP: '         . $char['currenthp'] . '/' . ( $char['maxhp'] ?? '?' ); }
+        if ( isset( $char['current_hp'] ) )         { $lines[] = 'HP: '         . $char['current_hp'] . '/' . ( $char['max_hp'] ?? '?' ); }
         if ( isset( $char['gold'] ) )               { $lines[] = 'GOLD: '       . $char['gold']; }
         if ( isset( $char['satiety'] ) )            { $lines[] = 'SATIETY: '    . $char['satiety']; }
         if ( isset( $char['mp'] ) )                 { $lines[] = 'MP: '         . $char['mp']; }
@@ -304,32 +312,6 @@ PROMPT;
             array_shift( $history );
         }
         return array_values( $history );
-    }
-
-    private function save_to_history( string $char_id, string $user_message, string $gm_message ): void {
-        $this->supabase_request(
-            'POST',
-            '/rest/v1/cyber_chat_messages',
-            [
-                'char_id'      => $char_id,
-                'message_type' => 'player',
-                'content'      => $user_message,
-                'created_at'   => gmdate( 'c' ),
-            ],
-            [ 'Prefer' => 'return=minimal' ]
-        );
-
-        $this->supabase_request(
-            'POST',
-            '/rest/v1/cyber_chat_messages',
-            [
-                'char_id'      => $char_id,
-                'message_type' => 'gm',
-                'content'      => $gm_message,
-                'created_at'   => gmdate( 'c' ),
-            ],
-            [ 'Prefer' => 'return=minimal' ]
-        );
     }
 
     /**

@@ -283,6 +283,11 @@ if ( ! function_exists( 'tw_rest_ai_protocol_extra' ) ) {
 
 // ============================================================
 // HELPER: Aplikuj tagi
+//
+// SYNC NOTE: lista case'ów musi być zsynchronizowana z KNOWN_TAGS
+// w class-neoweaver-claude-engine.php. Jeśli dodasz tag tu, dodaj go
+// też do KNOWN_TAGS — inaczej parser silnika go nie wytnie z tekstu
+// i tag wycieknie do narracji widocznej dla gracza.
 // ============================================================
 
 if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
@@ -335,7 +340,6 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					break;
 
 				case 'ENTROPY_UP':
-					// BUG 7 FIX — ENTROPY_UP zapisuje zmianę do Supabase przez RPC.
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
 					if ( $delta !== 0 && $world_id ) {
@@ -348,34 +352,38 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 					break;
 
 				case 'ENTROPY_DOWN':
-					// FIX — ENTROPY_DOWN był w KNOWN_TAGS silnika, ale nie miał handlera.
-					// Efekt: GM emitował tag obniżający entropię, który był cicho gubiony
-					// w default: — entropia świata nie mogła nigdy spaść przez czat.
 					$delta    = (int) $val;
 					$world_id = $context['world']['id'] ?? null;
 					if ( $delta !== 0 && $world_id ) {
 						tw_rest_ai_supa_rpc( 'fn_apply_entropy_change', [
 							'p_world_id' => $world_id,
-							'p_delta'    => -abs( $delta ), // zawsze ujemna delta (obniżenie)
+							'p_delta'    => -abs( $delta ),
 						] );
 						do_action( 'tw_entropy_change', $world_id, -abs( $delta ), $context );
 					}
 					break;
 
+				// STATUS — named tags (muszą być w KNOWN_TAGS silnika).
+				// fn_add_status otrzymuje pełną nazwę tagu, np. "STATUS_POISONED".
+				// Jeśli Twoja funkcja SQL oczekuje krótkiej formy ("POISONED"),
+				// zmień na: str_replace( 'STATUS_', '', $tag )
 				case 'STATUS_POISONED':
 				case 'STATUS_STUNNED':
-				case 'STATUS_BURNING':
-				case 'STATUS_FROZEN':
-				case 'STATUS_BLEEDING':
+				case 'STATUS_BLESSED':
 				case 'STATUS_CURSED':
-					// FIX — silnik emituje konkretne named status tagi, nie generyczny STATUS_ADD.
-					// Używamy nazwy tagu jako wartości statusu (np. "STATUS_POISONED").
-					// Jeśli fn_add_status oczekuje krótkiej formy, zmień na: str_replace('STATUS_', '', $tag)
+				case 'STATUS_BURNING':
+				case 'STATUS_BLEEDING':
 					tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $tag ] );
 					break;
 
+				case 'STATUS_CLEAR':
+					tw_rest_ai_supa_rpc( 'fn_clear_status', [ 'p_char_id' => $char_id ] );
+					break;
+
 				case 'STATUS_ADD':
-					// Fallback: generyczny tag ze starszych buildów silnika
+					// Fallback: generyczny tag ze starszych buildów silnika.
+					// Nie ma go w KNOWN_TAGS — parser silnika go nie wyetnie,
+					// ale jeśli jakiś zewnętrzny wywołujący go wyśle, obsłuż.
 					if ( $val ) {
 						tw_rest_ai_supa_rpc( 'fn_add_status', [ 'p_char_id' => $char_id, 'p_status' => $val ] );
 					}
@@ -408,6 +416,10 @@ if ( ! function_exists( 'tw_rest_ai_apply_tags' ) ) {
 				case 'CARD_DRAW':
 					$count = max( 1, (int) $val );
 					tw_rest_ai_supa_rpc( 'fn_draw_cards', [ 'p_char_id' => $char_id, 'p_count' => $count ] );
+					break;
+
+				case 'HUD_REFRESH':
+					// Obsługiwane po stronie frontendu przez realtime push — brak akcji serwera.
 					break;
 
 				default:
@@ -581,7 +593,7 @@ function tw_rest_ai_supa_rpc( string $fn, array $params ) {
 			$http_code,
 			wp_remote_retrieve_body( $response )
 		) );
-		return new WP_Error( 'tw_rpc_error', 'RPC ' . $fn . ' failed with HTTP ' . $http_code );
+		return new WP_Error( 'tw_rpc_error', 'RPC ' . $fn . ' failed with HTTP ' . $http_status );
 	}
 	return json_decode( wp_remote_retrieve_body( $response ), true ) ?? [];
 }
