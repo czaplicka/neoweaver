@@ -36,13 +36,6 @@ class Neoweaver_Agents_List {
 
 		$default_avatar = trailingslashit( NEOWEAVER_PLUGIN_URL ) . 'assets/images/Avatar.svg';
 
-		// BUG 19 FIX: build a JS registry of character objects keyed by UUID.
-		// Embedding wp_json_encode() output directly in an HTML attribute is unsafe:
-		// JSON can contain `"`, `</script>`, and other sequences that break the
-		// attribute context even after esc_attr(). The safe pattern is a
-		// <script> block with JSON.parse() on a server-controlled string.
-		// twOpenModal() reads from window.nwCharRegistry[id] instead of
-		// reading a data- attribute.
 		$registry_entries = [];
 		foreach ( $characters as $char ) {
 			$cid = (string) ( $char['id'] ?? '' );
@@ -135,11 +128,6 @@ class Neoweaver_Agents_List {
 					</div>
 
 					<div class="tw-card-actions">
-						<?php
-						// BUG 19 FIX: removed data-char="<?= esc_attr($char_json) ?>".
-						// twOpenModal() now reads from window.nwCharRegistry[data-char-id]
-						// via the <script> registry block emitted above the grid.
-						?>
 						<button
 							class="tw-btn"
 							data-char-id="<?php echo $char_id_attr; ?>"
@@ -147,14 +135,6 @@ class Neoweaver_Agents_List {
 						>
 							Agent Dossier
 						</button>
-
-						<?php
-						// BUG 20 FIX: removed onclick='twConfirmDeleteCharacter(<?= wp_json_encode($char_id) ?>, this)'.
-						// Inlining wp_json_encode() inside an onclick attribute is unsafe:
-						// a single-quote in the value breaks out of the attribute context.
-						// The handler is now attached via JS event delegation (see below);
-						// $char_id is passed only as a data-char-id attribute, safely escaped.
-						?>
 						<button
 							class="tw-btn tw-btn-danger tw-btn-delete-agent"
 							data-char-id="<?php echo $char_id_attr; ?>"
@@ -174,8 +154,6 @@ class Neoweaver_Agents_List {
 		</div>
 
 		<script>
-		// BUG 20 FIX: event delegation for delete buttons.
-		// Reads char_id safely from data-char-id; no inline JS interpolation.
 		(function () {
 			document.addEventListener('click', function (e) {
 				var btn = e.target.closest('.tw-btn-delete-agent');
