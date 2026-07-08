@@ -120,7 +120,7 @@ if ( ! function_exists( 'tw_enqueue_global_game_data' ) ) {
 			 * Anon key jest publiczny z założenia, ale nie ma powodu
 			 * wstawiać go w HTML na stronach gdzie nie jest potrzebny.
 			 */
-			'supabase_anon_key'   => tw_is_adventure_template() ? tw_supabase_anon_key() : null,
+			'supabase_anon_key'   => tw_supabase_anon_key(),
 			// supabaseToken: używaj tego w nowym JS do uwierzytelnionych requestów.
 			'supabaseToken'       => $supabase_token,
 			'active_session_id'   => $game_data['active_session_id']   ?? null,
