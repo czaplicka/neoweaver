@@ -7,6 +7,8 @@ jQuery(document).ready(function($) {
     const TERMINAL_URL      = window.twCampaignData?.terminalUrl || '/terminal/';
     const AGENTS_URL        = window.twCampaignData?.agentsUrl || '/agents/?campaign_id=';
     const LOBBY_URL         = window.twCampaignData?.lobbyUrl || '/lobby/?campaign_id=';
+    const AJAX_URL          = window.twCampaignData?.ajaxUrl || '';
+    const JOIN_NONCE        = window.twCampaignData?.joinNonce || '';
 
     function resetBtn(btn, label) {
         btn.prop('disabled', false).text(label).css('opacity', '1');
@@ -22,7 +24,6 @@ jQuery(document).ready(function($) {
         });
     }
 
-    /* DELETE CAMPAIGN */
     $('.tw-delete-campaign-btn').on('click', async function(e) {
         e.preventDefault();
 
@@ -81,14 +82,14 @@ jQuery(document).ready(function($) {
         }
     });
 
-    /* ENTER MATRIX */
-    $('.enter-matrix').on('click', function(e) {
+    $('.enter-matrix').on('click', async function(e) {
         e.preventDefault();
 
-        const btn         = $(this);
-        const campId      = btn.data('id');
-        const characterId = btn.data('character') || null;
-        const mode        = String(btn.data('mode') || 'SOLO').toUpperCase();
+        const btn          = $(this);
+        const campId       = String(btn.data('id') || '').trim();
+        const characterId  = String(btn.data('character') || '').trim();
+        const joinCode     = String(btn.data('code') || '').trim().toUpperCase();
+        const mode         = String(btn.data('mode') || 'SOLO').toUpperCase();
         const defaultLabel = btn.data('label') || 'ENTER MATRIX';
 
         if (!campId) {
@@ -146,7 +147,6 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        /* MULTIPLAYER */
         btn.prop('disabled', true).text('LINKING...').css('opacity', '0.7');
 
         if (!characterId) {
@@ -154,16 +154,46 @@ jQuery(document).ready(function($) {
             return;
         }
 
-        /* 
-         * FIX:
-         * Nie wołamy REST_URL + 'campaigns/signup',
-         * bo ten endpoint nie istnieje w repo.
-         * Multiplayer flow idzie do lobby.
-         */
-        window.location.href = LOBBY_URL + encodeURIComponent(campId);
+        if (!AJAX_URL || !JOIN_NONCE) {
+            alert('SIGNUP FAILED: Missing AJAX config');
+            resetBtn(btn, defaultLabel);
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('action', 'tw_join_campaign');
+        fd.append('nonce', JOIN_NONCE);
+        fd.append('character_id', characterId);
+        fd.append('campaign_id', campId);
+
+        if (joinCode) {
+            fd.append('join_code', joinCode);
+        }
+
+        try {
+            const res  = await fetch(AJAX_URL, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const json = await safeJson(res);
+
+            if (!res.ok || !json.success) {
+                const msg = (json.data && json.data.message) || json.message || ('HTTP ' + res.status);
+                alert('SIGNUP FAILED: ' + msg);
+                resetBtn(btn, defaultLabel);
+                return;
+            }
+
+            const targetCampaignId = json.data?.campaign_id || campId;
+            window.location.href = LOBBY_URL + encodeURIComponent(targetCampaignId);
+
+        } catch (err) {
+            alert('SIGNUP FAILED: EXCEPTION');
+            resetBtn(btn, defaultLabel);
+        }
     });
 
-    /* COPY JOIN HASH */
     $('.tw-copy-join-btn').on('click', async function(e) {
         e.preventDefault();
 
