@@ -1,124 +1,199 @@
 jQuery(document).ready(function($) {
 
-    const GLOBAL_NONCE      = twCampaignData.nonce;
-    const REST_NONCE        = twCampaignData.restNonce;
-    const REST_URL          = twCampaignData.restUrl;
-    const SESSION_START_URL = twCampaignData.sessionUrl;
+    const GLOBAL_NONCE      = window.twCampaignData?.nonce || '';
+    const REST_NONCE        = window.twCampaignData?.restNonce || '';
+    const REST_URL          = window.twCampaignData?.restUrl || '';
+    const SESSION_START_URL = window.twCampaignData?.sessionUrl || '';
+    const TERMINAL_URL      = window.twCampaignData?.terminalUrl || '/terminal/';
+    const AGENTS_URL        = window.twCampaignData?.agentsUrl || '/agents/?campaign_id=';
+    const LOBBY_URL         = window.twCampaignData?.lobbyUrl || '/lobby/?campaign_id=';
 
     function resetBtn(btn, label) {
         btn.prop('disabled', false).text(label).css('opacity', '1');
     }
 
-    /* ── Delete campaign via WP REST (nie Supabase bezpośrednio) ── */
+    function safeJson(response) {
+        return response.text().then(function(text) {
+            try {
+                return text ? JSON.parse(text) : {};
+            } catch (e) {
+                return {};
+            }
+        });
+    }
+
+    /* DELETE CAMPAIGN */
     $('.tw-delete-campaign-btn').on('click', async function(e) {
         e.preventDefault();
+
         const btn      = $(this);
         const campId   = btn.data('id');
         const campName = btn.data('name');
-        if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) return;
-        btn.prop('disabled', true).text('TERMINATING...');
+
+        if (!campId) {
+            alert('TERMINATION FAILED: Missing campaign ID');
+            return;
+        }
+
+        if (!REST_URL) {
+            alert('TERMINATION FAILED: Missing REST URL');
+            return;
+        }
+
+        if (!confirm('CONFIRM TERMINATION OF DEPLOYMENT: ' + campName + ' ?')) {
+            return;
+        }
+
+        btn.prop('disabled', true).text('TERMINATING...').css('opacity', '0.7');
 
         try {
             const res = await fetch(REST_URL + 'campaigns/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-WP-Nonce':   REST_NONCE
+                    'X-WP-Nonce': REST_NONCE
                 },
                 body: JSON.stringify({ campaign_id: campId }),
                 credentials: 'same-origin'
             });
-            const json = await res.json();
+
+            const json = await safeJson(res);
+
             if (!res.ok || !json.success) {
-                const msg = (json.data && json.data.message) || json.message || 'Grid Denied.';
+                const msg = (json.data && json.data.message) || json.message || ('HTTP ' + res.status);
                 alert('TERMINATION FAILED: ' + msg);
                 resetBtn(btn, 'TERMINATE');
                 return;
             }
-            $('#campaign-card-' + campId).css({ opacity: '0', 'pointer-events': 'none' });
-            setTimeout(() => window.location.reload(), 1200);
+
+            $('#campaign-card-' + campId).css({
+                opacity: '0',
+                pointerEvents: 'none'
+            });
+
+            setTimeout(function() {
+                window.location.reload();
+            }, 1200);
+
         } catch (err) {
             alert('TERMINATION FAILED: CLIENT EXCEPTION');
             resetBtn(btn, 'TERMINATE');
         }
     });
 
-    /* ── Enter Matrix ── */
+    /* ENTER MATRIX */
     $('.enter-matrix').on('click', function(e) {
         e.preventDefault();
+
         const btn         = $(this);
         const campId      = btn.data('id');
         const characterId = btn.data('character') || null;
         const mode        = String(btn.data('mode') || 'SOLO').toUpperCase();
-        if (!campId) { alert('DEPLOYMENT ERROR: Missing campaign ID.'); return; }
+        const defaultLabel = btn.data('label') || 'ENTER MATRIX';
+
+        if (!campId) {
+            alert('DEPLOYMENT ERROR: Missing campaign ID.');
+            return;
+        }
 
         if (mode === 'SOLO') {
-            btn.text('INITIALIZING...').css('opacity', '0.7');
+            if (!SESSION_START_URL) {
+                alert('SESSION INIT FAILED: Missing session endpoint');
+                return;
+            }
+
+            btn.prop('disabled', true).text('INITIALIZING...').css('opacity', '0.7');
+
             const fd = new FormData();
-            fd.append('campaign_id',  campId);
+            fd.append('campaign_id', campId);
             fd.append('character_id', characterId || '');
-            fd.append('security',     GLOBAL_NONCE);
+            fd.append('security', GLOBAL_NONCE);
+
             fetch(SESSION_START_URL, {
-                method: 'POST', headers: { 'X-WP-Nonce': REST_NONCE }, body: fd, credentials: 'same-origin',
-            })
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-            .then(response => {
-                if (response.success) {
-                    window.location.href = twCampaignData.terminalUrl;
-                } else {
-                    const data = response.data || {};
-                    if (data.message === 'no_character') {
-                        window.location.href = twCampaignData.agentsUrl + campId;
-                    } else {
-                        alert('SESSION INIT FAILED: ' + (data.message || 'Unknown interference'));
-                        resetBtn(btn, 'ENTER MATRIX');
-                    }
-                }
-            })
-            .catch(err => { alert('SESSION INIT FAILED: network error'); resetBtn(btn, 'ENTER MATRIX'); });
-
-        } else {
-            /* MULTIPLAYER: signup przez WP REST, nie bezpośrednio Supabase */
-            btn.text('LINKING...').css('opacity', '0.7');
-            if (!characterId) { window.location.href = twCampaignData.agentsUrl + campId; return; }
-
-            fetch(REST_URL + 'campaigns/signup', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce':   REST_NONCE
+                    'X-WP-Nonce': REST_NONCE
                 },
-                body: JSON.stringify({ campaign_id: campId, character_id: characterId }),
+                body: fd,
                 credentials: 'same-origin'
             })
-            .then(r => r.json())
-            .then(json => {
-                if (json.success) {
-                    window.location.href = twCampaignData.lobbyUrl + campId;
-                } else {
-                    const msg = (json.data && json.data.message) || json.message || 'Unknown';
-                    alert('SIGNUP FAILED: ' + msg);
-                    resetBtn(btn, 'ENTER MATRIX');
+            .then(function(r) {
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
                 }
+                return r.json();
             })
-            .catch(err => { alert('SIGNUP FAILED: EXCEPTION'); resetBtn(btn, 'ENTER MATRIX'); });
+            .then(function(response) {
+                if (response.success) {
+                    window.location.href = TERMINAL_URL;
+                    return;
+                }
+
+                const data = response.data || {};
+                if (data.message === 'no_character') {
+                    window.location.href = AGENTS_URL + encodeURIComponent(campId);
+                    return;
+                }
+
+                alert('SESSION INIT FAILED: ' + (data.message || 'Unknown interference'));
+                resetBtn(btn, defaultLabel);
+            })
+            .catch(function() {
+                alert('SESSION INIT FAILED: network error');
+                resetBtn(btn, defaultLabel);
+            });
+
+            return;
         }
+
+        /* MULTIPLAYER */
+        btn.prop('disabled', true).text('LINKING...').css('opacity', '0.7');
+
+        if (!characterId) {
+            window.location.href = AGENTS_URL + encodeURIComponent(campId);
+            return;
+        }
+
+        /* 
+         * FIX:
+         * Nie wołamy REST_URL + 'campaigns/signup',
+         * bo ten endpoint nie istnieje w repo.
+         * Multiplayer flow idzie do lobby.
+         */
+        window.location.href = LOBBY_URL + encodeURIComponent(campId);
     });
 
-    /* ── Copy join hash ── */
+    /* COPY JOIN HASH */
     $('.tw-copy-join-btn').on('click', async function(e) {
         e.preventDefault();
+
         const btn  = $(this);
         const code = btn.data('code');
-        if (!code) { alert('NO HASH DETECTED.'); return; }
+
+        if (!code) {
+            alert('NO HASH DETECTED.');
+            return;
+        }
+
         try {
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(code);
             } else {
-                const temp = $('<input>'); $('body').append(temp); temp.val(code).select(); document.execCommand('copy'); temp.remove();
+                const temp = $('<input>');
+                $('body').append(temp);
+                temp.val(code).select();
+                document.execCommand('copy');
+                temp.remove();
             }
+
             btn.text('HASH COPIED');
-            setTimeout(() => btn.text('COPY HASH'), 2000);
-        } catch (err) { alert('COPY FAILED.'); }
+
+            setTimeout(function() {
+                btn.text('COPY HASH');
+            }, 2000);
+
+        } catch (err) {
+            alert('COPY FAILED.');
+        }
     });
 });
