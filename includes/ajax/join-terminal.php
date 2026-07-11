@@ -21,17 +21,21 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			? strtoupper( sanitize_text_field( wp_unslash( $_POST['join_code'] ) ) )
 			: '';
 
+		$campaign_id = isset( $_POST['campaign_id'] )
+			? nw_sanitize_uuid( sanitize_text_field( wp_unslash( $_POST['campaign_id'] ) ) )
+			: '';
+
 		$character_id = isset( $_POST['character_id'] )
 			? nw_sanitize_uuid( sanitize_text_field( wp_unslash( $_POST['character_id'] ) ) )
 			: '';
 
-		if ( '' === $join_code ) {
-			wp_send_json_error( array( 'message' => 'missing_join_code' ) );
+		if ( '' === $character_id ) {
+			wp_send_json_error( array( 'message' => 'missing_character_id' ) );
 			return;
 		}
 
-		if ( '' === $character_id ) {
-			wp_send_json_error( array( 'message' => 'missing_character_id' ) );
+		if ( '' === $join_code && '' === $campaign_id ) {
+			wp_send_json_error( array( 'message' => 'missing_join_reference' ) );
 			return;
 		}
 
@@ -73,20 +77,7 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 			$base . 'cyber_characters'
 		);
 
-		$camp_url = add_query_arg(
-			array(
-				'join_code' => 'eq.' . $join_code,
-				'select'    => 'id,world_id',
-				'limit'     => 1,
-			),
-			$base . 'cyber_campaign'
-		);
-
 		$char_resp = wp_remote_get( $char_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
-		$camp_resp = wp_remote_get( $camp_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
-
-		// FIX: use 2xx range check instead of strict === 200.
-		// PostgREST can return 206 Partial Content or other 2xx codes on valid reads.
 		$char_code = (int) wp_remote_retrieve_response_code( $char_resp );
 		if ( is_wp_error( $char_resp ) || $char_code < 200 || $char_code >= 300 ) {
 			wp_send_json_error( array( 'message' => 'character_lookup_failed' ) );
@@ -94,7 +85,6 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		}
 
 		$char_rows = json_decode( wp_remote_retrieve_body( $char_resp ), true );
-
 		if ( empty( $char_rows[0] ) ) {
 			wp_send_json_error( array( 'message' => 'character_not_owned_or_dead' ) );
 			return;
@@ -102,6 +92,27 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 
 		$char_world_id = nw_sanitize_uuid( (string) ( $char_rows[0]['world_id'] ?? '' ) );
 
+		if ( '' !== $join_code ) {
+			$camp_url = add_query_arg(
+				array(
+					'join_code' => 'eq.' . $join_code,
+					'select'    => 'id,world_id',
+					'limit'     => 1,
+				),
+				$base . 'cyber_campaign'
+			);
+		} else {
+			$camp_url = add_query_arg(
+				array(
+					'id'     => 'eq.' . $campaign_id,
+					'select' => 'id,world_id',
+					'limit'  => 1,
+				),
+				$base . 'cyber_campaign'
+			);
+		}
+
+		$camp_resp = wp_remote_get( $camp_url, array( 'headers' => $read_headers, 'timeout' => 10 ) );
 		$camp_code = (int) wp_remote_retrieve_response_code( $camp_resp );
 		if ( is_wp_error( $camp_resp ) || $camp_code < 200 || $camp_code >= 300 ) {
 			wp_send_json_error( array( 'message' => 'campaign_lookup_failed' ) );
@@ -109,9 +120,8 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		}
 
 		$camp_rows = json_decode( wp_remote_retrieve_body( $camp_resp ), true );
-
 		if ( empty( $camp_rows[0]['id'] ) ) {
-			wp_send_json_error( array( 'message' => 'no_campaign_for_code' ) );
+			wp_send_json_error( array( 'message' => '' !== $join_code ? 'no_campaign_for_code' : 'campaign_not_found' ) );
 			return;
 		}
 
@@ -176,7 +186,6 @@ if ( ! function_exists( 'tw_ajax_join_campaign' ) ) {
 		}
 
 		$insert_code = (int) wp_remote_retrieve_response_code( $insert_resp );
-
 		if ( $insert_code < 200 || $insert_code >= 300 ) {
 			wp_send_json_error(
 				array(
