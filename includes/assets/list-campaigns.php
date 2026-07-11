@@ -40,11 +40,11 @@ if ( ! function_exists( 'tw_enqueue_list_campaigns_assets' ) ) {
 
 		$data = array_merge(
 			array(
-'nonce'       => wp_create_nonce( 'tw_game_nonce' ),
+'nonce'       => wp_create_nonce( 'tw__nonce' ),
 'restNonce'   => wp_create_nonce( 'wp_rest' ),
 'restUrl'     => get_rest_url( null, 'neoweaver/v1/' ),
 'sessionUrl'  => get_rest_url( null, 'neoweaver/v1/session/start' ),
-'terminalUrl' => home_url( '/game/' ),
+'terminalUrl' => home_url( '/terminal/' ),
 'agentsUrl'   => home_url( '/agents/?campaign_id=' ),
 'lobbyUrl'    => home_url( '/lobby/?campaign_id=' ),
 			),
